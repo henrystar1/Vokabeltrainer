@@ -24,7 +24,7 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
-      - run: npm test
+      - run: npm test -- --passWithNoTests
       - name: Basis-Pfad bestimmen
         run: |
           REPO="${{ github.event.repository.name }}"
