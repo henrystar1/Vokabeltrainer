@@ -4,9 +4,10 @@ export const MIN_QUESTIONS = 1
 export const MAX_QUESTIONS = 200
 
 export function activeDirections(s: Pick<UserSettings, 'direction_to_foreign' | 'direction_to_german'>): Direction[] {
+  // Fremdsprache → Deutsch steht immer zuerst.
   const d: Direction[] = []
-  if (s.direction_to_foreign) d.push('forward')
   if (s.direction_to_german) d.push('backward')
+  if (s.direction_to_foreign) d.push('forward')
   return d.length > 0 ? d : ['forward']
 }
 

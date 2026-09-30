@@ -47,6 +47,7 @@ export default function Test() {
   const [correct, setCorrect] = useState(0)
 
   const directions = useMemo(() => activeDirections(settings), [settings])
+  const language = books.data?.find((b) => b.id === bookId)?.language ?? settings.learn_language
   const session = useRef(new LearningSession(directions))
   const levels = useRef<Record<string, number>>({})
   const startedAt = useRef(new Date())
@@ -126,6 +127,7 @@ export default function Test() {
         questions={questions}
         caseSensitive={settings.case_sensitive}
         showFeedback={false}
+        accents={language === 'fr'}
         title="Test"
         onAnswer={onAnswer}
         onFinish={() => void finish()}
@@ -193,7 +195,7 @@ export default function Test() {
             </div>
             <p className="text-sm text-slate-400">
               {vocabInRange.length} Vokabeln im Bereich → {vocabInRange.length * directions.length} Abfragen
-              {directions.length === 2 ? ' (erst Deutsch → Fremdsprache, dann zurück)' : ''}
+              {directions.length === 2 ? ' (erst Fremdsprache → Deutsch, dann zurück)' : ''}
             </p>
             <label className="flex min-h-[44px] items-center gap-3 rounded-xl border border-white/10 bg-space-900/50 px-4 text-sm">
               <input type="checkbox" className="h-5 w-5 accent-cyan-400" checked={affectsLevel} onChange={(e) => setAffectsLevel(e.target.checked)} />

@@ -24,6 +24,15 @@ describe('validateBookExport', () => {
     if (!r.ok) expect(r.errors.length).toBeGreaterThanOrEqual(3)
   })
 })
+describe('german_alts', () => {
+  it('akzeptiert optionale weitere deutsche Lösungen, lehnt Unsinn ab', () => {
+    const withAlts = JSON.parse(JSON.stringify(good))
+    withAlts.units[0].pages[0].vocabulary[0].german_alts = ['das Gebäude']
+    expect(validateBookExport(withAlts, ['en']).ok).toBe(true)
+    withAlts.units[0].pages[0].vocabulary[0].german_alts = 'nope'
+    expect(validateBookExport(withAlts, ['en']).ok).toBe(false)
+  })
+})
 describe('exportFileName', () => {
   it('bildet einen sauberen Dateinamen', () => expect(exportFileName('Grüne Linie 3!')).toBe('grune-linie-3.vokabeltrainer.json'))
   it('hat einen Ersatz für leere Namen', () => expect(exportFileName('???')).toBe('buch.vokabeltrainer.json'))

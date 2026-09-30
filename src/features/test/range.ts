@@ -26,7 +26,7 @@ export function distinctVocabulary(entries: readonly BookEntry[]): VocabLike[] {
   for (const e of entries) {
     if (seen.has(e.vocabulary_id)) continue
     seen.add(e.vocabulary_id)
-    out.push({ vocabulary_id: e.vocabulary_id, german: e.german, translations: e.translations })
+    out.push({ vocabulary_id: e.vocabulary_id, german: e.german, german_alts: e.german_alts ?? [], translations: e.translations })
   }
   return out
 }

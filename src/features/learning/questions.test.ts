@@ -13,6 +13,7 @@ const mk = (i: number, level = 1, tr?: string[]): PoolVocab => ({
   vocabulary_id: `v${i}`,
   book_id: 'b',
   german: `de${i}`,
+  german_alts: [],
   translations: tr ?? [`en${i}`],
   level,
 })
@@ -68,19 +69,43 @@ describe('buildLearningQuestions', () => {
   it('akzeptiert in Rückrichtung alle deutschen Wörter mit derselben Übersetzung', () => {
     const p = [mk(1, 1, ['flat']), mk(2, 1, ['flat'])]
     const qs = buildLearningQuestions(p, { directions: ['backward'], questionCount: 2, rng: mulberry32(1) })
-    for (const q of qs) expect(q.accepted.sort()).toEqual(['de1', 'de2'])
+    for (const q of qs) expect([...q.accepted].sort()).toEqual(['de1', 'de2'])
   })
   it('zeigt bei mehreren Lösungen alle akzeptierten an', () => {
     const p = [mk(1, 1, ['a', 'b'])]
     const [q] = buildLearningQuestions(p, { directions: ['forward'], questionCount: 1, rng: mulberry32(1) })
     expect(q.accepted).toEqual(['a', 'b'])
   })
+  it('akzeptiert in Rückrichtung alle deutschen Lösungen derselben Vokabel', () => {
+    const p = [{ ...mk(1, 1, ['l’heure']), german: 'die Zeit', german_alts: ['der Fahrplan'] }]
+    const [q] = buildLearningQuestions(p, { directions: ['backward'], questionCount: 1, rng: mulberry32(1) })
+    expect(q.prompt).toBe('l’heure')
+    expect(q.accepted).toEqual(['die Zeit', 'der Fahrplan'])
+  })
+  it('zeigt in Vorwärtsrichtung eine der deutschen Varianten', () => {
+    const p = [{ ...mk(1, 1, ['l’heure']), german: 'die Zeit', german_alts: ['der Fahrplan'] }]
+    const prompts = new Set<string>()
+    for (let s = 1; s < 30; s++) {
+      const [q] = buildLearningQuestions(p, { directions: ['forward'], questionCount: 1, rng: mulberry32(s) })
+      prompts.add(q.prompt)
+      expect(q.accepted).toEqual(['l’heure'])
+    }
+    expect([...prompts].sort()).toEqual(['der Fahrplan', 'die Zeit'])
+  })
+  it('stellt pro Vokabel zuerst Fremdsprache → Deutsch', () => {
+    const qs = buildLearningQuestions(pool(20), { directions: both, questionCount: 20, rng: mulberry32(11) })
+    const seen = new Set<string>()
+    for (const q of qs) {
+      if (!seen.has(q.vocabularyId)) expect(q.direction).toBe('backward')
+      seen.add(q.vocabularyId)
+    }
+  })
 })
 
 describe('buildTestQuestions', () => {
-  it('fragt erst alle Vorwärts-, dann alle Rückwärtsfragen in Buchreihenfolge', () => {
+  it('fragt erst alle Fremdsprache → Deutsch, dann alle Deutsch → Fremdsprache in Buchreihenfolge', () => {
     const v = pool(3)
     const qs = buildTestQuestions(v, v, { directions: both, rng: mulberry32(1) })
-    expect(qs.map((q) => q.id)).toEqual(['v0:forward', 'v1:forward', 'v2:forward', 'v0:backward', 'v1:backward', 'v2:backward'])
+    expect(qs.map((q) => q.id)).toEqual(['v0:backward', 'v1:backward', 'v2:backward', 'v0:forward', 'v1:forward', 'v2:forward'])
   })
 })

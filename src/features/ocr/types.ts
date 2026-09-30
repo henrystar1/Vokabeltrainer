@@ -1,35 +1,41 @@
 /**
- * OCR-Vorbereitung (noch NICHT umgesetzt).
+ * Foto-Einlesung der Wortlisten-Seiten (Buch: "Liste des mots", Französisch).
  *
- * Geplanter Ablauf: Foto einer Buchseite → Texterkennung → Vorschlagsliste → Benutzer prüft und
- * korrigiert → erst dann werden die Zeilen wie bei der manuellen Eingabe gespeichert
- * (save_vocab_entry). Der OCR-Anbieter ist austauschbar, damit später z. B. ein Server-Dienst
- * oder eine Edge Function angebunden werden kann, ohne die Oberfläche zu ändern.
+ * Ablauf: Foto → Bild aufbereiten → Texterkennung im Browser (Tesseract, kostenlos, ohne API-Schlüssel)
+ * → Spalten/Zeilen zuordnen → Prüfansicht → Speichern über save_vocab_entry.
+ * Das Foto wird nur im Arbeitsspeicher verarbeitet und nirgends hochgeladen oder gespeichert.
  */
 
-/** Eine erkannte Zeile; `confidence` (0–1) hilft, unsichere Zeilen in der Prüfansicht hervorzuheben. */
-export interface OcrLine {
-  german: string
-  translations: string[]
-  confidence?: number
+/** Ein erkanntes Wort mit Position (Pixel) und Sicherheit (0–100). */
+export interface OcrWord {
+  text: string
+  x0: number
+  y0: number
+  x1: number
+  y1: number
+  conf: number
 }
 
-export interface OcrRequest {
-  /** Bilddaten der Buchseite (JPEG/PNG). */
-  image: Blob
-  language: string
-  /** Optionale Hinweise, in welche Unit/Seite das Ergebnis eingetragen werden soll. */
-  unit?: number
-  page?: number
+/** Eine eingelesene Vokabelzeile; beide Seiten können mehrere gleichwertige Lösungen haben. */
+export interface ParsedRow {
+  foreign: string[]
+  german: string[]
+  /** true, wenn die Zeile besonders geprüft werden sollte (fehlendes Deutsch, unsichere Erkennung). */
+  uncertain: boolean
+  notes: string[]
 }
 
-export interface OcrResult {
-  lines: OcrLine[]
-  /** Vom Anbieter gemeldete Warnungen (z. B. „Bild unscharf“). */
+export interface ParsedPage {
+  /** Nummer aus der Überschrift "Unité N", falls auf der Seite vorhanden. */
+  unit: number | null
+  /** Seitenzahl unten auf der Seite ("164 cent-soixante-quatre"). */
+  page: number | null
+  rows: ParsedRow[]
   warnings: string[]
 }
 
-export interface OcrProvider {
+/** Austauschbare Erkennung: Bild → Wörter mit Positionen. */
+export interface OcrEngine {
   readonly id: string
-  recognize(request: OcrRequest): Promise<OcrResult>
+  recognize(image: HTMLCanvasElement, onProgress?: (fraction: number, status: string) => void): Promise<OcrWord[]>
 }

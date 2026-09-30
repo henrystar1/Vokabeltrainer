@@ -93,6 +93,15 @@ export function validateBookExport(input: unknown, knownLanguages: readonly stri
           return
         }
         const german = entry.german.trim()
+        const alts = entry.german_alts
+        if (
+          alts !== undefined &&
+          alts !== null &&
+          (!Array.isArray(alts) || alts.some((a) => typeof a !== 'string' || a.trim().length > 200))
+        ) {
+          add(`Seite ${page.number}: Die weiteren deutschen Lösungen von „${german}“ sind ungültig.`)
+          return
+        }
         const translations: string[] = []
         for (const t of entry.translations as unknown[]) {
           if (typeof t !== 'string') {

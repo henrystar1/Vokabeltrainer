@@ -5,9 +5,11 @@ interface ModalProps {
   title: string
   onClose: () => void
   children: ReactNode
+  /** Breiteres Fenster für Tabellen/Listen. */
+  wide?: boolean
 }
 
-export default function Modal({ title, onClose, children }: ModalProps) {
+export default function Modal({ title, onClose, children, wide = false }: ModalProps) {
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => e.key === 'Escape' && onClose()
     window.addEventListener('keydown', onKey)
@@ -20,7 +22,7 @@ export default function Modal({ title, onClose, children }: ModalProps) {
         role="dialog"
         aria-modal="true"
         aria-label={title}
-        className="glass max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-2xl p-6 shadow-glow"
+        className={`glass max-h-[90vh] w-full overflow-y-auto rounded-2xl p-6 shadow-glow ${wide ? 'max-w-3xl' : 'max-w-lg'}`}
         onMouseDown={(e) => e.stopPropagation()}
       >
         <div className="mb-4 flex items-center justify-between gap-4">

@@ -131,8 +131,8 @@ export default function Search() {
               className="glass flex flex-wrap items-center justify-between gap-2 rounded-xl px-4 py-3 transition hover:border-accent-cyan/40"
             >
               <div>
-                <p className="font-medium">{r.german}</p>
-                <p className="text-sm text-slate-400">{r.translations.join(' · ')}</p>
+                <p className="font-medium">{r.translations.join(' · ')}</p>
+                <p className="text-sm text-slate-400">{[r.german, ...(r.german_alts ?? [])].join(' · ')}</p>
               </div>
               <p className="label-mono">{r.book_name} · U{r.unit_number} · S{r.page_number}</p>
             </Link>

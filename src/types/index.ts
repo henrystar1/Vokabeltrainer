@@ -32,6 +32,8 @@ export interface BookEntry {
   placement_id: string
   vocabulary_id: string
   german: string
+  /** Weitere gleichwertige deutsche Lösungen. */
+  german_alts: string[]
   translations: string[]
   unit_number: number
   page_number: number
@@ -43,6 +45,7 @@ export interface PageEntry {
   placement_id: string
   vocabulary_id: string
   german: string
+  german_alts: string[]
   position: number
   translations: string[]
 }
@@ -56,6 +59,7 @@ export interface SaveEntryResult {
   placement_id: string
   vocabulary_id: string
   german: string
+  german_alts: string[]
   merged: boolean
   position: number
   translations: string[]
@@ -65,6 +69,7 @@ export interface PoolVocab {
   vocabulary_id: string
   book_id: string
   german: string
+  german_alts: string[]
   translations: string[]
   level: number
 }
@@ -73,6 +78,7 @@ export interface SearchResult {
   placement_id: string
   vocabulary_id: string
   german: string
+  german_alts: string[]
   translations: string[]
   book_id: string
   book_name: string
@@ -145,7 +151,7 @@ export interface BookExport {
     name?: string | null
     pages: Array<{
       number: number
-      vocabulary: Array<{ german: string; translations: string[] }>
+      vocabulary: Array<{ german: string; german_alts?: string[]; translations: string[] }>
     }>
   }>
 }

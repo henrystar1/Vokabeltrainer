@@ -16,7 +16,21 @@ export interface Question {
 export interface VocabLike {
   vocabulary_id: string
   german: string
+  /** Weitere gleichwertige deutsche Lösungen. */
+  german_alts: string[]
   translations: string[]
+}
+
+/** Alle deutschen Lösungen einer Vokabel (Hauptwort zuerst). */
+export function germanVariants(v: Pick<VocabLike, 'german' | 'german_alts'>): string[] {
+  return [v.german, ...(v.german_alts ?? [])]
+}
+
+export interface Indexes {
+  /** Fremdsprachige Variante → alle deutschen Lösungen aller Vokabeln mit dieser Variante. */
+  toGerman: Map<string, string[]>
+  /** Deutsche Variante → alle fremdsprachigen Lösungen aller Vokabeln mit dieser Variante. */
+  toForeign: Map<string, string[]>
 }
 
 /** Anzahl Vokabeln, die für die gewünschte Anzahl Abfragen nötig sind. */
@@ -24,34 +38,51 @@ export function vocabCountFor(questionCount: number, directions: readonly Direct
   return directions.length >= 2 ? Math.floor(questionCount / 2) : questionCount
 }
 
-/** Übersetzung → alle deutschen Wörter, die diese Übersetzung haben (für die Rückrichtung). */
-export function buildReverseIndex(vocab: readonly VocabLike[]): Map<string, string[]> {
-  const index = new Map<string, string[]>()
-  for (const v of vocab) {
-    for (const t of v.translations) {
-      const key = normalizeAnswer(t, false)
-      const list = index.get(key) ?? []
-      if (!list.includes(v.german)) list.push(v.german)
-      index.set(key, list)
-    }
-  }
-  return index
+function addTo(map: Map<string, string[]>, key: string, values: readonly string[]): void {
+  const list = map.get(key) ?? []
+  for (const v of values) if (!list.includes(v)) list.push(v)
+  map.set(key, list)
 }
 
-export function makeQuestion(
-  vocab: VocabLike,
-  direction: Direction,
-  reverse: Map<string, string[]>,
-  rng: Rng = Math.random,
-): Question {
+/**
+ * Nachschlagetabellen für beide Richtungen. Haben zwei Vokabeln dieselbe Variante
+ * (z. B. dieselbe Übersetzung), gelten die Lösungen beider als richtig.
+ */
+export function buildIndexes(vocab: readonly VocabLike[]): Indexes {
+  const toGerman = new Map<string, string[]>()
+  const toForeign = new Map<string, string[]>()
+  for (const v of vocab) {
+    const de = germanVariants(v)
+    for (const t of v.translations) addTo(toGerman, normalizeAnswer(t, false), de)
+    for (const g of de) addTo(toForeign, normalizeAnswer(g, false), v.translations)
+  }
+  return { toGerman, toForeign }
+}
+
+function pick<T>(list: readonly T[], rng: Rng): T {
+  return list[Math.floor(rng() * list.length)]
+}
+
+/** Die eigenen Lösungen kommen zuerst, danach weitere aus dem Index. */
+function acceptedFor(own: readonly string[], fromIndex: readonly string[] | undefined): string[] {
+  const out = [...own]
+  for (const x of fromIndex ?? []) if (!out.includes(x)) out.push(x)
+  return out
+}
+
+/**
+ * direction 'backward' = Fremdsprache → Deutsch, 'forward' = Deutsch → Fremdsprache.
+ * Gezeigt wird jeweils eine zufällige Variante; akzeptiert werden alle Lösungen der Gegenseite.
+ */
+export function makeQuestion(vocab: VocabLike, direction: Direction, idx: Indexes, rng: Rng = Math.random): Question {
   const id = `${vocab.vocabulary_id}:${direction}`
   if (direction === 'forward') {
-    return { id, vocabularyId: vocab.vocabulary_id, direction, prompt: vocab.german, accepted: [...vocab.translations] }
+    const prompt = pick(germanVariants(vocab), rng)
+    const accepted = acceptedFor(vocab.translations, idx.toForeign.get(normalizeAnswer(prompt, false)))
+    return { id, vocabularyId: vocab.vocabulary_id, direction, prompt, accepted }
   }
-  const prompt = vocab.translations[Math.floor(rng() * vocab.translations.length)]
-  const germans = reverse.get(normalizeAnswer(prompt, false)) ?? [vocab.german]
-  // Eigenes Wort zuerst, dann weitere deutsche Wörter mit derselben Übersetzung.
-  const accepted = [vocab.german, ...germans.filter((g) => g !== vocab.german)]
+  const prompt = pick(vocab.translations, rng)
+  const accepted = acceptedFor(germanVariants(vocab), idx.toGerman.get(normalizeAnswer(prompt, false)))
   return { id, vocabularyId: vocab.vocabulary_id, direction, prompt, accepted }
 }
 
@@ -82,13 +113,13 @@ export function orderQuestions(questions: readonly Question[], rng: Rng = Math.r
   let best: Question[] = []
   let bestGap = -1
   for (let attempt = 0; attempt < 80; attempt++) {
-    // Erste Abfrage jeder Vokabel: zufällige Richtung; alle ersten zuerst, dann alle zweiten.
+    // Immer zuerst Fremdsprache → Deutsch; die Gegenrichtung kommt erst später in der Runde.
     const firsts: Question[] = []
     const seconds: Question[] = []
     for (const g of groups) {
-      const s = shuffle(g, rng)
-      firsts.push(s[0])
-      seconds.push(...s.slice(1))
+      const first = g.find((q) => q.direction === 'backward') ?? g[0]
+      firsts.push(first)
+      seconds.push(...g.filter((q) => q !== first))
     }
     const seq = [...shuffle(firsts, rng), ...shuffle(seconds, rng)]
     const gap = minPairGap(seq)
@@ -116,8 +147,8 @@ export function buildLearningQuestions(pool: readonly PoolVocab[], opts: LearnBu
   const usable = pool.filter((v) => v.translations.length > 0)
   const due = usable.filter((v) => isDue(v.level))
   const picked = weightedSample(due, (v) => selectionWeight(v.level), vocabCountFor(opts.questionCount, opts.directions), rng)
-  const reverse = buildReverseIndex(usable)
-  const questions = picked.flatMap((v) => opts.directions.map((d) => makeQuestion(v, d, reverse, rng)))
+  const idx = buildIndexes(usable)
+  const questions = picked.flatMap((v) => opts.directions.map((d) => makeQuestion(v, d, idx, rng)))
   return orderQuestions(questions, rng)
 }
 
@@ -128,7 +159,7 @@ export interface TestBuildOptions {
 
 /**
  * Test: alle Vokabeln des Bereichs in Buchreihenfolge. Bei zwei Richtungen zuerst alle
- * Deutsch → Fremdsprache, danach alle Fremdsprache → Deutsch (jeweils in Buchreihenfolge).
+ * Fremdsprache → Deutsch, danach alle Deutsch → Fremdsprache (jeweils in Buchreihenfolge).
  */
 export function buildTestQuestions(
   inRange: readonly VocabLike[],
@@ -136,8 +167,8 @@ export function buildTestQuestions(
   opts: TestBuildOptions,
 ): Question[] {
   const rng = opts.rng ?? Math.random
-  const reverse = buildReverseIndex(reverseSource.filter((v) => v.translations.length > 0))
+  const idx = buildIndexes(reverseSource.filter((v) => v.translations.length > 0))
   const usable = inRange.filter((v) => v.translations.length > 0)
-  const order: Direction[] = (['forward', 'backward'] as const).filter((d) => opts.directions.includes(d))
-  return order.flatMap((d) => usable.map((v) => makeQuestion(v, d, reverse, rng)))
+  const order: Direction[] = (['backward', 'forward'] as const).filter((d) => opts.directions.includes(d))
+  return order.flatMap((d) => usable.map((v) => makeQuestion(v, d, idx, rng)))
 }

@@ -1,17 +1,21 @@
 import { useCallback, useEffect, useRef, useState, type FocusEvent, type FormEvent, type KeyboardEvent } from 'react'
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
-import { AlertCircle, ArrowLeft, Check, ChevronRight, Loader2, Plus, Trash2 } from 'lucide-react'
+import { AlertCircle, ArrowLeft, Camera, Check, ChevronRight, Loader2, Plus, Trash2 } from 'lucide-react'
+import ScanModal from '../components/ocr/ScanModal'
+import AccentBar from '../components/ui/AccentBar'
 import Button from '../components/ui/Button'
 import { inputClass } from '../components/ui/Field'
 import { ErrorBox, Notice, Spinner } from '../components/ui/States'
 import {
-  cleanTranslations,
   emptyRow,
   isRowComplete,
   isRowDirty,
+  isRowEmpty,
   rowSnapshot,
   rowsFromEntries,
+  toSavePayload,
   type EntryRow,
+  type Side,
 } from '../features/entry/rows'
 import { errorHint, errorMessage } from '../lib/errors'
 import { deleteEntry, getPage, saveEntry } from '../services/entry'
@@ -22,7 +26,13 @@ const posInt = (v: string | null, fallback: number, min: number) => {
   return Number.isInteger(n) && n >= min ? n : fallback
 }
 
-/** Tabellarische Eingabe im Stil einer Vokabelkartei: links Deutsch, rechts eine oder mehrere Lösungen. */
+const LANGUAGE_NAME: Record<string, string> = { en: 'Englisch', fr: 'Französisch' }
+const fieldName = (side: Side, i: number) => `${side === 'foreign' ? 'fr' : 'de'}-${i}`
+
+/**
+ * Tabellarische Eingabe im Stil einer Vokabelkartei: links Fremdsprache, rechts Deutsch.
+ * Auf beiden Seiten sind mehrere gleichwertige Lösungen möglich.
+ */
 export default function BookEntry() {
   const { bookId = '' } = useParams()
   const navigate = useNavigate()
@@ -31,6 +41,7 @@ export default function BookEntry() {
   const page = posInt(params.get('seite'), 1, 1)
 
   const [bookName, setBookName] = useState('')
+  const [bookLanguage, setBookLanguage] = useState('')
   const [rows, setRows] = useState<EntryRow[]>([emptyRow()])
   const [loading, setLoading] = useState(true)
   const [loadError, setLoadError] = useState<string | null>(null)
@@ -39,6 +50,8 @@ export default function BookEntry() {
   const [confirmDelete, setConfirmDelete] = useState<string | null>(null)
   const [unitInput, setUnitInput] = useState(String(unit))
   const [pageInput, setPageInput] = useState(String(page))
+  const [scanning, setScanning] = useState(false)
+  const [reloadKey, setReloadKey] = useState(0)
 
   const rowsRef = useRef(rows)
   rowsRef.current = rows
@@ -51,7 +64,12 @@ export default function BookEntry() {
   }, [])
 
   useEffect(() => {
-    getBook(bookId).then((b) => setBookName(b?.name ?? '')).catch(() => undefined)
+    getBook(bookId)
+      .then((b) => {
+        setBookName(b?.name ?? '')
+        setBookLanguage(b?.language ?? '')
+      })
+      .catch(() => undefined)
   }, [bookId])
 
   useEffect(() => {
@@ -69,8 +87,7 @@ export default function BookEntry() {
     getPage(bookId, page).then(
       (data) => {
         if (gen !== generation.current) return
-        const loaded = rowsFromEntries(data.entries)
-        setRows([...loaded, emptyRow()])
+        setRows([...rowsFromEntries(data.entries), emptyRow()])
         setPageUnit(data.page?.unit_number ?? null)
         if (data.page && data.page.unit_number !== unit) setConflict(data.page.unit_number)
         setLoading(false)
@@ -81,7 +98,7 @@ export default function BookEntry() {
         setLoading(false)
       },
     )
-  }, [bookId, page, unit])
+  }, [bookId, page, unit, reloadKey])
 
   const focusField = useCallback((key: string, field: string) => {
     requestAnimationFrame(() => {
@@ -96,15 +113,14 @@ export default function BookEntry() {
       const row = rowsRef.current.find((r) => r.key === key)
       if (!row || !isRowDirty(row)) return
       if (!isRowComplete(row)) {
-        if (row.german.trim() !== '' || cleanTranslations(row.translations).length > 0) {
-          patchRow(key, { status: 'error', error: 'Deutsch und mindestens eine Lösung ausfüllen.' })
-        }
+        if (!isRowEmpty(row)) patchRow(key, { status: 'error', error: 'Französisch und Deutsch brauchen je mindestens eine Lösung.' })
         return
       }
       saving.current.add(key)
       patchRow(key, { status: 'saving', error: undefined })
       const gen = generation.current
       const snapshotAtSave = rowSnapshot(row)
+      const payload = toSavePayload(row)
       const job = (async () => {
         try {
           const res = await saveEntry({
@@ -112,14 +128,12 @@ export default function BookEntry() {
             unit,
             page,
             placementId: row.placementId,
-            german: row.german,
-            translations: cleanTranslations(row.translations),
             position: row.placementId ? row.position : null,
+            ...payload,
           })
           if (gen !== generation.current) return
           setRows((rs) => {
-            const duplicate = rs.some((r) => r.key !== key && r.placementId === res.placement_id)
-            if (duplicate) return rs.filter((r) => r.key !== key)
+            if (rs.some((r) => r.key !== key && r.placementId === res.placement_id)) return rs.filter((r) => r.key !== key)
             return rs.map((r) => {
               if (r.key !== key) return r
               const stillSame = rowSnapshot(r) === snapshotAtSave
@@ -133,12 +147,12 @@ export default function BookEntry() {
                 error: undefined,
               }
               if (stillSame) {
-                updated.german = res.german
-                updated.translations = res.translations.length > 0 ? res.translations : r.translations
+                updated.foreign = res.translations.length > 0 ? res.translations : r.foreign
+                updated.german = [res.german, ...(res.german_alts ?? [])]
+                updated.savedSnapshot = rowSnapshot(updated)
+              } else {
+                updated.savedSnapshot = snapshotAtSave
               }
-              updated.savedSnapshot = stillSame
-                ? rowSnapshot(updated)
-                : JSON.stringify({ g: row.german.trim(), t: cleanTranslations(row.translations) })
               return updated
             })
           })
@@ -190,21 +204,21 @@ export default function BookEntry() {
     })
   }
 
-  function setTranslation(row: EntryRow, i: number, value: string) {
-    const t = [...row.translations]
-    t[i] = value
-    update(row.key, { translations: t })
+  function setItem(row: EntryRow, side: Side, i: number, value: string) {
+    const list = [...row[side]]
+    list[i] = value
+    update(row.key, { [side]: list })
   }
 
-  function addTranslation(row: EntryRow) {
-    update(row.key, { translations: [...row.translations, ''] })
-    focusField(row.key, `tr-${row.translations.length}`)
+  function addItem(row: EntryRow, side: Side) {
+    update(row.key, { [side]: [...row[side], ''] })
+    focusField(row.key, fieldName(side, row[side].length))
   }
 
   function ensureTrailingEmpty() {
     setRows((rs) => {
       const last = rs[rs.length - 1]
-      return last && last.german === '' && cleanTranslations(last.translations).length === 0 ? rs : [...rs, emptyRow()]
+      return last && isRowEmpty(last) ? rs : [...rs, emptyRow()]
     })
   }
 
@@ -213,25 +227,24 @@ export default function BookEntry() {
     void saveRow(row.key).then(ensureTrailingEmpty)
   }
 
-  function onKeyDown(row: EntryRow, index: number, field: string, e: KeyboardEvent<HTMLInputElement>) {
+  function onKeyDown(row: EntryRow, index: number, side: Side, e: KeyboardEvent<HTMLInputElement>) {
     if (e.key !== 'Enter') return
     e.preventDefault()
     if (e.ctrlKey || e.metaKey) {
-      addTranslation(row)
+      addItem(row, side)
       return
     }
-    if (field === 'de') {
-      focusField(row.key, 'tr-0')
+    if (side === 'foreign') {
+      focusField(row.key, fieldName('german', 0))
       return
     }
     void saveRow(row.key).then(() => {
-      const list = rowsRef.current
-      const nextRow = list[index + 1]
-      if (nextRow) focusField(nextRow.key, 'de')
+      const nextRow = rowsRef.current[index + 1]
+      if (nextRow) focusField(nextRow.key, fieldName('foreign', 0))
       else {
         const fresh = emptyRow()
         setRows((rs) => [...rs, fresh])
-        focusField(fresh.key, 'de')
+        focusField(fresh.key, fieldName('foreign', 0))
       }
     })
   }
@@ -258,17 +271,13 @@ export default function BookEntry() {
     setParams({ unit: String(nextUnit), seite: String(nextPage) })
   }
 
-  async function nextPage() {
-    await go(unit, page + 1)
-  }
-
-  async function nextUnit() {
-    await go(unit + 1, page + 1)
-  }
-
   async function jump(e: FormEvent) {
     e.preventDefault()
     await go(posInt(unitInput, unit, 0), posInt(pageInput, page, 1))
+  }
+
+  async function openScan() {
+    if (await flush()) setScanning(true)
   }
 
   async function moveHere() {
@@ -276,7 +285,6 @@ export default function BookEntry() {
       await movePageToUnit(bookId, page, unit)
       setConflict(null)
       setPageUnit(unit)
-      // Blockierte Zeilen erneut speichern
       for (const r of rowsRef.current) if (r.status === 'error' && isRowComplete(r)) patchRow(r.key, { status: 'dirty', error: undefined })
       for (const r of rowsRef.current) if (isRowComplete(r) && isRowDirty(r)) void saveRow(r.key)
     } catch (e) {
@@ -285,10 +293,18 @@ export default function BookEntry() {
   }
 
   const savedCount = rows.filter((r) => r.placementId).length
+  const foreignLabel = LANGUAGE_NAME[bookLanguage] ?? 'Fremdsprache'
 
   return (
     <div>
-      <Link to={`/buecher/${bookId}`} className="mb-4 inline-flex min-h-[44px] items-center gap-2 text-sm text-slate-400 hover:text-white" onClick={(e) => { e.preventDefault(); void flush().then((ok) => ok && navigate(`/buecher/${bookId}`)) }}>
+      <Link
+        to={`/buecher/${bookId}`}
+        className="mb-4 inline-flex min-h-[44px] items-center gap-2 text-sm text-slate-400 hover:text-white"
+        onClick={(e) => {
+          e.preventDefault()
+          void flush().then((ok) => ok && navigate(`/buecher/${bookId}`))
+        }}
+      >
         <ArrowLeft size={16} /> {bookName || 'Zurück zum Buch'}
       </Link>
 
@@ -305,10 +321,13 @@ export default function BookEntry() {
           <Button type="submit" variant="secondary">Gehe zu</Button>
         </form>
         <div className="flex flex-wrap gap-2">
-          <Button variant="secondary" onClick={() => void nextPage()}>
+          <Button variant="secondary" onClick={() => void openScan()}>
+            <Camera size={16} /> Foto einlesen
+          </Button>
+          <Button variant="secondary" onClick={() => void go(unit, page + 1)}>
             Nächste Seite <ChevronRight size={16} />
           </Button>
-          <Button onClick={() => void nextUnit()}>
+          <Button onClick={() => void go(unit + 1, page + 1)}>
             Nächste Unit <ChevronRight size={16} />
           </Button>
         </div>
@@ -340,10 +359,10 @@ export default function BookEntry() {
           <p className="label-mono px-1">
             Unit {unit} · Seite {page} · {savedCount} gespeichert
           </p>
-          <div className="hidden grid-cols-[2.5rem_1fr_1.4fr_5rem] gap-3 px-2 text-slate-500 md:grid">
+          <div className="hidden grid-cols-[2.5rem_1fr_1fr_5rem] gap-3 px-2 text-slate-500 md:grid">
             <span />
+            <span className="label-mono">{foreignLabel}</span>
             <span className="label-mono">Deutsch</span>
-            <span className="label-mono">Lösung(en)</span>
             <span />
           </div>
 
@@ -351,53 +370,43 @@ export default function BookEntry() {
             <div
               key={row.key}
               onBlur={(e) => onRowBlur(row, e)}
-              className={`glass grid grid-cols-[2rem_1fr] items-start gap-x-3 gap-y-2 rounded-xl p-3 md:grid-cols-[2.5rem_1fr_1.4fr_5rem] ${
+              className={`glass grid grid-cols-[2rem_1fr] items-start gap-x-3 gap-y-2 rounded-xl p-3 md:grid-cols-[2.5rem_1fr_1fr_5rem] ${
                 row.status === 'error' ? 'border-rose-500/50' : row.merged ? 'border-amber-400/40' : ''
               }`}
             >
               <span className="pt-3 text-center font-mono text-xs text-slate-500">{index + 1}</span>
-              <input
-                data-row={row.key}
-                data-field="de"
-                aria-label={`Deutsch, Zeile ${index + 1}`}
-                className={inputClass}
-                value={row.german}
-                maxLength={200}
-                autoCorrect="off"
-                spellCheck={false}
-                enterKeyHint="next"
-                onChange={(e) => update(row.key, { german: e.target.value })}
-                onKeyDown={(e) => onKeyDown(row, index, 'de', e)}
-              />
-              <div className="col-span-2 space-y-2 md:col-span-1">
-                {row.translations.map((t, i) => (
-                  <input
-                    key={i}
-                    data-row={row.key}
-                    data-field={`tr-${i}`}
-                    aria-label={`Lösung ${i + 1}, Zeile ${index + 1}`}
-                    className={inputClass}
-                    value={t}
-                    maxLength={200}
-                    autoCapitalize="none"
-                    autoCorrect="off"
-                    spellCheck={false}
-                    enterKeyHint="done"
-                    onChange={(e) => setTranslation(row, i, e.target.value)}
-                    onKeyDown={(e) => onKeyDown(row, index, `tr-${i}`, e)}
-                  />
-                ))}
-                <button
-                  type="button"
-                  onClick={() => addTranslation(row)}
-                  className="inline-flex min-h-[36px] items-center gap-1 text-xs text-slate-400 hover:text-accent-cyan"
-                >
-                  <Plus size={13} /> Lösung hinzufügen
-                </button>
-              </div>
+              {(['foreign', 'german'] as const).map((side) => (
+                <div key={side} className={`space-y-2 ${side === 'foreign' ? '' : 'col-span-2 md:col-span-1'}`}>
+                  {row[side].map((value, i) => (
+                    <input
+                      key={i}
+                      data-row={row.key}
+                      data-field={fieldName(side, i)}
+                      aria-label={`${side === 'foreign' ? foreignLabel : 'Deutsch'} ${i + 1}, Zeile ${index + 1}`}
+                      placeholder={side === 'foreign' ? foreignLabel : 'Deutsch'}
+                      className={inputClass}
+                      value={value}
+                      maxLength={200}
+                      autoCapitalize={side === 'foreign' ? 'none' : 'sentences'}
+                      autoCorrect="off"
+                      spellCheck={false}
+                      enterKeyHint={side === 'foreign' ? 'next' : 'done'}
+                      onChange={(e) => setItem(row, side, i, e.target.value)}
+                      onKeyDown={(e) => onKeyDown(row, index, side, e)}
+                    />
+                  ))}
+                  <button
+                    type="button"
+                    onClick={() => addItem(row, side)}
+                    className="inline-flex min-h-[36px] items-center gap-1 text-xs text-slate-400 hover:text-accent-cyan"
+                  >
+                    <Plus size={13} /> Lösung hinzufügen
+                  </button>
+                </div>
+              ))}
               <div className="col-span-2 flex items-center justify-end gap-2 md:col-span-1 md:pt-1.5">
                 <StatusIcon row={row} />
-                {(row.placementId || row.german || row.translations.some((t) => t)) && (
+                {(row.placementId || !isRowEmpty(row)) && (
                   <button
                     type="button"
                     aria-label={confirmDelete === row.key ? 'Löschen bestätigen' : 'Zeile löschen'}
@@ -411,8 +420,8 @@ export default function BookEntry() {
                 )}
               </div>
               {(row.error || row.merged) && (
-                <p className={`col-span-2 text-xs md:col-start-2 md:col-span-3 ${row.error ? 'text-rose-300' : 'text-amber-300'}`}>
-                  {row.error ?? 'Diese Vokabel gab es im Buch schon – die Lösungen wurden zusammengeführt.'}
+                <p className={`col-span-2 text-xs md:col-span-4 md:col-start-2 ${row.error ? 'text-rose-300' : 'text-amber-300'}`}>
+                  {row.error ?? 'Dieses deutsche Wort gab es im Buch schon – die Lösungen wurden zusammengeführt.'}
                 </p>
               )}
             </div>
@@ -421,6 +430,27 @@ export default function BookEntry() {
             Enter springt weiter und speichert · Strg/⌘+Enter fügt eine weitere Lösung hinzu · Änderungen werden automatisch gespeichert.
           </p>
         </div>
+      )}
+
+      {bookLanguage === 'fr' && (
+        <div className="sticky bottom-[76px] z-20 mt-4 md:bottom-3">
+          <AccentBar />
+        </div>
+      )}
+
+      {scanning && (
+        <ScanModal
+          bookId={bookId}
+          language={bookLanguage}
+          defaultUnit={unit}
+          defaultPage={page}
+          onClose={() => setScanning(false)}
+          onSaved={(u, p) => {
+            setScanning(false)
+            if (u === unit && p === page) setReloadKey((k) => k + 1)
+            else setParams({ unit: String(u), seite: String(p) })
+          }}
+        />
       )}
     </div>
   )
@@ -433,3 +463,4 @@ function StatusIcon({ row }: { row: EntryRow }) {
   if (row.status === 'saved' || row.placementId) return <Check size={16} className="text-emerald-400" aria-label="Gespeichert" />
   return null
 }
+

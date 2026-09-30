@@ -1,17 +1,28 @@
 import { describe, expect, it } from 'vitest'
-import { cleanTranslations, emptyRow, isRowComplete, isRowDirty, nextPosition, rowsFromEntries } from './rows'
+import { cleanList, emptyRow, isRowComplete, isRowDirty, nextPosition, rowsFromEntries, toSavePayload } from './rows'
 
 describe('rows', () => {
-  it('bereinigt Lösungen', () => expect(cleanTranslations([' a ', '', 'A', 'b'])).toEqual(['a', 'b']))
-  it('Zeile ist nur mit Deutsch und Lösung vollständig', () => {
-    expect(isRowComplete({ german: 'x', translations: [''] })).toBe(false)
-    expect(isRowComplete({ german: 'x', translations: ['y'] })).toBe(true)
+  it('bereinigt Lösungen', () => expect(cleanList([' a ', '', 'A', 'b  c'])).toEqual(['a', 'b c']))
+  it('Zeile braucht beide Seiten', () => {
+    expect(isRowComplete({ foreign: ['x'], german: [''] })).toBe(false)
+    expect(isRowComplete({ foreign: [''], german: ['y'] })).toBe(false)
+    expect(isRowComplete({ foreign: ['x'], german: ['y'] })).toBe(true)
   })
   it('nextPosition zählt weiter', () => expect(nextPosition([{ position: 3 }, { position: null }])).toBe(4))
+  it('erstes Deutsch ist Hauptwort, der Rest Zusatzlösungen', () => {
+    expect(toSavePayload({ foreign: ['la main'], german: ['die Hand', '', 'die Pfote', 'DIE HAND'] })).toEqual({
+      german: 'die Hand',
+      germanAlts: ['die Pfote'],
+      translations: ['la main'],
+    })
+  })
   it('erkennt Änderungen gegenüber dem gespeicherten Stand', () => {
-    const [row] = rowsFromEntries([{ placement_id: 'p', vocabulary_id: 'v', german: 'Haus', translations: ['house'], position: 1 }])
+    const [row] = rowsFromEntries([
+      { placement_id: 'p', vocabulary_id: 'v', german: 'die Zeit', german_alts: ['der Fahrplan'], translations: ['l’heure'], position: 1 },
+    ])
+    expect(row.german).toEqual(['die Zeit', 'der Fahrplan'])
     expect(isRowDirty(row)).toBe(false)
-    expect(isRowDirty({ ...row, translations: ['house', 'home'] })).toBe(true)
+    expect(isRowDirty({ ...row, german: ['die Zeit'] })).toBe(true)
     expect(isRowDirty(emptyRow())).toBe(false)
   })
 })

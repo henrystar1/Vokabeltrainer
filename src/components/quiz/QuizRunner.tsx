@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, type FormEvent } from 'react'
 import { ArrowRight, Check, X } from 'lucide-react'
+import AccentBar from '../ui/AccentBar'
 import Button from '../ui/Button'
 import ProgressBar from '../ui/ProgressBar'
 import { isAnswerCorrect } from '../../features/learning/answer'
@@ -14,12 +15,14 @@ interface QuizRunnerProps {
   /** Nach falscher Antwort sofort Lösungen zeigen (Standard); im Test ohne Feedback später. */
   showFeedback?: boolean
   title?: string
+  /** Leiste mit französischen Sonderzeichen einblenden. */
+  accents?: boolean
 }
 
 const DIRECTION_LABEL = { forward: 'Deutsch → Fremdsprache', backward: 'Fremdsprache → Deutsch' } as const
 
 /** Abfrageoberfläche: eine Frage nach der anderen, getippte Antwort, sofortige Rückmeldung. */
-export default function QuizRunner({ questions, caseSensitive, onAnswer, onFinish, showFeedback = true, title }: QuizRunnerProps) {
+export default function QuizRunner({ questions, caseSensitive, onAnswer, onFinish, showFeedback = true, title, accents = false }: QuizRunnerProps) {
   const [index, setIndex] = useState(0)
   const [value, setValue] = useState('')
   const [result, setResult] = useState<{ correct: boolean } | null>(null)
@@ -106,6 +109,8 @@ export default function QuizRunner({ questions, caseSensitive, onAnswer, onFinis
             )}
           </div>
         )}
+
+        {accents && q.direction === 'forward' && result === null && <AccentBar className="mt-4" />}
 
         <Button type="submit" className="mt-6 w-full min-h-[52px]">
           {result ? (index + 1 >= questions.length ? 'Fertig' : 'Weiter') : 'Prüfen'} <ArrowRight size={18} />

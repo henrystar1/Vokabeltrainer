@@ -36,6 +36,7 @@ export default function Learn() {
   const [repeatSaved, setRepeatSaved] = useState(true)
 
   const directions = useMemo(() => activeDirections(settings), [settings])
+  const language = bookId ? (books.data?.find((b) => b.id === bookId)?.language ?? settings.learn_language) : settings.learn_language
   const session = useRef(new LearningSession(directions))
   const levels = useRef<Record<string, number>>({})
   const sessionId = useRef<string | null>(null)
@@ -147,6 +148,7 @@ export default function Learn() {
         key={phase}
         questions={questions}
         caseSensitive={settings.case_sensitive}
+        accents={language === 'fr'}
         title={phase === 'repeat' ? 'Fehler wiederholen' : 'Lernrunde'}
         onAnswer={phase === 'repeat' ? onRepeatAnswer : onMainAnswer}
         onFinish={() => void (phase === 'repeat' ? finishRepeat() : finishMain())}

@@ -10,6 +10,7 @@ export interface SaveEntryInput {
   page: number
   placementId: string | null
   german: string
+  germanAlts: string[]
   translations: string[]
   position: number | null
 }
@@ -23,6 +24,7 @@ export const saveEntry = (i: SaveEntryInput) =>
     p_german: i.german.trim(),
     p_translations: i.translations,
     p_position: i.position,
+    p_german_alts: i.germanAlts,
   })
 
 export const deleteEntry = (placementId: string) => rpc<void>('delete_vocab_entry', { p_placement_id: placementId })

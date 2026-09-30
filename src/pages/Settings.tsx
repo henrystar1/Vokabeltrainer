@@ -106,8 +106,8 @@ export default function Settings() {
             </Select>
           </Field>
           <div className="space-y-2">
-            <Toggle label="Deutsch → Fremdsprache" checked={settings.direction_to_foreign} onChange={(v) => setDirection('direction_to_foreign', v)} />
             <Toggle label="Fremdsprache → Deutsch" checked={settings.direction_to_german} onChange={(v) => setDirection('direction_to_german', v)} />
+            <Toggle label="Deutsch → Fremdsprache" checked={settings.direction_to_foreign} onChange={(v) => setDirection('direction_to_foreign', v)} />
           </div>
           <Field
             label="Abfragen pro Runde (1–200)"

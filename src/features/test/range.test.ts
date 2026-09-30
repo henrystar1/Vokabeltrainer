@@ -3,7 +3,7 @@ import type { BookEntry } from '../../types'
 import { distinctVocabulary, selectRange } from './range'
 
 const e = (order: number, unit: number, page: number, vid = `v${order}`): BookEntry => ({
-  placement_id: `p${order}`, vocabulary_id: vid, german: `de${order}`, translations: ['x'],
+  placement_id: `p${order}`, vocabulary_id: vid, german: `de${order}`, german_alts: [], translations: ['x'],
   unit_number: unit, page_number: page, position: order, order,
 })
 const entries = [e(1, 1, 10), e(2, 1, 10), e(3, 1, 11), e(4, 2, 12), e(5, 2, 13, 'v1')]
