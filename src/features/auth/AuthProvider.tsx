@@ -1,0 +1,124 @@
+import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react'
+import type { Session, User } from '@supabase/supabase-js'
+import { supabase } from '../../lib/supabaseClient'
+import { loadDisplayName } from '../../services/settings'
+
+interface AuthState {
+  loading: boolean
+  session: Session | null
+  user: User | null
+  displayName: string | null
+  /** true, solange der Benutzer über den Link aus der Passwort-vergessen-Mail gekommen ist. */
+  recovering: boolean
+  signIn: (email: string, password: string) => Promise<void>
+  signUp: (email: string, password: string, displayName: string) => Promise<{ needsConfirmation: boolean }>
+  signOut: () => Promise<void>
+  sendReset: (email: string) => Promise<void>
+  setNewPassword: (password: string) => Promise<void>
+  setDisplayNameLocal: (name: string) => void
+}
+
+const AuthContext = createContext<AuthState | null>(null)
+
+/** Absolute URL innerhalb der App (berücksichtigt den Unterpfad von GitHub Pages). */
+export function appUrl(path: string): string {
+  const base = import.meta.env.BASE_URL.replace(/\/$/, '')
+  return `${window.location.origin}${base}/${path.replace(/^\//, '')}`
+}
+
+export function AuthProvider({ children }: { children: ReactNode }) {
+  const [loading, setLoading] = useState(true)
+  const [session, setSession] = useState<Session | null>(null)
+  const [displayName, setDisplayName] = useState<string | null>(null)
+  const [recovering, setRecovering] = useState(false)
+
+  useEffect(() => {
+    let active = true
+    supabase.auth
+      .getSession()
+      .then(({ data }) => {
+        if (!active) return
+        setSession(data.session)
+        setLoading(false)
+      })
+      .catch(() => active && setLoading(false))
+    const { data } = supabase.auth.onAuthStateChange((event, s) => {
+      setSession(s)
+      if (event === 'PASSWORD_RECOVERY') setRecovering(true)
+      if (event === 'SIGNED_OUT') {
+        setRecovering(false)
+        setDisplayName(null)
+      }
+    })
+    return () => {
+      active = false
+      data.subscription.unsubscribe()
+    }
+  }, [])
+
+  const userId = session?.user.id
+  useEffect(() => {
+    if (!userId) return
+    let active = true
+    loadDisplayName(userId)
+      .then((n) => active && setDisplayName(n))
+      .catch(() => undefined)
+    return () => {
+      active = false
+    }
+  }, [userId])
+
+  const signIn = useCallback(async (email: string, password: string) => {
+    const { error } = await supabase.auth.signInWithPassword({ email: email.trim(), password })
+    if (error) throw error
+  }, [])
+
+  const signUp = useCallback(async (email: string, password: string, name: string) => {
+    const { data, error } = await supabase.auth.signUp({
+      email: email.trim(),
+      password,
+      options: { data: { display_name: name.trim() }, emailRedirectTo: appUrl('/') },
+    })
+    if (error) throw error
+    return { needsConfirmation: data.session === null }
+  }, [])
+
+  const signOut = useCallback(async () => {
+    await supabase.auth.signOut()
+  }, [])
+
+  const sendReset = useCallback(async (email: string) => {
+    const { error } = await supabase.auth.resetPasswordForEmail(email.trim(), { redirectTo: appUrl('/passwort-neu') })
+    if (error) throw error
+  }, [])
+
+  const setNewPassword = useCallback(async (password: string) => {
+    const { error } = await supabase.auth.updateUser({ password })
+    if (error) throw error
+    setRecovering(false)
+  }, [])
+
+  const value = useMemo<AuthState>(
+    () => ({
+      loading,
+      session,
+      user: session?.user ?? null,
+      displayName,
+      recovering,
+      signIn,
+      signUp,
+      signOut,
+      sendReset,
+      setNewPassword,
+      setDisplayNameLocal: setDisplayName,
+    }),
+    [loading, session, displayName, recovering, signIn, signUp, signOut, sendReset, setNewPassword],
+  )
+  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>
+}
+
+export function useAuth(): AuthState {
+  const ctx = useContext(AuthContext)
+  if (!ctx) throw new Error('useAuth muss innerhalb von AuthProvider verwendet werden.')
+  return ctx
+}

@@ -1,5 +1,6 @@
 import { NavLink } from 'react-router-dom'
-import { ChevronsLeft, ChevronsRight, Rocket, User } from 'lucide-react'
+import { ChevronsLeft, ChevronsRight, LogOut, Rocket, User } from 'lucide-react'
+import { useAuth } from '../../features/auth/AuthProvider'
 import { NAV_ITEMS } from '../../lib/navigation'
 
 interface SidebarProps {
@@ -8,6 +9,7 @@ interface SidebarProps {
 }
 
 export default function Sidebar({ collapsed, onToggle }: SidebarProps) {
+  const { displayName, user, signOut } = useAuth()
   return (
     <aside
       className={`glass fixed inset-y-0 left-0 z-30 hidden flex-col border-y-0 border-l-0 transition-[width] duration-300 ease-out md:flex ${
@@ -49,11 +51,19 @@ export default function Sidebar({ collapsed, onToggle }: SidebarProps) {
           </div>
           {!collapsed && (
             <div className="min-w-0">
-              <p className="truncate text-sm font-medium">Benutzerprofil</p>
-              <p className="label-mono">Anmeldung folgt</p>
+              <p className="truncate text-sm font-medium">{displayName ?? 'Benutzer'}</p>
+              <p className="truncate text-[11px] text-slate-500">{user?.email}</p>
             </div>
           )}
         </div>
+        <button
+          onClick={() => void signOut()}
+          title="Abmelden"
+          className="flex min-h-[44px] w-full items-center justify-center gap-2 rounded-xl text-sm text-slate-400 transition hover:bg-white/5 hover:text-slate-100"
+        >
+          <LogOut size={16} />
+          {!collapsed && 'Abmelden'}
+        </button>
         <button
           onClick={onToggle}
           aria-label={collapsed ? 'Sidebar ausklappen' : 'Sidebar einklappen'}

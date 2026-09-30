@@ -1,4 +1,4 @@
-import { BookOpen, Brain, ClipboardCheck, Home, Settings, Trophy, BarChart3, type LucideIcon } from 'lucide-react'
+import { BookOpen, Brain, ClipboardCheck, Home, Search, Settings, Trophy, BarChart3, type LucideIcon } from 'lucide-react'
 
 export interface NavItem {
   to: string
@@ -9,6 +9,7 @@ export interface NavItem {
 export const NAV_ITEMS: NavItem[] = [
   { to: '/', label: 'Start', icon: Home },
   { to: '/buecher', label: 'Bücher', icon: BookOpen },
+  { to: '/suche', label: 'Suche', icon: Search },
   { to: '/lernen', label: 'Lernen', icon: Brain },
   { to: '/test', label: 'Test', icon: ClipboardCheck },
   { to: '/statistik', label: 'Statistik', icon: BarChart3 },

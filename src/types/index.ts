@@ -1,0 +1,151 @@
+/** Domain-Typen. Die Feldnamen folgen den Antworten der Datenbankfunktionen (snake_case). */
+
+export type Direction = 'forward' | 'backward' // forward = Deutsch → Fremdsprache
+
+export interface BookSummary {
+  id: string
+  name: string
+  language: string
+  description: string | null
+  created_at: string
+  unit_count: number
+  page_count: number
+  vocab_count: number
+  mastery_percent: number
+}
+
+export interface OutlinePage {
+  page_id: string
+  page_number: number
+  vocab_count: number
+}
+
+export interface OutlineUnit {
+  unit_id: string
+  unit_number: number
+  name: string | null
+  pages: OutlinePage[]
+}
+
+/** Eine Vokabel an einer Stelle im Buch (dieselbe Vokabel kann mehrfach vorkommen). */
+export interface BookEntry {
+  placement_id: string
+  vocabulary_id: string
+  german: string
+  translations: string[]
+  unit_number: number
+  page_number: number
+  position: number
+  order: number
+}
+
+export interface PageEntry {
+  placement_id: string
+  vocabulary_id: string
+  german: string
+  position: number
+  translations: string[]
+}
+
+export interface PageData {
+  page: { page_id: string; unit_number: number } | null
+  entries: PageEntry[]
+}
+
+export interface SaveEntryResult {
+  placement_id: string
+  vocabulary_id: string
+  german: string
+  merged: boolean
+  position: number
+  translations: string[]
+}
+
+export interface PoolVocab {
+  vocabulary_id: string
+  book_id: string
+  german: string
+  translations: string[]
+  level: number
+}
+
+export interface SearchResult {
+  placement_id: string
+  vocabulary_id: string
+  german: string
+  translations: string[]
+  book_id: string
+  book_name: string
+  language: string
+  unit_number: number
+  page_number: number
+}
+
+export interface UserSettings {
+  learn_language: string
+  direction_to_foreign: boolean
+  direction_to_german: boolean
+  words_per_round: number
+  case_sensitive: boolean
+}
+
+export interface HistoryDay {
+  day: string
+  total: number
+  correct: number
+}
+
+export interface MyStats {
+  level_counts: Record<'1' | '2' | '3' | '4' | '5', number>
+  vocab_total: number
+  learned: number
+  mastery_percent: number
+  due_problem: number
+  answers_total: number
+  answers_correct: number
+  accuracy_percent: number | null
+  today_vocab: number
+  today_answers: number
+  week_vocab: number
+  week_answers: number
+  history: HistoryDay[]
+}
+
+export interface LeaderboardRow {
+  rank: number
+  display_name: string
+  points: number
+  is_me: boolean
+}
+
+export interface CommunityAverages {
+  avg_accuracy_percent: number | null
+  avg_learned_vocabulary: number | null
+  learners: number
+}
+
+export type LeaderboardPeriod = 'week' | 'month' | 'all'
+
+export interface RecentSession {
+  id: string
+  mode: 'learn' | 'test'
+  started_at: string
+  answers_total: number
+  answers_correct: number
+  book_id: string | null
+}
+
+/** Austauschformat für Bücher (Version 1). Die Reihenfolge in "vocabulary" ist die Position auf der Seite. */
+export interface BookExport {
+  format: 'vokabeltrainer-book'
+  version: 1
+  book: { name: string; language: string; description?: string | null }
+  units: Array<{
+    number: number
+    name?: string | null
+    pages: Array<{
+      number: number
+      vocabulary: Array<{ german: string; translations: string[] }>
+    }>
+  }>
+}

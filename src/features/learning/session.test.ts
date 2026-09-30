@@ -30,3 +30,20 @@ describe('LearningSession – Wiederholungsrunde', () => {
     expect(s.levelUpdates({ v1: 1 })).toEqual({})
   })
 })
+
+describe('LearningSession – eine Richtung', () => {
+  it('bewertet richtig als „beide richtig“ und falsch als „beide falsch“', () => {
+    const s = new LearningSession(['forward'])
+    s.recordMain('a', 'forward', true)
+    s.recordMain('b', 'forward', false)
+    expect(s.levelUpdates({ a: 2, b: 2 })).toEqual({ a: 3, b: 1 })
+  })
+
+  it('liefert Antworten für das Speichern', () => {
+    const s = new LearningSession()
+    s.recordMain('a', 'forward', true, 'x')
+    s.recordRepeat('a', 'forward', false, 'y')
+    expect(s.mainAnswers()).toHaveLength(1)
+    expect(s.repeatAnswers()[0].given_answer).toBe('y')
+  })
+})
