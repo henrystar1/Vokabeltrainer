@@ -1,4 +1,4 @@
-import { tesseractEngine } from './engine'
+import { createTesseractEngine } from './engine'
 import { parsePage } from './layout'
 import { prepareCanvas } from './preprocess'
 import type { OcrEngine, ParsedPage } from './types'
@@ -7,7 +7,8 @@ import type { OcrEngine, ParsedPage } from './types'
 export async function scanPage(
   file: Blob,
   onProgress?: (fraction: number, status: string) => void,
-  engine: OcrEngine = tesseractEngine,
+  language = 'fr',
+  engine: OcrEngine = createTesseractEngine(language),
 ): Promise<ParsedPage> {
   onProgress?.(0, 'Bild wird aufbereitet …')
   const canvas = await prepareCanvas(file)

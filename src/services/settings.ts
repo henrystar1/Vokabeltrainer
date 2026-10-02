@@ -1,5 +1,5 @@
 import { supabase } from '../lib/supabaseClient'
-import type { UserSettings } from '../types'
+import type { Profile, Role, UserSettings } from '../types'
 
 export const DEFAULT_SETTINGS: UserSettings = {
   learn_language: 'en',
@@ -33,4 +33,11 @@ export async function loadDisplayName(userId: string): Promise<string | null> {
   const { data, error } = await supabase.from('profiles').select('display_name').eq('id', userId).maybeSingle()
   if (error) throw error
   return (data?.display_name as string | undefined) ?? null
+}
+
+export async function loadProfile(userId: string): Promise<Profile | null> {
+  const { data, error } = await supabase.from('profiles').select('display_name,role,blocked').eq('id', userId).maybeSingle()
+  if (error) throw error
+  if (!data) return null
+  return { display_name: data.display_name as string, role: (data.role as Role) ?? 'user', blocked: Boolean(data.blocked) }
 }

@@ -37,6 +37,7 @@ type Phase = 'pick' | 'scanning' | 'review' | 'saving'
 
 /** Foto einer Wortlisten-Seite einlesen, in Ruhe prüfen/korrigieren und dann speichern. */
 export default function ScanModal({ bookId, language, defaultUnit, defaultPage, onClose, onSaved }: ScanModalProps) {
+  const foreignName = language === 'en' ? 'Englisch' : 'Französisch'
   const [phase, setPhase] = useState<Phase>('pick')
   const [progress, setProgress] = useState(0)
   const [status, setStatus] = useState('')
@@ -66,10 +67,14 @@ export default function ScanModal({ bookId, language, defaultUnit, defaultPage, 
     setPhase('scanning')
     setProgress(0)
     try {
-      const parsed = await scanPage(file, (p, s) => {
-        setProgress(p)
-        setStatus(s)
-      })
+      const parsed = await scanPage(
+        file,
+        (p, s) => {
+          setProgress(p)
+          setStatus(s)
+        },
+        language,
+      )
       setRows(toRows(parsed))
       setWarnings(parsed.warnings)
       setDetected({ unit: parsed.unit, page: parsed.page })
@@ -140,9 +145,15 @@ export default function ScanModal({ bookId, language, defaultUnit, defaultPage, 
       {phase === 'pick' && (
         <div className="space-y-4">
           <p className="text-sm text-slate-300">
-            Fotografiere die Seite <strong>„Liste des mots“</strong> möglichst gerade und gut beleuchtet. Gelesen werden Französisch und
+            Fotografiere die Wortliste-Seite des Buchs möglichst gerade und gut beleuchtet. Gelesen werden {foreignName} und
             Deutsch; die Beispielsätze und die blauen Kästen werden ausgelassen.
           </p>
+          {language !== 'fr' && (
+            <Notice tone="warn">
+              Die Erkennung ist auf das französische Buch abgestimmt. Bei englischen Büchern klappt sie, wenn das Layout ähnlich ist
+              (Wort links, Deutsch rechts) – prüfe das Ergebnis bitte besonders genau.
+            </Notice>
+          )}
           <Notice tone="info">
             Das Foto wird nur auf deinem Gerät ausgewertet und <strong>nicht gespeichert oder hochgeladen</strong>. Die Texterkennung ist
             kostenlos und braucht keinen Schlüssel – sie ist aber nicht perfekt, darum prüfst du das Ergebnis vor dem Speichern.
@@ -230,7 +241,7 @@ export default function ScanModal({ bookId, language, defaultUnit, defaultPage, 
 
           {language === 'fr' && <AccentBar />}
 
-          {incomplete > 0 && <p className="text-xs text-amber-300">{incomplete} Zeile(n) ohne Französisch oder Deutsch werden nicht gespeichert.</p>}
+          {incomplete > 0 && <p className="text-xs text-amber-300">{incomplete} Zeile(n) ohne {foreignName} oder Deutsch werden nicht gespeichert.</p>}
 
           <div className="flex flex-wrap justify-end gap-2">
             <Button variant="ghost" onClick={onClose} disabled={phase === 'saving'}>

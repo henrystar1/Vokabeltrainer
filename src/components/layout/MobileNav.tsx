@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { NavLink, useLocation } from 'react-router-dom'
 import { LogOut, MoreHorizontal, X } from 'lucide-react'
-import { NAV_ITEMS } from '../../lib/navigation'
+import { navItemsFor } from '../../lib/navigation'
 import { useAuth } from '../../features/auth/AuthProvider'
 
 const PRIMARY = ['/', '/buecher', '/lernen', '/test']
@@ -9,7 +9,8 @@ const PRIMARY = ['/', '/buecher', '/lernen', '/test']
 /** Untere Tab-Leiste für Smartphone. Weitere Bereiche liegen unter „Mehr“. Auf dem iPad übernimmt die Sidebar. */
 export default function MobileNav() {
   const [open, setOpen] = useState(false)
-  const { displayName, signOut } = useAuth()
+  const { displayName, signOut, isStaff } = useAuth()
+  const NAV_ITEMS = navItemsFor(isStaff)
   const { pathname } = useLocation()
   const primary = NAV_ITEMS.filter((i) => PRIMARY.includes(i.to))
   const more = NAV_ITEMS.filter((i) => !PRIMARY.includes(i.to))

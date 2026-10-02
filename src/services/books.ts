@@ -16,9 +16,9 @@ export const listLanguages = async (): Promise<Language[]> => {
 export const listBooks = () => rpc<BookSummary[]>('get_book_summaries')
 
 export async function getBook(id: string) {
-  const { data, error } = await supabase.from('books').select('id,name,language,description').eq('id', id).maybeSingle()
+  const { data, error } = await supabase.from('books').select('id,name,language,description,is_public,owner_id').eq('id', id).maybeSingle()
   if (error) throw error
-  return data as { id: string; name: string; language: string; description: string | null } | null
+  return data as { id: string; name: string; language: string; description: string | null; is_public: boolean; owner_id: string } | null
 }
 
 export async function createBook(name: string, language: string, description: string): Promise<string> {
@@ -31,8 +31,11 @@ export async function createBook(name: string, language: string, description: st
   return data.id as string
 }
 
-export async function updateBook(id: string, name: string, description: string): Promise<void> {
-  const { error } = await supabase.from('books').update({ name: name.trim(), description: description.trim() || null }).eq('id', id)
+export async function updateBook(id: string, name: string, description: string, language: string): Promise<void> {
+  const { error } = await supabase
+    .from('books')
+    .update({ name: name.trim(), description: description.trim() || null, language })
+    .eq('id', id)
   if (error) throw error
 }
 

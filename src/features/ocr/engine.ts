@@ -10,14 +10,19 @@ const STATUS_DE: Record<string, string> = {
 
 /**
  * Tesseract (WebAssembly) im Browser: kostenlos, kein API-Schlüssel, das Bild bleibt auf dem Gerät.
- * Die Sprachdaten (Französisch + Deutsch) liegen unter public/tessdata und werden vom Browser zwischengespeichert.
+ * Die Sprachdaten (Fremdsprache + Deutsch) liegen unter public/tessdata und werden vom Browser zwischengespeichert.
  * Die Bibliothek wird erst beim ersten Einlesen nachgeladen.
  */
-export const tesseractEngine: OcrEngine = {
-  id: 'tesseract',
-  async recognize(image, onProgress) {
+/** Sprachcode des Buchs → Tesseract-Sprachpaket der Fremdsprache. */
+export const OCR_LANGUAGES: Record<string, string> = { fr: 'fra', en: 'eng' }
+
+export function createTesseractEngine(languageCode: string): OcrEngine {
+  const foreign = OCR_LANGUAGES[languageCode] ?? 'fra'
+  return {
+    id: `tesseract-${foreign}`,
+    async recognize(image, onProgress) {
     const { createWorker, PSM } = await import('tesseract.js')
-    const worker = await createWorker(['fra', 'deu'], 1, {
+    const worker = await createWorker([foreign, 'deu'], 1, {
       langPath: `${import.meta.env.BASE_URL}tessdata`,
       gzip: false,
       logger: (m: { status: string; progress: number }) => onProgress?.(m.progress, STATUS_DE[m.status] ?? m.status),
@@ -35,5 +40,8 @@ export const tesseractEngine: OcrEngine = {
     } finally {
       await worker.terminate()
     }
-  },
+    },
+  }
 }
+
+export const tesseractEngine = createTesseractEngine('fr')

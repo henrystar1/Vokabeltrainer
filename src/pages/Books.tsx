@@ -1,6 +1,6 @@
-import { useState, type FormEvent } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
-import { BookOpen, Brain, Plus, Upload } from 'lucide-react'
+import { useState, type FormEvent, type ReactNode } from 'react'
+import { Link, useNavigate, useSearchParams } from 'react-router-dom'
+import { BookOpen, Brain, Check, Globe, Plus, Upload, UserRound } from 'lucide-react'
 import Button from '../components/ui/Button'
 import Card from '../components/ui/Card'
 import { Field, Select, TextArea, TextInput } from '../components/ui/Field'
@@ -11,13 +11,48 @@ import { EmptyState, ErrorBox, Spinner } from '../components/ui/States'
 import { errorMessage } from '../lib/errors'
 import { useAsync } from '../lib/useAsync'
 import { createBook, listBooks, listLanguages } from '../services/books'
+import { addToLibrary, listPublicBooks, removeFromLibrary } from '../services/community'
 import { useSettings } from '../features/settings/SettingsProvider'
 
+type Tab = 'mine' | 'online'
+
 export default function Books() {
+  const [params, setParams] = useSearchParams()
+  const tab: Tab = params.get('tab') === 'online' ? 'online' : 'mine'
   const books = useAsync(listBooks, [])
+  const online = useAsync(listPublicBooks, [])
   const languages = useAsync(listLanguages, [])
   const [creating, setCreating] = useState(false)
+  const [busyId, setBusyId] = useState<string | null>(null)
+  const [actionError, setActionError] = useState<string | null>(null)
   const langName = (code: string) => languages.data?.find((l) => l.code === code)?.name ?? code
+
+  async function run(id: string, fn: () => Promise<void>) {
+    setBusyId(id)
+    setActionError(null)
+    try {
+      await fn()
+      books.reload()
+      online.reload()
+    } catch (e) {
+      setActionError(errorMessage(e))
+    } finally {
+      setBusyId(null)
+    }
+  }
+
+  const tabButton = (t: Tab, label: string, icon: ReactNode, count?: number) => (
+    <button
+      type="button"
+      onClick={() => setParams(t === 'mine' ? {} : { tab: t })}
+      className={`inline-flex min-h-[44px] items-center gap-2 rounded-xl px-4 text-sm font-medium transition ${
+        tab === t ? 'bg-accent-cyan/10 text-accent-cyan shadow-[inset_0_0_0_1px_rgba(34,211,238,0.25)]' : 'text-slate-400 hover:bg-white/5 hover:text-slate-100'
+      }`}
+    >
+      {icon} {label}
+      {count !== undefined && <span className="font-mono text-xs opacity-70">{count}</span>}
+    </button>
+  )
 
   return (
     <div>
@@ -36,42 +71,120 @@ export default function Books() {
         }
       />
 
-      {books.loading && !books.data && <Spinner />}
-      {books.error && <ErrorBox message={books.error} onRetry={books.reload} />}
-      {books.data && books.data.length === 0 && (
-        <EmptyState
-          title="Noch kein Buch"
-          text="Lege dein erstes Schulbuch an und trage die Vokabeln Seite für Seite ein – oder importiere eine Datei."
-          action={<Button onClick={() => setCreating(true)}>Erstes Buch anlegen</Button>}
-        />
+      <div className="mb-5 flex flex-wrap gap-2">
+        {tabButton('mine', 'Meine Bücher', <UserRound size={16} />, books.data?.length)}
+        {tabButton('online', 'Online', <Globe size={16} />, online.data?.length)}
+      </div>
+
+      {actionError && <div className="mb-4"><ErrorBox message={actionError} /></div>}
+
+      {tab === 'mine' && (
+        <>
+          {books.loading && !books.data && <Spinner />}
+          {books.error && <ErrorBox message={books.error} onRetry={books.reload} />}
+          {books.data && books.data.length === 0 && (
+            <EmptyState
+              title="Noch kein Buch"
+              text="Lege dein erstes Schulbuch an, trage die Vokabeln Seite für Seite ein – oder nutze ein Buch aus dem Bereich „Online“."
+              action={
+                <div className="flex flex-wrap justify-center gap-2">
+                  <Button onClick={() => setCreating(true)}>Erstes Buch anlegen</Button>
+                  <Button variant="secondary" onClick={() => setParams({ tab: 'online' })}>Online-Bücher ansehen</Button>
+                </div>
+              }
+            />
+          )}
+          <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+            {books.data?.map((b) => (
+              <Card key={b.id} interactive className="flex flex-col">
+                <Link to={`/buecher/${b.id}`} className="flex-1">
+                  <div className="flex items-start justify-between gap-3">
+                    <BookOpen className="text-accent-violet" size={24} />
+                    <span className="flex items-center gap-2">
+                      {b.is_public && (
+                        <span className="inline-flex items-center gap-1 rounded-full border border-accent-cyan/30 px-2 py-0.5 text-[10px] uppercase tracking-wider text-accent-cyan">
+                          <Globe size={10} /> Online
+                        </span>
+                      )}
+                      <span className="label-mono">{langName(b.language)}</span>
+                    </span>
+                  </div>
+                  <h2 className="mt-4 text-xl font-semibold">{b.name}</h2>
+                  <p className="mt-1 text-sm text-slate-400">
+                    {b.vocab_count} Vokabeln · {b.unit_count} Units · {b.page_count} Seiten
+                  </p>
+                  <div className="mt-4 space-y-1.5">
+                    <div className="flex justify-between text-xs text-slate-400">
+                      <span>Gelernt</span>
+                      <span className="font-mono text-accent-cyan">{Math.round(b.mastery_percent)}%</span>
+                    </div>
+                    <ProgressBar value={b.mastery_percent} label={`Fortschritt ${b.name}`} />
+                  </div>
+                </Link>
+                <Link to={`/lernen?buch=${b.id}`} className="btn-primary mt-5 w-full">
+                  <Brain size={18} /> Lernen
+                </Link>
+                {b.is_public && !b.is_mine && (
+                  <button
+                    type="button"
+                    disabled={busyId === b.id}
+                    onClick={() => void run(b.id, () => removeFromLibrary(b.id))}
+                    className="mt-2 min-h-[36px] text-xs text-slate-500 hover:text-rose-300"
+                  >
+                    Aus meinen Büchern entfernen (Fortschritt bleibt erhalten)
+                  </button>
+                )}
+              </Card>
+            ))}
+          </div>
+        </>
       )}
 
-      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
-        {books.data?.map((b) => (
-          <Card key={b.id} interactive className="flex flex-col">
-            <Link to={`/buecher/${b.id}`} className="flex-1">
-              <div className="flex items-start justify-between gap-3">
-                <BookOpen className="text-accent-violet" size={24} />
-                <span className="label-mono">{langName(b.language)}</span>
-              </div>
-              <h2 className="mt-4 text-xl font-semibold">{b.name}</h2>
-              <p className="mt-1 text-sm text-slate-400">
-                {b.vocab_count} Vokabeln · {b.unit_count} Units · {b.page_count} Seiten
-              </p>
-              <div className="mt-4 space-y-1.5">
-                <div className="flex justify-between text-xs text-slate-400">
-                  <span>Gelernt</span>
-                  <span className="font-mono text-accent-cyan">{Math.round(b.mastery_percent)}%</span>
-                </div>
-                <ProgressBar value={b.mastery_percent} label={`Fortschritt ${b.name}`} />
-              </div>
-            </Link>
-            <Link to={`/lernen?buch=${b.id}`} className="btn-primary mt-5 w-full">
-              <Brain size={18} /> Lernen
-            </Link>
-          </Card>
-        ))}
-      </div>
+      {tab === 'online' && (
+        <>
+          <p className="mb-4 max-w-2xl text-sm text-slate-400">
+            Diese Bücher haben Admins und Mods für alle bereitgestellt. Die Vokabeln sind fest vorgegeben, dein Lernfortschritt
+            gehört dir allein. Fehler kannst du bei einzelnen Vokabeln zur Prüfung melden.
+          </p>
+          {online.loading && !online.data && <Spinner />}
+          {online.error && <ErrorBox message={online.error} onRetry={online.reload} />}
+          {online.data && online.data.length === 0 && (
+            <EmptyState title="Noch keine Online-Bücher" text="Sobald ein Admin oder Mod ein Buch veröffentlicht, erscheint es hier." />
+          )}
+          <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+            {online.data?.map((b) => (
+              <Card key={b.id} className="flex flex-col">
+                <Link to={`/buecher/${b.id}`} className="flex-1">
+                  <div className="flex items-start justify-between gap-3">
+                    <Globe className="text-accent-cyan" size={24} />
+                    <span className="label-mono">{langName(b.language)}</span>
+                  </div>
+                  <h2 className="mt-4 text-xl font-semibold">{b.name}</h2>
+                  {b.description && <p className="mt-1 line-clamp-2 text-sm text-slate-400">{b.description}</p>}
+                  <p className="mt-1 text-sm text-slate-400">
+                    {b.vocab_count} Vokabeln · {b.unit_count} Units · {b.page_count} Seiten
+                  </p>
+                  {b.published_by_name && <p className="mt-1 text-xs text-slate-500">Bereitgestellt von {b.published_by_name}</p>}
+                </Link>
+                {b.in_library ? (
+                  <div className="mt-5 flex items-center gap-2">
+                    <span className="inline-flex min-h-[44px] items-center gap-1 text-sm text-emerald-300">
+                      <Check size={16} /> In meinen Büchern
+                    </span>
+                    <Link to={`/lernen?buch=${b.id}`} className="btn-primary ml-auto">
+                      <Brain size={18} /> Lernen
+                    </Link>
+                  </div>
+                ) : (
+                  <Button className="mt-5 w-full" busy={busyId === b.id} onClick={() => void run(b.id, () => addToLibrary(b.id))}>
+                    <Plus size={18} /> Dieses Buch verwenden
+                  </Button>
+                )}
+              </Card>
+            ))}
+          </div>
+        </>
+      )}
 
       {creating && <CreateBookModal onClose={() => setCreating(false)} languages={languages.data ?? []} />}
     </div>

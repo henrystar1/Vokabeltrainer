@@ -1,13 +1,22 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react'
 import type { Session, User } from '@supabase/supabase-js'
 import { supabase } from '../../lib/supabaseClient'
-import { loadDisplayName } from '../../services/settings'
+import { loadProfile } from '../../services/settings'
+import type { Role } from '../../types'
 
 interface AuthState {
   loading: boolean
   session: Session | null
   user: User | null
   displayName: string | null
+  /** Rolle des Benutzers (Standard: "user", bis das Profil geladen ist). */
+  role: Role
+  isStaff: boolean
+  isAdmin: boolean
+  /** true, wenn ein Admin das Konto gesperrt hat. */
+  blocked: boolean
+  /** true, sobald das Profil (und damit die Rolle) geladen ist. */
+  profileReady: boolean
   /** true, solange der Benutzer über den Link aus der Passwort-vergessen-Mail gekommen ist. */
   recovering: boolean
   signIn: (email: string, password: string) => Promise<void>
@@ -30,6 +39,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true)
   const [session, setSession] = useState<Session | null>(null)
   const [displayName, setDisplayName] = useState<string | null>(null)
+  const [role, setRole] = useState<Role>('user')
+  const [blocked, setBlocked] = useState(false)
+  const [profileReady, setProfileReady] = useState(false)
   const [recovering, setRecovering] = useState(false)
 
   useEffect(() => {
@@ -48,6 +60,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (event === 'SIGNED_OUT') {
         setRecovering(false)
         setDisplayName(null)
+        setRole('user')
+        setBlocked(false)
+        setProfileReady(false)
       }
     })
     return () => {
@@ -60,9 +75,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (!userId) return
     let active = true
-    loadDisplayName(userId)
-      .then((n) => active && setDisplayName(n))
+    loadProfile(userId)
+      .then((p) => {
+        if (!active || !p) return
+        setDisplayName(p.display_name)
+        setRole(p.role)
+        setBlocked(p.blocked)
+      })
       .catch(() => undefined)
+      .finally(() => active && setProfileReady(true))
     return () => {
       active = false
     }
@@ -104,6 +125,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       session,
       user: session?.user ?? null,
       displayName,
+      role,
+      isStaff: role === 'mod' || role === 'admin',
+      isAdmin: role === 'admin',
+      blocked,
+      profileReady,
       recovering,
       signIn,
       signUp,
@@ -112,7 +138,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setNewPassword,
       setDisplayNameLocal: setDisplayName,
     }),
-    [loading, session, displayName, recovering, signIn, signUp, signOut, sendReset, setNewPassword],
+    [loading, session, displayName, role, blocked, profileReady, recovering, signIn, signUp, signOut, sendReset, setNewPassword],
   )
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>
 }

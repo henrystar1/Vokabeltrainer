@@ -23,7 +23,7 @@ function Toggle({ label, checked, onChange }: { label: string; checked: boolean;
 }
 
 export default function Settings() {
-  const { user, displayName, setDisplayNameLocal, signOut } = useAuth()
+  const { user, displayName, role, setDisplayNameLocal, signOut } = useAuth()
   const { settings, update } = useSettings()
   const languages = useAsync(listLanguages, [])
   const [name, setName] = useState(displayName ?? '')
@@ -86,7 +86,10 @@ export default function Settings() {
             <Field label="Anzeigename" hint="Erscheint in der Rangliste.">
               <TextInput maxLength={30} value={name} onChange={(e) => setName(e.target.value)} />
             </Field>
-            <p className="text-sm text-slate-400">Angemeldet als {user?.email}</p>
+            <p className="text-sm text-slate-400">
+              Angemeldet als {user?.email}
+              {role !== 'user' && <span className="ml-2 rounded-full border border-accent-cyan/40 px-2 py-0.5 text-[10px] uppercase tracking-wider text-accent-cyan">{role === 'admin' ? 'Admin' : 'Mod'}</span>}
+            </p>
             <div className="flex flex-wrap gap-2">
               <Button type="submit" busy={busy} disabled={name.trim() === (displayName ?? '')}>Namen speichern</Button>
               <Button variant="secondary" onClick={() => void signOut()}>

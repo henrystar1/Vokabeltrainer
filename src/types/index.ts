@@ -12,6 +12,90 @@ export interface BookSummary {
   page_count: number
   vocab_count: number
   mastery_percent: number
+  is_public: boolean
+  is_mine: boolean
+}
+
+/** Öffentliches ("Online") Buch, das Admins/Mods veröffentlicht haben. */
+export interface PublicBook {
+  id: string
+  name: string
+  language: string
+  description: string | null
+  created_at: string
+  published_at: string | null
+  published_by_name: string | null
+  unit_count: number
+  page_count: number
+  vocab_count: number
+  mastery_percent: number
+  in_library: boolean
+  is_mine: boolean
+}
+
+export type Role = 'user' | 'mod' | 'admin'
+
+export interface Profile {
+  display_name: string
+  role: Role
+  blocked: boolean
+}
+
+export type ReviewStatus = 'open' | 'done' | 'dismissed'
+
+export interface VocabSnapshot {
+  german: string
+  german_alts: string[]
+  translations: string[]
+}
+
+export interface ReviewRequest {
+  id: string
+  status: ReviewStatus
+  message: string
+  created_at: string
+  book_id: string
+  book_name: string
+  language: string
+  vocabulary_id: string | null
+  requested_by_name: string | null
+  /** Stand der Vokabel zum Zeitpunkt der Anfrage. */
+  snapshot: VocabSnapshot
+  /** Aktueller Stand; null, wenn die Vokabel inzwischen ersetzt oder gelöscht wurde. */
+  current: VocabSnapshot | null
+  unit_number: number | null
+  page_number: number | null
+  resolved_by_name: string | null
+  resolved_at: string | null
+  resolution_note: string | null
+}
+
+export interface AdminUser {
+  user_id: string
+  display_name: string
+  email: string | null
+  role: Role
+  blocked: boolean
+  created_at: string
+  last_sign_in_at: string | null
+  book_count: number
+  public_book_count: number
+  vocab_count: number
+  progress_count: number
+  session_count: number
+  answer_count: number
+  approx_bytes: number
+}
+
+export interface AdminBook {
+  id: string
+  name: string
+  language: string
+  is_public: boolean
+  created_at: string
+  page_count: number
+  vocab_count: number
+  approx_bytes: number
 }
 
 export interface OutlinePage {
