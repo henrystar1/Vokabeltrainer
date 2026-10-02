@@ -8,7 +8,7 @@ import PageHeader from '../components/ui/PageHeader'
 import { ErrorBox, Notice, Spinner } from '../components/ui/States'
 import QuizRunner from '../components/quiz/QuizRunner'
 import ResultSummary, { type WrongAnswer } from '../components/quiz/ResultSummary'
-import { buildLearningQuestions, type Question } from '../features/learning/questions'
+import { buildLearningQuestions, buildMistakeQuestions, type Question } from '../features/learning/questions'
 import { LearningSession } from '../features/learning/session'
 import { useSettings } from '../features/settings/SettingsProvider'
 import { activeDirections } from '../features/settings/rules'
@@ -18,6 +18,7 @@ import { listBooks } from '../services/books'
 import { useWallet } from '../features/koins/WalletProvider'
 import { getWallet } from '../services/koins'
 import { activateNextPage } from '../services/community'
+import { getMistakePool } from '../services/play'
 import { addRepeatAnswers, getLearningPool, submitSession } from '../services/learning'
 
 type Phase = 'setup' | 'loading' | 'main' | 'result' | 'repeat' | 'repeat-result'
@@ -30,6 +31,7 @@ export default function Learn() {
   const [earned, setEarned] = useState(0)
   const books = useAsync(listBooks, [])
   const [bookId, setBookId] = useState(params.get('buch') ?? '')
+  const [mistakeMode, setMistakeMode] = useState(params.get('modus') === 'fehler')
   const [phase, setPhase] = useState<Phase>('setup')
   const [error, setError] = useState<string | null>(null)
   const [saveError, setSaveError] = useState<string | null>(null)
@@ -77,11 +79,14 @@ export default function Learn() {
     try {
       balanceAtStart.current = wallet.balance
       setEarned(0)
-      const pool = await getLearningPool(bookId ? null : settings.learn_language, bookId || null)
+      const pool = mistakeMode
+        ? await getMistakePool(bookId || null)
+        : await getLearningPool(bookId ? null : settings.learn_language, bookId || null)
       levels.current = Object.fromEntries(pool.map((v) => [v.vocabulary_id, v.level]))
-      const qs = buildLearningQuestions(pool, { directions, questionCount: settings.words_per_round })
+      const build = mistakeMode ? buildMistakeQuestions : buildLearningQuestions
+      const qs = build(pool, { directions, questionCount: settings.words_per_round })
       if (qs.length === 0) {
-        setError(pool.length === 0 ? 'Hier gibt es keine aktiven Vokabeln. Aktiviere im Buch zuerst Vokabeln (Seite „Buch“ → „Vokabeln aktivieren“) oder trage welche ein.' : 'Alle Vokabeln sind schon auf Stufe 5 – es gibt gerade nichts zu lernen. Stark!')
+        setError(mistakeMode ? 'Keine Fehler in den letzten 30 Tagen – es gibt nichts zu trainieren. Starke Leistung!' : pool.length === 0 ? 'Hier gibt es keine aktiven Vokabeln. Aktiviere im Buch zuerst Vokabeln (Seite „Buch“ → „Vokabeln aktivieren“) oder trage welche ein.' : 'Alle Vokabeln sind schon auf Stufe 5 – es gibt gerade nichts zu lernen. Stark!')
         setPhase('setup')
         return
       }
@@ -180,7 +185,7 @@ export default function Learn() {
         questions={questions}
         caseSensitive={settings.case_sensitive}
         accents={language === 'fr'}
-        title={phase === 'repeat' ? 'Fehler wiederholen' : 'Lernrunde'}
+        title={phase === 'repeat' ? 'Fehler wiederholen' : mistakeMode ? 'Fehler-Training' : 'Lernrunde'}
         onAnswer={phase === 'repeat' ? onRepeatAnswer : onMainAnswer}
         onFinish={() => void (phase === 'repeat' ? finishRepeat() : finishMain())}
         onCancel={() => setPhase('setup')}
@@ -191,7 +196,7 @@ export default function Learn() {
   if (phase === 'result') {
     return (
       <div>
-        <PageHeader eyebrow="Lernrunde" title="Geschafft" />
+        <PageHeader eyebrow={mistakeMode ? 'Fehler-Training' : 'Lernrunde'} title="Geschafft" />
         <ResultSummary total={questions.length} correct={correctCount} wrong={wrong} />
         <div className="mt-4 space-y-3">
           {levelChanges && (
@@ -249,6 +254,24 @@ export default function Learn() {
       <PageHeader eyebrow="Trainingsraum" title="Lernen" />
       {error && <div className="mb-4"><ErrorBox message={error} /></div>}
       <Card className="mx-auto max-w-xl space-y-5">
+        <div role="tablist" className="glass inline-flex w-full rounded-xl p-1">
+          {([[false, 'Normal lernen'], [true, 'Fehler-Training']] as const).map(([m, label]) => (
+            <button
+              key={label}
+              role="tab"
+              aria-selected={mistakeMode === m}
+              onClick={() => setMistakeMode(m)}
+              className={`min-h-[40px] flex-1 rounded-lg px-3 text-sm font-medium transition ${mistakeMode === m ? 'bg-accent-cyan/15 text-accent-cyan' : 'text-slate-400 hover:text-white'}`}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+        {mistakeMode && (
+          <p className="text-sm text-slate-400">
+            Hier kommen nur Vokabeln dran, die du in den letzten 30 Tagen falsch hattest – die schwersten zuerst. Dein Lernstand wird wie sonst angepasst.
+          </p>
+        )}
         <Field label="Was möchtest du lernen?">
           <Select value={bookId} onChange={(e) => setBookId(e.target.value)}>
             <option value="">Alle Bücher ({settings.learn_language.toUpperCase()})</option>
@@ -289,7 +312,7 @@ export default function Learn() {
           </div>
         )}
         <Button className="w-full min-h-[52px]" onClick={() => void start()}>
-          <Play size={18} /> Runde starten
+          <Play size={18} /> {mistakeMode ? 'Fehler-Training starten' : 'Runde starten'}
         </Button>
       </Card>
     </div>

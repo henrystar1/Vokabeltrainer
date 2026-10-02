@@ -172,3 +172,30 @@ export function buildTestQuestions(
   const order: Direction[] = (['backward', 'forward'] as const).filter((d) => opts.directions.includes(d))
   return order.flatMap((d) => usable.map((v) => makeQuestion(v, d, idx, rng)))
 }
+
+/**
+ * Fehler-Training: Vokabeln aus dem Fehlerpool (zuletzt falsch beantwortet), unabhängig davon, ob sie
+ * gerade „fällig“ sind. Jede wird in allen aktiven Richtungen abgefragt.
+ */
+export function buildMistakeQuestions(pool: readonly PoolVocab[], opts: LearnBuildOptions): Question[] {
+  const rng = opts.rng ?? Math.random
+  const usable = pool.filter((v) => v.translations.length > 0)
+  const picked = shuffle(usable, rng).slice(0, vocabCountFor(opts.questionCount, opts.directions))
+  const idx = buildIndexes(usable)
+  return orderQuestions(picked.flatMap((v) => opts.directions.map((d) => makeQuestion(v, d, idx, rng))), rng)
+}
+
+/** Sprint: jede Vokabel genau einmal, Richtung zufällig; gemischt, bis zu `max` Fragen. */
+export function buildSprintQuestions(pool: readonly PoolVocab[], max = 120, rng: Rng = Math.random): Question[] {
+  const usable = pool.filter((v) => v.translations.length > 0)
+  const idx = buildIndexes(usable)
+  return shuffle(usable, rng)
+    .slice(0, max)
+    .map((v) => makeQuestion(v, rng() < 0.5 ? 'forward' : 'backward', idx, rng))
+}
+
+/** Duell: Fragen mit vom Server vorgegebener Richtung. */
+export function buildDuelQuestions(items: ReadonlyArray<VocabLike & { direction: Direction }>, rng: Rng = Math.random): Question[] {
+  const idx = buildIndexes(items)
+  return items.map((it) => makeQuestion(it, it.direction, idx, rng))
+}

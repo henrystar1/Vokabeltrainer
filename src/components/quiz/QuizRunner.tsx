@@ -21,16 +21,22 @@ interface QuizRunnerProps {
   accents?: boolean
   /** Wird nach Bestätigung des "X" aufgerufen. Die laufende Runde wird dann verworfen. */
   onCancel?: () => void
+  /** Sprint: Gesamtzeit in Sekunden; danach wird onFinish automatisch aufgerufen. */
+  timeLimitSeconds?: number
 }
 
 const DIRECTION_LABEL = { forward: 'Deutsch → Fremdsprache', backward: 'Fremdsprache → Deutsch' } as const
 
 /** Abfrageoberfläche: eine Frage nach der anderen, getippte Antwort, sofortige Rückmeldung. */
-export default function QuizRunner({ questions, caseSensitive, onAnswer, onFinish, showFeedback = true, title, accents = false, onCancel }: QuizRunnerProps) {
+export default function QuizRunner({ questions, caseSensitive, onAnswer, onFinish, showFeedback = true, title, accents = false, onCancel, timeLimitSeconds }: QuizRunnerProps) {
   const [index, setIndex] = useState(0)
   const [value, setValue] = useState('')
   const [result, setResult] = useState<{ correct: boolean } | null>(null)
   const [confirmCancel, setConfirmCancel] = useState(false)
+  const [left, setLeft] = useState(timeLimitSeconds ?? 0)
+  const finishRef = useRef(onFinish)
+  finishRef.current = onFinish
+  const doneRef = useRef(false)
   const inputRef = useRef<HTMLInputElement>(null)
   const q = questions[index]
 
@@ -45,6 +51,21 @@ export default function QuizRunner({ questions, caseSensitive, onAnswer, onFinis
   }, [])
 
   useEffect(() => {
+    if (!timeLimitSeconds) return
+    const end = Date.now() + timeLimitSeconds * 1000
+    const t = window.setInterval(() => {
+      const rest = Math.max(0, Math.ceil((end - Date.now()) / 1000))
+      setLeft(rest)
+      if (rest <= 0 && !doneRef.current) {
+        doneRef.current = true
+        window.clearInterval(t)
+        finishRef.current()
+      }
+    }, 250)
+    return () => window.clearInterval(t)
+  }, [timeLimitSeconds])
+
+  useEffect(() => {
     inputRef.current?.focus()
   }, [index])
 
@@ -53,7 +74,12 @@ export default function QuizRunner({ questions, caseSensitive, onAnswer, onFinis
   function advance() {
     setResult(null)
     setValue('')
-    if (index + 1 >= questions.length) onFinish()
+    if (index + 1 >= questions.length) {
+      if (!doneRef.current) {
+        doneRef.current = true
+        onFinish()
+      }
+    }
     else setIndex(index + 1)
   }
 
@@ -75,9 +101,15 @@ export default function QuizRunner({ questions, caseSensitive, onAnswer, onFinis
         <div className="flex items-center justify-between">
           <span className="label-mono">{title ?? 'Abfrage'}</span>
           <div className="flex items-center gap-3">
-            <span className="font-mono text-sm text-slate-400">
-              {index + 1} / {questions.length}
-            </span>
+            {timeLimitSeconds ? (
+              <span className={`font-mono text-lg ${left <= 10 ? 'text-rose-300' : 'text-accent-cyan'}`} aria-label="Verbleibende Zeit">
+                {left}s
+              </span>
+            ) : (
+              <span className="font-mono text-sm text-slate-400">
+                {index + 1} / {questions.length}
+              </span>
+            )}
             {onCancel && (
               <button
                 type="button"
@@ -90,7 +122,10 @@ export default function QuizRunner({ questions, caseSensitive, onAnswer, onFinis
             )}
           </div>
         </div>
-        <ProgressBar value={(index / questions.length) * 100} label="Fortschritt der Runde" />
+        <ProgressBar
+          value={timeLimitSeconds ? (left / timeLimitSeconds) * 100 : (index / questions.length) * 100}
+          label="Fortschritt der Runde"
+        />
       </div>
 
       <form onSubmit={submit} className="glass rounded-3xl p-6 shadow-glow sm:p-10">

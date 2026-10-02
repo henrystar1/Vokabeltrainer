@@ -23,6 +23,9 @@ const REASONS: Record<string, string> = {
   shop: 'Shop-Einkauf',
   feedback: 'Feedback belohnt',
   admin: 'Geschenk vom Admin',
+  quest: 'Quest abgeschlossen',
+  league: 'Liga-Belohnung',
+  duel: 'Duell gewonnen',
 }
 
 const ROLE_LABEL = { user: 'Lernender', mod: 'Moderator', admin: 'Admin' } as const

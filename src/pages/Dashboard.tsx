@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom'
-import { BookOpen, Brain, ClipboardCheck, Search } from 'lucide-react'
+import { BookOpen, Brain, ClipboardCheck, Search, Swords, Target, Zap } from 'lucide-react'
 import Card from '../components/ui/Card'
 import ProgressBar from '../components/ui/ProgressBar'
 import { ErrorBox } from '../components/ui/States'
@@ -11,6 +11,9 @@ const ACTIONS = [
   { to: '/lernen', label: 'Lernen', text: 'Gewichtete Lernrunde starten', icon: Brain },
   { to: '/buecher', label: 'Bücher', text: 'Units, Seiten und Vokabeln verwalten', icon: BookOpen },
   { to: '/test', label: 'Test', text: 'Bereich auswählen und abfragen', icon: ClipboardCheck },
+  { to: '/quests', label: 'Quests', text: 'Tagesziele und Lern-Serie', icon: Target },
+  { to: '/sprint', label: 'Sprint', text: '60 Sekunden gegen die Uhr', icon: Zap },
+  { to: '/duell', label: 'Duelle', text: 'Gemeinsam lernen: Freunde herausfordern', icon: Swords },
   { to: '/suche', label: 'Suche', text: 'Vokabeln in allen Büchern finden', icon: Search },
 ]
 

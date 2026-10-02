@@ -109,3 +109,34 @@ describe('buildTestQuestions', () => {
     expect(qs.map((q) => q.id)).toEqual(['v0:backward', 'v1:backward', 'v2:backward', 'v0:forward', 'v1:forward', 'v2:forward'])
   })
 })
+
+describe('Fehler-Training, Sprint und Duell', () => {
+  const pool = Array.from({ length: 8 }, (_, i) => ({
+    vocabulary_id: `v${i}`,
+    book_id: 'b',
+    german: `de${i}`,
+    german_alts: [],
+    translations: [`fr${i}`],
+    level: 5,
+  }))
+
+  it('Fehler-Training ignoriert Fälligkeit (auch Stufe 5)', async () => {
+    const { buildMistakeQuestions } = await import('./questions')
+    const qs = buildMistakeQuestions(pool, { directions: ['forward'], questionCount: 5 })
+    expect(qs).toHaveLength(5)
+  })
+
+  it('Sprint: eine Frage je Vokabel, höchstens max', async () => {
+    const { buildSprintQuestions } = await import('./questions')
+    expect(buildSprintQuestions(pool, 5)).toHaveLength(5)
+    expect(new Set(buildSprintQuestions(pool).map((q) => q.vocabularyId)).size).toBe(8)
+  })
+
+  it('Duell nutzt die vorgegebene Richtung', async () => {
+    const { buildDuelQuestions } = await import('./questions')
+    const qs = buildDuelQuestions([{ vocabulary_id: 'v0', german: 'Haus', german_alts: [], translations: ['maison'], direction: 'backward' }])
+    expect(qs[0].direction).toBe('backward')
+    expect(qs[0].prompt).toBe('maison')
+    expect(qs[0].accepted).toContain('Haus')
+  })
+})

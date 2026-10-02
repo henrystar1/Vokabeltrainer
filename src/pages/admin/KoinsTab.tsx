@@ -26,6 +26,16 @@ const SETTING_LABEL: Record<string, string> = {
   code_default_amount: 'Koins pro Code (Standard)',
   daily_bonus_mod: 'Tagesbonus Mods',
   daily_bonus_admin: 'Tagesbonus Admin',
+  quest_reward_answers: 'Quest „Fleißig“: Koins',
+  quest_reward_perfect: 'Quest „Fehlerfrei“: Koins',
+  quest_reward_sprint: 'Quest „Sprinter“: Koins',
+  quest_reward_duel: 'Quest „Herausforderer“: Koins',
+  league_reward_1: 'Liga: Koins für Platz 1',
+  league_reward_2: 'Liga: Koins für Platz 2',
+  league_reward_3: 'Liga: Koins für Platz 3',
+  league_min_points: 'Liga: Mindestpunkte pro Woche (sonst Abstieg)',
+  duel_reward: 'Duell-Sieg: Koins',
+  duel_daily_cap: 'Duell-Siege mit Koins pro Tag',
 }
 
 /** Nur für Admins: Codes, Zahlen, Shop-Preise, Geschenke. */

@@ -347,3 +347,103 @@ export interface NextPageResult {
   page_number: number
   count: number
 }
+
+// ---- Liga, Quests, Sprint, Duelle (Migration 0007) ----
+
+export interface SprintRow extends Flair {
+  rank: number
+  display_name: string
+  score: number
+  is_me: boolean
+}
+
+export interface Streak {
+  current: number
+  best: number
+  today_done: boolean
+}
+
+export type QuestId = 'answers' | 'perfect' | 'sprint' | 'duel'
+
+export interface Quest {
+  id: QuestId
+  progress: number
+  goal: number
+  reward: number
+  claimed: boolean
+}
+
+export interface LeagueRow extends Flair {
+  rank: number
+  display_name: string
+  points: number
+  is_me: boolean
+}
+
+export interface LeagueLast {
+  week_start: string
+  tier: number
+  rank: number | null
+  result: 'promoted' | 'relegated' | 'stayed'
+  reward: number
+  points: number
+}
+
+export interface League {
+  tier: number
+  week_start: string
+  ends_at: string
+  participants: number
+  relegation_active: boolean
+  min_points: number
+  rewards: number[]
+  rows: LeagueRow[]
+  last: LeagueLast | null
+}
+
+export interface PlayerHit extends Flair {
+  user_id: string
+  display_name: string
+}
+
+export interface Duel {
+  id: string
+  status: 'open' | 'finished' | 'cancelled'
+  created_at: string
+  i_am_challenger: boolean
+  opponent_name: string
+  opponent: Flair
+  question_count: number
+  my_done: boolean
+  opp_done: boolean
+  my_correct: number | null
+  my_total: number | null
+  opp_correct: number | null
+  winner: 'me' | 'opp' | 'tie' | null
+}
+
+export interface DuelQuestion {
+  vocabulary_id: string
+  direction: Direction
+  german: string
+  german_alts: string[]
+  translations: string[]
+}
+
+export interface DuelDetail {
+  id: string
+  status: Duel['status']
+  opponent_name: string
+  my_done: boolean
+  my_correct: number | null
+  my_total: number | null
+  opp_correct: number | null
+  winner: Duel['winner']
+  questions: DuelQuestion[]
+}
+
+export interface DuelSubmitResult {
+  status: Duel['status']
+  winner: Duel['winner']
+  opp_correct?: number
+}

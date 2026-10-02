@@ -7,18 +7,20 @@ import { EmptyState, ErrorBox, Spinner } from '../components/ui/States'
 import { useAsync } from '../lib/useAsync'
 import { getLeaderboard } from '../services/stats'
 import type { LeaderboardPeriod } from '../types'
+import LeagueView from './LeagueView'
 
-const PERIODS: Array<{ id: LeaderboardPeriod; label: string }> = [
+const PERIODS: Array<{ id: LeaderboardPeriod | 'league'; label: string }> = [
   { id: 'week', label: 'Woche' },
   { id: 'month', label: 'Monat' },
   { id: 'all', label: 'Gesamt' },
+  { id: 'league', label: 'Liga' },
 ]
 
 const MEDAL = ['text-amber-300', 'text-slate-300', 'text-orange-400']
 
 export default function Leaderboard() {
-  const [period, setPeriod] = useState<LeaderboardPeriod>('week')
-  const board = useAsync(() => getLeaderboard(period), [period])
+  const [period, setPeriod] = useState<LeaderboardPeriod | 'league'>('week')
+  const board = useAsync(() => (period === 'league' ? Promise.resolve([]) : getLeaderboard(period)), [period])
 
   return (
     <div>
@@ -39,6 +41,8 @@ export default function Leaderboard() {
         ))}
       </div>
 
+      {period === 'league' && <LeagueView />}
+      {period !== 'league' && (<>
       {board.loading && !board.data && <Spinner />}
       {board.error && <ErrorBox message={board.error} onRetry={board.reload} />}
       {board.data && board.data.length === 0 && <EmptyState title="Noch niemand auf der Rangliste" text="Starte eine Lernrunde, um Punkte zu sammeln." />}
@@ -67,6 +71,7 @@ export default function Leaderboard() {
         Punkte: pro richtiger Antwort 2 Punkte (max. 200 Antworten pro Tag), 25 Punkte Bonus für jeden aktiven Tag und bis zu 20 Punkte für eine hohe Trefferquote.
         Die Größe deiner Bücher spielt keine Rolle.
       </p>
+      </>)}
     </div>
   )
 }

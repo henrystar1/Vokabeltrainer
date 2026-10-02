@@ -49,7 +49,7 @@ export default function PresenceProvider({ children }: { children: ReactNode }) 
     <>
       {children}
       {messages.length > 0 && (
-        <Modal title={messages.length === 1 ? 'Nachricht vom Admin' : `${messages.length} Nachrichten vom Admin`} onClose={() => void confirm()}>
+        <Modal title={messages.length === 1 ? 'Nachricht' : `${messages.length} Nachrichten`} onClose={() => void confirm()}>
           <div className="space-y-3">
             {messages.map((m) => (
               <div key={m.id} className="rounded-xl border border-accent-cyan/30 bg-accent-cyan/5 p-4">

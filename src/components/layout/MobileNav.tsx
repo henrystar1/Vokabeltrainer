@@ -27,7 +27,7 @@ export default function MobileNav() {
       {open && (
         <div className="fixed inset-0 z-40 bg-black/60 backdrop-blur-sm md:hidden" onClick={() => setOpen(false)}>
           <div
-            className="glass absolute inset-x-3 bottom-[76px] space-y-1 rounded-2xl p-3"
+            className="glass absolute inset-x-3 bottom-[76px] max-h-[70vh] space-y-1 overflow-y-auto rounded-2xl p-3"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="flex items-center justify-between px-3 pb-2 pt-1">

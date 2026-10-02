@@ -16,6 +16,10 @@ import Leaderboard from './pages/Leaderboard'
 import Learn from './pages/Learn'
 import Placeholder from './pages/Placeholder'
 import Feedback from './pages/Feedback'
+import Duels from './pages/Duels'
+import DuelPlay from './pages/DuelPlay'
+import Quests from './pages/Quests'
+import Sprint from './pages/Sprint'
 import Profile from './pages/Profile'
 import Shop from './pages/Shop'
 import Search from './pages/Search'
@@ -52,6 +56,10 @@ export default function App() {
           <Route path="suche" element={<Search />} />
           <Route path="lernen" element={<Learn />} />
           <Route path="test" element={<Test />} />
+          <Route path="quests" element={<Quests />} />
+          <Route path="sprint" element={<Sprint />} />
+          <Route path="duell" element={<Duels />} />
+          <Route path="duell/:id" element={<DuelPlay />} />
           <Route path="statistik" element={<Stats />} />
           <Route path="rangliste" element={<Leaderboard />} />
           <Route path="shop" element={<Shop />} />

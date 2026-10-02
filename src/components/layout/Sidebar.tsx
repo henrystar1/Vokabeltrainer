@@ -25,7 +25,7 @@ export default function Sidebar({ collapsed, onToggle }: SidebarProps) {
         {!collapsed && <span className="truncate text-[15px] font-semibold tracking-tight">Vokabeltrainer</span>}
       </div>
 
-      <nav className="mt-2 flex-1 space-y-1 px-3">
+      <nav className="mt-2 flex-1 space-y-1 overflow-y-auto px-3">
         {navItemsFor(isStaff).map(({ to, label, icon: Icon }) => (
           <NavLink
             key={to}
