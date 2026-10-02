@@ -1,4 +1,4 @@
-import { BookOpen, MessageSquarePlus, ShoppingBag, UserCircle, Brain, ClipboardCheck, Home, Search, Settings, ShieldCheck, Trophy, BarChart3, Target, Swords, Zap, type LucideIcon } from 'lucide-react'
+import { BookOpen, MessageSquarePlus, ShoppingBag, UserCircle, Brain, ClipboardCheck, Home, Search, Settings, ShieldCheck, Trophy, BarChart3, MessagesSquare, Target, Swords, Zap, type LucideIcon } from 'lucide-react'
 
 export interface NavItem {
   to: string
@@ -12,6 +12,7 @@ export const NAV_ITEMS: NavItem[] = [
   { to: '/suche', label: 'Suche', icon: Search },
   { to: '/lernen', label: 'Lernen', icon: Brain },
   { to: '/test', label: 'Test', icon: ClipboardCheck },
+  { to: '/chat', label: 'Chat', icon: MessagesSquare },
   { to: '/quests', label: 'Quests', icon: Target },
   { to: '/sprint', label: 'Sprint', icon: Zap },
   { to: '/duell', label: 'Duelle', icon: Swords },

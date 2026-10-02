@@ -447,3 +447,13 @@ export interface DuelSubmitResult {
   winner: Duel['winner']
   opp_correct?: number
 }
+
+// ---- Chat (Migration 0008) ----
+
+export interface ChatMessage extends Flair {
+  id: number
+  body: string
+  created_at: string
+  is_me: boolean
+  display_name: string
+}
