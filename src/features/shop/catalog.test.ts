@@ -1,17 +1,23 @@
 import { describe, expect, it } from 'vitest'
-import { AVATARS, EFFECT_CLASSES, NAME_COLORS, THEMES, hexToTriplet } from './catalog'
+import { AVATARS, EFFECT_CLASSES, NAME_COLORS, TAGS, THEMES, hexToTriplet } from './catalog'
+import { ANIMATED_AVATARS } from './AnimatedAvatar'
 
-// Die Artikel-IDs stehen in der Migration; der Katalog muss jede davon kennen.
-const files = import.meta.glob('../../../supabase/migrations/0005_koins_shop.sql', { query: '?raw', import: 'default', eager: true }) as Record<string, string>
-const sql = Object.values(files)[0] ?? ''
-const seeded = [...sql.matchAll(/\('((?:avatar|color|effect|theme)_[a-z]+)', '(avatar|color|effect|theme)'/g)].map((m) => [m[1], m[2]])
+// Die Artikel-IDs stehen in den Migrationen; der Katalog muss jede davon kennen.
+const files = import.meta.glob('../../../supabase/migrations/000[56]_*.sql', { query: '?raw', import: 'default', eager: true }) as Record<string, string>
+const sql = Object.values(files).join('\n')
+const seeded = [...sql.matchAll(/\('((?:avatar|color|effect|theme|tag)_[a-z_]+)',\s*'(avatar|color|effect|theme|tag)'/g)].map((m) => [m[1], m[2]])
 
 describe('Shop-Katalog', () => {
   it('kennt alle in der Datenbank angelegten Artikel', () => {
-    expect(seeded.length).toBe(48)
+    expect(seeded.length).toBe(48 + 17)
     for (const [id, kind] of seeded) {
-      const known = kind === 'avatar' ? AVATARS : kind === 'color' ? NAME_COLORS : kind === 'effect' ? EFFECT_CLASSES : THEMES
-      expect(known[id], id).toBeDefined()
+      const known =
+        kind === 'avatar' ? { ...AVATARS, ...Object.fromEntries(ANIMATED_AVATARS.map((a) => [a, true])) }
+        : kind === 'color' ? NAME_COLORS
+        : kind === 'effect' ? EFFECT_CLASSES
+        : kind === 'tag' ? TAGS
+        : THEMES
+      expect(known[id as keyof typeof known], id).toBeDefined()
     }
   })
 

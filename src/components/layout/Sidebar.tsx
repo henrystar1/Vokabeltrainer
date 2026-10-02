@@ -49,7 +49,7 @@ export default function Sidebar({ collapsed, onToggle }: SidebarProps) {
       <div className="space-y-2 border-t border-white/10 p-3">
         <div className="flex min-h-[48px] items-center gap-3 rounded-xl px-3 text-slate-300">
           {collapsed ? (
-            <PlayerTag name={displayName ?? 'Benutzer'} cosmetics={cosmetics} className="[&>span:last-child]:hidden" />
+            <PlayerTag name={displayName ?? 'Benutzer'} cosmetics={{ ...cosmetics, role: undefined, tag_id: null }} className="[&>span:not(:first-child)]:hidden" />
           ) : (
             <div className="min-w-0">
               <PlayerTag name={displayName ?? 'Benutzer'} cosmetics={cosmetics} />

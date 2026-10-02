@@ -9,16 +9,17 @@ import KoinBadge from '../components/profile/KoinBadge'
 import { Avatar, StyledName } from '../components/profile/PlayerTag'
 import { useAuth } from '../features/auth/AuthProvider'
 import { useWallet } from '../features/koins/WalletProvider'
-import { AVATARS, KIND_LABEL, THEMES } from '../features/shop/catalog'
+import { AVATARS, KIND_LABEL, TAGS, THEMES } from '../features/shop/catalog'
 import { errorMessage } from '../lib/errors'
 import { useAsync } from '../lib/useAsync'
 import { buyItem, equipItem, getShop, unequipItem } from '../services/koins'
 import type { ShopItem, ShopKind } from '../types'
 
-const KINDS: ShopKind[] = ['avatar', 'color', 'effect', 'theme']
+const KINDS: ShopKind[] = ['avatar', 'color', 'effect', 'tag', 'theme']
 
 function Preview({ item, name, cosmetics }: { item: ShopItem; name: string; cosmetics: { color_id: string | null; effect_id: string | null } }) {
-  if (item.kind === 'avatar') return <Avatar name={name} avatarId={item.id} size={56} />
+  if (item.kind === 'avatar') return <Avatar name={name} avatarId={item.id} size={item.price >= 700 ? 76 : 56} />
+  if (item.kind === 'tag') return <span className={`tag ${TAGS[item.id]?.className ?? ''} !text-xs`}>{TAGS[item.id]?.label ?? item.name}</span>
   if (item.kind === 'color') return <StyledName name={name} colorId={item.id} className="text-xl font-semibold" />
   if (item.kind === 'effect') return <StyledName name={name} colorId={cosmetics.color_id} effectId={item.id} className="text-xl font-semibold" />
   const t = THEMES[item.id]
@@ -60,7 +61,7 @@ export default function Shop() {
     <div>
       <PageHeader eyebrow="Koins ausgeben" title="Shop" actions={<KoinBadge />} />
       <p className="mb-4 max-w-2xl text-sm text-slate-400">
-        Profilbilder, Namensfarben und Effekte siehst du auf deinem Profil und in der Rangliste – alle anderen sehen sie auch.
+        Profilbilder, Namensfarben, Effekte und Tags siehst du auf deinem Profil und in der Rangliste – alle anderen sehen sie auch.
         Designs ändern die Farben und den Hintergrund der ganzen Website, aber nur für dich.
       </p>
 
@@ -104,8 +105,10 @@ export default function Shop() {
                   </div>
                   <div className="flex items-center justify-between gap-2">
                     <span className="font-medium">{item.name}</span>
-                    {item.kind === 'avatar' && <span className="text-lg">{AVATARS[item.id]}</span>}
+                    {item.kind === 'avatar' && AVATARS[item.id] && <span className="text-lg">{AVATARS[item.id]}</span>}
+                    {item.required_role && <span className="tag tag-admin">{item.required_role === 'admin' ? 'Nur Admin' : 'Nur Mods'}</span>}
                   </div>
+                  {item.price > 0 && item.kind !== 'theme' && <p className="-mt-1 text-xs text-slate-500">{item.price >= 4000 ? 'Sehr selten' : item.price >= 1000 ? 'Selten' : ''}</p>}
                   {equipped ? (
                     <span className="inline-flex min-h-[44px] items-center justify-center gap-2 rounded-xl bg-accent-cyan/10 text-sm text-accent-cyan">
                       <Check size={16} /> Ausgewählt
@@ -116,7 +119,7 @@ export default function Shop() {
                     </Button>
                   ) : (
                     <Button disabled={busy || !affordable} onClick={() => setConfirm(item)}>
-                      <Coins size={16} /> {item.price} Koins
+                      <Coins size={16} /> {item.price.toLocaleString('de-DE')} Koins
                     </Button>
                   )}
                   {!item.owned && !affordable && <p className="text-xs text-slate-500">Dir fehlen {item.price - wallet.balance} Koins.</p>}

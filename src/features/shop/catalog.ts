@@ -1,5 +1,5 @@
 import type { CSSProperties } from 'react'
-import type { ShopKind } from '../../types'
+import type { Role, ShopKind } from '../../types'
 
 /**
  * Aussehen der Shop-Artikel. Die Datenbank kennt nur ID, Name und Preis;
@@ -51,6 +51,32 @@ export const EFFECT_CLASSES: Record<string, string> = {
   effect_shimmer: 'fx-shimmer',
   effect_rainbow: 'fx-rainbow',
   effect_fire: 'fx-fire',
+  // Nur für Mods/Admins
+  effect_mod_aura: 'fx-mod-aura',
+  effect_mod_bolt: 'fx-mod-bolt',
+  effect_admin_royal: 'fx-admin-royal',
+  effect_admin_void: 'fx-admin-void',
+}
+
+/** Spender-Tags aus dem Shop (Klasse in index.css). */
+export const TAGS: Record<string, { label: string; className: string }> = {
+  tag_supporter: { label: 'Unterstützer', className: 'tag-supporter' },
+  tag_big: { label: 'Big Spender', className: 'tag-big' },
+  tag_master: { label: 'Master Spender', className: 'tag-master' },
+  tag_legend: { label: 'Legende', className: 'tag-legend' },
+  tag_king: { label: 'Koin-König', className: 'tag-king' },
+}
+
+/** Automatische Rollen-Tags (nicht kaufbar). */
+export const ROLE_TAGS: Partial<Record<Role, { label: string; className: string }>> = {
+  mod: { label: 'MOD', className: 'tag-mod' },
+  admin: { label: 'ADMIN', className: 'tag-admin' },
+}
+
+/** Rahmenfarbe um den Namen in der Rangliste = Hauptfarbe des gewählten Designs (Standarddesign: kein Rahmen). */
+export function themeFrameColor(themeId: string | null | undefined): string | null {
+  if (!themeId || themeId === DEFAULT_THEME) return null
+  return THEMES[themeId]?.cyan ?? null
 }
 
 export function nameColorStyle(colorId: string | null | undefined): { className: string; style: CSSProperties } {
@@ -149,6 +175,7 @@ export const KIND_LABEL: Record<ShopKind, string> = {
   color: 'Namensfarben',
   effect: 'Effekte',
   theme: 'Designs',
+  tag: 'Tags',
 }
 
 export function hexToTriplet(hex: string): string {

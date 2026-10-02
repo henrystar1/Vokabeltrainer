@@ -1,6 +1,6 @@
 import { useMemo, useRef, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
-import { Play, RotateCcw, Settings as SettingsIcon } from 'lucide-react'
+import { ChevronsRight, Play, RotateCcw, Settings as SettingsIcon } from 'lucide-react'
 import Button from '../components/ui/Button'
 import Card from '../components/ui/Card'
 import { Field, Select } from '../components/ui/Field'
@@ -17,6 +17,7 @@ import { useAsync } from '../lib/useAsync'
 import { listBooks } from '../services/books'
 import { useWallet } from '../features/koins/WalletProvider'
 import { getWallet } from '../services/koins'
+import { activateNextPage } from '../services/community'
 import { addRepeatAnswers, getLearningPool, submitSession } from '../services/learning'
 
 type Phase = 'setup' | 'loading' | 'main' | 'result' | 'repeat' | 'repeat-result'
@@ -50,6 +51,24 @@ export default function Learn() {
   const correctRef = useRef(0)
   const repeatWrongRef = useRef<WrongAnswer[]>([])
   const repeatCorrectRef = useRef(0)
+
+  const selected = bookId ? books.data?.find((b) => b.id === bookId) : undefined
+  const [unlocking, setUnlocking] = useState(false)
+  const [unlockMsg, setUnlockMsg] = useState<string | null>(null)
+
+  async function unlockNext() {
+    setUnlocking(true)
+    setUnlockMsg(null)
+    try {
+      const r = await activateNextPage(bookId)
+      setUnlockMsg(r ? `Unit ${r.unit_number}, Seite ${r.page_number} freigeschaltet (${r.count} Vokabeln).` : 'Alles ist schon aktiv.')
+      books.reload()
+    } catch (e) {
+      setError(errorMessage(e))
+    } finally {
+      setUnlocking(false)
+    }
+  }
 
   async function start() {
     setPhase('loading')
@@ -251,6 +270,24 @@ export default function Learn() {
             <SettingsIcon size={14} /> Einstellungen ändern
           </Link>
         </div>
+        {selected && (
+          <div className="rounded-xl border border-white/10 bg-space-900/50 p-4 text-sm">
+            <p className="text-slate-300">
+              <span className="font-mono text-accent-cyan">{selected.active_count}</span> von {selected.vocab_count} Vokabeln aktiv
+            </p>
+            {selected.active_count < selected.vocab_count && (
+              <Button
+                variant="secondary"
+                className="mt-3"
+                busy={unlocking}
+                onClick={() => void unlockNext()}
+              >
+                <ChevronsRight size={16} /> Nächste Seite freischalten
+              </Button>
+            )}
+            {unlockMsg && <p className="mt-2 text-xs text-emerald-300">{unlockMsg}</p>}
+          </div>
+        )}
         <Button className="w-full min-h-[52px]" onClick={() => void start()}>
           <Play size={18} /> Runde starten
         </Button>

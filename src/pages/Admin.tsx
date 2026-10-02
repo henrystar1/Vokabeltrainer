@@ -1,13 +1,14 @@
 import { useState, type ReactNode } from 'react'
-import { Coins, Flag, MessageSquarePlus, Users } from 'lucide-react'
+import { Coins, Flag, MessageSquarePlus, Radio, Users } from 'lucide-react'
 import PageHeader from '../components/ui/PageHeader'
 import { useAuth } from '../features/auth/AuthProvider'
 import FeedbackTab from './admin/FeedbackTab'
 import KoinsTab from './admin/KoinsTab'
+import OnlineTab from './admin/OnlineTab'
 import ReviewsTab from './admin/ReviewsTab'
 import UsersTab from './admin/UsersTab'
 
-type Tab = 'reviews' | 'feedback' | 'users' | 'koins'
+type Tab = 'reviews' | 'feedback' | 'users' | 'koins' | 'online'
 
 /** Verwaltung für Mods (Prüfanfragen) und Admins (zusätzlich Benutzer). */
 export default function Admin() {
@@ -32,6 +33,7 @@ export default function Admin() {
       <div className="mb-5 flex flex-wrap gap-2">
         {button('reviews', 'Prüfanfragen', <Flag size={16} />)}
         {button('feedback', 'Feedback', <MessageSquarePlus size={16} />)}
+        {isAdmin && button('online', 'Online & Nachrichten', <Radio size={16} />)}
         {isAdmin && button('users', 'Benutzer', <Users size={16} />)}
         {isAdmin && button('koins', 'Koins & Shop', <Coins size={16} />)}
       </div>
@@ -39,6 +41,7 @@ export default function Admin() {
       {tab === 'feedback' && <FeedbackTab />}
       {tab === 'users' && isAdmin && <UsersTab />}
       {tab === 'koins' && isAdmin && <KoinsTab />}
+      {tab === 'online' && isAdmin && <OnlineTab />}
     </div>
   )
 }

@@ -1,5 +1,5 @@
 import { supabase } from '../lib/supabaseClient'
-import type { AppSettings, FeedbackItem, FeedbackKind, FeedbackStatus, KoinCode, LedgerEntry, RedeemResult, ShopItem } from '../types'
+import type { AppSettings, OnlineUser, SentMessage, UserMessage, FeedbackItem, FeedbackKind, FeedbackStatus, KoinCode, LedgerEntry, RedeemResult, ShopItem } from '../types'
 import { rpc } from './rpc'
 
 /** Guthaben, Codes, Shop, Feedback. */
@@ -68,3 +68,13 @@ export async function adminListItems(): Promise<AdminShopItem[]> {
   if (error) throw error
   return (data ?? []) as AdminShopItem[]
 }
+
+/* ---------- Online-Anzeige und Nachrichten ---------- */
+
+export const sendHeartbeat = () => rpc<void>('heartbeat')
+export const adminListOnline = () => rpc<OnlineUser[]>('admin_list_online')
+export const getUnreadMessages = () => rpc<UserMessage[]>('get_unread_messages')
+export const markMessagesRead = (ids: string[]) => rpc<void>('mark_messages_read', { p_ids: ids })
+/** userId = null → an alle. Gibt die Zahl der Empfänger zurück. */
+export const adminSendMessage = (userId: string | null, body: string) => rpc<number>('admin_send_message', { p_user: userId, p_body: body })
+export const adminListMessages = () => rpc<SentMessage[]>('admin_list_messages')

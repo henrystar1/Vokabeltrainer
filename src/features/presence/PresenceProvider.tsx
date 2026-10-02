@@ -1,0 +1,70 @@
+import { useCallback, useEffect, useState, type ReactNode } from 'react'
+import { Mail } from 'lucide-react'
+import Button from '../../components/ui/Button'
+import Modal from '../../components/ui/Modal'
+import { getUnreadMessages, markMessagesRead, sendHeartbeat } from '../../services/koins'
+import type { UserMessage } from '../../types'
+import { useAuth } from '../auth/AuthProvider'
+import { formatDateTime } from '../../lib/format'
+
+const INTERVAL_MS = 60_000
+
+/**
+ * Meldet jede Minute "ich bin online" (nur Admins sehen das) und holt Nachrichten vom Admin ab.
+ * Ungelesene Nachrichten erscheinen als Fenster, bis man sie bestätigt.
+ */
+export default function PresenceProvider({ children }: { children: ReactNode }) {
+  const { user, profileReady, blocked } = useAuth()
+  const userId = user?.id
+  const [messages, setMessages] = useState<UserMessage[]>([])
+
+  const tick = useCallback(async () => {
+    if (document.visibilityState !== 'visible') return
+    await sendHeartbeat().catch(() => undefined)
+    const m = await getUnreadMessages().catch(() => null)
+    if (m) setMessages((prev) => (prev.length === m.length && prev.every((p, i) => p.id === m[i].id) ? prev : m))
+  }, [])
+
+  useEffect(() => {
+    if (!userId || !profileReady || blocked) {
+      setMessages([])
+      return
+    }
+    void tick()
+    const timer = window.setInterval(() => void tick(), INTERVAL_MS)
+    document.addEventListener('visibilitychange', tick)
+    return () => {
+      window.clearInterval(timer)
+      document.removeEventListener('visibilitychange', tick)
+    }
+  }, [userId, profileReady, blocked, tick])
+
+  async function confirm() {
+    const ids = messages.map((m) => m.id)
+    setMessages([])
+    await markMessagesRead(ids).catch(() => undefined)
+  }
+
+  return (
+    <>
+      {children}
+      {messages.length > 0 && (
+        <Modal title={messages.length === 1 ? 'Nachricht vom Admin' : `${messages.length} Nachrichten vom Admin`} onClose={() => void confirm()}>
+          <div className="space-y-3">
+            {messages.map((m) => (
+              <div key={m.id} className="rounded-xl border border-accent-cyan/30 bg-accent-cyan/5 p-4">
+                <p className="mb-1 flex items-center gap-2 text-xs text-slate-400">
+                  <Mail size={13} /> {m.from_name} · {formatDateTime(m.created_at)}
+                </p>
+                <p className="whitespace-pre-wrap break-words text-sm text-slate-100">{m.body}</p>
+              </div>
+            ))}
+          </div>
+          <div className="mt-5 flex justify-end">
+            <Button onClick={() => void confirm()}>Gelesen</Button>
+          </div>
+        </Modal>
+      )}
+    </>
+  )
+}

@@ -1,21 +1,18 @@
-import { AVATARS, EFFECT_CLASSES, nameColorStyle } from '../../features/shop/catalog'
-import type { Cosmetics } from '../../types'
+import { AVATARS, EFFECT_CLASSES, ROLE_TAGS, TAGS, nameColorStyle, themeFrameColor } from '../../features/shop/catalog'
+import AnimatedAvatar, { isAnimatedAvatar } from '../../features/shop/AnimatedAvatar'
+import type { Flair, Role } from '../../types'
 
-/** Profilbild: Emoji aus dem Shop oder Anfangsbuchstabe. */
+/** Profilbild: animiertes Bild oder Emoji aus dem Shop, sonst Anfangsbuchstabe. */
 export function Avatar({ name, avatarId, colorId, size = 32 }: { name: string; avatarId?: string | null; colorId?: string | null; size?: number }) {
+  if (avatarId && isAnimatedAvatar(avatarId)) return <AnimatedAvatar id={avatarId} size={size} />
   const emoji = avatarId ? AVATARS[avatarId] : undefined
-  const { style } = nameColorStyle(colorId)
-  const ring = style.color
+  const ring = nameColorStyle(colorId).style
+  const ringColor = ring.color ?? (ring.backgroundImage ? 'rgb(var(--c-violet))' : undefined)
   return (
     <span
       aria-hidden
       className="flex shrink-0 items-center justify-center rounded-full bg-space-600 font-semibold text-slate-200"
-      style={{
-        width: size,
-        height: size,
-        fontSize: size * 0.55,
-        boxShadow: ring ? `0 0 0 2px ${ring}` : style.backgroundImage ? '0 0 0 2px rgb(var(--c-violet))' : undefined,
-      }}
+      style={{ width: size, height: size, fontSize: size * 0.55, boxShadow: ringColor ? `0 0 0 2px ${ringColor}` : undefined }}
     >
       {emoji ?? (name.trim().charAt(0).toUpperCase() || '?')}
     </span>
@@ -33,22 +30,45 @@ export function StyledName({ name, colorId, effectId, className = '' }: { name: 
   )
 }
 
-/** Profilbild + Name zusammen (Rangliste, Seitenleiste, Profil). */
+/** Rollen-Tag (Mod/Admin) und gekaufter Spender-Tag. */
+export function Tags({ role, tagId }: { role?: Role; tagId?: string | null }) {
+  const r = role ? ROLE_TAGS[role] : undefined
+  const t = tagId ? TAGS[tagId] : undefined
+  if (!r && !t) return null
+  return (
+    <span className="flex shrink-0 items-center gap-1">
+      {r && <span className={`tag ${r.className}`}>{r.label}</span>}
+      {t && <span className={`tag ${t.className}`}>{t.label}</span>}
+    </span>
+  )
+}
+
+/**
+ * Profilbild + Name + Tags (Rangliste, Seitenleiste, Profil).
+ * `framed`: farbiger Rahmen in der Hauptfarbe des gewählten Website-Designs (z. B. Gold).
+ */
 export default function PlayerTag({
   name,
   cosmetics,
   size = 32,
   className = '',
+  framed = false,
 }: {
   name: string
-  cosmetics: Cosmetics
+  cosmetics: Flair
   size?: number
   className?: string
+  framed?: boolean
 }) {
+  const frame = framed ? themeFrameColor(cosmetics.theme_id) : null
   return (
-    <span className={`flex min-w-0 items-center gap-2.5 ${className}`}>
+    <span
+      className={`flex min-w-0 items-center gap-2.5 ${frame ? 'w-fit max-w-full rounded-full py-1 pl-1 pr-3' : ''} ${className}`}
+      style={frame ? { boxShadow: `0 0 0 1.5px ${frame}, 0 0 14px -2px ${frame}`, background: `linear-gradient(90deg, ${frame}22, transparent 70%)` } : undefined}
+    >
       <Avatar name={name} avatarId={cosmetics.avatar_id} colorId={cosmetics.color_id} size={size} />
       <StyledName name={name} colorId={cosmetics.color_id} effectId={cosmetics.effect_id} className="truncate font-medium" />
+      <Tags role={cosmetics.role} tagId={cosmetics.tag_id} />
     </span>
   )
 }

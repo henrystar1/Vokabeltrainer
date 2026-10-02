@@ -47,11 +47,19 @@ export interface Cosmetics {
   effect_id: string | null
 }
 
+/** Alles, was bei einem Namen zusätzlich angezeigt wird (Rangliste, Profil, Seitenleiste). */
+export interface Flair extends Cosmetics {
+  role?: Role
+  tag_id?: string | null
+  theme_id?: string | null
+}
+
 export interface Profile extends Cosmetics {
   display_name: string
   role: Role
   blocked: boolean
   theme_id: string | null
+  tag_id: string | null
 }
 
 export type ReviewStatus = 'open' | 'done' | 'dismissed'
@@ -216,7 +224,7 @@ export interface MyStats {
   history: HistoryDay[]
 }
 
-export interface LeaderboardRow extends Cosmetics {
+export interface LeaderboardRow extends Flair {
   rank: number
   display_name: string
   points: number
@@ -258,7 +266,7 @@ export interface BookExport {
 
 /* ---------- Koins, Shop, Feedback ---------- */
 
-export type ShopKind = 'avatar' | 'color' | 'effect' | 'theme'
+export type ShopKind = 'avatar' | 'color' | 'effect' | 'theme' | 'tag'
 
 export interface ShopItem {
   id: string
@@ -268,6 +276,8 @@ export interface ShopItem {
   sort: number
   owned: boolean
   equipped: boolean
+  /** Nur für Mods bzw. Admins (nicht kaufbar). */
+  required_role: 'mod' | 'admin' | null
 }
 
 export interface LedgerEntry {
@@ -306,3 +316,34 @@ export interface FeedbackItem {
 }
 
 export type AppSettings = Record<string, number>
+
+export interface OnlineUser {
+  user_id: string
+  display_name: string
+  role: Role
+  last_seen_at: string
+  avatar_id: string | null
+  color_id: string | null
+  effect_id: string | null
+}
+
+export interface UserMessage {
+  id: string
+  body: string
+  created_at: string
+  from_name: string
+}
+
+export interface SentMessage {
+  id: string
+  to_name: string | null
+  body: string
+  created_at: string
+  read_at: string | null
+}
+
+export interface NextPageResult {
+  unit_number: number
+  page_number: number
+  count: number
+}

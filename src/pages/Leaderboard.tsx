@@ -54,7 +54,7 @@ export default function Leaderboard() {
                   {r.rank <= 3 ? <Trophy size={18} className="mx-auto" /> : r.rank}
                 </span>
                 <span className="flex min-w-0 flex-1 items-center gap-2">
-                  <PlayerTag name={r.display_name} cosmetics={r} />
+                  <PlayerTag name={r.display_name} cosmetics={r} framed size={36} />
                   {r.is_me && <span className="label-mono shrink-0 text-accent-cyan">Du</span>}
                 </span>
                 <span className="font-mono text-accent-cyan">{r.points}</span>

@@ -14,6 +14,7 @@ import { useAsync } from '../lib/useAsync'
 import { adminDeleteBook } from '../services/admin'
 import { deleteBook, deletePage, deleteUnit, getBook, getOutline, listBooks, listLanguages, updateBook } from '../services/books'
 import { addToLibrary, listPublicBooks, publishBook, setVocabActive, unpublishBook } from '../services/community'
+import ActivationPanel from '../components/books/ActivationPanel'
 import { adminSetBookPrice } from '../services/koins'
 import { useWallet } from '../features/koins/WalletProvider'
 import { exportBook } from '../services/exchange'
@@ -102,7 +103,6 @@ export default function BookDetail() {
   const publicInfo = online.data?.find((b) => b.id === bookId)
   const price = publicInfo?.price ?? 0
   const needsPurchase = price > 0 && !publicInfo?.purchased
-  const myActive = library.data?.find((b) => b.id === bookId)
 
   async function savePrice() {
     const p = Number.parseInt(priceDraft ?? '', 10)
@@ -207,21 +207,15 @@ export default function BookDetail() {
         </div>
       )}
       {isPublic && !isAdmin && price > 0 && <p className="mb-3 text-sm text-slate-400">Preis: {price} Koins{publicInfo?.purchased ? ' (schon freigeschaltet)' : ''}</p>}
-      {inLibrary && myActive && (
-        <div className="mb-4">
-          <Notice tone={myActive.active_count === 0 && myActive.vocab_count > 0 ? 'warn' : 'info'}>
-            <span className="inline-flex flex-wrap items-center gap-3">
-              <span>
-                <b>{myActive.active_count}</b> von {myActive.vocab_count} Vokabeln sind für dich aktiv. Nur aktive Vokabeln kommen beim Lernen dran –
-                so bleiben neue Vokabeln draußen, bis du sie freischaltest.
-              </span>
-              <span className="flex gap-2">
-                <Button variant="secondary" onClick={() => void activate(true)}><Power size={15} /> Alle aktivieren</Button>
-                <Button variant="ghost" onClick={() => void activate(false)}>Alle deaktivieren</Button>
-              </span>
-            </span>
-          </Notice>
-        </div>
+      {inLibrary && (
+        <ActivationPanel
+          bookId={bookId}
+          units={units}
+          onChanged={() => {
+            outline.reload()
+            library.reload()
+          }}
+        />
       )}
       {book.data.description && <p className="-mt-3 mb-6 text-slate-400">{book.data.description}</p>}
       {error && <div className="mb-4"><ErrorBox message={error} /></div>}
@@ -289,7 +283,18 @@ export default function BookDetail() {
             </div>
             <div className="mt-3 flex flex-wrap gap-2">
               {u.pages.map((p) => (
-                <div key={p.page_id} className="flex items-center overflow-hidden rounded-xl border border-white/10 bg-space-900/60">
+                <div
+                  key={p.page_id}
+                  className={`flex items-center overflow-hidden rounded-xl border bg-space-900/60 ${
+                    !inLibrary || p.vocab_count === 0
+                      ? 'border-white/10'
+                      : p.active_count === p.vocab_count
+                        ? 'border-emerald-400/50'
+                        : p.active_count > 0
+                          ? 'border-amber-300/50'
+                          : 'border-white/10 opacity-70'
+                  }`}
+                >
                   <Link
                     to={`/buecher/${bookId}/eingabe?unit=${u.unit_number}&seite=${p.page_number}`}
                     className="flex min-h-[44px] items-center gap-2 px-3 text-sm hover:bg-white/5"

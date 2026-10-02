@@ -2,7 +2,7 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useState, t
 import type { Session, User } from '@supabase/supabase-js'
 import { supabase } from '../../lib/supabaseClient'
 import { loadProfile } from '../../services/settings'
-import type { Cosmetics, Profile, Role } from '../../types'
+import type { Flair, Profile, Role } from '../../types'
 
 interface AuthState {
   loading: boolean
@@ -20,7 +20,7 @@ interface AuthState {
   /** true, solange der Benutzer über den Link aus der Passwort-vergessen-Mail gekommen ist. */
   recovering: boolean
   /** Ausgewählte Shop-Artikel (Profilbild, Namensfarbe, Effekt). */
-  cosmetics: Cosmetics
+  cosmetics: Flair
   /** Ausgewähltes Design der ganzen Website. */
   themeId: string | null
   /** Lädt das Profil neu (z. B. nach Kauf/Auswahl im Shop). */
@@ -33,7 +33,7 @@ interface AuthState {
   setDisplayNameLocal: (name: string) => void
 }
 
-const NO_COSMETICS: Cosmetics = { avatar_id: null, color_id: null, effect_id: null }
+const NO_COSMETICS: Flair = { avatar_id: null, color_id: null, effect_id: null }
 
 const AuthContext = createContext<AuthState | null>(null)
 
@@ -50,7 +50,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [role, setRole] = useState<Role>('user')
   const [blocked, setBlocked] = useState(false)
   const [profileReady, setProfileReady] = useState(false)
-  const [cosmetics, setCosmetics] = useState<Cosmetics>(NO_COSMETICS)
+  const [cosmetics, setCosmetics] = useState<Flair>(NO_COSMETICS)
   const [themeId, setThemeId] = useState<string | null>(null)
   const [recovering, setRecovering] = useState(false)
 
@@ -88,7 +88,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setDisplayName(p.display_name)
     setRole(p.role)
     setBlocked(p.blocked)
-    setCosmetics({ avatar_id: p.avatar_id, color_id: p.color_id, effect_id: p.effect_id })
+    setCosmetics({ avatar_id: p.avatar_id, color_id: p.color_id, effect_id: p.effect_id, tag_id: p.tag_id, theme_id: p.theme_id, role: p.role })
     setThemeId(p.theme_id)
   }, [])
 

@@ -64,7 +64,7 @@ export default function Profile() {
       <PageHeader eyebrow="Du" title="Profil" />
       <div className="grid gap-4 lg:grid-cols-2">
         <Card className="space-y-4">
-          <PlayerTag name={displayName ?? 'Du'} cosmetics={cosmetics} size={64} className="text-2xl" />
+          <PlayerTag name={displayName ?? 'Du'} cosmetics={cosmetics} size={72} framed className="text-2xl" />
           <p className="label-mono">{ROLE_LABEL[role]}</p>
           <div className="flex items-center gap-3 rounded-xl border border-amber-300/20 bg-amber-300/5 px-4 py-3">
             <Coins className="text-amber-200" />

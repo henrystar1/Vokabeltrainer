@@ -1,4 +1,4 @@
-import type { PublicBook, ReviewRequest, ReviewStatus } from '../types'
+import type { NextPageResult, PublicBook, ReviewRequest, ReviewStatus } from '../types'
 import { rpc } from './rpc'
 
 /** Öffentliche Bücher, Bibliothek und Prüfanfragen. */
@@ -24,3 +24,9 @@ export const setVocabActive = (bookId: string, active: boolean, unitNumber?: num
     p_page_number: pageNumber ?? null,
   })
 export const countOpenReviews = () => rpc<number>('count_open_reviews')
+
+/** Schaltet die nächste Seite mit inaktiven Vokabeln frei (null = alles schon aktiv). */
+export const activateNextPage = (bookId: string) => rpc<NextPageResult | null>('activate_next_page', { p_book_id: bookId })
+/** Aktiviert alles bis einschließlich Unit/Seite. */
+export const activateUpTo = (bookId: string, unit: number, page: number) =>
+  rpc<number>('activate_up_to', { p_book_id: bookId, p_unit_number: unit, p_page_number: page })
