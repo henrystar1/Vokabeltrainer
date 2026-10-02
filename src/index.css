@@ -4,6 +4,15 @@
 
 :root {
   color-scheme: dark;
+  /* Farben des Designs (Triplets), werden vom ThemeProvider überschrieben. */
+  --s950: 5 7 15;
+  --s900: 8 12 26;
+  --s800: 13 19 38;
+  --s700: 20 28 54;
+  --s600: 29 39 71;
+  --c-cyan: 34 211 238;
+  --c-violet: 139 92 246;
+  --c-blue: 59 130 246;
 }
 
 html,
@@ -15,8 +24,8 @@ body,
 body {
   @apply bg-space-950 font-sans text-slate-200 antialiased;
   background-image:
-    radial-gradient(1200px 600px at 85% -10%, rgba(139, 92, 246, 0.16), transparent 60%),
-    radial-gradient(900px 500px at -10% 110%, rgba(34, 211, 238, 0.1), transparent 60%);
+    radial-gradient(1200px 600px at 85% -10%, rgb(var(--c-violet) / 0.16), transparent 60%),
+    radial-gradient(900px 500px at -10% 110%, rgb(var(--c-cyan) / 0.1), transparent 60%);
   background-attachment: fixed;
 }
 
@@ -36,4 +45,44 @@ body {
   .btn-primary {
     @apply inline-flex min-h-[44px] items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-accent-violet to-accent-cyan px-5 font-semibold text-space-950 shadow-glow transition hover:brightness-110 active:scale-[0.98];
   }
+}
+
+
+/* ---------- Shop-Effekte für Namen (filter statt text-shadow, damit Verlaufsfarben funktionieren) ---------- */
+.fx-glow { filter: drop-shadow(0 0 6px currentColor); }
+.fx-pulse { display: inline-block; animation: fx-pulse 1.8s ease-in-out infinite; }
+.fx-float { display: inline-block; animation: fx-float 2.6s ease-in-out infinite; }
+.fx-neon { filter: drop-shadow(0 0 2px #fff) drop-shadow(0 0 8px currentColor) drop-shadow(0 0 16px currentColor); }
+.fx-shimmer { animation: fx-shimmer 2.4s ease-in-out infinite; }
+.fx-rainbow {
+  background-image: linear-gradient(90deg, #f43f5e, #f59e0b, #84cc16, #22d3ee, #8b5cf6, #f43f5e) !important;
+  background-size: 200% 100%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent !important;
+  animation: fx-rainbow 3s linear infinite;
+}
+.fx-fire { animation: fx-fire 1.1s ease-in-out infinite; }
+.fx-sparkle { position: relative; }
+.fx-sparkle::after {
+  content: '✨';
+  position: absolute;
+  top: -0.5em;
+  right: -1.1em;
+  font-size: 0.8em;
+  -webkit-text-fill-color: initial;
+  animation: fx-twinkle 1.6s ease-in-out infinite;
+}
+@keyframes fx-pulse { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.07); } }
+@keyframes fx-float { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-3px); } }
+@keyframes fx-shimmer { 0%, 100% { filter: brightness(1); } 50% { filter: brightness(1.7) drop-shadow(0 0 4px currentColor); } }
+@keyframes fx-rainbow { to { background-position: 200% 0; } }
+@keyframes fx-fire {
+  0%, 100% { filter: drop-shadow(0 -1px 3px #f97316) drop-shadow(0 -3px 7px #ef4444); }
+  50% { filter: drop-shadow(0 -2px 5px #fbbf24) drop-shadow(0 -5px 10px #f97316); }
+}
+@keyframes fx-twinkle { 0%, 100% { opacity: 0.2; transform: scale(0.7); } 50% { opacity: 1; transform: scale(1.1); } }
+
+@media (prefers-reduced-motion: reduce) {
+  .fx-pulse, .fx-float, .fx-shimmer, .fx-rainbow, .fx-fire, .fx-sparkle::after { animation: none; }
 }

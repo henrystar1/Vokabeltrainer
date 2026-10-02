@@ -131,6 +131,7 @@ export default function Test() {
         title="Test"
         onAnswer={onAnswer}
         onFinish={() => void finish()}
+        onCancel={() => setPhase('setup')}
       />
     )
   }

@@ -3,6 +3,8 @@ import { createRoot } from 'react-dom/client'
 import { BrowserRouter } from 'react-router-dom'
 import App from './App'
 import { AuthProvider } from './features/auth/AuthProvider'
+import { WalletProvider } from './features/koins/WalletProvider'
+import ThemeApplier from './features/shop/ThemeProvider'
 import { SettingsProvider } from './features/settings/SettingsProvider'
 import './index.css'
 
@@ -10,9 +12,12 @@ createRoot(document.getElementById('root')!).render(
   <StrictMode>
     <BrowserRouter basename={import.meta.env.BASE_URL}>
       <AuthProvider>
-        <SettingsProvider>
-          <App />
-        </SettingsProvider>
+        <ThemeApplier />
+        <WalletProvider>
+          <SettingsProvider>
+            <App />
+          </SettingsProvider>
+        </WalletProvider>
       </AuthProvider>
     </BrowserRouter>
   </StrictMode>,

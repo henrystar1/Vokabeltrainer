@@ -2,7 +2,7 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useState, t
 import type { Session, User } from '@supabase/supabase-js'
 import { supabase } from '../../lib/supabaseClient'
 import { loadProfile } from '../../services/settings'
-import type { Role } from '../../types'
+import type { Cosmetics, Profile, Role } from '../../types'
 
 interface AuthState {
   loading: boolean
@@ -19,6 +19,12 @@ interface AuthState {
   profileReady: boolean
   /** true, solange der Benutzer über den Link aus der Passwort-vergessen-Mail gekommen ist. */
   recovering: boolean
+  /** Ausgewählte Shop-Artikel (Profilbild, Namensfarbe, Effekt). */
+  cosmetics: Cosmetics
+  /** Ausgewähltes Design der ganzen Website. */
+  themeId: string | null
+  /** Lädt das Profil neu (z. B. nach Kauf/Auswahl im Shop). */
+  refreshProfile: () => Promise<void>
   signIn: (email: string, password: string) => Promise<void>
   signUp: (email: string, password: string, displayName: string) => Promise<{ needsConfirmation: boolean }>
   signOut: () => Promise<void>
@@ -26,6 +32,8 @@ interface AuthState {
   setNewPassword: (password: string) => Promise<void>
   setDisplayNameLocal: (name: string) => void
 }
+
+const NO_COSMETICS: Cosmetics = { avatar_id: null, color_id: null, effect_id: null }
 
 const AuthContext = createContext<AuthState | null>(null)
 
@@ -42,6 +50,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [role, setRole] = useState<Role>('user')
   const [blocked, setBlocked] = useState(false)
   const [profileReady, setProfileReady] = useState(false)
+  const [cosmetics, setCosmetics] = useState<Cosmetics>(NO_COSMETICS)
+  const [themeId, setThemeId] = useState<string | null>(null)
   const [recovering, setRecovering] = useState(false)
 
   useEffect(() => {
@@ -63,6 +73,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setRole('user')
         setBlocked(false)
         setProfileReady(false)
+        setCosmetics(NO_COSMETICS)
+        setThemeId(null)
       }
     })
     return () => {
@@ -72,22 +84,33 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [])
 
   const userId = session?.user.id
+  const applyProfile = useCallback((p: Profile) => {
+    setDisplayName(p.display_name)
+    setRole(p.role)
+    setBlocked(p.blocked)
+    setCosmetics({ avatar_id: p.avatar_id, color_id: p.color_id, effect_id: p.effect_id })
+    setThemeId(p.theme_id)
+  }, [])
+
   useEffect(() => {
     if (!userId) return
     let active = true
     loadProfile(userId)
       .then((p) => {
-        if (!active || !p) return
-        setDisplayName(p.display_name)
-        setRole(p.role)
-        setBlocked(p.blocked)
+        if (active && p) applyProfile(p)
       })
       .catch(() => undefined)
       .finally(() => active && setProfileReady(true))
     return () => {
       active = false
     }
-  }, [userId])
+  }, [userId, applyProfile])
+
+  const refreshProfile = useCallback(async () => {
+    if (!userId) return
+    const p = await loadProfile(userId)
+    if (p) applyProfile(p)
+  }, [userId, applyProfile])
 
   const signIn = useCallback(async (email: string, password: string) => {
     const { error } = await supabase.auth.signInWithPassword({ email: email.trim(), password })
@@ -130,6 +153,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       isAdmin: role === 'admin',
       blocked,
       profileReady,
+      cosmetics,
+      themeId,
+      refreshProfile,
       recovering,
       signIn,
       signUp,
@@ -138,7 +164,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setNewPassword,
       setDisplayNameLocal: setDisplayName,
     }),
-    [loading, session, displayName, role, blocked, profileReady, recovering, signIn, signUp, signOut, sendReset, setNewPassword],
+    [loading, session, displayName, role, blocked, profileReady, cosmetics, themeId, refreshProfile, recovering, signIn, signUp, signOut, sendReset, setNewPassword],
   )
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>
 }

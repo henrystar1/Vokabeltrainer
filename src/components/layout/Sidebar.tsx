@@ -1,6 +1,8 @@
 import { NavLink } from 'react-router-dom'
-import { ChevronsLeft, ChevronsRight, LogOut, Rocket, User } from 'lucide-react'
+import { ChevronsLeft, ChevronsRight, LogOut, Rocket } from 'lucide-react'
 import { useAuth } from '../../features/auth/AuthProvider'
+import KoinBadge from '../profile/KoinBadge'
+import PlayerTag from '../profile/PlayerTag'
 import { navItemsFor } from '../../lib/navigation'
 
 interface SidebarProps {
@@ -9,7 +11,7 @@ interface SidebarProps {
 }
 
 export default function Sidebar({ collapsed, onToggle }: SidebarProps) {
-  const { displayName, user, signOut, isStaff } = useAuth()
+  const { displayName, user, signOut, isStaff, cosmetics } = useAuth()
   return (
     <aside
       className={`glass fixed inset-y-0 left-0 z-30 hidden flex-col border-y-0 border-l-0 transition-[width] duration-300 ease-out md:flex ${
@@ -33,7 +35,7 @@ export default function Sidebar({ collapsed, onToggle }: SidebarProps) {
             className={({ isActive }) =>
               `group relative flex min-h-[44px] items-center gap-3 rounded-xl px-3 text-sm font-medium transition ${
                 isActive
-                  ? 'bg-accent-cyan/10 text-accent-cyan shadow-[inset_0_0_0_1px_rgba(34,211,238,0.25)]'
+                  ? 'bg-accent-cyan/10 text-accent-cyan shadow-[inset_0_0_0_1px_rgb(var(--c-cyan)/0.25)]'
                   : 'text-slate-400 hover:bg-white/5 hover:text-slate-100'
               }`
             }
@@ -46,15 +48,17 @@ export default function Sidebar({ collapsed, onToggle }: SidebarProps) {
 
       <div className="space-y-2 border-t border-white/10 p-3">
         <div className="flex min-h-[48px] items-center gap-3 rounded-xl px-3 text-slate-300">
-          <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-space-600">
-            <User size={16} />
-          </div>
-          {!collapsed && (
+          {collapsed ? (
+            <PlayerTag name={displayName ?? 'Benutzer'} cosmetics={cosmetics} className="[&>span:last-child]:hidden" />
+          ) : (
             <div className="min-w-0">
-              <p className="truncate text-sm font-medium">{displayName ?? 'Benutzer'}</p>
+              <PlayerTag name={displayName ?? 'Benutzer'} cosmetics={cosmetics} />
               <p className="truncate text-[11px] text-slate-500">{user?.email}</p>
             </div>
           )}
+        </div>
+        <div className={`flex ${collapsed ? 'justify-center' : 'px-3'}`}>
+          <KoinBadge compact={collapsed} />
         </div>
         <button
           onClick={() => void signOut()}

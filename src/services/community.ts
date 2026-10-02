@@ -13,6 +13,14 @@ export const requestReview = (vocabularyId: string, message: string) =>
   rpc<string>('request_review', { p_vocabulary_id: vocabularyId, p_message: message })
 export const listReviewRequests = (status: ReviewStatus | 'all') =>
   rpc<ReviewRequest[]>('list_review_requests', { p_status: status })
-export const resolveReviewRequest = (id: string, status: 'done' | 'dismissed', note: string) =>
-  rpc<void>('resolve_review_request', { p_id: id, p_status: status, p_note: note })
+export const resolveReviewRequest = (id: string, status: 'done' | 'dismissed', note: string, reward = true) =>
+  rpc<void>('resolve_review_request', { p_id: id, p_status: status, p_note: note, p_reward: reward })
+/** Aktiviert/deaktiviert Vokabeln eines Buchs (ganz, pro Lektion oder pro Seite). Gibt die Zahl geänderter Zeilen zurück. */
+export const setVocabActive = (bookId: string, active: boolean, unitNumber?: number, pageNumber?: number) =>
+  rpc<number>('set_vocab_active', {
+    p_book_id: bookId,
+    p_active: active,
+    p_unit_number: unitNumber ?? null,
+    p_page_number: pageNumber ?? null,
+  })
 export const countOpenReviews = () => rpc<number>('count_open_reviews')

@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { Trophy } from 'lucide-react'
+import PlayerTag from '../components/profile/PlayerTag'
 import Card from '../components/ui/Card'
 import PageHeader from '../components/ui/PageHeader'
 import { EmptyState, ErrorBox, Spinner } from '../components/ui/States'
@@ -52,9 +53,9 @@ export default function Leaderboard() {
                 <span className={`w-8 text-center font-mono text-lg ${MEDAL[r.rank - 1] ?? 'text-slate-500'}`}>
                   {r.rank <= 3 ? <Trophy size={18} className="mx-auto" /> : r.rank}
                 </span>
-                <span className="flex-1 truncate font-medium">
-                  {r.display_name}
-                  {r.is_me && <span className="ml-2 label-mono text-accent-cyan">Du</span>}
+                <span className="flex min-w-0 flex-1 items-center gap-2">
+                  <PlayerTag name={r.display_name} cosmetics={r} />
+                  {r.is_me && <span className="label-mono shrink-0 text-accent-cyan">Du</span>}
                 </span>
                 <span className="font-mono text-accent-cyan">{r.points}</span>
               </li>

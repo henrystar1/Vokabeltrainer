@@ -15,6 +15,8 @@ import { activeDirections } from '../features/settings/rules'
 import { errorMessage } from '../lib/errors'
 import { useAsync } from '../lib/useAsync'
 import { listBooks } from '../services/books'
+import { useWallet } from '../features/koins/WalletProvider'
+import { getWallet } from '../services/koins'
 import { addRepeatAnswers, getLearningPool, submitSession } from '../services/learning'
 
 type Phase = 'setup' | 'loading' | 'main' | 'result' | 'repeat' | 'repeat-result'
@@ -22,6 +24,9 @@ type Phase = 'setup' | 'loading' | 'main' | 'result' | 'repeat' | 'repeat-result
 export default function Learn() {
   const [params] = useSearchParams()
   const { settings } = useSettings()
+  const wallet = useWallet()
+  const balanceAtStart = useRef(0)
+  const [earned, setEarned] = useState(0)
   const books = useAsync(listBooks, [])
   const [bookId, setBookId] = useState(params.get('buch') ?? '')
   const [phase, setPhase] = useState<Phase>('setup')
@@ -51,11 +56,13 @@ export default function Learn() {
     setError(null)
     setSaveError(null)
     try {
+      balanceAtStart.current = wallet.balance
+      setEarned(0)
       const pool = await getLearningPool(bookId ? null : settings.learn_language, bookId || null)
       levels.current = Object.fromEntries(pool.map((v) => [v.vocabulary_id, v.level]))
       const qs = buildLearningQuestions(pool, { directions, questionCount: settings.words_per_round })
       if (qs.length === 0) {
-        setError(pool.length === 0 ? 'Hier gibt es noch keine Vokabeln. Trage zuerst welche in einem Buch ein.' : 'Alle Vokabeln sind schon auf Stufe 5 – es gibt gerade nichts zu lernen. Stark!')
+        setError(pool.length === 0 ? 'Hier gibt es keine aktiven Vokabeln. Aktiviere im Buch zuerst Vokabeln (Seite „Buch“ → „Vokabeln aktivieren“) oder trage welche ein.' : 'Alle Vokabeln sind schon auf Stufe 5 – es gibt gerade nichts zu lernen. Stark!')
         setPhase('setup')
         return
       }
@@ -98,6 +105,11 @@ export default function Learn() {
         answers: session.current.mainAnswers(),
         levelUpdates: updates,
       })
+      const b = await getWallet().catch(() => null)
+      if (b !== null) {
+        wallet.setBalance(b)
+        setEarned(Math.max(0, b - balanceAtStart.current))
+      }
     } catch (e) {
       setSaveError(errorMessage(e))
     }
@@ -152,6 +164,7 @@ export default function Learn() {
         title={phase === 'repeat' ? 'Fehler wiederholen' : 'Lernrunde'}
         onAnswer={phase === 'repeat' ? onRepeatAnswer : onMainAnswer}
         onFinish={() => void (phase === 'repeat' ? finishRepeat() : finishMain())}
+        onCancel={() => setPhase('setup')}
       />
     )
   }
@@ -167,6 +180,7 @@ export default function Learn() {
               Lernstand: {levelChanges.up} Vokabeln aufgestiegen, {levelChanges.down} abgestiegen.
             </Notice>
           )}
+          {earned > 0 && <Notice tone="info">+{earned} Koins fürs Lernen – gut gemacht!</Notice>}
           {saveError && <ErrorBox message={`Die Runde konnte nicht gespeichert werden: ${saveError}`} onRetry={() => void saveMain()} />}
         </div>
         <div className="mt-6 flex flex-wrap gap-3">

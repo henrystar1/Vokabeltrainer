@@ -1,11 +1,13 @@
 import { useState, type ReactNode } from 'react'
-import { Flag, Users } from 'lucide-react'
+import { Coins, Flag, MessageSquarePlus, Users } from 'lucide-react'
 import PageHeader from '../components/ui/PageHeader'
 import { useAuth } from '../features/auth/AuthProvider'
+import FeedbackTab from './admin/FeedbackTab'
+import KoinsTab from './admin/KoinsTab'
 import ReviewsTab from './admin/ReviewsTab'
 import UsersTab from './admin/UsersTab'
 
-type Tab = 'reviews' | 'users'
+type Tab = 'reviews' | 'feedback' | 'users' | 'koins'
 
 /** Verwaltung für Mods (Prüfanfragen) und Admins (zusätzlich Benutzer). */
 export default function Admin() {
@@ -17,7 +19,7 @@ export default function Admin() {
       type="button"
       onClick={() => setTab(t)}
       className={`inline-flex min-h-[44px] items-center gap-2 rounded-xl px-4 text-sm font-medium transition ${
-        tab === t ? 'bg-accent-cyan/10 text-accent-cyan shadow-[inset_0_0_0_1px_rgba(34,211,238,0.25)]' : 'text-slate-400 hover:bg-white/5 hover:text-slate-100'
+        tab === t ? 'bg-accent-cyan/10 text-accent-cyan shadow-[inset_0_0_0_1px_rgb(var(--c-cyan)/0.25)]' : 'text-slate-400 hover:bg-white/5 hover:text-slate-100'
       }`}
     >
       {icon} {label}
@@ -29,10 +31,14 @@ export default function Admin() {
       <PageHeader eyebrow={role === 'admin' ? 'Admin' : 'Mod'} title="Verwaltung" />
       <div className="mb-5 flex flex-wrap gap-2">
         {button('reviews', 'Prüfanfragen', <Flag size={16} />)}
+        {button('feedback', 'Feedback', <MessageSquarePlus size={16} />)}
         {isAdmin && button('users', 'Benutzer', <Users size={16} />)}
+        {isAdmin && button('koins', 'Koins & Shop', <Coins size={16} />)}
       </div>
       {tab === 'reviews' && <ReviewsTab />}
+      {tab === 'feedback' && <FeedbackTab />}
       {tab === 'users' && isAdmin && <UsersTab />}
+      {tab === 'koins' && isAdmin && <KoinsTab />}
     </div>
   )
 }

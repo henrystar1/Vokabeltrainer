@@ -14,6 +14,8 @@ export interface BookSummary {
   mastery_percent: number
   is_public: boolean
   is_mine: boolean
+  /** Anzahl der für mich aktivierten Vokabeln. */
+  active_count: number
 }
 
 /** Öffentliches ("Online") Buch, das Admins/Mods veröffentlicht haben. */
@@ -31,14 +33,25 @@ export interface PublicBook {
   mastery_percent: number
   in_library: boolean
   is_mine: boolean
+  /** Preis in Koins (0 = kostenlos). */
+  price: number
+  /** Schon gekauft bzw. frei verfügbar. */
+  purchased: boolean
 }
 
 export type Role = 'user' | 'mod' | 'admin'
 
-export interface Profile {
+export interface Cosmetics {
+  avatar_id: string | null
+  color_id: string | null
+  effect_id: string | null
+}
+
+export interface Profile extends Cosmetics {
   display_name: string
   role: Role
   blocked: boolean
+  theme_id: string | null
 }
 
 export type ReviewStatus = 'open' | 'done' | 'dismissed'
@@ -85,6 +98,7 @@ export interface AdminUser {
   session_count: number
   answer_count: number
   approx_bytes: number
+  koins: number
 }
 
 export interface AdminBook {
@@ -102,6 +116,7 @@ export interface OutlinePage {
   page_id: string
   page_number: number
   vocab_count: number
+  active_count: number
 }
 
 export interface OutlineUnit {
@@ -201,7 +216,7 @@ export interface MyStats {
   history: HistoryDay[]
 }
 
-export interface LeaderboardRow {
+export interface LeaderboardRow extends Cosmetics {
   rank: number
   display_name: string
   points: number
@@ -239,3 +254,55 @@ export interface BookExport {
     }>
   }>
 }
+
+
+/* ---------- Koins, Shop, Feedback ---------- */
+
+export type ShopKind = 'avatar' | 'color' | 'effect' | 'theme'
+
+export interface ShopItem {
+  id: string
+  kind: ShopKind
+  name: string
+  price: number
+  sort: number
+  owned: boolean
+  equipped: boolean
+}
+
+export interface LedgerEntry {
+  id: number
+  amount: number
+  reason: string
+  ref: string | null
+  created_at: string
+}
+
+export type RedeemResult =
+  | { ok: true; amount: number; balance: number }
+  | { ok: false; message: string }
+
+export interface KoinCode {
+  code: string
+  amount: number
+  note: string | null
+  created_at: string
+  created_by_name: string | null
+}
+
+export type FeedbackKind = 'idea' | 'improvement' | 'bug' | 'other'
+export type FeedbackStatus = 'new' | 'seen' | 'done' | 'declined'
+
+export interface FeedbackItem {
+  id: string
+  kind: FeedbackKind
+  message: string
+  status: FeedbackStatus
+  staff_note: string | null
+  created_at: string
+  user_name?: string | null
+  handled_by_name?: string | null
+  handled_at?: string | null
+}
+
+export type AppSettings = Record<string, number>

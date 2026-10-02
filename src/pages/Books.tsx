@@ -1,6 +1,6 @@
 import { useState, type FormEvent, type ReactNode } from 'react'
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
-import { BookOpen, Brain, Check, Globe, Plus, Upload, UserRound } from 'lucide-react'
+import { BookOpen, Brain, Check, Coins, Globe, Plus, Upload, UserRound } from 'lucide-react'
 import Button from '../components/ui/Button'
 import Card from '../components/ui/Card'
 import { Field, Select, TextArea, TextInput } from '../components/ui/Field'
@@ -9,9 +9,11 @@ import PageHeader from '../components/ui/PageHeader'
 import ProgressBar from '../components/ui/ProgressBar'
 import { EmptyState, ErrorBox, Spinner } from '../components/ui/States'
 import { errorMessage } from '../lib/errors'
+import type { PublicBook } from '../types'
 import { useAsync } from '../lib/useAsync'
 import { createBook, listBooks, listLanguages } from '../services/books'
 import { addToLibrary, listPublicBooks, removeFromLibrary } from '../services/community'
+import { useWallet } from '../features/koins/WalletProvider'
 import { useSettings } from '../features/settings/SettingsProvider'
 
 type Tab = 'mine' | 'online'
@@ -25,6 +27,9 @@ export default function Books() {
   const [creating, setCreating] = useState(false)
   const [busyId, setBusyId] = useState<string | null>(null)
   const [actionError, setActionError] = useState<string | null>(null)
+  const [buying, setBuying] = useState<PublicBook | null>(null)
+  const wallet = useWallet()
+  const navigate = useNavigate()
   const langName = (code: string) => languages.data?.find((l) => l.code === code)?.name ?? code
 
   async function run(id: string, fn: () => Promise<void>) {
@@ -46,7 +51,7 @@ export default function Books() {
       type="button"
       onClick={() => setParams(t === 'mine' ? {} : { tab: t })}
       className={`inline-flex min-h-[44px] items-center gap-2 rounded-xl px-4 text-sm font-medium transition ${
-        tab === t ? 'bg-accent-cyan/10 text-accent-cyan shadow-[inset_0_0_0_1px_rgba(34,211,238,0.25)]' : 'text-slate-400 hover:bg-white/5 hover:text-slate-100'
+        tab === t ? 'bg-accent-cyan/10 text-accent-cyan shadow-[inset_0_0_0_1px_rgb(var(--c-cyan)/0.25)]' : 'text-slate-400 hover:bg-white/5 hover:text-slate-100'
       }`}
     >
       {icon} {label}
@@ -113,6 +118,10 @@ export default function Books() {
                   <p className="mt-1 text-sm text-slate-400">
                     {b.vocab_count} Vokabeln · {b.unit_count} Units · {b.page_count} Seiten
                   </p>
+                  <p className={`mt-1 text-xs ${b.active_count === 0 && b.vocab_count > 0 ? 'text-amber-300' : 'text-slate-500'}`}>
+                    {b.active_count} von {b.vocab_count} Vokabeln aktiv
+                    {b.active_count === 0 && b.vocab_count > 0 && ' – im Buch aktivieren, um zu lernen'}
+                  </p>
                   <div className="mt-4 space-y-1.5">
                     <div className="flex justify-between text-xs text-slate-400">
                       <span>Gelernt</span>
@@ -176,14 +185,53 @@ export default function Books() {
                     </Link>
                   </div>
                 ) : (
-                  <Button className="mt-5 w-full" busy={busyId === b.id} onClick={() => void run(b.id, () => addToLibrary(b.id))}>
-                    <Plus size={18} /> Dieses Buch verwenden
+                  <Button className="mt-5 w-full" busy={busyId === b.id} onClick={() => setBuying(b)}>
+                    {b.price > 0 && !b.purchased ? (
+                      <>
+                        <Coins size={18} /> Kaufen · {b.price} Koins
+                      </>
+                    ) : (
+                      <>
+                        <Plus size={18} /> Dieses Buch verwenden
+                      </>
+                    )}
                   </Button>
                 )}
               </Card>
             ))}
           </div>
         </>
+      )}
+
+      {buying && (
+        <Modal title={buying.price > 0 && !buying.purchased ? 'Buch kaufen?' : 'Buch verwenden?'} onClose={() => setBuying(null)}>
+          {buying.price > 0 && !buying.purchased ? (
+            <p className="text-sm text-slate-300">
+              „{buying.name}“ kostet <b>{buying.price} Koins</b>. Du hast {wallet.balance} Koins.
+              {wallet.balance < buying.price && <span className="mt-2 block text-amber-300">Dir fehlen noch {buying.price - wallet.balance} Koins – z. B. mit einem Code oder durch Lernen.</span>}
+            </p>
+          ) : (
+            <p className="text-sm text-slate-300">„{buying.name}“ ist für dich kostenlos. Danach aktivierst du die Vokabeln, die du lernen willst.</p>
+          )}
+          <div className="mt-5 flex flex-col gap-2 sm:flex-row sm:justify-end">
+            <Button variant="ghost" onClick={() => setBuying(null)}>Abbrechen</Button>
+            <Button
+              busy={busyId === buying.id}
+              disabled={buying.price > 0 && !buying.purchased && wallet.balance < buying.price}
+              onClick={() => {
+                const b = buying
+                setBuying(null)
+                void run(b.id, async () => {
+                  await addToLibrary(b.id)
+                  await wallet.refresh()
+                  navigate(`/buecher/${b.id}`)
+                })
+              }}
+            >
+              {buying.price > 0 && !buying.purchased ? 'Jetzt kaufen' : 'Verwenden'}
+            </Button>
+          </div>
+        </Modal>
       )}
 
       {creating && <CreateBookModal onClose={() => setCreating(false)} languages={languages.data ?? []} />}

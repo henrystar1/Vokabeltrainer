@@ -1,6 +1,6 @@
 import { useState, type FormEvent } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
-import { Brain, ClipboardCheck, Download, Eye, Globe, Lock, Pencil, Plus, Trash2 } from 'lucide-react'
+import { Brain, ClipboardCheck, Coins, Download, Eye, Globe, Lock, Pencil, Plus, Power, Trash2 } from 'lucide-react'
 import Button from '../components/ui/Button'
 import Card from '../components/ui/Card'
 import { Field, Select, TextArea, TextInput } from '../components/ui/Field'
@@ -13,7 +13,9 @@ import { errorMessage } from '../lib/errors'
 import { useAsync } from '../lib/useAsync'
 import { adminDeleteBook } from '../services/admin'
 import { deleteBook, deletePage, deleteUnit, getBook, getOutline, listBooks, listLanguages, updateBook } from '../services/books'
-import { addToLibrary, publishBook, unpublishBook } from '../services/community'
+import { addToLibrary, listPublicBooks, publishBook, setVocabActive, unpublishBook } from '../services/community'
+import { adminSetBookPrice } from '../services/koins'
+import { useWallet } from '../features/koins/WalletProvider'
 import { exportBook } from '../services/exchange'
 
 type Confirm =
@@ -31,6 +33,9 @@ export default function BookDetail() {
   const book = useAsync(() => getBook(bookId), [bookId])
   const outline = useAsync(() => getOutline(bookId), [bookId])
   const library = useAsync(listBooks, [])
+  const online = useAsync(listPublicBooks, [])
+  const wallet = useWallet()
+  const [priceDraft, setPriceDraft] = useState<string | null>(null)
   const languages = useAsync(listLanguages, [])
   const [confirm, setConfirm] = useState<Confirm>(null)
   const [editing, setEditing] = useState(false)
@@ -94,12 +99,43 @@ export default function BookDetail() {
   const canUnpublish = isPublic && (isAdmin || (isStaff && isOwner))
   const inLibrary = library.data?.some((b) => b.id === bookId) ?? false
 
+  const publicInfo = online.data?.find((b) => b.id === bookId)
+  const price = publicInfo?.price ?? 0
+  const needsPurchase = price > 0 && !publicInfo?.purchased
+  const myActive = library.data?.find((b) => b.id === bookId)
+
+  async function savePrice() {
+    const p = Number.parseInt(priceDraft ?? '', 10)
+    if (!Number.isInteger(p) || p < 0) return setError('Bitte einen Preis ab 0 eingeben.')
+    setError(null)
+    try {
+      await adminSetBookPrice(bookId, p)
+      setPriceDraft(null)
+      online.reload()
+    } catch (e) {
+      setError(errorMessage(e))
+    }
+  }
+
+  async function activate(active: boolean, unit?: number, page?: number) {
+    setError(null)
+    try {
+      await setVocabActive(bookId, active, unit, page)
+      outline.reload()
+      library.reload()
+    } catch (e) {
+      setError(errorMessage(e))
+    }
+  }
+
   async function useBook() {
     setBusy(true)
     setError(null)
     try {
       await addToLibrary(bookId)
+      await wallet.refresh()
       library.reload()
+      online.reload()
     } catch (e) {
       setError(errorMessage(e))
     } finally {
@@ -129,7 +165,15 @@ export default function BookDetail() {
           ) : (
             isPublic && (
               <Button busy={busy} onClick={() => void useBook()}>
-                <Plus size={18} /> Dieses Buch verwenden
+                {needsPurchase ? (
+                  <>
+                    <Coins size={18} /> Kaufen · {price} Koins
+                  </>
+                ) : (
+                  <>
+                    <Plus size={18} /> Dieses Buch verwenden
+                  </>
+                )}
               </Button>
             )
           )
@@ -144,6 +188,38 @@ export default function BookDetail() {
             {canEdit
               ? 'Du kannst die Vokabeln als Mod/Admin ändern – alle Nutzer sehen die Änderung sofort.'
               : 'Die Vokabeln sind vorgegeben. Fehler kannst du bei einer Seite zur Prüfung melden. Dein Lernfortschritt gehört dir allein.'}
+          </Notice>
+        </div>
+      )}
+      {isPublic && isAdmin && (
+        <div className="mb-4 flex flex-wrap items-end gap-2">
+          <Field label="Preis in Koins (Admin)">
+            <TextInput
+              type="number"
+              min={0}
+              inputMode="numeric"
+              className="!w-32"
+              value={priceDraft ?? String(price)}
+              onChange={(e) => setPriceDraft(e.target.value)}
+            />
+          </Field>
+          <Button variant="secondary" disabled={priceDraft === null} onClick={() => void savePrice()}>Preis speichern</Button>
+        </div>
+      )}
+      {isPublic && !isAdmin && price > 0 && <p className="mb-3 text-sm text-slate-400">Preis: {price} Koins{publicInfo?.purchased ? ' (schon freigeschaltet)' : ''}</p>}
+      {inLibrary && myActive && (
+        <div className="mb-4">
+          <Notice tone={myActive.active_count === 0 && myActive.vocab_count > 0 ? 'warn' : 'info'}>
+            <span className="inline-flex flex-wrap items-center gap-3">
+              <span>
+                <b>{myActive.active_count}</b> von {myActive.vocab_count} Vokabeln sind für dich aktiv. Nur aktive Vokabeln kommen beim Lernen dran –
+                so bleiben neue Vokabeln draußen, bis du sie freischaltest.
+              </span>
+              <span className="flex gap-2">
+                <Button variant="secondary" onClick={() => void activate(true)}><Power size={15} /> Alle aktivieren</Button>
+                <Button variant="ghost" onClick={() => void activate(false)}>Alle deaktivieren</Button>
+              </span>
+            </span>
           </Notice>
         </div>
       )}
@@ -198,11 +274,18 @@ export default function BookDetail() {
                 Unit {u.unit_number}
                 {u.name ? ` – ${u.name}` : ''}
               </h2>
-              {canEdit && (
-                <Button variant="ghost" className="text-rose-300" onClick={() => setConfirm({ kind: 'unit', n: u.unit_number })}>
-                  <Trash2 size={15} /> Unit löschen
-                </Button>
-              )}
+              <div className="flex flex-wrap gap-1">
+                {inLibrary && (
+                  <Button variant="ghost" onClick={() => void activate(u.pages.some((p) => p.active_count < p.vocab_count), u.unit_number)}>
+                    <Power size={15} /> {u.pages.some((p) => p.active_count < p.vocab_count) ? 'Unit aktivieren' : 'Unit deaktivieren'}
+                  </Button>
+                )}
+                {canEdit && (
+                  <Button variant="ghost" className="text-rose-300" onClick={() => setConfirm({ kind: 'unit', n: u.unit_number })}>
+                    <Trash2 size={15} /> Unit löschen
+                  </Button>
+                )}
+              </div>
             </div>
             <div className="mt-3 flex flex-wrap gap-2">
               {u.pages.map((p) => (
@@ -213,8 +296,20 @@ export default function BookDetail() {
                   >
                     {!canEdit && <Eye size={14} className="text-slate-500" />}
                     Seite {p.page_number}
-                    <span className="font-mono text-xs text-accent-cyan">{p.vocab_count}</span>
+                    <span className="font-mono text-xs text-accent-cyan">{inLibrary ? `${p.active_count}/${p.vocab_count}` : p.vocab_count}</span>
                   </Link>
+                  {inLibrary && (
+                    <button
+                      aria-label={`Seite ${p.page_number} ${p.active_count < p.vocab_count ? 'aktivieren' : 'deaktivieren'}`}
+                      title={p.active_count < p.vocab_count ? 'Vokabeln dieser Seite aktivieren' : 'Vokabeln dieser Seite deaktivieren'}
+                      onClick={() => void activate(p.active_count < p.vocab_count, u.unit_number, p.page_number)}
+                      className={`flex min-h-[44px] w-10 items-center justify-center border-l border-white/10 ${
+                        p.active_count === p.vocab_count && p.vocab_count > 0 ? 'text-emerald-300' : 'text-slate-500 hover:text-accent-cyan'
+                      }`}
+                    >
+                      <Power size={14} />
+                    </button>
+                  )}
                   {canEdit && (
                     <button
                       aria-label={`Seite ${p.page_number} löschen`}

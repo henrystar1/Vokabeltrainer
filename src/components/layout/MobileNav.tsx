@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { NavLink, useLocation } from 'react-router-dom'
 import { LogOut, MoreHorizontal, X } from 'lucide-react'
 import { navItemsFor } from '../../lib/navigation'
+import KoinBadge from '../profile/KoinBadge'
 import { useAuth } from '../../features/auth/AuthProvider'
 
 const PRIMARY = ['/', '/buecher', '/lernen', '/test']
@@ -30,7 +31,10 @@ export default function MobileNav() {
             onClick={(e) => e.stopPropagation()}
           >
             <div className="flex items-center justify-between px-3 pb-2 pt-1">
-              <span className="text-sm text-slate-400">{displayName ?? 'Benutzer'}</span>
+              <span className="flex items-center gap-3 text-sm text-slate-400">
+                {displayName ?? 'Benutzer'}
+                <KoinBadge compact />
+              </span>
               <button aria-label="Schließen" onClick={() => setOpen(false)} className="p-1 text-slate-400">
                 <X size={18} />
               </button>

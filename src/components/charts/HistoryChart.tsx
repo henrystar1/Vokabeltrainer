@@ -13,8 +13,8 @@ export default function HistoryChart({ days }: { days: HistoryDay[] }) {
           const hc = (d.correct / max) * 36
           return (
             <g key={d.day}>
-              <rect x={i * W + W * 0.15} y={38 - h} width={W * 0.7} height={h} rx="0.8" fill="rgba(139,92,246,0.35)" />
-              <rect x={i * W + W * 0.15} y={38 - hc} width={W * 0.7} height={hc} rx="0.8" fill="#22d3ee" />
+              <rect x={i * W + W * 0.15} y={38 - h} width={W * 0.7} height={h} rx="0.8" style={{ fill: 'rgb(var(--c-violet) / 0.35)' }} />
+              <rect x={i * W + W * 0.15} y={38 - hc} width={W * 0.7} height={hc} rx="0.8" style={{ fill: 'rgb(var(--c-cyan))' }} />
             </g>
           )
         })}

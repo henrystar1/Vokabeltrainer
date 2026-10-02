@@ -15,6 +15,9 @@ import ImportBook from './pages/ImportBook'
 import Leaderboard from './pages/Leaderboard'
 import Learn from './pages/Learn'
 import Placeholder from './pages/Placeholder'
+import Feedback from './pages/Feedback'
+import Profile from './pages/Profile'
+import Shop from './pages/Shop'
 import Search from './pages/Search'
 import Settings from './pages/Settings'
 import Stats from './pages/Stats'
@@ -51,6 +54,9 @@ export default function App() {
           <Route path="test" element={<Test />} />
           <Route path="statistik" element={<Stats />} />
           <Route path="rangliste" element={<Leaderboard />} />
+          <Route path="shop" element={<Shop />} />
+          <Route path="profil" element={<Profile />} />
+          <Route path="feedback" element={<Feedback />} />
           <Route path="einstellungen" element={<Settings />} />
           <Route path="verwaltung" element={<StaffOnly><Admin /></StaffOnly>} />
           <Route path="*" element={<Placeholder title="Nicht gefunden" phase="Fehlerseite" />} />
