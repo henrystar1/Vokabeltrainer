@@ -1,5 +1,7 @@
 import { useCallback, useEffect, useRef, useState, type FormEvent } from 'react'
 import { Send, Trash2 } from 'lucide-react'
+import type { RealtimeChannel } from '@supabase/supabase-js'
+import { supabase } from '../lib/supabaseClient'
 import PlayerTag from '../components/profile/PlayerTag'
 import Button from '../components/ui/Button'
 import Card from '../components/ui/Card'
@@ -25,7 +27,10 @@ function time(iso: string): string {
 
 /** Gemeinsamer Chat für alle; aktualisiert sich alle paar Sekunden, solange die Seite sichtbar ist. */
 export default function Chat() {
-  const { isStaff } = useAuth()
+  const { isStaff, displayName } = useAuth()
+  const [typing, setTyping] = useState<Record<string, number>>({})
+  const channel = useRef<RealtimeChannel | null>(null)
+  const lastTypingSent = useRef(0)
   const [messages, setMessages] = useState<ChatMessage[]>([])
   const [loaded, setLoaded] = useState(false)
   const [text, setText] = useState('')
@@ -52,6 +57,42 @@ export default function Chat() {
     return () => window.clearInterval(t)
   }, [refresh])
 
+  // Echtzeit über Supabase Broadcast: „schreibt …“ und sofortiges Nachladen bei neuen Nachrichten.
+  useEffect(() => {
+    const ch = supabase
+      .channel('vokabeltrainer-chat')
+      .on('broadcast', { event: 'typing' }, ({ payload }) => {
+        const name = String(payload?.name ?? '')
+        if (name) setTyping((t) => ({ ...t, [name]: Date.now() + 4500 }))
+      })
+      .on('broadcast', { event: 'posted' }, ({ payload }) => {
+        const name = String(payload?.name ?? '')
+        if (name) setTyping((t) => Object.fromEntries(Object.entries(t).filter(([n]) => n !== name)))
+        void refresh()
+      })
+      .subscribe()
+    channel.current = ch
+    const clean = window.setInterval(() => {
+      setTyping((t) => {
+        const now = Date.now()
+        const keep = Object.entries(t).filter(([, until]) => until > now)
+        return keep.length === Object.keys(t).length ? t : Object.fromEntries(keep)
+      })
+    }, 1000)
+    return () => {
+      window.clearInterval(clean)
+      channel.current = null
+      void supabase.removeChannel(ch)
+    }
+  }, [refresh])
+
+  function announceTyping() {
+    const now = Date.now()
+    if (!displayName || now - lastTypingSent.current < 2500) return
+    lastTypingSent.current = now
+    void channel.current?.send({ type: 'broadcast', event: 'typing', payload: { name: displayName } })
+  }
+
   useEffect(() => {
     const el = listRef.current
     if (el && stick.current) el.scrollTop = el.scrollHeight
@@ -67,6 +108,7 @@ export default function Chat() {
       await postChat(body)
       setText('')
       stick.current = true
+      void channel.current?.send({ type: 'broadcast', event: 'posted', payload: { name: displayName } })
       await refresh()
     } catch (err) {
       setError(errorMessage(err))
@@ -124,11 +166,22 @@ export default function Chat() {
             </div>
           ))}
         </div>
+        <div className="h-5 px-1 text-xs text-slate-400" aria-live="polite">
+          {Object.keys(typing).length > 0 && (
+            <span className="inline-flex items-center gap-1.5">
+              <span className="typing-dots" aria-hidden><i /><i /><i /></span>
+              {typingText(Object.keys(typing))}
+            </span>
+          )}
+        </div>
         {error && <ErrorBox message={error} />}
         <form onSubmit={(e) => void send(e)} className="flex gap-2">
           <input
             value={text}
-            onChange={(e) => setText(e.target.value)}
+            onChange={(e) => {
+              setText(e.target.value)
+              if (e.target.value.trim()) announceTyping()
+            }}
             maxLength={500}
             placeholder="Nachricht schreiben …"
             aria-label="Nachricht"
@@ -144,4 +197,10 @@ export default function Chat() {
       <p className="mt-3 text-xs text-slate-500">Coins verschicken: <span className="font-mono text-slate-300">!pay @Anzeigename 100</span>. Sei nett zueinander – Mods und Admins können Nachrichten löschen. Der Chat zeigt die letzten 100 Nachrichten.</p>
     </div>
   )
+}
+
+function typingText(names: string[]): string {
+  if (names.length === 1) return `${names[0]} schreibt …`
+  if (names.length === 2) return `${names[0]} und ${names[1]} schreiben …`
+  return 'Mehrere schreiben …'
 }

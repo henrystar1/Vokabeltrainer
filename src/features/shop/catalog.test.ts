@@ -3,13 +3,13 @@ import { AVATARS, EFFECT_CLASSES, NAME_COLORS, TAGS, THEMES, hexToTriplet } from
 import { ANIMATED_AVATARS } from './AnimatedAvatar'
 
 // Die Artikel-IDs stehen in den Migrationen; der Katalog muss jede davon kennen.
-const files = import.meta.glob('../../../supabase/migrations/000[569]_*.sql', { query: '?raw', import: 'default', eager: true }) as Record<string, string>
+const files = import.meta.glob('../../../supabase/migrations/00{05,06,09,10}_*.sql', { query: '?raw', import: 'default', eager: true }) as Record<string, string>
 const sql = Object.values(files).join('\n')
 const seeded = [...sql.matchAll(/\('((?:avatar|color|effect|theme|tag)_[a-z_]+)',\s*'(avatar|color|effect|theme|tag)'/g)].map((m) => [m[1], m[2]])
 
 describe('Shop-Katalog', () => {
   it('kennt alle in der Datenbank angelegten Artikel', () => {
-    expect(seeded.length).toBe(48 + 17 + 6)
+    expect(seeded.length).toBe(48 + 17 + 6 + 2)
     for (const [id, kind] of seeded) {
       const known =
         kind === 'avatar' ? { ...AVATARS, ...Object.fromEntries(ANIMATED_AVATARS.map((a) => [a, true])) }

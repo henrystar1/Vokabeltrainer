@@ -8,9 +8,11 @@ import Button from '../components/ui/Button'
 import Card from '../components/ui/Card'
 import { Field, Select } from '../components/ui/Field'
 import PageHeader from '../components/ui/PageHeader'
-import { ErrorBox, Spinner } from '../components/ui/States'
+import { ErrorBox, Notice, Spinner } from '../components/ui/States'
 import { buildSprintQuestions, type Question } from '../features/learning/questions'
 import { LearningSession } from '../features/learning/session'
+import { useWallet } from '../features/koins/WalletProvider'
+import { getWallet } from '../services/koins'
 import { useSettings } from '../features/settings/SettingsProvider'
 import { errorMessage } from '../lib/errors'
 import { useAsync } from '../lib/useAsync'
@@ -36,6 +38,8 @@ export default function Sprint() {
   const [correct, setCorrect] = useState(0)
   const [answered, setAnswered] = useState(0)
   const [best, setBest] = useState<number | null>(null)
+  const [earned, setEarned] = useState(0)
+  const wallet = useWallet()
   const session = useRef(new LearningSession(['forward', 'backward']))
   const startedAt = useRef(new Date())
   const wrongRef = useRef<WrongAnswer[]>([])
@@ -81,7 +85,13 @@ export default function Sprint() {
   async function save(score: number, total: number) {
     setSaveError(null)
     try {
-      setBest(await submitSprint(score, total))
+      const r = await submitSprint(score, total)
+      setBest(r.best)
+      setEarned(r.earned)
+      if (r.earned > 0) {
+        const b = await getWallet().catch(() => null)
+        if (b !== null) wallet.setBalance(b)
+      }
       if (total > 0) {
         await submitSession({
           bookId: null,
@@ -132,6 +142,7 @@ export default function Sprint() {
         <PageHeader eyebrow="Sprint" title={`${correct} richtig`} />
         <ResultSummary total={answered} correct={correct} wrong={wrong} />
         <div className="mt-4 space-y-3">
+          {earned > 0 && <Notice tone="ok">+{earned} Coins für deinen Sprint!</Notice>}
           {best !== null && <p className="text-sm text-slate-300">Deine Bestleistung diese Woche: <span className="font-mono text-accent-cyan">{best}</span></p>}
           {saveError && <ErrorBox message={`Das Ergebnis konnte nicht gespeichert werden: ${saveError}`} onRetry={() => void save(correct, answered)} />}
         </div>
@@ -155,7 +166,7 @@ export default function Sprint() {
         <Card className="space-y-4">
           <Zap className="text-accent-violet" size={28} />
           <p className="text-slate-300">
-            Du hast <span className="font-mono text-accent-cyan">{SECONDS} Sekunden</span>. Beantworte so viele Vokabeln richtig wie möglich – ohne Rückmeldung nach jeder Antwort. Falsche Antworten kosten nichts, aber Zeit.
+            Du hast <span className="font-mono text-accent-cyan">{SECONDS} Sekunden</span>. Beantworte so viele Vokabeln richtig wie möglich – ohne Rückmeldung nach jeder Antwort. Falsche Antworten kosten nichts, aber Zeit. Für jede richtige Runde gibt es Coins (begrenzt pro Tag).
           </p>
           <Field label="Vokabeln aus">
             <Select value={bookId} onChange={(e) => setBookId(e.target.value)}>

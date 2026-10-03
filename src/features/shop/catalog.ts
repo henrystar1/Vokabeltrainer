@@ -58,6 +58,7 @@ export const EFFECT_CLASSES: Record<string, string> = {
   effect_admin_royal: 'fx-admin-royal',
   effect_admin_void: 'fx-admin-void',
   effect_vortex: 'fx-vortex',
+  effect_piano: 'fx-piano',
 }
 
 /** Spender-Tags aus dem Shop (Klasse in index.css). */

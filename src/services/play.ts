@@ -3,7 +3,7 @@ import { rpc } from './rpc'
 
 export const getMistakePool = (bookId: string | null) => rpc<PoolVocab[]>('get_mistake_pool', { p_book_id: bookId })
 
-export const submitSprint = (score: number, total: number) => rpc<number>('submit_sprint', { p_score: score, p_total: total })
+export const submitSprint = (score: number, total: number) => rpc<{ best: number; earned: number }>('submit_sprint', { p_score: score, p_total: total })
 export const getSprintBoard = () => rpc<SprintRow[]>('get_sprint_board')
 
 export const getStreak = () => rpc<Streak>('get_streak')
@@ -23,3 +23,10 @@ export const cancelDuel = (id: string) => rpc<void>('cancel_duel', { p_id: id })
 export const getChat = (limit = 100) => rpc<ChatMessage[]>('get_chat', { p_limit: limit })
 export const postChat = (body: string) => rpc<number>('post_chat', { p_body: body })
 export const deleteChatMessage = (id: number) => rpc<void>('delete_chat_message', { p_id: id })
+
+export type GameId = 'snake' | 'tetris' | 'blast'
+export interface GameStart { id: string; bot_score: number; fee: number; balance: number }
+export interface GameResult { won: boolean; score: number; bot_score: number; reward: number; balance: number }
+
+export const startGame = (game: GameId) => rpc<GameStart>('start_game', { p_game: game })
+export const finishGame = (id: string, score: number) => rpc<GameResult>('finish_game', { p_id: id, p_score: score })

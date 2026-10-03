@@ -104,19 +104,30 @@ body {
   50% { filter: drop-shadow(0 0 6px #c084fc) drop-shadow(0 0 20px #a855f7) drop-shadow(0 0 4px #fb7185); }
 }
 
-/* Wirbel: blau leuchtender Strudel hinter dem Namen (passt zum Schwarzen Loch) */
-.fx-vortex { position: relative; isolation: isolate; animation: fx-vortex-glow 3s ease-in-out infinite; }
+/* Wirbel: Text leuchtet blau, dahinter kreist ein weicher Strudel (eigenes Element, wird nie abgeschnitten, blendet am Rand aus) */
+.fx-vortex { animation: fx-vortex-glow 3s ease-in-out infinite; }
 @property --vx { syntax: '<angle>'; inherits: false; initial-value: 0deg; }
-.fx-vortex::before {
-  content: ''; position: absolute; z-index: -1; inset: -40% -16%; border-radius: 50%; pointer-events: none;
-  background: conic-gradient(from var(--vx), transparent 0 12%, rgb(56 189 248 / 0.75) 30%, transparent 46%, rgb(37 99 235 / 0.7) 64%, rgb(224 242 254 / 0.55) 74%, transparent 90%);
-  mask: radial-gradient(ellipse at center, #000 30%, rgb(0 0 0 / 0.5) 52%, transparent 72%);
-  filter: blur(5px); animation: fx-vortex-spin 3.2s linear infinite;
+.vx-glow {
+  position: absolute; inset: -60% -22%; z-index: 0; pointer-events: none; border-radius: 50%;
+  background: conic-gradient(from var(--vx), transparent 0 12%, rgb(56 189 248 / 0.7) 30%, transparent 46%, rgb(37 99 235 / 0.65) 64%, rgb(224 242 254 / 0.5) 74%, transparent 90%);
+  mask: radial-gradient(closest-side, #000 25%, rgb(0 0 0 / 0.45) 60%, transparent 100%);
+  filter: blur(4px); animation: fx-vortex-spin 3.2s linear infinite;
 }
 @keyframes fx-vortex-spin { to { --vx: 360deg; } }
 @keyframes fx-vortex-glow {
   0%, 100% { filter: drop-shadow(0 0 3px #38bdf8) drop-shadow(0 0 9px rgb(37 99 235 / 0.9)); }
   50% { filter: drop-shadow(0 0 6px #7dd3fc) drop-shadow(0 0 18px #2563eb) brightness(1.2); }
+}
+
+/* Klaviertasten: jeder Buchstabe ist eine Taste (weiß/schwarz wie auf dem Klavier) und wird der Reihe nach gedrückt */
+.pk-name { display: inline-flex; align-items: flex-start; gap: 1px; padding-bottom: 0.22em; }
+.pk { display: inline-block; min-width: 0.78em; padding: 0.02em 0.1em 0.1em; text-align: center; font-weight: 700; line-height: 1.25; border-radius: 0 0 0.25em 0.25em; animation: pk-press 3s ease-in-out infinite; animation-delay: calc(var(--i) * 0.17s); }
+.pk-w { color: #0f172a; background: linear-gradient(#ffffff, #e2e8f0); box-shadow: 0 0.1em 0 #94a3b8, 0 0.15em 0.2em rgb(0 0 0 / 0.45); }
+.pk-b { color: #f8fafc; background: linear-gradient(#3f3f46, #000); box-shadow: 0 0.1em 0 #000, 0 0.15em 0.2em rgb(0 0 0 / 0.6); }
+.pk-gap { display: inline-block; width: 0.45em; }
+@keyframes pk-press {
+  0%, 15%, 100% { transform: translateY(0); filter: none; }
+  4%, 11% { transform: translateY(0.09em); filter: brightness(0.82); box-shadow: 0 0.015em 0 #64748b, 0 0.04em 0.06em rgb(0 0 0 / 0.5); }
 }
 
 /* ---------- Tags ---------- */
@@ -130,9 +141,17 @@ body {
 .tag-king { color: #fff; background: linear-gradient(90deg, #f43f5e, #f59e0b, #84cc16, #22d3ee, #8b5cf6, #f43f5e); background-size: 200% 100%; animation: fx-rainbow 2.2s linear infinite; box-shadow: 0 0 16px rgb(255 255 255 / 0.5); text-shadow: 0 1px 2px rgb(0 0 0 / 0.5); }
 
 @media (prefers-reduced-motion: reduce) {
-  .fx-mod-aura, .fx-mod-bolt, .fx-admin-royal, .fx-admin-void, .fx-admin-void::after, .fx-vortex, .fx-vortex::before, .fx-mod-bolt::after, .tag-legend, .tag-king { animation: none; }
+  .fx-mod-aura, .fx-mod-bolt, .fx-admin-royal, .fx-admin-void, .fx-admin-void::after, .fx-vortex, .vx-glow, .pk, .fx-mod-bolt::after, .tag-legend, .tag-king { animation: none; }
 }
 
 @media (prefers-reduced-motion: reduce) {
   .fx-pulse, .fx-float, .fx-shimmer, .fx-rainbow, .fx-fire, .fx-sparkle::after { animation: none; }
 }
+
+/* "schreibt …"-Punkte im Chat */
+.typing-dots { display: inline-flex; gap: 3px; }
+.typing-dots i { width: 5px; height: 5px; border-radius: 9999px; background: currentColor; animation: typing-bounce 1.1s ease-in-out infinite; }
+.typing-dots i:nth-child(2) { animation-delay: 0.15s; }
+.typing-dots i:nth-child(3) { animation-delay: 0.3s; }
+@keyframes typing-bounce { 0%, 60%, 100% { transform: translateY(0); opacity: 0.4; } 30% { transform: translateY(-4px); opacity: 1; } }
+@media (prefers-reduced-motion: reduce) { .typing-dots i { animation: none; } }

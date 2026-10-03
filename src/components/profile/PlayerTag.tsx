@@ -19,10 +19,43 @@ export function Avatar({ name, avatarId, colorId, size = 32 }: { name: string; a
   )
 }
 
+/** Klaviertasten-Effekt: Buchstaben als weiße und schwarze Tasten (Muster einer Oktave). */
+const KEY_PATTERN = [false, true, false, true, false, false, true, false, true, false, true, false]
+
+function PianoName({ name, className }: { name: string; className: string }) {
+  let k = 0
+  return (
+    <span className={`pk-name ${className}`} aria-label={name}>
+      {Array.from(name).map((ch, i) => {
+        if (ch === ' ') return <span key={i} className="pk-gap" aria-hidden />
+        const black = KEY_PATTERN[k % KEY_PATTERN.length]
+        const idx = k++
+        return (
+          <span key={i} aria-hidden className={`pk ${black ? 'pk-b' : 'pk-w'}`} style={{ '--i': idx } as React.CSSProperties}>
+            {ch}
+          </span>
+        )
+      })}
+    </span>
+  )
+}
+
 /** Name mit gekaufter Farbe und gekauftem Effekt. */
 export function StyledName({ name, colorId, effectId, className = '' }: { name: string; colorId?: string | null; effectId?: string | null; className?: string }) {
+  if (effectId === 'effect_piano') return <PianoName name={name} className={className} />
   const { className: c, style } = nameColorStyle(colorId)
   const fx = effectId ? EFFECT_CLASSES[effectId] ?? '' : ''
+  if (effectId === 'effect_vortex') {
+    // Der Strudel ist ein eigenes Element neben dem Text, damit ihn `truncate` nicht abschneidet.
+    return (
+      <span className="relative isolate inline-flex min-w-0 max-w-full items-center">
+        <i aria-hidden className="vx-glow" />
+        <span className={`relative z-[1] ${c} ${fx} ${className}`} style={style}>
+          {name}
+        </span>
+      </span>
+    )
+  }
   return (
     <span className={`${c} ${fx} ${className}`} style={style}>
       {name}

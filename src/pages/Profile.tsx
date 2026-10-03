@@ -27,6 +27,9 @@ const REASONS: Record<string, string> = {
   quest: 'Quest abgeschlossen',
   league: 'Liga-Belohnung',
   duel: 'Duell gewonnen',
+  sprint: 'Sprint',
+  game_fee: 'Spiel-Eintritt',
+  game_win: 'Spiel gewonnen',
   pay_in: 'Coins erhalten',
   pay_out: 'Coins verschickt',
 }

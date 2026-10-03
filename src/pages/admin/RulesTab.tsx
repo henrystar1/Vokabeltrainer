@@ -14,6 +14,9 @@ const RULES: Array<{ key: string; label: string; hint: string }> = [
   { key: 'points_active_day', label: 'Bonus für jeden aktiven Tag', hint: 'Punkte, sobald man an einem Tag etwas beantwortet' },
   { key: 'points_accuracy_bonus', label: 'Maximaler Trefferquoten-Bonus pro Tag', hint: 'Bei 100 % richtig gibt es den vollen Bonus' },
   { key: 'points_accuracy_min', label: 'Trefferquoten-Bonus ab so vielen Antworten', hint: 'Schützt vor Glückstreffern bei wenigen Antworten' },
+  { key: 'bot_snake', label: 'Bot-Stärke Snake (höchstes Ziel in Äpfeln)', hint: 'Das Ziel des Bots liegt zufällig zwischen 25 % und 100 % davon' },
+  { key: 'bot_tetris', label: 'Bot-Stärke Tetris (höchstes Ziel in Punkten)', hint: 'Höher = schwerer zu schlagen' },
+  { key: 'bot_blast', label: 'Bot-Stärke Block Blast (höchstes Ziel in Punkten)', hint: 'Höher = schwerer zu schlagen' },
   { key: 'chat_per_minute', label: 'Chat: Nachrichten pro Minute und Person', hint: 'Gegen Spam' },
 ]
 

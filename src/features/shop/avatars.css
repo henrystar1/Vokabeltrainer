@@ -57,34 +57,33 @@
 .av-supernova .d { border: calc(var(--s) * 0.04) solid rgb(253 230 138 / 0.8); animation: av-wave 2s ease-out infinite; }
 .av-supernova .e { border: calc(var(--s) * 0.03) solid rgb(147 197 253 / 0.8); animation: av-wave 2s ease-out infinite 1s; }
 
-/* Schwarzes Loch (blau): 12 s Ablauf
-   0–20 %  Lichtstreifen läuft um den Rand · 20–45 % Wirbelarme wachsen vom Rand nach innen
-   45–66 % das Loch bildet sich in der Mitte · 66–90 % Loch mit Akkretionsscheibe · 90–100 % fällt zusammen */
+/* Schwarzes Loch (blau): 16 s Ablauf
+   0–30 %  zwei Lichtstreifen laufen gegenläufig um den Rand · 10–46 % Wirbelarme wachsen vom Rand nach innen und werden eingesogen
+   30–44 % das Loch bildet sich · 44–93 % Loch mit geradem Ring, Lichtbögen oben und unten · 93–100 % fällt zusammen */
 .av-blackhole { overflow: visible; filter: drop-shadow(0 0 calc(var(--s) * 0.16) rgb(37 99 235 / 0.65)); }
 .av-blackhole .space { background: radial-gradient(circle, #02030a 0, #000 55%, #01020c 100%); box-shadow: inset 0 0 0 calc(var(--s) * 0.016) rgb(56 189 248 / 0.5), inset 0 0 calc(var(--s) * 0.14) rgb(0 0 0); }
-.av-blackhole .halo { inset: -16%; background: radial-gradient(circle, transparent 54%, rgb(56 189 248 / 0.35) 61%, rgb(37 99 235 / 0.2) 72%, transparent 82%); animation: bh-halo 12s ease-in-out infinite; }
-.av-blackhole .rim, .av-blackhole .rimglow { background: conic-gradient(from 0deg, transparent 0 42%, rgb(37 99 235 / 0.35) 55%, rgb(56 189 248 / 0.95) 80%, #fff 93%, rgb(255 255 255 / 0) 100%); mask: radial-gradient(farthest-side, transparent calc(100% - var(--s) * 0.075), #000 calc(100% - var(--s) * 0.068)); animation: av-spin 3.2s linear infinite, bh-rim 12s ease-in-out infinite; }
+.av-blackhole .halo { inset: -16%; background: radial-gradient(circle, transparent 54%, rgb(56 189 248 / 0.35) 61%, rgb(37 99 235 / 0.2) 72%, transparent 82%); animation: bh-halo 16s ease-in-out infinite; }
+.av-blackhole .rim, .av-blackhole .rimglow { background: repeating-conic-gradient(from 0deg, transparent 0deg, rgb(37 99 235 / 0.3) 45deg, rgb(56 189 248 / 0.95) 135deg, #fff 170deg, rgb(255 255 255 / 0) 180deg); mask: radial-gradient(farthest-side, transparent calc(100% - var(--s) * 0.075), #000 calc(100% - var(--s) * 0.068)); animation: av-spin 4.5s linear infinite, bh-rim 16s ease-in-out infinite; }
 .av-blackhole .rimglow { inset: calc(var(--s) * -0.03); mask: radial-gradient(farthest-side, transparent calc(100% - var(--s) * 0.15), #000 calc(100% - var(--s) * 0.06), transparent 100%); filter: blur(calc(var(--s) * 0.035)); }
-.av-blackhole .arms { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; filter: drop-shadow(0 0 calc(var(--s) * 0.035) #38bdf8); animation: av-spin 7s linear infinite, bh-arms 12s ease-in-out infinite; }
-.av-blackhole .arms path { fill: none; stroke: #7dd3fc; stroke-width: 1.7; stroke-linecap: round; stroke-dasharray: 100 100; stroke-dashoffset: 100; animation: bh-draw 12s ease-in-out infinite; }
-.av-blackhole .arms path.t { stroke: #38bdf8; stroke-width: 0.9; opacity: 0.7; animation-delay: 0.35s; }
-.av-blackhole .dust { background-image: radial-gradient(1px 1px at 22% 30%, #e0f2fe, transparent), radial-gradient(1.4px 1.4px at 74% 24%, #bae6fd, transparent), radial-gradient(1px 1px at 82% 66%, #e0f2fe, transparent), radial-gradient(1.2px 1.2px at 30% 78%, #7dd3fc, transparent), radial-gradient(1px 1px at 52% 12%, #fff, transparent), radial-gradient(1px 1px at 12% 58%, #bae6fd, transparent); animation: av-spin-rev 5s linear infinite, bh-dust 12s ease-in-out infinite; }
-.av-blackhole .lens { inset: 21%; border-radius: 50%; border: calc(var(--s) * 0.02) solid #8fd0ff; box-shadow: 0 0 calc(var(--s) * 0.05) #38bdf8, 0 0 calc(var(--s) * 0.12) rgb(37 99 235 / 0.8), inset 0 0 calc(var(--s) * 0.04) rgb(56 189 248 / 0.7); transform: scale(0); animation: bh-hole 12s cubic-bezier(0.3, 0.7, 0.2, 1) infinite 0.12s; }
-.av-blackhole .lens::before, .av-blackhole .lens::after { content: ''; position: absolute; left: -6%; right: -6%; height: 70%; border-radius: 50%; filter: blur(calc(var(--s) * 0.006)); }
-.av-blackhole .lens::before { top: -22%; border-top: calc(var(--s) * 0.016) solid rgb(147 210 255 / 0.95); clip-path: inset(0 0 62% 0); }
-.av-blackhole .lens::after { bottom: -22%; border-bottom: calc(var(--s) * 0.012) solid rgb(96 165 250 / 0.8); clip-path: inset(62% 0 0 0); }
-.av-blackhole .core { inset: 27%; background: #000; box-shadow: 0 0 calc(var(--s) * 0.1) calc(var(--s) * 0.05) #000; transform: scale(0); animation: bh-hole 12s cubic-bezier(0.3, 0.7, 0.2, 1) infinite; }
-.av-blackhole .disc { position: absolute; left: 2%; right: 2%; top: 39%; height: 22%; border-radius: 50%; transform: rotate(-9deg) scale(0); background: radial-gradient(ellipse at center, #fff 0, #e0f2fe 6%, #7dd3fc 20%, #2563eb 46%, rgb(30 64 175 / 0.45) 62%, transparent 74%); filter: blur(calc(var(--s) * 0.008)); animation: bh-disc 12s cubic-bezier(0.3, 0.7, 0.2, 1) infinite 0.2s; }
-.av-blackhole .disc.back { clip-path: inset(0 0 50% 0); opacity: 0.75; }
-.av-blackhole .disc.front { clip-path: inset(50% 0 0 0); }
+.av-blackhole .arms { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; filter: drop-shadow(0 0 calc(var(--s) * 0.035) #38bdf8); animation: av-spin 8s linear infinite, bh-arms 16s ease-in-out infinite; }
+.av-blackhole .arms path { fill: none; stroke: #7dd3fc; stroke-width: 1.7; stroke-linecap: round; stroke-dasharray: 100 100; stroke-dashoffset: 100; animation: bh-draw 16s ease-in-out infinite; }
+.av-blackhole .arms path.t { stroke: #38bdf8; stroke-width: 0.9; opacity: 0.7; animation-delay: 0.4s; }
+.av-blackhole .dust { background-image: radial-gradient(1px 1px at 22% 30%, #e0f2fe, transparent), radial-gradient(1.4px 1.4px at 74% 24%, #bae6fd, transparent), radial-gradient(1px 1px at 82% 66%, #e0f2fe, transparent), radial-gradient(1.2px 1.2px at 30% 78%, #7dd3fc, transparent), radial-gradient(1px 1px at 52% 12%, #fff, transparent), radial-gradient(1px 1px at 12% 58%, #bae6fd, transparent); animation: av-spin-rev 6s linear infinite, bh-dust 16s ease-in-out infinite; }
+/* Lichtbögen: das Licht der Scheibe wird um die schwarze Kugel gebogen (oben hell, unten schwächer) */
+.av-blackhole .arcs, .av-blackhole .arcs2 { background: conic-gradient(from 0deg, #fff 0deg, rgb(125 211 252 / 0.95) 38deg, rgb(37 99 235 / 0.5) 72deg, transparent 98deg, transparent 118deg, rgb(56 189 248 / 0.5) 158deg, rgb(147 197 253 / 0.8) 180deg, rgb(56 189 248 / 0.5) 202deg, transparent 242deg, transparent 262deg, rgb(37 99 235 / 0.5) 288deg, rgb(125 211 252 / 0.95) 322deg, #fff 360deg); transform: scale(0); animation: bh-hole 16s cubic-bezier(0.3, 0.7, 0.2, 1) infinite 0.3s; }
+.av-blackhole .arcs { inset: 15%; mask: radial-gradient(farthest-side, transparent calc(100% - var(--s) * 0.045), #000 calc(100% - var(--s) * 0.034), #000 calc(100% - var(--s) * 0.014), transparent); filter: blur(calc(var(--s) * 0.003)) drop-shadow(0 0 calc(var(--s) * 0.035) #38bdf8); }
+.av-blackhole .arcs2 { inset: 10%; opacity: 0.55; mask: radial-gradient(farthest-side, transparent calc(100% - var(--s) * 0.035), #000 calc(100% - var(--s) * 0.022), transparent); filter: blur(calc(var(--s) * 0.006)); animation-delay: 0.5s; }
+.av-blackhole .lens { inset: 22%; border-radius: 50%; border: calc(var(--s) * 0.016) solid #8fd0ff; box-shadow: 0 0 calc(var(--s) * 0.05) #38bdf8, 0 0 calc(var(--s) * 0.1) rgb(37 99 235 / 0.8), inset 0 0 calc(var(--s) * 0.04) rgb(56 189 248 / 0.6); transform: scale(0); animation: bh-hole 16s cubic-bezier(0.3, 0.7, 0.2, 1) infinite 0.12s; }
+.av-blackhole .core { inset: 25%; background: #000; box-shadow: 0 0 calc(var(--s) * 0.08) calc(var(--s) * 0.03) #000; transform: scale(0); animation: bh-hole 16s cubic-bezier(0.3, 0.7, 0.2, 1) infinite; }
+.av-blackhole .disc { position: absolute; left: 0; right: 0; top: 42.5%; height: 15%; border-radius: 50%; transform: scale(0); background: radial-gradient(ellipse at center, #fff 0, #e0f2fe 5%, #7dd3fc 18%, #2563eb 42%, rgb(30 64 175 / 0.4) 60%, transparent 74%); filter: blur(calc(var(--s) * 0.006)); animation: bh-disc 16s cubic-bezier(0.3, 0.7, 0.2, 1) infinite 0.2s; }
 
-@keyframes bh-halo { 0%, 100% { opacity: 0.35; transform: scale(0.96); } 30% { opacity: 0.6; } 70% { opacity: 1; transform: scale(1.06); } 92% { opacity: 0.45; } }
-@keyframes bh-rim { 0%, 22% { opacity: 1; } 40%, 90% { opacity: 0.55; } 96% { opacity: 1; } 100% { opacity: 1; } }
-@keyframes bh-arms { 0%, 17% { opacity: 0; transform: scale(1); } 22% { opacity: 1; } 58% { opacity: 1; transform: scale(1); } 76% { opacity: 0; transform: scale(0.3); } 100% { opacity: 0; transform: scale(1); } }
-@keyframes bh-draw { 0%, 18% { stroke-dashoffset: 100; } 44%, 52% { stroke-dashoffset: 0; } 72%, 100% { stroke-dashoffset: -100; } }
-@keyframes bh-dust { 0%, 25% { opacity: 0; } 40%, 60% { opacity: 0.9; } 78%, 100% { opacity: 0; } }
-@keyframes bh-hole { 0%, 44% { transform: scale(0); opacity: 0; } 50% { opacity: 1; } 66% { transform: scale(1); } 90% { transform: scale(1); opacity: 1; } 100% { transform: scale(0); opacity: 0; } }
-@keyframes bh-disc { 0%, 46% { transform: rotate(-9deg) scale(0); opacity: 0; } 52% { opacity: 1; } 70% { transform: rotate(-9deg) scale(1); } 80% { transform: rotate(-7deg) scale(1.03); } 90% { transform: rotate(-9deg) scale(1); opacity: 1; } 100% { transform: rotate(-9deg) scale(0); opacity: 0; } }
+@keyframes bh-halo { 0%, 100% { opacity: 0.35; transform: scale(0.96); } 30% { opacity: 0.6; } 60% { opacity: 1; transform: scale(1.06); } 93% { opacity: 0.45; } }
+@keyframes bh-rim { 0%, 30% { opacity: 1; } 46%, 90% { opacity: 0.8; } 96% { opacity: 1; } 100% { opacity: 1; } }
+@keyframes bh-arms { 0%, 8% { opacity: 0; transform: scale(1); } 13% { opacity: 1; } 40% { opacity: 1; transform: scale(1); } 49% { opacity: 0; transform: scale(0.3); } 100% { opacity: 0; transform: scale(1); } }
+@keyframes bh-draw { 0%, 10% { stroke-dashoffset: 100; } 30%, 34% { stroke-dashoffset: 0; } 46%, 100% { stroke-dashoffset: -100; } }
+@keyframes bh-dust { 0%, 14% { opacity: 0; } 26%, 40% { opacity: 0.9; } 50%, 100% { opacity: 0; } }
+@keyframes bh-hole { 0%, 30% { transform: scale(0); opacity: 0; } 34% { opacity: 1; } 44% { transform: scale(1); } 93% { transform: scale(1); opacity: 1; } 100% { transform: scale(0); opacity: 0; } }
+@keyframes bh-disc { 0%, 32% { transform: scale(0); opacity: 0; } 36% { opacity: 1; } 46% { transform: scale(1); } 62% { transform: scale(1.04, 1.1); } 78% { transform: scale(1); } 93% { transform: scale(1); opacity: 1; } 100% { transform: scale(0); opacity: 0; } }
 
 /* Aurora */
 .av-aurora { box-shadow: 0 0 calc(var(--s) * 0.3) rgb(52 211 153 / 0.6); }
@@ -120,10 +119,20 @@
 .av-eclipse .d { inset: 24%; background: #000; box-shadow: 0 0 calc(var(--s) * 0.05) calc(var(--s) * 0.015) #fde68a; }
 .av-eclipse .e { inset: 0; background: radial-gradient(circle at 50% 4%, #fff 0, rgb(254 240 138 / 0.9) 6%, transparent 18%); animation: av-spin 9s linear infinite; mix-blend-mode: screen; }
 
+/* Klavier: Tasten werden nacheinander gedrückt, Noten steigen auf */
+.av-piano { box-shadow: 0 0 calc(var(--s) * 0.28) rgb(167 139 250 / 0.6); }
+.av-piano .a { background: radial-gradient(circle at 50% 30%, #4c1d95, #1e1b4b 60%, #0b0820); }
+.av-piano .keys { position: absolute; left: 8%; right: 8%; bottom: 8%; height: 46%; display: flex; gap: 1px; border-radius: 0 0 calc(var(--s) * 0.05) calc(var(--s) * 0.05); }
+.av-piano .keys b { flex: 1; background: linear-gradient(#fff, #cbd5e1); border-radius: 0 0 calc(var(--s) * 0.03) calc(var(--s) * 0.03); animation: pn-white 3.2s ease-in-out infinite; animation-delay: var(--d); transform-origin: top; }
+.av-piano .keys u { position: absolute; top: 0; width: 9%; height: 60%; background: linear-gradient(#3f3f46, #000); border-radius: 0 0 calc(var(--s) * 0.02) calc(var(--s) * 0.02); box-shadow: 0 1px 2px rgb(0 0 0 / 0.6); animation: pn-black 3.2s ease-in-out infinite; animation-delay: var(--d); transform-origin: top; z-index: 1; }
+.av-piano em { position: absolute; top: 52%; font-style: normal; font-size: calc(var(--s) * 0.22); line-height: 1; opacity: 0; text-shadow: 0 0 calc(var(--s) * 0.06) currentColor; animation: pn-note 3.2s ease-out infinite; animation-delay: var(--d); }
+@keyframes pn-white { 0%, 12%, 100% { transform: none; filter: none; } 3%, 8% { transform: translateY(6%) scaleY(0.96); background: linear-gradient(#bfdbfe, #60a5fa); filter: drop-shadow(0 0 4px #93c5fd); } }
+@keyframes pn-black { 0%, 12%, 100% { transform: none; } 3%, 8% { transform: translateY(8%) scaleY(0.94); background: linear-gradient(#6366f1, #1e1b4b); } }
+@keyframes pn-note { 0% { opacity: 0; transform: translate(0, 0) scale(0.5) rotate(-10deg); } 6% { opacity: 1; } 55% { opacity: 0.9; transform: translate(40%, -150%) scale(1) rotate(12deg); } 80%, 100% { opacity: 0; transform: translate(-30%, -260%) scale(1.1) rotate(-8deg); } }
+
 @media (prefers-reduced-motion: reduce) {
   .av i, .av svg, .av path, .av .disc { animation: none !important; }
   /* Schwarzes Loch ohne Bewegung: fertiges Loch zeigen */
-  .av-blackhole .core, .av-blackhole .lens { transform: scale(1); }
-  .av-blackhole .disc { transform: rotate(-9deg) scale(1); }
+  .av-blackhole .core, .av-blackhole .lens, .av-blackhole .arcs, .av-blackhole .arcs2, .av-blackhole .disc { transform: scale(1); }
   .av-blackhole .arms, .av-blackhole .dust { opacity: 0; }
 }
