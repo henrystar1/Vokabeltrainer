@@ -1,6 +1,7 @@
 import { useState, type FormEvent, type ReactNode } from 'react'
+import CoinIcon from '../components/ui/CoinIcon'
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
-import { BookOpen, Brain, Check, Coins, Globe, Plus, Upload, UserRound } from 'lucide-react'
+import { BookOpen, Brain, Check, Globe, Plus, Upload, UserRound } from 'lucide-react'
 import Button from '../components/ui/Button'
 import Card from '../components/ui/Card'
 import { Field, Select, TextArea, TextInput } from '../components/ui/Field'
@@ -188,7 +189,7 @@ export default function Books() {
                   <Button className="mt-5 w-full" busy={busyId === b.id} onClick={() => setBuying(b)}>
                     {b.price > 0 && !b.purchased ? (
                       <>
-                        <Coins size={18} /> Kaufen · {b.price} Koins
+                        <CoinIcon size={18} /> Kaufen · {b.price} Coins
                       </>
                     ) : (
                       <>
@@ -207,8 +208,8 @@ export default function Books() {
         <Modal title={buying.price > 0 && !buying.purchased ? 'Buch kaufen?' : 'Buch verwenden?'} onClose={() => setBuying(null)}>
           {buying.price > 0 && !buying.purchased ? (
             <p className="text-sm text-slate-300">
-              „{buying.name}“ kostet <b>{buying.price} Koins</b>. Du hast {wallet.balance} Koins.
-              {wallet.balance < buying.price && <span className="mt-2 block text-amber-300">Dir fehlen noch {buying.price - wallet.balance} Koins – z. B. mit einem Code oder durch Lernen.</span>}
+              „{buying.name}“ kostet <b>{buying.price} Coins</b>. Du hast {wallet.balance} Coins.
+              {wallet.balance < buying.price && <span className="mt-2 block text-amber-300">Dir fehlen noch {buying.price - wallet.balance} Coins – z. B. mit einem Code oder durch Lernen.</span>}
             </p>
           ) : (
             <p className="text-sm text-slate-300">„{buying.name}“ ist für dich kostenlos. Danach aktivierst du die Vokabeln, die du lernen willst.</p>

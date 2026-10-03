@@ -6,6 +6,7 @@ import QuizRunner from '../components/quiz/QuizRunner'
 import ResultSummary, { type WrongAnswer } from '../components/quiz/ResultSummary'
 import Button from '../components/ui/Button'
 import Card from '../components/ui/Card'
+import { Field, Select } from '../components/ui/Field'
 import PageHeader from '../components/ui/PageHeader'
 import { ErrorBox, Spinner } from '../components/ui/States'
 import { buildSprintQuestions, type Question } from '../features/learning/questions'
@@ -13,6 +14,7 @@ import { LearningSession } from '../features/learning/session'
 import { useSettings } from '../features/settings/SettingsProvider'
 import { errorMessage } from '../lib/errors'
 import { useAsync } from '../lib/useAsync'
+import { listBooks } from '../services/books'
 import { getLearningPool, submitSession } from '../services/learning'
 import { getSprintBoard, submitSprint } from '../services/play'
 
@@ -23,6 +25,9 @@ type Phase = 'setup' | 'loading' | 'run' | 'result'
 export default function Sprint() {
   const { settings } = useSettings()
   const board = useAsync(getSprintBoard, [])
+  const books = useAsync(listBooks, [])
+  const [bookId, setBookId] = useState('')
+  const language = bookId ? (books.data?.find((b) => b.id === bookId)?.language ?? settings.learn_language) : settings.learn_language
   const [phase, setPhase] = useState<Phase>('setup')
   const [error, setError] = useState<string | null>(null)
   const [saveError, setSaveError] = useState<string | null>(null)
@@ -41,10 +46,15 @@ export default function Sprint() {
     setPhase('loading')
     setError(null)
     try {
-      const pool = await getLearningPool(settings.learn_language, null)
+      // Ohne Buchauswahl zählen alle aktiven Vokabeln aus allen Büchern und Sprachen.
+      const pool = await getLearningPool(null, bookId || null)
       const qs = buildSprintQuestions(pool)
       if (qs.length < 5) {
-        setError('Für den Sprint brauchst du mindestens 5 aktive Vokabeln. Aktiviere im Buch erst welche.')
+        setError(
+          pool.length === 0
+            ? 'Hier gibt es keine aktiven Vokabeln. Aktiviere im Buch zuerst welche.'
+            : `Für den Sprint brauchst du mindestens 5 Vokabeln mit Übersetzung – hier sind nur ${qs.length}. Wähle „Alle Bücher“ oder ein anderes Buch.`,
+        )
         setPhase('setup')
         return
       }
@@ -105,7 +115,7 @@ export default function Sprint() {
       <QuizRunner
         questions={questions}
         caseSensitive={settings.case_sensitive}
-        accents={settings.learn_language === 'fr'}
+        accents={language === 'fr'}
         title="Sprint"
         showFeedback={false}
         timeLimitSeconds={SECONDS}
@@ -147,7 +157,15 @@ export default function Sprint() {
           <p className="text-slate-300">
             Du hast <span className="font-mono text-accent-cyan">{SECONDS} Sekunden</span>. Beantworte so viele Vokabeln richtig wie möglich – ohne Rückmeldung nach jeder Antwort. Falsche Antworten kosten nichts, aber Zeit.
           </p>
-          <p className="text-sm text-slate-400">Aktive Vokabeln deiner Lernsprache, beide Richtungen gemischt. Dein Lernstand ändert sich nicht.</p>
+          <Field label="Vokabeln aus">
+            <Select value={bookId} onChange={(e) => setBookId(e.target.value)}>
+              <option value="">Alle meine Bücher</option>
+              {books.data?.map((b) => (
+                <option key={b.id} value={b.id}>{b.name}</option>
+              ))}
+            </Select>
+          </Field>
+          <p className="text-sm text-slate-400">Beide Richtungen gemischt. Dein Lernstand ändert sich nicht.</p>
           <Button className="w-full min-h-[52px]" onClick={() => void start()}>
             <Play size={18} /> Sprint starten
           </Button>

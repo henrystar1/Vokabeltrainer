@@ -100,7 +100,7 @@ export default function UsersTab() {
               </div>
               <div className="text-right text-xs text-slate-400">
                 <p className="font-mono text-sm text-accent-cyan">{formatBytes(Number(u.approx_bytes))}</p>
-                <p className="font-mono text-xs text-amber-200">{u.koins} Koins</p>
+                <p className="font-mono text-xs text-amber-200">{u.koins} Coins</p>
                 <p>
                   {u.book_count} Bücher{u.public_book_count > 0 ? ` (${u.public_book_count} online)` : ''} · {u.vocab_count} Vokabeln
                 </p>

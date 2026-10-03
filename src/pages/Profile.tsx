@@ -1,6 +1,7 @@
 import { useState, type FormEvent } from 'react'
+import CoinIcon from '../components/ui/CoinIcon'
 import { Link } from 'react-router-dom'
-import { Coins, Gift } from 'lucide-react'
+import { Gift } from 'lucide-react'
 import Button from '../components/ui/Button'
 import Card from '../components/ui/Card'
 import { TextInput } from '../components/ui/Field'
@@ -26,6 +27,8 @@ const REASONS: Record<string, string> = {
   quest: 'Quest abgeschlossen',
   league: 'Liga-Belohnung',
   duel: 'Duell gewonnen',
+  pay_in: 'Coins erhalten',
+  pay_out: 'Coins verschickt',
 }
 
 const ROLE_LABEL = { user: 'Lernender', mod: 'Moderator', admin: 'Admin' } as const
@@ -48,7 +51,7 @@ export default function Profile() {
     try {
       const r = await redeemCode(code.trim())
       if (r.ok) {
-        setMessage(`${r.amount} Koins gutgeschrieben! Neues Guthaben: ${r.balance}.`)
+        setMessage(`${r.amount} Coins gutgeschrieben! Neues Guthaben: ${r.balance}.`)
         wallet.setBalance(r.balance)
         setCode('')
         ledger.reload()
@@ -70,10 +73,10 @@ export default function Profile() {
           <PlayerTag name={displayName ?? 'Du'} cosmetics={cosmetics} size={72} framed className="text-2xl" />
           <p className="label-mono">{ROLE_LABEL[role]}</p>
           <div className="flex items-center gap-3 rounded-xl border border-amber-300/20 bg-amber-300/5 px-4 py-3">
-            <Coins className="text-amber-200" />
+            <CoinIcon size={26} />
             <div>
               <p className="font-mono text-2xl text-amber-200">{wallet.balance.toLocaleString('de-DE')}</p>
-              <p className="text-xs text-slate-400">Koins</p>
+              <p className="text-xs text-slate-400">Coins</p>
             </div>
           </div>
           <Link to="/shop" className="inline-flex min-h-[44px] items-center text-sm text-accent-cyan hover:underline">
@@ -108,7 +111,7 @@ export default function Profile() {
         </Card>
       </div>
 
-      <h2 className="mb-3 mt-8 text-lg font-semibold">Koin-Verlauf</h2>
+      <h2 className="mb-3 mt-8 text-lg font-semibold">Coin-Verlauf</h2>
       {ledger.loading && !ledger.data && <Spinner />}
       {ledger.error && <ErrorBox message={ledger.error} onRetry={ledger.reload} />}
       {ledger.data && ledger.data.length === 0 && <p className="text-sm text-slate-500">Noch keine Bewegungen.</p>}
@@ -131,7 +134,7 @@ export default function Profile() {
         </Card>
       )}
       <p className="mt-4 max-w-xl text-xs text-slate-500">
-        Koins gibt es für Codes, fürs Lernen (nur Vokabeln aus Online-Büchern, begrenzt pro Tag) und für sinnvolle Fehlermeldungen oder Feedback.
+        Coins gibt es für Codes, fürs Lernen (nur Vokabeln aus Online-Büchern, begrenzt pro Tag) für sinnvolle Fehlermeldungen oder Feedback und von Freunden: Im Chat verschickst du Coins mit !pay @Name Betrag.
         Sie haben keinen Geldwert und lassen sich nicht kaufen oder auszahlen.
       </p>
     </div>

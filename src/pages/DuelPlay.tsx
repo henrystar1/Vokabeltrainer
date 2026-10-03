@@ -18,7 +18,7 @@ import type { DuelSubmitResult } from '../types'
 
 type Phase = 'intro' | 'run' | 'result'
 
-/** Ein Duell spielen. Gewertet werden Treffer und Zeit; Lernstand und Koins fürs Lernen bleiben unberührt. */
+/** Ein Duell spielen. Gewertet werden Treffer und Zeit; Lernstand und Coins fürs Lernen bleiben unberührt. */
 export default function DuelPlay() {
   const { id = '' } = useParams()
   const { settings } = useSettings()

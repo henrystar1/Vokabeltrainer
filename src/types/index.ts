@@ -33,7 +33,7 @@ export interface PublicBook {
   mastery_percent: number
   in_library: boolean
   is_mine: boolean
-  /** Preis in Koins (0 = kostenlos). */
+  /** Preis in Coins (0 = kostenlos). */
   price: number
   /** Schon gekauft bzw. frei verfügbar. */
   purchased: boolean
@@ -264,7 +264,7 @@ export interface BookExport {
 }
 
 
-/* ---------- Koins, Shop, Feedback ---------- */
+/* ---------- Coins, Shop, Feedback ---------- */
 
 export type ShopKind = 'avatar' | 'color' | 'effect' | 'theme' | 'tag'
 
@@ -316,6 +316,8 @@ export interface FeedbackItem {
 }
 
 export type AppSettings = Record<string, number>
+/** Welche Einstellungen auch Mods ändern dürfen. */
+export type ModEditable = Record<string, boolean>
 
 export interface OnlineUser {
   user_id: string
@@ -452,6 +454,7 @@ export interface DuelSubmitResult {
 
 export interface ChatMessage extends Flair {
   id: number
+  kind: 'text' | 'pay'
   body: string
   created_at: string
   is_me: boolean

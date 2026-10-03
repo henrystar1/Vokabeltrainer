@@ -56,7 +56,7 @@ export default function PresenceProvider({ children }: { children: ReactNode }) 
                 <p className="mb-1 flex items-center gap-2 text-xs text-slate-400">
                   <Mail size={13} /> {m.from_name} · {formatDateTime(m.created_at)}
                 </p>
-                <p className="whitespace-pre-wrap break-words text-sm text-slate-100">{m.body}</p>
+                <p className="whitespace-pre-wrap break-words text-sm text-slate-100">{m.body.replace(/\bKoins\b/g, 'Coins')}</p>
               </div>
             ))}
           </div>

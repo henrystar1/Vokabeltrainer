@@ -1,6 +1,7 @@
 import { useState, type FormEvent } from 'react'
+import CoinIcon from '../components/ui/CoinIcon'
 import { Link, useNavigate, useParams } from 'react-router-dom'
-import { Brain, ClipboardCheck, Coins, Download, Eye, Globe, Lock, Pencil, Plus, Power, Trash2 } from 'lucide-react'
+import { Brain, ClipboardCheck, Download, Eye, Globe, Lock, Pencil, Plus, Power, Trash2 } from 'lucide-react'
 import Button from '../components/ui/Button'
 import Card from '../components/ui/Card'
 import { Field, Select, TextArea, TextInput } from '../components/ui/Field'
@@ -167,7 +168,7 @@ export default function BookDetail() {
               <Button busy={busy} onClick={() => void useBook()}>
                 {needsPurchase ? (
                   <>
-                    <Coins size={18} /> Kaufen · {price} Koins
+                    <CoinIcon size={18} /> Kaufen · {price} Coins
                   </>
                 ) : (
                   <>
@@ -193,7 +194,7 @@ export default function BookDetail() {
       )}
       {isPublic && isAdmin && (
         <div className="mb-4 flex flex-wrap items-end gap-2">
-          <Field label="Preis in Koins (Admin)">
+          <Field label="Preis in Coins (Admin)">
             <TextInput
               type="number"
               min={0}
@@ -206,7 +207,7 @@ export default function BookDetail() {
           <Button variant="secondary" disabled={priceDraft === null} onClick={() => void savePrice()}>Preis speichern</Button>
         </div>
       )}
-      {isPublic && !isAdmin && price > 0 && <p className="mb-3 text-sm text-slate-400">Preis: {price} Koins{publicInfo?.purchased ? ' (schon freigeschaltet)' : ''}</p>}
+      {isPublic && !isAdmin && price > 0 && <p className="mb-3 text-sm text-slate-400">Preis: {price} Coins{publicInfo?.purchased ? ' (schon freigeschaltet)' : ''}</p>}
       {inLibrary && (
         <ActivationPanel
           bookId={bookId}

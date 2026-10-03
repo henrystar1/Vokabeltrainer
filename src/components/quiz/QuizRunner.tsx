@@ -182,7 +182,7 @@ export default function QuizRunner({ questions, caseSensitive, onAnswer, onFinis
       {confirmCancel && onCancel && (
         <Modal title="Runde abbrechen?" onClose={() => setConfirmCancel(false)}>
           <p className="text-sm text-slate-300">
-            Die Antworten dieser Runde werden dann nicht gewertet und es gibt keine Koins dafür. Du kannst jederzeit eine neue Runde starten.
+            Die Antworten dieser Runde werden dann nicht gewertet und es gibt keine Coins dafür. Du kannst jederzeit eine neue Runde starten.
           </p>
           <div className="mt-5 flex flex-col gap-2 sm:flex-row sm:justify-end">
             <Button variant="ghost" onClick={() => setConfirmCancel(false)}>Weiterlernen</Button>

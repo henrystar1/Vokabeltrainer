@@ -38,6 +38,7 @@ export const NAME_COLORS: Record<string, { solid?: string; gradient?: string }> 
   color_sunset: { gradient: 'linear-gradient(90deg,#f97316,#ec4899,#8b5cf6)' },
   color_ocean: { gradient: 'linear-gradient(90deg,#22d3ee,#3b82f6,#6366f1)' },
   color_candy: { gradient: 'linear-gradient(90deg,#f9a8d4,#c4b5fd,#93c5fd)' },
+  color_void: { gradient: 'linear-gradient(90deg,#1d4ed8,#38bdf8,#e0f2fe,#38bdf8,#1d4ed8)' },
   color_aurora: { gradient: 'linear-gradient(90deg,#34d399,#22d3ee,#a78bfa,#f472b6)' },
 }
 
@@ -56,6 +57,7 @@ export const EFFECT_CLASSES: Record<string, string> = {
   effect_mod_bolt: 'fx-mod-bolt',
   effect_admin_royal: 'fx-admin-royal',
   effect_admin_void: 'fx-admin-void',
+  effect_vortex: 'fx-vortex',
 }
 
 /** Spender-Tags aus dem Shop (Klasse in index.css). */
@@ -64,7 +66,7 @@ export const TAGS: Record<string, { label: string; className: string }> = {
   tag_big: { label: 'Big Spender', className: 'tag-big' },
   tag_master: { label: 'Master Spender', className: 'tag-master' },
   tag_legend: { label: 'Legende', className: 'tag-legend' },
-  tag_king: { label: 'Koin-König', className: 'tag-king' },
+  tag_king: { label: 'Coin-König', className: 'tag-king' },
 }
 
 /** Automatische Rollen-Tags (nicht kaufbar). */

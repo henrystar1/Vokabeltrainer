@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react'
-import { Check, Coins } from 'lucide-react'
+import CoinIcon from '../components/ui/CoinIcon'
+import { Check } from 'lucide-react'
 import Button from '../components/ui/Button'
 import Card from '../components/ui/Card'
 import Modal from '../components/ui/Modal'
@@ -59,7 +60,7 @@ export default function Shop() {
 
   return (
     <div>
-      <PageHeader eyebrow="Koins ausgeben" title="Shop" actions={<KoinBadge />} />
+      <PageHeader eyebrow="Coins ausgeben" title="Shop" actions={<KoinBadge />} />
       <p className="mb-4 max-w-2xl text-sm text-slate-400">
         Profilbilder, Namensfarben, Effekte und Tags siehst du auf deinem Profil und in der Rangliste – alle anderen sehen sie auch.
         Designs ändern die Farben und den Hintergrund der ganzen Website, aber nur für dich.
@@ -119,10 +120,10 @@ export default function Shop() {
                     </Button>
                   ) : (
                     <Button disabled={busy || !affordable} onClick={() => setConfirm(item)}>
-                      <Coins size={16} /> {item.price.toLocaleString('de-DE')} Koins
+                      <CoinIcon size={16} /> {item.price.toLocaleString('de-DE')} Coins
                     </Button>
                   )}
-                  {!item.owned && !affordable && <p className="text-xs text-slate-500">Dir fehlen {item.price - wallet.balance} Koins.</p>}
+                  {!item.owned && !affordable && <p className="text-xs text-slate-500">Dir fehlen {item.price - wallet.balance} Coins.</p>}
                 </Card>
               )
             })}
@@ -133,7 +134,7 @@ export default function Shop() {
       {confirm && (
         <Modal title="Artikel kaufen?" onClose={() => setConfirm(null)}>
           <p className="text-sm text-slate-300">
-            „{confirm.name}“ kostet <b>{confirm.price} Koins</b>. Danach hast du noch {wallet.balance - confirm.price} Koins. Gekaufte Artikel gehören dir dauerhaft.
+            „{confirm.name}“ kostet <b>{confirm.price} Coins</b>. Danach hast du noch {wallet.balance - confirm.price} Coins. Gekaufte Artikel gehören dir dauerhaft.
           </p>
           <div className="mt-5 flex flex-col gap-2 sm:flex-row sm:justify-end">
             <Button variant="ghost" onClick={() => setConfirm(null)}>Abbrechen</Button>

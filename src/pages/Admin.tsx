@@ -1,14 +1,16 @@
 import { useState, type ReactNode } from 'react'
-import { Coins, Flag, MessageSquarePlus, Radio, Users } from 'lucide-react'
+import CoinIcon from '../components/ui/CoinIcon'
+import { Flag, MessageSquarePlus, Radio, SlidersHorizontal, Users } from 'lucide-react'
 import PageHeader from '../components/ui/PageHeader'
 import { useAuth } from '../features/auth/AuthProvider'
 import FeedbackTab from './admin/FeedbackTab'
 import KoinsTab from './admin/KoinsTab'
 import OnlineTab from './admin/OnlineTab'
 import ReviewsTab from './admin/ReviewsTab'
+import RulesTab from './admin/RulesTab'
 import UsersTab from './admin/UsersTab'
 
-type Tab = 'reviews' | 'feedback' | 'users' | 'koins' | 'online'
+type Tab = 'reviews' | 'feedback' | 'users' | 'koins' | 'online' | 'rules'
 
 /** Verwaltung für Mods (Prüfanfragen) und Admins (zusätzlich Benutzer). */
 export default function Admin() {
@@ -33,12 +35,14 @@ export default function Admin() {
       <div className="mb-5 flex flex-wrap gap-2">
         {button('reviews', 'Prüfanfragen', <Flag size={16} />)}
         {button('feedback', 'Feedback', <MessageSquarePlus size={16} />)}
+        {button('rules', 'Regeln', <SlidersHorizontal size={16} />)}
         {isAdmin && button('online', 'Online & Nachrichten', <Radio size={16} />)}
         {isAdmin && button('users', 'Benutzer', <Users size={16} />)}
-        {isAdmin && button('koins', 'Koins & Shop', <Coins size={16} />)}
+        {isAdmin && button('koins', 'Coins & Shop', <CoinIcon size={16} />)}
       </div>
       {tab === 'reviews' && <ReviewsTab />}
       {tab === 'feedback' && <FeedbackTab />}
+      {tab === 'rules' && <RulesTab />}
       {tab === 'users' && isAdmin && <UsersTab />}
       {tab === 'koins' && isAdmin && <KoinsTab />}
       {tab === 'online' && isAdmin && <OnlineTab />}

@@ -101,7 +101,7 @@ function ReviewCard({ request: r, onChanged }: { request: ReviewRequest; onChang
           <TextInput placeholder="Notiz (optional)" maxLength={500} value={note} onChange={(e) => setNote(e.target.value)} aria-label="Notiz" />
           <label className="flex min-h-[40px] cursor-pointer items-center gap-3 text-sm text-slate-300">
             <input type="checkbox" className="h-5 w-5 accent-cyan-400" checked={reward} onChange={(e) => setReward(e.target.checked)} />
-            Beim Erledigen Koins an {r.requested_by_name ?? 'den Melder'} vergeben (sinnvolle Meldung)
+            Beim Erledigen Coins an {r.requested_by_name ?? 'den Melder'} vergeben (sinnvolle Meldung)
           </label>
           {error && <ErrorBox message={error} />}
           <div className="flex flex-wrap gap-2">

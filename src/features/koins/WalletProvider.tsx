@@ -1,5 +1,6 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
-import { Coins } from 'lucide-react'
+
+import CoinIcon from '../../components/ui/CoinIcon'
 import { supabase } from '../../lib/supabaseClient'
 import { useAuth } from '../auth/AuthProvider'
 import { claimDailyBonus, getWallet } from '../../services/koins'
@@ -23,7 +24,7 @@ export function WalletProvider({ children }: { children: ReactNode }) {
   const [toast, setToast] = useState<{ amount: number; key: number } | null>(null)
   const last = useRef<number | null>(null)
 
-  // Einzige Stelle, an der das Guthaben gesetzt wird: zeigt bei einem Plus kurz "+N Koins".
+  // Einzige Stelle, an der das Guthaben gesetzt wird: zeigt bei einem Plus kurz "+N Coins".
   const setBalance = useCallback((n: number) => {
     const prev = last.current
     last.current = n
@@ -92,7 +93,7 @@ export function WalletProvider({ children }: { children: ReactNode }) {
       {toast && (
         <div key={toast.key} role="status" className="pointer-events-none fixed inset-x-0 top-4 z-[60] flex justify-center px-4">
           <div className="flex animate-rise items-center gap-2 rounded-full border border-amber-300/40 bg-space-800/95 px-5 py-2.5 font-mono text-amber-200 shadow-glow backdrop-blur">
-            <Coins size={18} /> +{toast.amount.toLocaleString('de-DE')} Koins
+            <CoinIcon size={18} /> +{toast.amount.toLocaleString('de-DE')} Coins
           </div>
         </div>
       )}

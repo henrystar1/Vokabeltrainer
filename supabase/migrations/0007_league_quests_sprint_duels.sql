@@ -7,7 +7,7 @@
 
 
 -- ----------------------------------------------------------------------------
--- 1. Einstellungen (alle im Admin-Tab „Koins & Shop“ änderbar)
+-- 1. Einstellungen (alle im Admin-Tab „Coins & Shop“ änderbar)
 -- ----------------------------------------------------------------------------
 
 insert into public.app_settings (key, value) values
@@ -282,7 +282,7 @@ as $$
 $$;
 
 -- Wertet beendete Wochen aus: Top 3 steigen auf, inaktive und (ab 8 Aktiven) die letzten 3 steigen ab,
--- Platz 1–3 bekommen Koins. Wird beim Öffnen der Liga ausgeführt und ist idempotent.
+-- Platz 1–3 bekommen Coins. Wird beim Öffnen der Liga ausgeführt und ist idempotent.
 create or replace function public._league_rollover()
 returns void
 language plpgsql
@@ -354,7 +354,7 @@ begin
           || case v_result when 'promoted' then 'Aufstieg in ' || v_names[v_new] || '!'
                            when 'relegated' then 'Abstieg in ' || v_names[v_new] || '.'
                            else 'Du bleibst in ' || v_names[r.tier] || '.' end
-          || case when v_reward > 0 then ' +' || v_reward || ' Koins.' else '' end;
+          || case when v_reward > 0 then ' +' || v_reward || ' Coins.' else '' end;
         insert into public.user_messages (user_id, from_id, body) values (r.user_id, null, v_text);
         if v_reward > 0 then
           perform public._grant_koins(r.user_id, v_reward, 'league', v_last::text);

@@ -98,7 +98,16 @@ export default function Chat() {
           aria-live="polite"
         >
           {loaded && messages.length === 0 && <p className="py-10 text-center text-sm text-slate-400">Noch nichts geschrieben – sag Hallo! 👋</p>}
-          {messages.map((m) => (
+          {messages.map((m) => m.kind === 'pay' ? (
+            <div key={m.id} className="flex items-center justify-center gap-2 text-center text-xs text-amber-200">
+              <span className="rounded-full border border-amber-300/30 bg-amber-300/10 px-3 py-1">{m.body}</span>
+              {isStaff && (
+                <button type="button" aria-label="Nachricht löschen" onClick={() => void remove(m.id)} className="text-slate-500 hover:text-rose-300">
+                  <Trash2 size={13} />
+                </button>
+              )}
+            </div>
+          ) : (
             <div key={m.id} className={`flex ${m.is_me ? 'justify-end' : 'justify-start'}`}>
               <div className={`group max-w-[85%] rounded-2xl px-3 py-2 ${m.is_me ? 'bg-accent-cyan/15' : 'bg-white/5'}`}>
                 <div className="flex items-center gap-2 text-xs text-slate-400">
@@ -132,7 +141,7 @@ export default function Chat() {
           </Button>
         </form>
       </Card>
-      <p className="mt-3 text-xs text-slate-500">Sei nett zueinander. Mods und Admins können Nachrichten löschen. Der Chat zeigt die letzten 100 Nachrichten.</p>
+      <p className="mt-3 text-xs text-slate-500">Coins verschicken: <span className="font-mono text-slate-300">!pay @Anzeigename 100</span>. Sei nett zueinander – Mods und Admins können Nachrichten löschen. Der Chat zeigt die letzten 100 Nachrichten.</p>
     </div>
   )
 }

@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
-import { ArrowDown, ArrowUp, Clock, Gift } from 'lucide-react'
+import { ArrowDown, ArrowUp, Clock } from 'lucide-react'
+import CoinIcon from '../components/ui/CoinIcon'
 import PlayerTag from '../components/profile/PlayerTag'
 import Card from '../components/ui/Card'
 import { ErrorBox, Notice, Spinner } from '../components/ui/States'
@@ -22,7 +23,7 @@ function countdown(iso: string, now: number): string {
   return d > 0 ? `${d} Tg ${h} Std` : `${h} Std ${m} Min`
 }
 
-/** Wochenliga: eine Gruppe je Stufe, Auf- und Abstieg am Wochenende, Koins für die Top 3. */
+/** Wochenliga: eine Gruppe je Stufe, Auf- und Abstieg am Wochenende, Coins für die Top 3. */
 export default function LeagueView() {
   const league = useAsync(getLeague, [])
   const [now, setNow] = useState(() => Date.now())
@@ -51,7 +52,7 @@ export default function LeagueView() {
         </div>
         <div className="text-right text-sm text-slate-300">
           <p className="flex items-center justify-end gap-1"><Clock size={15} /> endet in {countdown(l.ends_at, now)}</p>
-          <p className="mt-1 flex items-center justify-end gap-1 text-amber-300"><Gift size={15} /> Top 3: {l.rewards.join(' / ')} Koins</p>
+          <p className="mt-1 flex items-center justify-end gap-1 text-amber-300"><CoinIcon size={15} /> Top 3: {l.rewards.join(' / ')} Coins</p>
         </div>
       </Card>
 
@@ -59,7 +60,7 @@ export default function LeagueView() {
         <Notice tone={last.result === 'relegated' ? 'warn' : 'info'}>
           Letzte Woche ({TIERS[last.tier - 1]?.name}): {last.rank ? `Platz ${last.rank}` : 'keine Punkte'} mit {last.points} Punkten –{' '}
           {last.result === 'promoted' ? 'Aufstieg! ' : last.result === 'relegated' ? 'Abstieg. ' : 'Stufe gehalten. '}
-          {last.reward > 0 ? `+${last.reward} Koins.` : ''}
+          {last.reward > 0 ? `+${last.reward} Coins.` : ''}
         </Notice>
       )}
 

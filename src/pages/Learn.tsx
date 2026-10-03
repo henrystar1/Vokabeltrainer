@@ -204,7 +204,7 @@ export default function Learn() {
               Lernstand: {levelChanges.up} Vokabeln aufgestiegen, {levelChanges.down} abgestiegen.
             </Notice>
           )}
-          {earned > 0 && <Notice tone="info">+{earned} Koins fürs Lernen – gut gemacht!</Notice>}
+          {earned > 0 && <Notice tone="info">+{earned} Coins fürs Lernen – gut gemacht!</Notice>}
           {saveError && <ErrorBox message={`Die Runde konnte nicht gespeichert werden: ${saveError}`} onRetry={() => void saveMain()} />}
         </div>
         <div className="mt-6 flex flex-wrap gap-3">

@@ -13,7 +13,8 @@ export function errorMessage(err: unknown): string {
   if (e.code === '42883' || /could not find the function/i.test(msg)) {
     return 'Eine Datenbankfunktion fehlt. Bitte supabase/migrations/0002_functions.sql im Supabase-SQL-Editor ausführen.'
   }
-  return msg || 'Unbekannter Fehler.'
+  // Ältere Datenbankmeldungen sagen noch „Koins“.
+  return msg ? msg.replace(/\bKoins\b/g, 'Coins').replace(/\bKoin\b/g, 'Coin') : 'Unbekannter Fehler.'
 }
 
 /** Fehler-Hint, den die Datenbankfunktionen für bekannte Sonderfälle setzen. */

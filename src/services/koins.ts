@@ -44,6 +44,13 @@ export async function getAppSettings(): Promise<AppSettings> {
   return Object.fromEntries((data ?? []).map((r) => [r.key as string, r.value as number]))
 }
 
+export async function getModEditable(): Promise<Record<string, boolean>> {
+  const { data, error } = await supabase.from('app_settings').select('key,mod_editable')
+  if (error) throw error
+  return Object.fromEntries((data ?? []).map((r) => [r.key as string, !!r.mod_editable]))
+}
+
+export const staffSetSetting = (key: string, value: number) => rpc<void>('staff_set_setting', { p_key: key, p_value: value })
 export const adminSetSetting = (key: string, value: number) => rpc<void>('admin_set_setting', { p_key: key, p_value: value })
 export const adminGrantKoins = (userId: string, amount: number, note: string) =>
   rpc<number>('admin_grant_koins', { p_user: userId, p_amount: amount, p_note: note })

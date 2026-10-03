@@ -19,7 +19,7 @@ export default function FeedbackTab() {
     <div className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <p className="max-w-xl text-sm text-slate-400">
-          Ideen und Verbesserungen der Nutzer. Du kannst eine Antwort notieren (der Nutzer sieht sie) und für gute Ideen bis zu 50 Koins schenken.
+          Ideen und Verbesserungen der Nutzer. Du kannst eine Antwort notieren (der Nutzer sieht sie) und für gute Ideen bis zu 50 Coins schenken.
         </p>
         <Select className="!w-auto" value={status} onChange={(e) => setStatus(e.target.value as FeedbackStatus | 'all')} aria-label="Status filtern">
           <option value="new">Neu</option>
@@ -72,7 +72,7 @@ function FeedbackCard({ item: f, onChanged }: { item: FeedbackItem; onChanged: (
       <p className="whitespace-pre-wrap break-words text-sm">{f.message}</p>
       <div className="grid gap-2 sm:grid-cols-[1fr_140px]">
         <TextInput placeholder="Antwort/Notiz (der Nutzer sieht sie)" maxLength={500} value={note} onChange={(e) => setNote(e.target.value)} aria-label="Notiz" />
-        <TextInput type="number" min={0} max={50} inputMode="numeric" value={reward} onChange={(e) => setReward(e.target.value)} aria-label="Belohnung in Koins (max. 50)" placeholder="Koins (0–50)" />
+        <TextInput type="number" min={0} max={50} inputMode="numeric" value={reward} onChange={(e) => setReward(e.target.value)} aria-label="Belohnung in Coins (max. 50)" placeholder="Coins (0–50)" />
       </div>
       {error && <ErrorBox message={error} />}
       <div className="flex flex-wrap gap-2">

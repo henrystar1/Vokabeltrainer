@@ -104,6 +104,21 @@ body {
   50% { filter: drop-shadow(0 0 6px #c084fc) drop-shadow(0 0 20px #a855f7) drop-shadow(0 0 4px #fb7185); }
 }
 
+/* Wirbel: blau leuchtender Strudel hinter dem Namen (passt zum Schwarzen Loch) */
+.fx-vortex { position: relative; isolation: isolate; animation: fx-vortex-glow 3s ease-in-out infinite; }
+@property --vx { syntax: '<angle>'; inherits: false; initial-value: 0deg; }
+.fx-vortex::before {
+  content: ''; position: absolute; z-index: -1; inset: -40% -16%; border-radius: 50%; pointer-events: none;
+  background: conic-gradient(from var(--vx), transparent 0 12%, rgb(56 189 248 / 0.75) 30%, transparent 46%, rgb(37 99 235 / 0.7) 64%, rgb(224 242 254 / 0.55) 74%, transparent 90%);
+  mask: radial-gradient(ellipse at center, #000 30%, rgb(0 0 0 / 0.5) 52%, transparent 72%);
+  filter: blur(5px); animation: fx-vortex-spin 3.2s linear infinite;
+}
+@keyframes fx-vortex-spin { to { --vx: 360deg; } }
+@keyframes fx-vortex-glow {
+  0%, 100% { filter: drop-shadow(0 0 3px #38bdf8) drop-shadow(0 0 9px rgb(37 99 235 / 0.9)); }
+  50% { filter: drop-shadow(0 0 6px #7dd3fc) drop-shadow(0 0 18px #2563eb) brightness(1.2); }
+}
+
 /* ---------- Tags ---------- */
 .tag { display: inline-flex; align-items: center; border-radius: 9999px; padding: 1px 8px; font-family: 'JetBrains Mono', ui-monospace, monospace; font-size: 10px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; white-space: nowrap; line-height: 1.5; }
 .tag-mod { color: #031a20; background: linear-gradient(90deg, #22d3ee, #67e8f9); box-shadow: 0 0 10px rgb(34 211 238 / 0.6); }
@@ -115,7 +130,7 @@ body {
 .tag-king { color: #fff; background: linear-gradient(90deg, #f43f5e, #f59e0b, #84cc16, #22d3ee, #8b5cf6, #f43f5e); background-size: 200% 100%; animation: fx-rainbow 2.2s linear infinite; box-shadow: 0 0 16px rgb(255 255 255 / 0.5); text-shadow: 0 1px 2px rgb(0 0 0 / 0.5); }
 
 @media (prefers-reduced-motion: reduce) {
-  .fx-mod-aura, .fx-mod-bolt, .fx-admin-royal, .fx-admin-void, .fx-admin-void::after, .fx-mod-bolt::after, .tag-legend, .tag-king { animation: none; }
+  .fx-mod-aura, .fx-mod-bolt, .fx-admin-royal, .fx-admin-void, .fx-admin-void::after, .fx-vortex, .fx-vortex::before, .fx-mod-bolt::after, .tag-legend, .tag-king { animation: none; }
 }
 
 @media (prefers-reduced-motion: reduce) {

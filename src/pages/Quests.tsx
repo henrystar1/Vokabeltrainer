@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
-import { Check, Flame, Gift } from 'lucide-react'
+import { Check, Flame } from 'lucide-react'
+import CoinIcon from '../components/ui/CoinIcon'
 import Button from '../components/ui/Button'
 import Card from '../components/ui/Card'
 import PageHeader from '../components/ui/PageHeader'
@@ -33,7 +34,7 @@ export default function Quests() {
     setMsg(null)
     try {
       wallet.setBalance(await claimQuest(q.id))
-      setMsg(`+${q.reward} Koins eingesammelt!`)
+      setMsg(`+${q.reward} Coins eingesammelt!`)
       quests.reload()
     } catch (e) {
       setError(errorMessage(e))
@@ -68,7 +69,7 @@ export default function Quests() {
             <Card key={q.id} className="flex flex-col gap-3">
               <div className="flex items-start justify-between gap-3">
                 <h2 className="text-lg font-semibold">{info.title}</h2>
-                <span className="flex items-center gap-1 font-mono text-sm text-amber-300"><Gift size={15} /> {q.reward}</span>
+                <span className="flex items-center gap-1 font-mono text-sm text-amber-300"><CoinIcon size={15} /> {q.reward}</span>
               </div>
               <p className="text-sm text-slate-300">{info.text(q)}</p>
               <div>

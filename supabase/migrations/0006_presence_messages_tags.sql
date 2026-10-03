@@ -1,6 +1,6 @@
 -- ============================================================================
 -- 0006: Online-Anzeige für Admins, Nachrichten vom Admin, Tags (Mod/Admin/Spender),
---       Staff-Effekte, krasse Profilbilder, schnelleres Aktivieren, Live-Koins.
+--       Staff-Effekte, krasse Profilbilder, schnelleres Aktivieren, Live-Coins.
 --
 -- Einspielen: Supabase → SQL Editor → komplett einfügen → Run (nach 0001–0005).
 -- Die Datei ist wiederholbar.
@@ -163,7 +163,7 @@ insert into public.shop_items (id, kind, name, price, sort, required_role) value
   ('tag_big',       'tag', 'Big Spender',     4000, 20, null),
   ('tag_master',    'tag', 'Master Spender', 10000, 30, null),
   ('tag_legend',    'tag', 'Legende',        25000, 40, null),
-  ('tag_king',      'tag', 'Koin-König',     50000, 50, null),
+  ('tag_king',      'tag', 'Coin-König',     50000, 50, null),
   -- Effekte, die es nur für Mods bzw. Admins gibt (kostenlos, nicht kaufbar)
   ('effect_mod_aura',   'effect', 'Mod-Aura',      0, 100, 'mod'),
   ('effect_mod_bolt',   'effect', 'Mod-Blitz',     0, 110, 'mod'),
@@ -457,7 +457,7 @@ $$;
 
 
 -- ----------------------------------------------------------------------------
--- 5. Live-Koins (Realtime) und Rechte
+-- 5. Live-Coins (Realtime) und Rechte
 -- ----------------------------------------------------------------------------
 
 -- Auf Supabase: Änderungen am eigenen Guthaben live an den Client schicken (RLS gilt weiterhin).

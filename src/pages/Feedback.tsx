@@ -41,7 +41,7 @@ export default function Feedback() {
       <PageHeader eyebrow="Mitmachen" title="Feedback" />
       <Card className="max-w-2xl">
         <p className="mb-4 text-sm text-slate-400">
-          Hast du eine Idee oder einen Verbesserungsvorschlag? Schreib ihn hier auf – Admin und Mods lesen alles. Für besonders gute Vorschläge gibt es manchmal Koins.
+          Hast du eine Idee oder einen Verbesserungsvorschlag? Schreib ihn hier auf – Admin und Mods lesen alles. Für besonders gute Vorschläge gibt es manchmal Coins.
           Bitte schreib keine privaten Daten (Adressen, Telefonnummern) hinein.
         </p>
         <form onSubmit={send} className="space-y-4">

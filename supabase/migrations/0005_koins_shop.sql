@@ -1,14 +1,14 @@
 -- ============================================================================
--- 0005: Koins, Codes, Buchpreise, Shop (Profilbild/Farbe/Effekt/Theme), Feedback,
+-- 0005: Coins, Codes, Buchpreise, Shop (Profilbild/Farbe/Effekt/Theme), Feedback,
 --       aktive Vokabeln, Belohnungen.
 --
 -- Einspielen: Supabase → SQL Editor → komplett einfügen → Run (nach 0001–0004).
 -- Die Datei ist wiederholbar.
 --
--- Koins kommen aus:  Codes (Admin erstellt, einmalig einlösbar), Lernen (nur Vokabeln aus
+-- Coins kommen aus:  Codes (Admin erstellt, einmalig einlösbar), Lernen (nur Vokabeln aus
 --                    Online-Büchern, begrenzt pro Tag), bestätigte Fehlermeldungen,
 --                    Tagesbonus für Mods/Admins, Geschenke von Admins.
--- Koins gehen für:   Online-Bücher und Shop-Artikel.
+-- Coins gehen für:   Online-Bücher und Shop-Artikel.
 -- Alle Zahlen stehen in app_settings und lassen sich von Admins ändern.
 -- ============================================================================
 
@@ -24,10 +24,10 @@ create table if not exists public.app_settings (
 
 insert into public.app_settings (key, value) values
   ('book_price_default', 200),   -- Preis eines neu veröffentlichten Buchs
-  ('learn_reward', 1),           -- Koins, wenn eine Vokabel zum ersten Mal Stufe 2 erreicht
-  ('learn_daily_cap', 30),       -- höchstens so viele Lern-Koins pro Tag
-  ('review_reward', 10),         -- Koins für eine sinnvolle Fehlermeldung
-  ('code_default_amount', 500),  -- Koins pro Code
+  ('learn_reward', 1),           -- Coins, wenn eine Vokabel zum ersten Mal Stufe 2 erreicht
+  ('learn_daily_cap', 30),       -- höchstens so viele Lern-Coins pro Tag
+  ('review_reward', 10),         -- Coins für eine sinnvolle Fehlermeldung
+  ('code_default_amount', 500),  -- Coins pro Code
   ('daily_bonus_mod', 1),
   ('daily_bonus_admin', 10)
 on conflict (key) do nothing;
@@ -63,7 +63,7 @@ create table if not exists public.koin_ledger (
 
 create index if not exists koin_ledger_user_idx on public.koin_ledger (user_id, created_at desc);
 
--- Einzige Stelle, an der Koins bewegt werden. Negative Beträge nur bei ausreichendem Guthaben.
+-- Einzige Stelle, an der Coins bewegt werden. Negative Beträge nur bei ausreichendem Guthaben.
 create or replace function public._grant_koins(p_user uuid, p_amount integer, p_reason text, p_ref text default null)
 returns integer
 language plpgsql
@@ -82,7 +82,7 @@ begin
    where user_id = p_user and balance + p_amount >= 0
    returning balance into v_balance;
   if v_balance is null then
-    raise exception 'Nicht genug Koins.' using errcode = '23514';
+    raise exception 'Nicht genug Coins.' using errcode = '23514';
   end if;
   insert into public.koin_ledger (user_id, amount, reason, ref) values (p_user, p_amount, p_reason, p_ref);
   return v_balance;
@@ -583,7 +583,7 @@ drop function public._patch_function(regprocedure, text, text);
 -- 6. Belohnungen
 -- ----------------------------------------------------------------------------
 
--- Lernen: 1 Koin, wenn eine Vokabel eines Online-Buchs zum ersten Mal Stufe 2 erreicht (täglich begrenzt).
+-- Lernen: 1 Coin, wenn eine Vokabel eines Online-Buchs zum ersten Mal Stufe 2 erreicht (täglich begrenzt).
 create table if not exists public.koin_learn_awards (
   user_id uuid not null references auth.users (id) on delete cascade,
   vocabulary_id uuid not null references public.vocabulary (id) on delete cascade,
@@ -1031,7 +1031,7 @@ begin
     raise exception 'Ungültiger Status.' using errcode = '22023';
   end if;
   if coalesce(p_reward, 0) < 0 or coalesce(p_reward, 0) > 50 then
-    raise exception 'Die Belohnung darf höchstens 50 Koins betragen.' using errcode = '22023';
+    raise exception 'Die Belohnung darf höchstens 50 Coins betragen.' using errcode = '22023';
   end if;
   update public.feedback
      set status = p_status, handled_by = v_me, handled_at = now(),
@@ -1049,7 +1049,7 @@ $$;
 
 
 -- ----------------------------------------------------------------------------
--- 9. Admin: Einstellungen, Geschenke, Nutzerliste mit Koins
+-- 9. Admin: Einstellungen, Geschenke, Nutzerliste mit Coins
 -- ----------------------------------------------------------------------------
 
 create or replace function public.admin_set_setting(p_key text, p_value integer)
@@ -1070,7 +1070,7 @@ begin
 end;
 $$;
 
--- Koins schenken (positiv) oder abziehen (negativ, höchstens bis 0).
+-- Coins schenken (positiv) oder abziehen (negativ, höchstens bis 0).
 create or replace function public.admin_grant_koins(p_user uuid, p_amount integer, p_note text default '')
 returns integer
 language plpgsql

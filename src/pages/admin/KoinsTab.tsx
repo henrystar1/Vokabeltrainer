@@ -20,22 +20,24 @@ import {
 
 const SETTING_LABEL: Record<string, string> = {
   book_price_default: 'Standardpreis für neu veröffentlichte Bücher',
-  learn_reward: 'Koins pro neu gelernter Vokabel (Online-Bücher)',
-  learn_daily_cap: 'Lern-Koins pro Tag höchstens',
-  review_reward: 'Koins für eine sinnvolle Fehlermeldung',
-  code_default_amount: 'Koins pro Code (Standard)',
+  learn_reward: 'Coins pro neu gelernter Vokabel (Online-Bücher)',
+  learn_daily_cap: 'Lern-Coins pro Tag höchstens',
+  review_reward: 'Coins für eine sinnvolle Fehlermeldung',
+  code_default_amount: 'Coins pro Code (Standard)',
   daily_bonus_mod: 'Tagesbonus Mods',
   daily_bonus_admin: 'Tagesbonus Admin',
-  quest_reward_answers: 'Quest „Fleißig“: Koins',
-  quest_reward_perfect: 'Quest „Fehlerfrei“: Koins',
-  quest_reward_sprint: 'Quest „Sprinter“: Koins',
-  quest_reward_duel: 'Quest „Herausforderer“: Koins',
-  league_reward_1: 'Liga: Koins für Platz 1',
-  league_reward_2: 'Liga: Koins für Platz 2',
-  league_reward_3: 'Liga: Koins für Platz 3',
+  quest_reward_answers: 'Quest „Fleißig“: Coins',
+  quest_reward_perfect: 'Quest „Fehlerfrei“: Coins',
+  quest_reward_sprint: 'Quest „Sprinter“: Coins',
+  quest_reward_duel: 'Quest „Herausforderer“: Coins',
+  league_reward_1: 'Liga: Coins für Platz 1',
+  league_reward_2: 'Liga: Coins für Platz 2',
+  league_reward_3: 'Liga: Coins für Platz 3',
   league_min_points: 'Liga: Mindestpunkte pro Woche (sonst Abstieg)',
-  duel_reward: 'Duell-Sieg: Koins',
-  duel_daily_cap: 'Duell-Siege mit Koins pro Tag',
+  duel_reward: 'Duell-Sieg: Coins',
+  pay_max: '!pay: Höchstbetrag pro Überweisung (Coins)',
+  pay_daily_cap: '!pay: Coins pro Tag und Person höchstens',
+  duel_daily_cap: 'Duell-Siege mit Coins pro Tag',
 }
 
 /** Nur für Admins: Codes, Zahlen, Shop-Preise, Geschenke. */
@@ -88,10 +90,10 @@ function CodesSection() {
     <Section title="Codes">
       <p className="text-sm text-slate-400">
         Ein Code gilt für genau eine Einlösung und wird danach gelöscht. Gib den Code einem Freund weiter.
-        Leer lassen = Standardmenge ({settings.data?.code_default_amount ?? 500} Koins).
+        Leer lassen = Standardmenge ({settings.data?.code_default_amount ?? 500} Coins).
       </p>
       <div className="grid gap-3 sm:grid-cols-4">
-        <Field label="Koins">
+        <Field label="Coins">
           <TextInput type="number" min={1} inputMode="numeric" value={amount} onChange={(e) => setAmount(e.target.value)} placeholder={String(settings.data?.code_default_amount ?? 500)} />
         </Field>
         <Field label="Anzahl">
@@ -131,7 +133,7 @@ function CodesSection() {
           {codes.data?.map((c) => (
             <li key={c.code} className="flex min-h-[44px] flex-wrap items-center justify-between gap-2 rounded-lg bg-white/5 px-3 text-sm">
               <span>
-                <span className="font-mono">{c.code}</span> · {c.amount} Koins{c.note ? ` · ${c.note}` : ''}
+                <span className="font-mono">{c.code}</span> · {c.amount} Coins{c.note ? ` · ${c.note}` : ''}
                 <span className="ml-2 text-xs text-slate-500">{formatDateTime(c.created_at)}</span>
               </span>
               <button
@@ -167,7 +169,7 @@ function GrantSection() {
     setDone(null)
     try {
       const balance = await adminGrantKoins(userId, a, note)
-      setDone(`Erledigt. Neues Guthaben: ${balance} Koins.`)
+      setDone(`Erledigt. Neues Guthaben: ${balance} Coins.`)
       users.reload()
     } catch (e) {
       setError(errorMessage(e))
@@ -177,7 +179,7 @@ function GrantSection() {
   }
 
   return (
-    <Section title="Koins schenken oder abziehen">
+    <Section title="Coins schenken oder abziehen">
       <div className="grid gap-3 sm:grid-cols-4">
         <Field label="Nutzer">
           <Select value={userId} onChange={(e) => setUserId(e.target.value)}>
