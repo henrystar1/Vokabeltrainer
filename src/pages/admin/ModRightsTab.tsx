@@ -11,7 +11,7 @@ import { SECTIONS } from './ruleDefs'
 
 type NumMode = 'none' | 'selected' | 'all'
 
-function Choice({ checked, onSelect, title, text }: { checked: boolean; onSelect: () => void; title: string; text?: string }) {
+export function Choice({ checked, onSelect, title, text }: { checked: boolean; onSelect: () => void; title: string; text?: string }) {
   return (
     <button
       type="button"
@@ -30,7 +30,7 @@ function Choice({ checked, onSelect, title, text }: { checked: boolean; onSelect
   )
 }
 
-function Block({ icon, title, text, children }: { icon: ReactNode; title: string; text: string; children: ReactNode }) {
+export function Block({ icon, title, text, children }: { icon: ReactNode; title: string; text: string; children: ReactNode }) {
   return (
     <Card className="space-y-4">
       <div>
@@ -42,7 +42,7 @@ function Block({ icon, title, text, children }: { icon: ReactNode; title: string
   )
 }
 
-/** Nur für Admins: Was dürfen normale Mods? Bis hin zu freiem Zugriff. */
+/** Nur für Admins: Standard-Rechte für alle Mods und Alphamods. */
 export default function ModRightsTab() {
   const settings = useAsync(getAppSettings, [])
   const editable = useAsync(getModEditable, [])
@@ -96,7 +96,7 @@ export default function ModRightsTab() {
   return (
     <div className="space-y-5">
       <Notice tone="info">
-        Hier legst du fest, was normale Mods dürfen. Alphamods und Admins dürfen immer alles. Punkte ± und Artikel schenken bleiben immer bei den Admins. Änderungen gelten sofort.
+        Das ist der Standard für alle Mods und Alphamods. Für einzelne Personen kannst du ihn im Tab „Einzelne Mods“ überschreiben. Admins dürfen immer alles. Punkte ± und Artikel schenken bleiben immer bei den Admins. Änderungen gelten sofort.
       </Notice>
       {(settings.error || editable.error || books.error) && <ErrorBox message={settings.error ?? editable.error ?? books.error ?? ''} />}
       {error && <ErrorBox message={error} />}

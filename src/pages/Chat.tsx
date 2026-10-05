@@ -108,7 +108,7 @@ const GroupRow = memo(function GroupRow({ g, live, isStaff, onDelete, onTimeout 
 
 /** Gemeinsamer Chat für alle; aktualisiert sich alle paar Sekunden, solange die Seite sichtbar ist. */
 export default function Chat() {
-  const { isStaff, canEditRules, displayName } = useAuth()
+  const { isStaff, displayName } = useAuth()
   const chat = useChat()
   const [typing, setTyping] = useState<Record<string, number>>({})
   const lastTypingSent = useRef(0)
@@ -371,7 +371,7 @@ export default function Chat() {
             {[...new Set([1, 5, 15, 60].filter((m) => m <= maxMute).concat(maxMute < 60 ? [maxMute] : []))].map((m) => (
               <Button key={m} variant="secondary" onClick={() => void mute(m)}>{m} Min.</Button>
             ))}
-            {canEditRules && <Button variant="ghost" onClick={() => void mute(0)}>Aufheben</Button>}
+            <Button variant="ghost" onClick={() => void mute(0)}>Aufheben</Button>
           </div>
         </Modal>
       )}

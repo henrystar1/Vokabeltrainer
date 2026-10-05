@@ -5,14 +5,13 @@ import { Field, TextInput } from '../../components/ui/Field'
 import { ErrorBox, Notice, Spinner } from '../../components/ui/States'
 import { errorMessage } from '../../lib/errors'
 import { useAsync } from '../../lib/useAsync'
-import { getAppSettings, getModEditable, staffSetSetting, type MyPermissions } from '../../services/koins'
+import { getAppSettings, staffSetSetting, type MyPermissions } from '../../services/koins'
 import { SECTIONS } from './ruleDefs'
 
 /** Zahlen einstellen. Mods sehen nur, was ihnen freigegeben wurde. */
 export default function RulesTab({ perms }: { perms: MyPermissions }) {
   const settings = useAsync(getAppSettings, [])
-  const editable = useAsync(getModEditable, [])
-  const may = (key: string) => perms.alphamod || perms.settings_all || !!editable.data?.[key]
+  const may = (key: string) => perms.admin || perms.settings_all || perms.setting_keys.includes(key)
   const [draft, setDraft] = useState<Record<string, string>>({})
   const [saved, setSaved] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -32,12 +31,11 @@ export default function RulesTab({ perms }: { perms: MyPermissions }) {
 
   return (
     <div className="space-y-5">
-      <Notice tone="info">Änderungen gelten sofort für alle – auch rückwirkend für die Ranglisten, weil die Punkte bei jedem Aufruf neu berechnet werden.{!perms.alphamod && !perms.settings_all && ' Du siehst nur die Zahlen, die ein Admin dir freigegeben hat.'}</Notice>
+      <Notice tone="info">Änderungen gelten sofort für alle – auch rückwirkend für die Ranglisten, weil die Punkte bei jedem Aufruf neu berechnet werden.{!perms.admin && !perms.settings_all && ' Du siehst nur die Zahlen, die ein Admin dir freigegeben hat.'}</Notice>
       {settings.error && <ErrorBox message={settings.error} />}
       {error && <ErrorBox message={error} />}
       {settings.loading && !settings.data && <Spinner />}
       {settings.data &&
-        editable.data &&
         SECTIONS.map((s) => ({ ...s, rules: s.rules.filter((r) => may(r.key)) }))
           .filter((s) => s.rules.length > 0)
           .map((s) => (
