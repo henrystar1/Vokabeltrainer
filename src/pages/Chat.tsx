@@ -9,8 +9,8 @@ import { ErrorBox } from '../components/ui/States'
 import { useAuth } from '../features/auth/AuthProvider'
 import { useChat } from '../features/chat/ChatProvider'
 import { errorMessage } from '../lib/errors'
-import { deleteChatMessage, getChat, postChat, timeoutChatUser } from '../services/play'
-import { getAppSettings } from '../services/koins'
+import { deleteChatMessage, getChat, postChat, searchPlayers, timeoutChatUser } from '../services/play'
+import { getMyPermissions } from '../services/koins'
 import type { ChatMessage } from '../types'
 
 const POLL_MS = 4000
@@ -119,7 +119,10 @@ export default function Chat() {
   const [sending, setSending] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [muteFor, setMuteFor] = useState<ChatMessage | null>(null)
-  const [maxMute, setMaxMute] = useState(60)
+  const [maxMute, setMaxMute] = useState(1)
+  const [mention, setMention] = useState<{ query: string; start: number } | null>(null)
+  const [remote, setRemote] = useState<string[]>([])
+  const inputRef = useRef<HTMLInputElement>(null)
   const listRef = useRef<HTMLDivElement>(null)
   const stick = useRef(true)
   const sig = useRef('')
@@ -172,8 +175,53 @@ export default function Chat() {
   }, [chat, refresh])
 
   useEffect(() => {
-    if (canEditRules) void getAppSettings().then((s) => setMaxMute(s.timeout_max ?? 60)).catch(() => undefined)
-  }, [canEditRules])
+    if (isStaff) void getMyPermissions().then((p) => setMaxMute(p.timeout_max)).catch(() => undefined)
+  }, [isStaff])
+
+  // @-Vorschläge: erst Namen aus dem Chat, ab 2 Zeichen zusätzlich Spieler aus der Suche.
+  useEffect(() => {
+    if (!mention || mention.query.length < 2) {
+      setRemote([])
+      return
+    }
+    let stale = false
+    const t = window.setTimeout(() => {
+      searchPlayers(mention.query).then((r) => { if (!stale) setRemote(r.map((x) => x.display_name)) }).catch(() => undefined)
+    }, 200)
+    return () => {
+      stale = true
+      window.clearTimeout(t)
+    }
+  }, [mention])
+
+  const suggestions = useMemo(() => {
+    if (!mention) return []
+    const q = mention.query.toLowerCase()
+    const local = [...new Set(messages.filter((m) => m.display_name && m.display_name !== displayName).map((m) => m.display_name))].reverse()
+    const names = [...local.filter((n) => n.toLowerCase().startsWith(q)), ...remote]
+    return [...new Set(names)].filter((n) => n !== displayName).slice(0, 5)
+  }, [mention, messages, remote, displayName])
+
+  function onType(value: string, caret: number) {
+    setText(value)
+    const m = /@([^\s@]*)$/.exec(value.slice(0, caret))
+    setMention(m ? { query: m[1], start: caret - m[0].length } : null)
+    if (value.trim() && !value.startsWith('!whisper')) announceTyping()
+  }
+
+  function pick(name: string) {
+    if (!mention) return
+    const caret = mention.start + 1 + mention.query.length
+    const next = `${text.slice(0, mention.start)}@${name} ${text.slice(caret)}`
+    setText(next)
+    setMention(null)
+    setRemote([])
+    const pos = mention.start + name.length + 2
+    requestAnimationFrame(() => {
+      inputRef.current?.focus()
+      inputRef.current?.setSelectionRange(pos, pos)
+    })
+  }
 
   function announceTyping() {
     const now = Date.now()
@@ -195,7 +243,7 @@ export default function Chat() {
     setError(null)
     try {
       await postChat(body)
-      setText('')
+      setText(''); setMention(null)
       stick.current = true
       if (!/^!whisper\b/i.test(body)) chat.send('posted', { name: displayName })
       await refresh()
@@ -276,13 +324,29 @@ export default function Chat() {
           )}
         </div>
         {error && <ErrorBox message={error} />}
+        {mention && suggestions.length > 0 && (
+          <ul className="mb-2 flex flex-wrap gap-2" role="listbox" aria-label="Namen vorschlagen">
+            {suggestions.map((n) => (
+              <li key={n}>
+                <button
+                  type="button"
+                  role="option"
+                  aria-selected={false}
+                  onMouseDown={(e) => e.preventDefault()}
+                  onClick={() => pick(n)}
+                  className="min-h-[40px] rounded-full border border-accent-cyan/30 bg-accent-cyan/10 px-4 text-sm text-accent-cyan hover:bg-accent-cyan/20"
+                >
+                  @{n}
+                </button>
+              </li>
+            ))}
+          </ul>
+        )}
         <form onSubmit={(e) => void send(e)} className="flex gap-2">
           <input
+            ref={inputRef}
             value={text}
-            onChange={(e) => {
-              setText(e.target.value)
-              if (e.target.value.trim() && !e.target.value.startsWith('!whisper')) announceTyping()
-            }}
+            onChange={(e) => onType(e.target.value, e.target.selectionStart ?? e.target.value.length)}
             maxLength={500}
             placeholder="Nachricht schreiben …"
             aria-label="Nachricht"
@@ -304,7 +368,7 @@ export default function Chat() {
         <Modal title={`${muteFor.display_name} stummschalten`} onClose={() => setMuteFor(null)}>
           <p className="text-sm text-slate-300">Die Person kann in dieser Zeit nichts im Chat schreiben.</p>
           <div className="mt-4 flex flex-wrap gap-2">
-            {(canEditRules ? [1, 5, 15, 60].filter((m) => m <= maxMute) : [1]).map((m) => (
+            {[...new Set([1, 5, 15, 60].filter((m) => m <= maxMute).concat(maxMute < 60 ? [maxMute] : []))].map((m) => (
               <Button key={m} variant="secondary" onClick={() => void mute(m)}>{m} Min.</Button>
             ))}
             {canEditRules && <Button variant="ghost" onClick={() => void mute(0)}>Aufheben</Button>}

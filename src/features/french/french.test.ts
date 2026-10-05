@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { accepted, forms, VERBS, withPronoun } from './verbs'
-import { NOUNS } from './nouns'
+import { buildGenderQuestions, extractGenderWords } from './gender'
+import type { PoolVocab } from '../../types'
 
 const verb = (inf: string) => VERBS.find((x) => x.inf === inf)!
 
@@ -43,10 +44,17 @@ describe('Konjugation', () => {
   })
 })
 
-describe('Substantive', () => {
-  it('keine doppelten Wörter und ausgewogen', () => {
-    expect(new Set(NOUNS.map((n) => n.fr)).size).toBe(NOUNS.length)
-    expect(NOUNS.filter((n) => n.g === 'le').length).toBeGreaterThan(40)
-    expect(NOUNS.filter((n) => n.g === 'la').length).toBeGreaterThan(40)
+describe('le oder la aus den eigenen Büchern', () => {
+  const v = (german: string, translations: string[]) => ({ vocabulary_id: german, german, translations }) as unknown as PoolVocab
+  const pool = [v('Buch', ['le livre']), v('Haus', ['la maison']), v('Wasser', ["l'eau"]), v('Bild', ['un tableau']), v('Tür', ['une porte']), v('laufen', ['courir']), v('Buch2', ['le livre'])]
+  it('nimmt nur le/la-Wörter, keine l’-Wörter, keine Doppelten', () => {
+    const w = extractGenderWords(pool)
+    expect(w.map((x) => `${x.g} ${x.fr}`)).toEqual(['le livre', 'la maison', 'le tableau', 'la porte'])
+  })
+  it('baut Fragen mit richtiger Antwort', () => {
+    const q = buildGenderQuestions(extractGenderWords(pool), 10)
+    expect(q).toHaveLength(4)
+    const livre = q.find((x) => x.prompt.includes('livre'))!
+    expect(livre.options[livre.correct]).toBe('le')
   })
 })

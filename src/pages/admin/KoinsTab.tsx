@@ -14,45 +14,8 @@ import {
   adminListCodes,
   adminListItems,
   adminSetItem,
-  adminSetSetting,
   getAppSettings,
 } from '../../services/koins'
-
-const SETTING_LABEL: Record<string, string> = {
-  book_price_default: 'Standardpreis für neu veröffentlichte Bücher',
-  learn_reward: 'Coins pro neu gelernter Vokabel (Online-Bücher)',
-  learn_daily_cap: 'Lern-Coins pro Tag höchstens',
-  review_reward: 'Coins für eine sinnvolle Fehlermeldung',
-  code_default_amount: 'Coins pro Code (Standard)',
-  daily_bonus_mod: 'Tagesbonus Mods',
-  daily_bonus_admin: 'Tagesbonus Admin',
-  quest_reward_answers: 'Quest „Fleißig“: Coins',
-  quest_reward_perfect: 'Quest „Fehlerfrei“: Coins',
-  quest_reward_sprint: 'Quest „Sprinter“: Coins',
-  quest_reward_duel: 'Quest „Herausforderer“: Coins',
-  league_reward_1: 'Liga: Coins für Platz 1',
-  league_reward_2: 'Liga: Coins für Platz 2',
-  league_reward_3: 'Liga: Coins für Platz 3',
-  league_min_points: 'Liga: Mindestpunkte pro Woche (sonst Abstieg)',
-  duel_reward: 'Duell-Sieg: Coins',
-  sprint_coin_every: 'Sprint: 1 Coin je so viele richtige Antworten',
-  sprint_coin_cap: 'Sprint: Coins pro Tag höchstens',
-  pay_max: '!pay: Höchstbetrag pro Überweisung (Coins)',
-  pay_daily_cap: '!pay: Coins pro Tag und Person höchstens',
-  duel_daily_cap: 'Duell-Siege mit Coins pro Tag',
-}
-
-/** Nur für Admins: Codes, Zahlen, Shop-Preise, Geschenke. */
-export default function KoinsTab() {
-  return (
-    <div className="space-y-8">
-      <CodesSection />
-      <GrantSection />
-      <SettingsSection />
-      <ItemsSection />
-    </div>
-  )
-}
 
 function Section({ title, children }: { title: string; children: ReactNode }) {
   return (
@@ -63,7 +26,7 @@ function Section({ title, children }: { title: string; children: ReactNode }) {
   )
 }
 
-function CodesSection() {
+export function CodesSection() {
   const codes = useAsync(adminListCodes, [])
   const settings = useAsync(getAppSettings, [])
   const [amount, setAmount] = useState('')
@@ -154,7 +117,7 @@ function CodesSection() {
   )
 }
 
-function GrantSection() {
+export function GrantSection() {
   const users = useAsync(adminListUsers, [])
   const [userId, setUserId] = useState('')
   const [amount, setAmount] = useState('')
@@ -209,49 +172,14 @@ function GrantSection() {
   )
 }
 
-function SettingsSection() {
-  const settings = useAsync(getAppSettings, [])
-  const [error, setError] = useState<string | null>(null)
-  const [saved, setSaved] = useState<string | null>(null)
-  const [draft, setDraft] = useState<Record<string, string>>({})
-
-  async function save(key: string) {
-    const v = Number.parseInt(draft[key], 10)
-    if (!Number.isInteger(v) || v < 0) return setError('Bitte eine Zahl ab 0 eingeben.')
-    setError(null)
-    try {
-      await adminSetSetting(key, v)
-      setSaved(key)
-      settings.reload()
-    } catch (e) {
-      setError(errorMessage(e))
-    }
-  }
-
-  const keys = Object.keys(SETTING_LABEL)
-  return (
-    <Section title="Zahlen einstellen">
-      {settings.loading && !settings.data && <Spinner />}
-      {error && <ErrorBox message={error} />}
-      <div className="grid gap-3 sm:grid-cols-2">
-        {settings.data &&
-          keys.map((k) => (
-            <div key={k} className="flex items-end gap-2">
-              <Field label={SETTING_LABEL[k]}>
-                <TextInput type="number" min={0} inputMode="numeric" value={draft[k] ?? String(settings.data?.[k] ?? 0)} onChange={(e) => setDraft({ ...draft, [k]: e.target.value })} />
-              </Field>
-              <Button variant="secondary" onClick={() => void save(k)}>{saved === k ? '✓' : 'Speichern'}</Button>
-            </div>
-          ))}
-      </div>
-    </Section>
-  )
-}
-
-function ItemsSection() {
+export function ItemsSection() {
   const items = useAsync(adminListItems, [])
   const [error, setError] = useState<string | null>(null)
   const [draft, setDraft] = useState<Record<string, string>>({})
+  const [kind, setKind] = useState('all')
+  const [query, setQuery] = useState('')
+  const KIND_LABEL: Record<string, string> = { avatar: 'Profilbilder', color: 'Farben', effect: 'Effekte', theme: 'Themes', tag: 'Tags' }
+  const shown = (items.data ?? []).filter((i) => (kind === 'all' || i.kind === kind) && i.name.toLowerCase().includes(query.trim().toLowerCase()))
 
   async function save(id: string, price: number, active: boolean) {
     setError(null)
@@ -265,13 +193,29 @@ function ItemsSection() {
 
   return (
     <Section title="Shop-Preise">
+      <div className="flex flex-wrap items-end gap-3">
+        <div className="w-48">
+          <Field label="Art">
+            <Select value={kind} onChange={(e) => setKind(e.target.value)}>
+              <option value="all">Alle</option>
+              {Object.entries(KIND_LABEL).map(([k, l]) => <option key={k} value={k}>{l}</option>)}
+            </Select>
+          </Field>
+        </div>
+        <div className="min-w-[12rem] flex-1">
+          <Field label="Suchen">
+            <TextInput value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Name des Artikels" />
+          </Field>
+        </div>
+      </div>
       {items.loading && !items.data && <Spinner />}
       {error && <ErrorBox message={error} />}
+      {items.data && shown.length === 0 && <p className="text-sm text-slate-500">Nichts gefunden.</p>}
       <ul className="grid gap-2 sm:grid-cols-2">
-        {items.data?.map((i) => (
+        {shown.map((i) => (
           <li key={i.id} className={`flex min-h-[48px] items-center gap-2 rounded-lg bg-white/5 px-3 text-sm ${i.active ? '' : 'opacity-50'}`}>
             <span className="flex-1 truncate">
-              {i.name} <span className="text-xs text-slate-500">{i.kind}</span>
+              {i.name} <span className="text-xs text-slate-500">{KIND_LABEL[i.kind] ?? i.kind}</span>
             </span>
             <input
               type="number"

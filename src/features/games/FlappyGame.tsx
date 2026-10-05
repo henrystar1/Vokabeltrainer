@@ -83,8 +83,16 @@ export default function FlappyGame({ onScore, onOver }: GameProps) {
         state.current = flap(state.current)
       }
     }
+    // Ein Tipp irgendwo auf dem Bildschirm lässt den Vogel flattern (außer auf Knöpfen/Links/Dialogen).
+    const onPointer = (e: PointerEvent) => {
+      const t = e.target as Element | null
+      if (t?.closest('button, a, input, select, textarea, [role="dialog"], [data-no-flap]')) return
+      state.current = flap(state.current)
+    }
     window.addEventListener('keydown', onKey)
+    window.addEventListener('pointerdown', onPointer)
     return () => {
+      window.removeEventListener('pointerdown', onPointer)
       done = true
       cancelAnimationFrame(raf)
       window.removeEventListener('keydown', onKey)
@@ -98,12 +106,8 @@ export default function FlappyGame({ onScore, onOver }: GameProps) {
         width={FW}
         height={FH}
         className="max-h-[62vh] w-auto max-w-full touch-none select-none rounded-2xl border border-white/10"
-        onPointerDown={(e) => {
-          e.preventDefault()
-          state.current = flap(state.current)
-        }}
       />
-      <p className="text-xs text-slate-500">Tippen / Leertaste = flattern. Durch die Lücken fliegen.</p>
+      <p className="text-xs text-slate-500">Tippe irgendwo auf den Bildschirm oder drücke die Leertaste = flattern. Durch die Lücken fliegen.</p>
     </div>
   )
 }

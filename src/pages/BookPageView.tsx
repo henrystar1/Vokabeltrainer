@@ -1,14 +1,10 @@
 import { useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
-import { ArrowLeft, Flag } from 'lucide-react'
-import Button from '../components/ui/Button'
-import { TextArea } from '../components/ui/Field'
-import Modal from '../components/ui/Modal'
+import { ArrowLeft, Flag, Search } from 'lucide-react'
+import ReportModal from '../components/books/ReportModal'
 import { EmptyState, ErrorBox, Notice, Spinner } from '../components/ui/States'
-import { errorMessage } from '../lib/errors'
 import { useAsync } from '../lib/useAsync'
 import { getOutline } from '../services/books'
-import { requestReview } from '../services/community'
 import { getPage } from '../services/entry'
 import type { PageEntry } from '../types'
 
@@ -32,7 +28,10 @@ export default function BookPageView({ bookId, bookName }: { bookId: string; boo
       <div className="mb-4">
         <Notice tone="info">
           Dieses Buch ist online bereitgestellt – nur Admins und Mods können Vokabeln ändern. Siehst du einen Fehler? Tippe bei der
-          Vokabel auf die Flagge, dann prüft es jemand.
+          Vokabel auf die Flagge, dann prüft es jemand.{' '}
+          <Link to={`/suche?buch=${bookId}`} className="inline-flex items-center gap-1 text-accent-cyan underline-offset-2 hover:underline">
+            <Search size={14} /> Vokabel suchen und melden
+          </Link>
         </Notice>
       </div>
 
@@ -95,44 +94,5 @@ export default function BookPageView({ bookId, bookName }: { bookId: string; boo
         />
       )}
     </div>
-  )
-}
-
-function ReportModal({ entry, onClose, onSent }: { entry: PageEntry; onClose: () => void; onSent: () => void }) {
-  const [message, setMessage] = useState('')
-  const [busy, setBusy] = useState(false)
-  const [error, setError] = useState<string | null>(null)
-
-  async function send() {
-    setBusy(true)
-    setError(null)
-    try {
-      await requestReview(entry.vocabulary_id, message)
-      onSent()
-    } catch (e) {
-      setError(errorMessage(e))
-      setBusy(false)
-    }
-  }
-
-  return (
-    <Modal title="Überprüfung anfordern" onClose={onClose}>
-      <div className="space-y-4">
-        <p className="rounded-xl border border-white/10 bg-space-900/60 p-3 text-sm">
-          <strong>{entry.translations.join(' · ')}</strong>
-          <span className="text-slate-400"> = </span>
-          {[entry.german, ...entry.german_alts].join(' · ')}
-        </p>
-        <label className="block space-y-1.5">
-          <span className="label-mono">Was stimmt nicht? (optional)</span>
-          <TextArea maxLength={500} value={message} onChange={(e) => setMessage(e.target.value)} placeholder="z. B. Tippfehler, falsche Übersetzung, fehlende Lösung …" />
-        </label>
-        {error && <ErrorBox message={error} />}
-        <div className="flex justify-end gap-2">
-          <Button variant="ghost" onClick={onClose}>Abbrechen</Button>
-          <Button busy={busy} onClick={() => void send()}>Anfrage senden</Button>
-        </div>
-      </div>
-    </Modal>
   )
 }

@@ -23,6 +23,8 @@ interface AuthState {
   recovering: boolean
   /** Ausgewählte Shop-Artikel (Profilbild, Namensfarbe, Effekt). */
   cosmetics: Flair
+  /** true, wenn der Benutzer seine Tags (Rolle und gekauftes Tag) ausgeblendet hat. */
+  tagsHidden: boolean
   /** Ausgewähltes Design der ganzen Website. */
   themeId: string | null
   /** Lädt das Profil neu (z. B. nach Kauf/Auswahl im Shop). */
@@ -53,6 +55,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [blocked, setBlocked] = useState(false)
   const [profileReady, setProfileReady] = useState(false)
   const [cosmetics, setCosmetics] = useState<Flair>(NO_COSMETICS)
+  const [tagsHidden, setTagsHidden] = useState(false)
   const [themeId, setThemeId] = useState<string | null>(null)
   const [recovering, setRecovering] = useState(false)
 
@@ -90,7 +93,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setDisplayName(p.display_name)
     setRole(p.role)
     setBlocked(p.blocked)
-    setCosmetics({ avatar_id: p.avatar_id, color_id: p.color_id, effect_id: p.effect_id, tag_id: p.tag_id, theme_id: p.theme_id, role: p.role })
+    setTagsHidden(p.tags_hidden)
+    setCosmetics({ avatar_id: p.avatar_id, color_id: p.color_id, effect_id: p.effect_id, tag_id: p.tags_hidden ? null : p.tag_id, theme_id: p.theme_id, role: p.tags_hidden ? 'user' : p.role })
     setThemeId(p.theme_id)
   }, [])
 
@@ -157,6 +161,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       blocked,
       profileReady,
       cosmetics,
+      tagsHidden,
       themeId,
       refreshProfile,
       recovering,
@@ -167,7 +172,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setNewPassword,
       setDisplayNameLocal: setDisplayName,
     }),
-    [loading, session, displayName, role, blocked, profileReady, cosmetics, themeId, refreshProfile, recovering, signIn, signUp, signOut, sendReset, setNewPassword],
+    [loading, session, displayName, role, blocked, profileReady, cosmetics, tagsHidden, themeId, refreshProfile, recovering, signIn, signUp, signOut, sendReset, setNewPassword],
   )
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>
 }

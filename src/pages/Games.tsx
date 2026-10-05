@@ -24,7 +24,7 @@ const GAMES: Array<{ id: GameId; name: string; text: string; unit: string; icon:
   { id: 'snake', name: 'Snake', text: 'Friss Äpfel, werde länger, stoß nirgends an.', unit: 'Äpfel', icon: Gamepad2 },
   { id: 'tetris', name: 'Tetris', text: 'Stapel die Blöcke und lösche Reihen.', unit: 'Punkte', icon: Blocks },
   { id: 'blast', name: 'Block Blast', text: 'Zieh Teile aufs Feld und räum Reihen und Spalten ab.', unit: 'Punkte', icon: Grid3x3 },
-  { id: 'crossy', name: 'Crosstrainer Road', text: 'Bring das Huhn über Straßen und Wiesen – ohne überfahren zu werden.', unit: 'Reihen', icon: Footprints },
+  { id: 'crossy', name: 'Crossy Road', text: 'Bring das Huhn über Straßen und Wiesen – ohne überfahren zu werden.', unit: 'Reihen', icon: Footprints },
   { id: 'flappy', name: 'Flappy Bird', text: 'Flatter durch die Lücken der Röhren.', unit: 'Röhren', icon: Bird },
 ]
 

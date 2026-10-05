@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
-import { Search as SearchIcon } from 'lucide-react'
+import { Flag, Search as SearchIcon } from 'lucide-react'
+import ReportModal from '../components/books/ReportModal'
 import Card from '../components/ui/Card'
 import { Field, Select, TextInput, inputClass } from '../components/ui/Field'
 import PageHeader from '../components/ui/PageHeader'
@@ -27,6 +28,9 @@ export default function Search() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const books = useAsync(listBooks, [])
+  const [reporting, setReporting] = useState<SearchResult | null>(null)
+  const [sent, setSent] = useState<Set<string>>(new Set())
+  const isPublic = (bookId: string) => !!books.data?.find((b) => b.id === bookId)?.is_public
   const languages = useAsync(listLanguages, [])
 
   // Entprellte Suche
@@ -125,19 +129,35 @@ export default function Search() {
         <div className="space-y-2">
           <p className="label-mono">{results.length}{results.length >= 100 ? '+' : ''} Treffer</p>
           {results.map((r) => (
-            <Link
-              key={r.placement_id}
-              to={`/buecher/${r.book_id}/eingabe?unit=${r.unit_number}&seite=${r.page_number}`}
-              className="glass flex flex-wrap items-center justify-between gap-2 rounded-xl px-4 py-3 transition hover:border-accent-cyan/40"
-            >
-              <div>
-                <p className="font-medium">{r.translations.join(' · ')}</p>
-                <p className="text-sm text-slate-400">{[r.german, ...(r.german_alts ?? [])].join(' · ')}</p>
-              </div>
-              <p className="label-mono">{r.book_name} · U{r.unit_number} · S{r.page_number}</p>
-            </Link>
+            <div key={r.placement_id} className="glass flex items-center gap-1 rounded-xl pr-2 transition hover:border-accent-cyan/40">
+              <Link to={`/buecher/${r.book_id}/eingabe?unit=${r.unit_number}&seite=${r.page_number}`} className="flex min-h-[56px] flex-1 flex-wrap items-center justify-between gap-2 px-4 py-3">
+                <div>
+                  <p className="font-medium">{r.translations.join(' · ')}</p>
+                  <p className="text-sm text-slate-400">{[r.german, ...(r.german_alts ?? [])].join(' · ')}</p>
+                </div>
+                <p className="label-mono">{r.book_name} · U{r.unit_number} · S{r.page_number}</p>
+              </Link>
+              {isPublic(r.book_id) &&
+                (sent.has(r.vocabulary_id) ? (
+                  <span className="px-2 text-xs text-emerald-300">Gemeldet</span>
+                ) : (
+                  <button type="button" aria-label="Zur Prüfung melden" title="Zur Prüfung melden" onClick={() => setReporting(r)} className="flex min-h-[44px] w-11 items-center justify-center rounded-lg text-slate-500 hover:text-amber-300">
+                    <Flag size={16} />
+                  </button>
+                ))}
+            </div>
           ))}
         </div>
+      )}
+      {reporting && (
+        <ReportModal
+          entry={reporting}
+          onClose={() => setReporting(null)}
+          onSent={() => {
+            setSent((s) => new Set(s).add(reporting.vocabulary_id))
+            setReporting(null)
+          }}
+        />
       )}
     </div>
   )

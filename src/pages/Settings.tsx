@@ -13,6 +13,7 @@ import { errorMessage } from '../lib/errors'
 import { useAsync } from '../lib/useAsync'
 import { listLanguages } from '../services/books'
 import { updateDisplayName } from '../services/settings'
+import { setTagsHidden } from '../services/koins'
 
 function Toggle({ label, checked, onChange }: { label: string; checked: boolean; onChange: (v: boolean) => void }) {
   return (
@@ -24,7 +25,7 @@ function Toggle({ label, checked, onChange }: { label: string; checked: boolean;
 }
 
 export default function Settings() {
-  const { user, displayName, role, setDisplayNameLocal, signOut } = useAuth()
+  const { user, displayName, role, setDisplayNameLocal, signOut, tagsHidden, refreshProfile } = useAuth()
   const { settings, update } = useSettings()
   const languages = useAsync(listLanguages, [])
   const [name, setName] = useState(displayName ?? '')
@@ -143,6 +144,20 @@ export default function Settings() {
                 </Button>
               </div>
             </form>
+            <div className="mt-5 border-t border-white/10 pt-4">
+              <label className="flex min-h-[44px] cursor-pointer items-start gap-3 text-sm">
+                <input
+                  type="checkbox"
+                  className="mt-1 h-4 w-4 accent-cyan-400"
+                  checked={tagsHidden}
+                  onChange={(e) => void setTagsHidden(e.target.checked).then(refreshProfile).catch((err) => setError(errorMessage(err)))}
+                />
+                <span>
+                  <span className="block font-medium">Tags ausblenden</span>
+                  <span className="block text-xs text-slate-400">Neben deinem Namen erscheint dann weder ein gekaufter Tag noch „Admin“, „Alphamod“ oder „Mod“ – in Chat, Ranglisten und Spielen.</span>
+                </span>
+              </label>
+            </div>
           </Card>
         )}
 

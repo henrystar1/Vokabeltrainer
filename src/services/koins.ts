@@ -87,3 +87,27 @@ export const adminSendMessage = (userId: string | null, body: string) => rpc<num
 export const adminListMessages = () => rpc<SentMessage[]>('admin_list_messages')
 
 export const deleteMyMessages = (ids: string[]) => rpc<void>('delete_my_messages', { p_ids: ids })
+
+/* ---------- Mod-Rechte, Artikel verschenken, Tags ---------- */
+
+export interface MyPermissions {
+  staff: boolean
+  alphamod: boolean
+  admin: boolean
+  /** Darf mindestens eine Zahl ändern. */
+  settings: boolean
+  /** Darf alle Zahlen ändern. */
+  settings_all: boolean
+  shop: boolean
+  books_all: boolean
+  timeout_max: number
+}
+export const getMyPermissions = () => rpc<MyPermissions>('get_my_permissions')
+
+export interface ModBook { id: string; name: string; language: string; owner_name: string; vocab_count: number; mod_access: boolean }
+export const adminListPublicBooks = () => rpc<ModBook[]>('admin_list_public_books')
+export const adminSetModBook = (bookId: string, allowed: boolean) => rpc<void>('admin_set_mod_book', { p_book: bookId, p_allowed: allowed })
+export const adminSetModEditable = (key: string, value: boolean) => rpc<void>('admin_set_mod_editable', { p_key: key, p_value: value })
+export const adminGrantItem = (userId: string, itemId: string, equip: boolean) =>
+  rpc<void>('admin_grant_item', { p_user: userId, p_item_id: itemId, p_equip: equip })
+export const setTagsHidden = (hidden: boolean) => rpc<void>('set_tags_hidden', { p_hidden: hidden })

@@ -1,13 +1,15 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 import type { GameProps } from './SnakeGame'
 import { BLAST_SIZE, canPlace, newBlast, place, shapeSize, type BlastState } from './blast'
 
-const LIFT = 1.6
+/** Maus: Teil sitzt genau am Zeiger. Finger/Stift: etwas darüber, damit man es sieht. */
+const liftFor = (touch: boolean) => (touch ? 1.5 : 0)
 const TRAY_COLORS = ['#22d3ee', '#a78bfa', '#fb923c']
 
 export default function BlastGame({ onScore, onOver }: GameProps) {
   const [s, setS] = useState<BlastState>(() => newBlast())
-  const [drag, setDrag] = useState<{ i: number; x: number; y: number } | null>(null)
+  const [drag, setDrag] = useState<{ i: number; x: number; y: number; touch: boolean } | null>(null)
   const board = useRef<HTMLDivElement>(null)
   const cb = useRef({ onScore, onOver })
   cb.current = { onScore, onOver }
@@ -24,7 +26,7 @@ export default function BlastGame({ onScore, onOver }: GameProps) {
   }, [s])
 
   /** Misst das echte Raster (inkl. Rand und Abstände) und rechnet den Finger auf Zellen um. */
-  const geometry = (d: { i: number; x: number; y: number }) => {
+  const geometry = (d: { i: number; x: number; y: number; touch: boolean }) => {
     const cells = board.current?.children
     const shape = sRef.current.tray[d.i]
     if (!cells || cells.length < BLAST_SIZE * BLAST_SIZE || !shape) return null
@@ -33,14 +35,15 @@ export default function BlastGame({ onScore, onOver }: GameProps) {
     const step = (last.left - first.left) / (BLAST_SIZE - 1)
     const cell = first.width
     const { w, h } = shapeSize(shape)
-    // Das Teil schwebt etwas über dem Finger, damit man es sieht.
+    const lift = liftFor(d.touch) * step
     const col = Math.round((d.x - first.left) / step - w / 2 + (step - cell) / (2 * step))
-    const row = Math.round((d.y - LIFT * step - first.top) / step - h / 2 + (step - cell) / (2 * step))
+    const row = Math.round((d.y - lift - first.top) / step - h / 2 + (step - cell) / (2 * step))
     const inside = col > -w && row > -h && col < BLAST_SIZE && row < BLAST_SIZE
-    // Über dem Feld rastet das Teil auf dem Raster ein – genau dort, wo auch das Grün/Rot erscheint.
-    const px = inside ? first.left + col * step + (w * step - (step - cell)) / 2 : d.x
-    const py = inside ? first.top + row * step + (h * step - (step - cell)) / 2 : d.y - LIFT * step
-    return { cell, step, col, row, shape, px, py, inside }
+    const fits = inside && canPlace(sRef.current.grid, shape, col, row)
+    // Passt das Teil, rastet es deckend genau über den Zielzellen ein; sonst hängt es am Zeiger.
+    const px = fits ? first.left + col * step + (w * step - (step - cell)) / 2 : d.x
+    const py = fits ? first.top + row * step + (h * step - (step - cell)) / 2 : d.y - lift
+    return { cell, step, col, row, shape, px, py, fits }
   }
 
   useEffect(() => {
@@ -48,7 +51,7 @@ export default function BlastGame({ onScore, onOver }: GameProps) {
     const move = (e: PointerEvent) => setDrag((d) => (d ? { ...d, x: e.clientX, y: e.clientY } : d))
     const up = (e: PointerEvent) => {
       const g = geometry({ ...drag, x: e.clientX, y: e.clientY })
-      if (g && canPlace(sRef.current.grid, g.shape, g.col, g.row)) setS((cur) => place(cur, drag.i, g.col, g.row))
+      if (g && g.fits) setS((cur) => place(cur, drag.i, g.col, g.row))
       setDrag(null)
     }
     window.addEventListener('pointermove', move)
@@ -64,10 +67,7 @@ export default function BlastGame({ onScore, onOver }: GameProps) {
   const preview = useMemo(() => {
     if (!drag) return null
     const g = geometry(drag)
-    if (!g) return null
-    const ok = canPlace(s.grid, g.shape, g.col, g.row)
-    const set = new Set(g.shape.map(([x, y]) => `${g.col + x},${g.row + y}`))
-    return { ok, set, cell: g.cell, shape: g.shape, px: g.px, py: g.py, inside: g.inside }
+    return g ? { cell: g.cell, shape: g.shape, px: g.px, py: g.py } : null
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [drag, s.grid])
 
@@ -76,13 +76,7 @@ export default function BlastGame({ onScore, onOver }: GameProps) {
       <div ref={board} className="grid w-full max-w-[360px] touch-none gap-[3px] rounded-2xl border border-white/10 bg-space-900/80 p-2" style={{ gridTemplateColumns: `repeat(${BLAST_SIZE}, 1fr)` }}>
         {s.grid.flatMap((row, r) =>
           row.map((on, c) => {
-            const hint = preview?.set.has(`${c},${r}`)
-            return (
-              <div
-                key={`${r}-${c}`}
-                className={`aspect-square rounded-md ${on ? 'bg-accent-cyan shadow-[0_0_8px_rgb(34_211_238/0.5)]' : 'bg-white/5'} ${hint ? (preview?.ok ? '!bg-emerald-400/60' : '!bg-rose-500/40') : ''}`}
-              />
-            )
+            return <div key={`${r}-${c}`} className={`aspect-square rounded-md ${on ? 'bg-accent-cyan shadow-[0_0_8px_rgb(34_211_238/0.5)]' : 'bg-white/5'}`} />
           }),
         )}
       </div>
@@ -98,7 +92,7 @@ export default function BlastGame({ onScore, onOver }: GameProps) {
               key={i}
               onPointerDown={(e) => {
                 e.preventDefault()
-                setDrag({ i, x: e.clientX, y: e.clientY })
+                setDrag({ i, x: e.clientX, y: e.clientY, touch: e.pointerType !== 'mouse' })
               }}
               className="flex h-24 w-24 cursor-grab touch-none items-center justify-center"
               style={{ opacity: hidden ? 0.25 : 1 }}
@@ -115,8 +109,8 @@ export default function BlastGame({ onScore, onOver }: GameProps) {
         })}
       </div>
 
-      {drag && preview && (
-        <div className="pointer-events-none fixed z-50" style={{ left: preview.px, top: preview.py, transform: 'translate(-50%, -50%)', opacity: preview.inside ? 0.6 : 1 }}>
+      {drag && preview && createPortal(
+        <div className="pointer-events-none fixed z-[100]" style={{ left: preview.px, top: preview.py, transform: 'translate(-50%, -50%)' }}>
           {(() => {
             const { w, h } = shapeSize(preview.shape)
             const on = new Set(preview.shape.map(([x, y]) => `${x},${y}`))
@@ -128,7 +122,8 @@ export default function BlastGame({ onScore, onOver }: GameProps) {
               </div>
             )
           })()}
-        </div>
+        </div>,
+        document.body,
       )}
       <p className="text-xs text-slate-500">Zieh die Teile aufs Feld. Volle Reihen und Spalten verschwinden.</p>
     </div>

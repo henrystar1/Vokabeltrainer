@@ -1,8 +1,8 @@
 import { useState } from 'react'
-import { Ban, BookOpen, Crown, Plus, RotateCcw, ShieldCheck, ShieldOff, Trash2, UserCheck } from 'lucide-react'
+import { Ban, BookOpen, Crown, Gift, Plus, RotateCcw, ShieldCheck, ShieldOff, Trash2, UserCheck } from 'lucide-react'
 import Button from '../../components/ui/Button'
 import Modal from '../../components/ui/Modal'
-import { Field, TextInput } from '../../components/ui/Field'
+import { Field, Select, TextInput } from '../../components/ui/Field'
 import { ErrorBox, Notice, Spinner } from '../../components/ui/States'
 import { useAuth } from '../../features/auth/AuthProvider'
 import { errorMessage } from '../../lib/errors'
@@ -19,6 +19,7 @@ import {
   adminSetBlocked,
   adminSetRole,
 } from '../../services/admin'
+import { adminGrantItem, adminListItems } from '../../services/koins'
 import type { AdminUser } from '../../types'
 
 type Confirm =
@@ -26,6 +27,7 @@ type Confirm =
   | { kind: 'delete'; user: AdminUser }
   | { kind: 'block'; user: AdminUser }
   | { kind: 'points'; user: AdminUser }
+  | { kind: 'gift'; user: AdminUser }
   | null
 
 const ROLE_LABEL = { user: 'Nutzer', mod: 'Mod', alphamod: 'Alphamod', admin: 'Admin' } as const
@@ -42,6 +44,9 @@ export default function UsersTab() {
   const [pts, setPts] = useState('')
   const [ptsReason, setPtsReason] = useState('')
   const adjustments = useAsync(adminListPointAdjustments, [])
+  const items = useAsync(adminListItems, [])
+  const [giftItem, setGiftItem] = useState('')
+  const [giftEquip, setGiftEquip] = useState(true)
 
   async function run(fn: () => Promise<void>, ok: string) {
     setBusy(true)
@@ -126,6 +131,9 @@ export default function UsersTab() {
               <Button variant="secondary" className="!min-h-[40px] !px-3 text-sm" onClick={() => { setPts(''); setPtsReason(''); setConfirm({ kind: 'points', user: u }) }}>
                 <Plus size={15} /> Punkte ±
               </Button>
+              <Button variant="secondary" className="!min-h-[40px] !px-3 text-sm" onClick={() => { setGiftItem(''); setGiftEquip(true); setConfirm({ kind: 'gift', user: u }) }}>
+                <Gift size={15} /> Artikel schenken
+              </Button>
               {!protectedUser && (
                 <>
                   <Button
@@ -171,7 +179,7 @@ export default function UsersTab() {
 
       {confirm && (
         <Modal
-          title={confirm.kind === 'points' ? `Ranglistenpunkte: ${confirm.user.display_name}` : confirm.kind === 'reset' ? 'Fortschritt zurücksetzen?' : confirm.kind === 'delete' ? 'Konto löschen?' : 'Konto sperren?'}
+          title={confirm.kind === 'gift' ? `Artikel schenken: ${confirm.user.display_name}` : confirm.kind === 'points' ? `Ranglistenpunkte: ${confirm.user.display_name}` : confirm.kind === 'reset' ? 'Fortschritt zurücksetzen?' : confirm.kind === 'delete' ? 'Konto löschen?' : 'Konto sperren?'}
           onClose={() => setConfirm(null)}
         >
           {confirm.kind === 'points' && (
@@ -191,7 +199,25 @@ export default function UsersTab() {
               )}
             </div>
           )}
-          {confirm.kind !== 'points' && <Notice tone="warn">
+          {confirm.kind === 'gift' && (
+            <div className="space-y-3">
+              <Field label="Artikel" hint="Kostet den Nutzer nichts. Profilbilder, Farben, Effekte, Themes und Tags.">
+                <Select value={giftItem} onChange={(e) => setGiftItem(e.target.value)}>
+                  <option value="">Auswählen …</option>
+                  {([['avatar', 'Profilbilder'], ['color', 'Farben'], ['effect', 'Effekte'], ['theme', 'Themes'], ['tag', 'Tags']] as const).map(([k, l]) => (
+                    <optgroup key={k} label={l}>
+                      {items.data?.filter((i) => i.kind === k).map((i) => <option key={i.id} value={i.id}>{i.name}</option>)}
+                    </optgroup>
+                  ))}
+                </Select>
+              </Field>
+              <label className="flex min-h-[44px] cursor-pointer items-center gap-3 text-sm">
+                <input type="checkbox" className="h-4 w-4 accent-cyan-400" checked={giftEquip} onChange={(e) => setGiftEquip(e.target.checked)} />
+                Gleich anziehen (der Nutzer trägt es sofort)
+              </label>
+            </div>
+          )}
+          {confirm.kind !== 'points' && confirm.kind !== 'gift' && <Notice tone="warn">
             {confirm.kind === 'reset' &&
               `Lernstände, Lernrunden, Antworten und Statistik von ${confirm.user.display_name} werden gelöscht. Konto und Bücher bleiben bestehen.`}
             {confirm.kind === 'delete' &&
@@ -202,18 +228,19 @@ export default function UsersTab() {
           <div className="mt-5 flex justify-end gap-2">
             <Button variant="ghost" onClick={() => setConfirm(null)}>Abbrechen</Button>
             <Button
-              variant={confirm.kind === 'points' ? 'primary' : 'danger'}
+              variant={confirm.kind === 'points' || confirm.kind === 'gift' ? 'primary' : 'danger'}
               busy={busy}
-              disabled={confirm.kind === 'points' && !Number.isInteger(Number.parseInt(pts, 10))}
+              disabled={(confirm.kind === 'points' && !Number.isInteger(Number.parseInt(pts, 10))) || (confirm.kind === 'gift' && !giftItem)}
               onClick={() => {
                 const u = confirm.user
                 if (confirm.kind === 'reset') void run(() => adminResetProgress(u.user_id), `Fortschritt von ${u.display_name} zurückgesetzt.`)
                 if (confirm.kind === 'delete') void run(() => adminDeleteUser(u.user_id), `${u.display_name} wurde gelöscht.`)
                 if (confirm.kind === 'points') void run(async () => { await adminAdjustPoints(u.user_id, Number.parseInt(pts, 10), ptsReason); adjustments.reload() }, `${u.display_name}: ${Number.parseInt(pts, 10) > 0 ? '+' : ''}${pts} Punkte.`)
+                if (confirm.kind === 'gift') void run(() => adminGrantItem(u.user_id, giftItem, giftEquip), `${u.display_name} hat den Artikel bekommen${giftEquip ? ' und trägt ihn jetzt' : ''}.`)
                 if (confirm.kind === 'block') void run(() => adminSetBlocked(u.user_id, true), `${u.display_name} ist gesperrt.`)
               }}
             >
-              {confirm.kind === 'points' ? 'Buchen' : confirm.kind === 'reset' ? 'Zurücksetzen' : confirm.kind === 'delete' ? 'Endgültig löschen' : 'Sperren'}
+              {confirm.kind === 'gift' ? 'Schenken' : confirm.kind === 'points' ? 'Buchen' : confirm.kind === 'reset' ? 'Zurücksetzen' : confirm.kind === 'delete' ? 'Endgültig löschen' : 'Sperren'}
             </Button>
           </div>
         </Modal>

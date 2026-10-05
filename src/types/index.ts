@@ -60,6 +60,7 @@ export interface Profile extends Cosmetics {
   blocked: boolean
   theme_id: string | null
   tag_id: string | null
+  tags_hidden: boolean
 }
 
 export type ReviewStatus = 'open' | 'done' | 'dismissed'

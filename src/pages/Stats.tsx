@@ -8,6 +8,7 @@ import LevelBars from '../components/charts/LevelBars'
 import ProgressRing from '../components/charts/ProgressRing'
 import { useAsync } from '../lib/useAsync'
 import { listBooks } from '../services/books'
+import { getAppSettings } from '../services/koins'
 import { getCommunity, getMyStats } from '../services/stats'
 
 function Kpi({ label, value, unit }: { label: string; value: string | number; unit?: string }) {
@@ -25,6 +26,7 @@ export default function Stats() {
   const books = useAsync(listBooks, [])
   const stats = useAsync(() => getMyStats(bookId || null), [bookId])
   const community = useAsync(getCommunity, [])
+  const rules = useAsync(getAppSettings, [])
   const s = stats.data
   const c = community.data
 
@@ -59,7 +61,7 @@ export default function Stats() {
           <div className="grid gap-4 lg:grid-cols-2">
             <Card>
               <p className="label-mono mb-4">Lernstufen</p>
-              <LevelBars counts={s.level_counts} />
+              <LevelBars counts={s.level_counts} gaps={rules.data ?? undefined} />
             </Card>
             <Card>
               <p className="label-mono mb-4">Antworten pro Tag</p>

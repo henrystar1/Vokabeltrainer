@@ -7,27 +7,20 @@ import Card from '../components/ui/Card'
 import { Field, Select } from '../components/ui/Field'
 import PageHeader from '../components/ui/PageHeader'
 import { Notice } from '../components/ui/States'
-import { NOUNS } from '../features/french/nouns'
-import { shuffle } from '../features/learning/random'
+import { buildGenderQuestions, extractGenderWords } from '../features/french/gender'
+import { useAsync } from '../lib/useAsync'
+import { getLearningPool } from '../services/learning'
+import { ErrorBox, Spinner } from '../components/ui/States'
 
 type Phase = { name: 'setup' } | { name: 'run'; questions: ChoiceQuestion[] } | { name: 'result'; answers: ChoiceAnswer[] }
-
-function buildGenderQuestions(count: number): ChoiceQuestion[] {
-  return shuffle(NOUNS).slice(0, count).map((n) => ({
-    id: n.fr,
-    prompt: `… ${n.fr}`,
-    sub: n.de,
-    options: ['le', 'la'],
-    correct: n.g === 'le' ? 0 : 1,
-    reveal: `${n.g} ${n.fr} – ${n.de}`,
-  }))
-}
 
 /** le oder la? Links = le (männlich), rechts = la (weiblich). */
 export default function Gender() {
   const [count, setCount] = useState(20)
   const [phase, setPhase] = useState<Phase>({ name: 'setup' })
-  const start = () => setPhase({ name: 'run', questions: buildGenderQuestions(count) })
+  const pool = useAsync(() => getLearningPool('fr', null), [])
+  const words = pool.data ? extractGenderWords(pool.data) : []
+  const start = () => setPhase({ name: 'run', questions: buildGenderQuestions(words, count) })
 
   if (phase.name === 'run') return <ChoiceRunner layout="leftright" title="le oder la?" questions={phase.questions} onFinish={(answers) => setPhase({ name: 'result', answers })} onCancel={() => setPhase({ name: 'setup' })} />
   if (phase.name === 'result') return <ChoiceResult answers={phase.answers} onAgain={start} />
@@ -42,8 +35,12 @@ export default function Gender() {
             {[10, 20, 30, 50].map((n) => <option key={n} value={n}>{n}</option>)}
           </Select>
         </Field>
-        <Notice tone="info">Es kommen {NOUNS.length} häufige Wörter vor. Wörter mit l’ (z. B. l’eau) sind nicht dabei.</Notice>
-        <Button onClick={start} className="w-full"><Play size={16} /> Starten</Button>
+        {pool.loading ? <Spinner /> : pool.error ? <ErrorBox message={pool.error} /> : words.length < 5 ? (
+          <Notice tone="info">Dafür brauchst du mindestens 5 aktive Französisch-Vokabeln mit le/la (z. B. „la maison“). Aktiviere in deinen Büchern mehr Vokabeln.</Notice>
+        ) : (
+          <Notice tone="info">Es kommen {words.length} Wörter aus deinen Französisch-Büchern vor. Wörter mit l’ (z. B. l’eau) sind nicht dabei.</Notice>
+        )}
+        <Button onClick={start} disabled={words.length < 5} className="w-full"><Play size={16} /> Starten</Button>
       </Card>
     </div>
   )
