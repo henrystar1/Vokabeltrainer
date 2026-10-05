@@ -13,6 +13,8 @@ interface AuthState {
   role: Role
   isStaff: boolean
   isAdmin: boolean
+  /** Alphamod oder Admin: darf Werte ändern. */
+  canEditRules: boolean
   /** true, wenn ein Admin das Konto gesperrt hat. */
   blocked: boolean
   /** true, sobald das Profil (und damit die Rolle) geladen ist. */
@@ -149,7 +151,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       user: session?.user ?? null,
       displayName,
       role,
-      isStaff: role === 'mod' || role === 'admin',
+      isStaff: role === 'mod' || role === 'alphamod' || role === 'admin',
+      canEditRules: role === 'alphamod' || role === 'admin',
       isAdmin: role === 'admin',
       blocked,
       profileReady,

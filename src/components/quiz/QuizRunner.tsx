@@ -23,12 +23,14 @@ interface QuizRunnerProps {
   onCancel?: () => void
   /** Sprint: Gesamtzeit in Sekunden; danach wird onFinish automatisch aufgerufen. */
   timeLimitSeconds?: number
+  /** Eigene Beschriftung über der Frage (Standard: Richtung). */
+  labelFor?: (q: Question) => string
 }
 
 const DIRECTION_LABEL = { forward: 'Deutsch → Fremdsprache', backward: 'Fremdsprache → Deutsch' } as const
 
 /** Abfrageoberfläche: eine Frage nach der anderen, getippte Antwort, sofortige Rückmeldung. */
-export default function QuizRunner({ questions, caseSensitive, onAnswer, onFinish, showFeedback = true, title, accents = false, onCancel, timeLimitSeconds }: QuizRunnerProps) {
+export default function QuizRunner({ questions, caseSensitive, onAnswer, onFinish, showFeedback = true, title, accents = false, onCancel, timeLimitSeconds, labelFor }: QuizRunnerProps) {
   const [index, setIndex] = useState(0)
   const [value, setValue] = useState('')
   const [result, setResult] = useState<{ correct: boolean } | null>(null)
@@ -89,8 +91,14 @@ export default function QuizRunner({ questions, caseSensitive, onAnswer, onFinis
       advance()
       return
     }
-    const correct = isAnswerCorrect(value, q.accepted, caseSensitive)
-    onAnswer(q, value, correct)
+    // Leere Antworten werden nicht abgeschickt (sonst zählt ein versehentliches Enter als Fehler).
+    if (value.trim() === '') return
+    grade(value)
+  }
+
+  function grade(given: string, forceWrong = false) {
+    const correct = !forceWrong && isAnswerCorrect(given, q.accepted, caseSensitive)
+    onAnswer(q, given, correct)
     if (showFeedback) setResult({ correct })
     else advance()
   }
@@ -129,7 +137,7 @@ export default function QuizRunner({ questions, caseSensitive, onAnswer, onFinis
       </div>
 
       <form onSubmit={submit} className="glass rounded-3xl p-6 shadow-glow sm:p-10">
-        <p className="label-mono">{DIRECTION_LABEL[q.direction]}</p>
+        <p className="label-mono">{labelFor ? labelFor(q) : DIRECTION_LABEL[q.direction]}</p>
         <p className="mt-4 break-words text-center text-3xl font-semibold tracking-tight sm:text-4xl" aria-live="polite">
           {q.prompt}
         </p>
@@ -174,9 +182,14 @@ export default function QuizRunner({ questions, caseSensitive, onAnswer, onFinis
 
         {accents && q.direction === 'forward' && result === null && <AccentBar className="mt-4" />}
 
-        <Button type="submit" className="mt-6 w-full min-h-[52px]">
+        <Button type="submit" className="mt-6 w-full min-h-[52px]" disabled={result === null && value.trim() === ''}>
           {result ? (index + 1 >= questions.length ? 'Fertig' : 'Weiter') : 'Prüfen'} <ArrowRight size={18} />
         </Button>
+        {result === null && (
+          <button type="button" onClick={() => grade('', true)} className="mt-3 w-full min-h-[44px] rounded-xl text-sm text-slate-400 transition hover:bg-white/5 hover:text-slate-200">
+            Weiß ich nicht
+          </button>
+        )}
       </form>
 
       {confirmCancel && onCancel && (

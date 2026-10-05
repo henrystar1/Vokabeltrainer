@@ -1,4 +1,6 @@
 import { AVATARS, EFFECT_CLASSES, ROLE_TAGS, TAGS, nameColorStyle, themeFrameColor } from '../../features/shop/catalog'
+import BikeSvg from '../../features/shop/Bike'
+import { FrogMini } from '../../features/shop/Frog'
 import AnimatedAvatar, { isAnimatedAvatar } from '../../features/shop/AnimatedAvatar'
 import type { Flair, Role } from '../../types'
 
@@ -44,6 +46,22 @@ function PianoName({ name, className }: { name: string; className: string }) {
 export function StyledName({ name, colorId, effectId, className = '' }: { name: string; colorId?: string | null; effectId?: string | null; className?: string }) {
   if (effectId === 'effect_piano') return <PianoName name={name} className={className} />
   const { className: c, style } = nameColorStyle(colorId)
+  if (effectId === 'effect_bike' || effectId === 'effect_frog') {
+    // Das Fahrzeug/Tier ist ein eigenes Element neben dem Text, damit `truncate` es nicht abschneidet.
+    const frog = effectId === 'effect_frog'
+    return (
+      <span className="relative inline-flex min-w-0 max-w-full items-center">
+        <span className={`${frog ? 'fx-frog' : c} ${className}`} style={frog ? undefined : style}>
+          {name}
+        </span>
+        {frog ? (
+          <span aria-hidden className="fg-hopper"><span className="fg-hop"><FrogMini /></span></span>
+        ) : (
+          <span aria-hidden className="bk-name-rider"><BikeSvg /></span>
+        )}
+      </span>
+    )
+  }
   const fx = effectId ? EFFECT_CLASSES[effectId] ?? '' : ''
   if (effectId === 'effect_vortex') {
     // Der Strudel ist ein eigenes Element neben dem Text, damit ihn `truncate` nicht abschneidet.

@@ -136,6 +136,16 @@ export interface LearnBuildOptions {
   directions: readonly Direction[]
   questionCount: number
   rng?: Rng
+  /** Wartezeit in Minuten je ganzer Stufe 1–4 (Index 0 = Stufe 1). Ohne Angabe gibt es keine Wartezeit. */
+  gapMinutes?: readonly number[]
+  now?: number
+}
+
+/** Ist die Wartezeit seit der letzten Antwort vorbei? Vokabeln ohne bisherige Antwort sind sofort dran. */
+export function isReady(v: PoolVocab, gapMinutes: readonly number[] | undefined, now: number): boolean {
+  if (!gapMinutes || !v.last_at) return true
+  const gap = gapMinutes[Math.min(Math.max(Math.floor(v.level), 1), gapMinutes.length) - 1] ?? 0
+  return gap <= 0 || now - new Date(v.last_at).getTime() >= gap * 60_000
 }
 
 /**
@@ -145,7 +155,7 @@ export interface LearnBuildOptions {
 export function buildLearningQuestions(pool: readonly PoolVocab[], opts: LearnBuildOptions): Question[] {
   const rng = opts.rng ?? Math.random
   const usable = pool.filter((v) => v.translations.length > 0)
-  const due = usable.filter((v) => isDue(v.level))
+  const due = usable.filter((v) => isDue(v.level) && isReady(v, opts.gapMinutes, opts.now ?? Date.now()))
   const picked = weightedSample(due, (v) => selectionWeight(v.level), vocabCountFor(opts.questionCount, opts.directions), rng)
   const idx = buildIndexes(usable)
   const questions = picked.flatMap((v) => opts.directions.map((d) => makeQuestion(v, d, idx, rng)))

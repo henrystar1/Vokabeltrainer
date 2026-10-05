@@ -1,7 +1,8 @@
 import { useState } from 'react'
-import { Ban, BookOpen, RotateCcw, ShieldCheck, ShieldOff, Trash2, UserCheck } from 'lucide-react'
+import { Ban, BookOpen, Crown, Plus, RotateCcw, ShieldCheck, ShieldOff, Trash2, UserCheck } from 'lucide-react'
 import Button from '../../components/ui/Button'
 import Modal from '../../components/ui/Modal'
+import { Field, TextInput } from '../../components/ui/Field'
 import { ErrorBox, Notice, Spinner } from '../../components/ui/States'
 import { useAuth } from '../../features/auth/AuthProvider'
 import { errorMessage } from '../../lib/errors'
@@ -9,7 +10,9 @@ import { formatBytes, formatDate, formatDateTime } from '../../lib/format'
 import { useAsync } from '../../lib/useAsync'
 import {
   adminDeleteBook,
+  adminAdjustPoints,
   adminDeleteUser,
+  adminListPointAdjustments,
   adminListUserBooks,
   adminListUsers,
   adminResetProgress,
@@ -22,9 +25,10 @@ type Confirm =
   | { kind: 'reset'; user: AdminUser }
   | { kind: 'delete'; user: AdminUser }
   | { kind: 'block'; user: AdminUser }
+  | { kind: 'points'; user: AdminUser }
   | null
 
-const ROLE_LABEL = { user: 'Nutzer', mod: 'Mod', admin: 'Admin' } as const
+const ROLE_LABEL = { user: 'Nutzer', mod: 'Mod', alphamod: 'Alphamod', admin: 'Admin' } as const
 
 /** Benutzerverwaltung (nur Admins): Rollen, Sperren, Zurücksetzen, Speicher einsehen und löschen. */
 export default function UsersTab() {
@@ -35,6 +39,9 @@ export default function UsersTab() {
   const [error, setError] = useState<string | null>(null)
   const [message, setMessage] = useState<string | null>(null)
   const [open, setOpen] = useState<string | null>(null)
+  const [pts, setPts] = useState('')
+  const [ptsReason, setPtsReason] = useState('')
+  const adjustments = useAsync(adminListPointAdjustments, [])
 
   async function run(fn: () => Promise<void>, ok: string) {
     setBusy(true)
@@ -83,7 +90,9 @@ export default function UsersTab() {
                     className={`rounded-full border px-2 py-0.5 text-[10px] uppercase tracking-wider ${
                       u.role === 'admin'
                         ? 'border-accent-violet/50 text-accent-violet'
-                        : u.role === 'mod'
+                        : u.role === 'alphamod'
+                          ? 'border-amber-300/60 text-amber-300'
+                          : u.role === 'mod'
                           ? 'border-accent-cyan/40 text-accent-cyan'
                           : 'border-white/15 text-slate-400'
                     }`}
@@ -114,6 +123,9 @@ export default function UsersTab() {
               <Button variant="secondary" className="!min-h-[40px] !px-3 text-sm" onClick={() => setOpen(open === u.user_id ? null : u.user_id)}>
                 <BookOpen size={15} /> Bücher
               </Button>
+              <Button variant="secondary" className="!min-h-[40px] !px-3 text-sm" onClick={() => { setPts(''); setPtsReason(''); setConfirm({ kind: 'points', user: u }) }}>
+                <Plus size={15} /> Punkte ±
+              </Button>
               {!protectedUser && (
                 <>
                   <Button
@@ -124,6 +136,14 @@ export default function UsersTab() {
                   >
                     {u.role === 'mod' ? <ShieldOff size={15} /> : <ShieldCheck size={15} />}
                     {u.role === 'mod' ? 'Mod entziehen' : 'Zum Mod machen'}
+                  </Button>
+                  <Button
+                    variant="secondary"
+                    className="!min-h-[40px] !px-3 text-sm"
+                    disabled={busy}
+                    onClick={() => void run(() => adminSetRole(u.user_id, u.role === 'alphamod' ? 'user' : 'alphamod'), u.role === 'alphamod' ? 'Alphamod-Rechte entzogen.' : `${u.display_name} ist jetzt Alphamod.`)}
+                  >
+                    <Crown size={15} /> {u.role === 'alphamod' ? 'Alphamod entziehen' : 'Zum Alphamod machen'}
                   </Button>
                   {u.blocked ? (
                     <Button variant="secondary" className="!min-h-[40px] !px-3 text-sm" disabled={busy} onClick={() => void run(() => adminSetBlocked(u.user_id, false), 'Konto entsperrt.')}>
@@ -151,30 +171,49 @@ export default function UsersTab() {
 
       {confirm && (
         <Modal
-          title={confirm.kind === 'reset' ? 'Fortschritt zurücksetzen?' : confirm.kind === 'delete' ? 'Konto löschen?' : 'Konto sperren?'}
+          title={confirm.kind === 'points' ? `Ranglistenpunkte: ${confirm.user.display_name}` : confirm.kind === 'reset' ? 'Fortschritt zurücksetzen?' : confirm.kind === 'delete' ? 'Konto löschen?' : 'Konto sperren?'}
           onClose={() => setConfirm(null)}
         >
-          <Notice tone="warn">
+          {confirm.kind === 'points' && (
+            <div className="space-y-3">
+              <Field label="Punkte (minus zum Abziehen)" hint="z. B. 50 oder -20">
+                <TextInput type="number" inputMode="numeric" value={pts} onChange={(e) => setPts(e.target.value)} />
+              </Field>
+              <Field label="Grund (optional)">
+                <TextInput value={ptsReason} maxLength={200} onChange={(e) => setPtsReason(e.target.value)} />
+              </Field>
+              {adjustments.data && adjustments.data.length > 0 && (
+                <ul className="max-h-40 space-y-1 overflow-y-auto text-xs text-slate-400">
+                  {adjustments.data.slice(0, 8).map((a) => (
+                    <li key={a.id}>{a.display_name ?? '?'}: <span className={a.points > 0 ? 'text-emerald-300' : 'text-rose-300'}>{a.points > 0 ? '+' : ''}{a.points}</span> {a.reason && `· ${a.reason}`} · {formatDateTime(a.created_at)}</li>
+                  ))}
+                </ul>
+              )}
+            </div>
+          )}
+          {confirm.kind !== 'points' && <Notice tone="warn">
             {confirm.kind === 'reset' &&
               `Lernstände, Lernrunden, Antworten und Statistik von ${confirm.user.display_name} werden gelöscht. Konto und Bücher bleiben bestehen.`}
             {confirm.kind === 'delete' &&
               `${confirm.user.display_name} wird samt allen privaten Büchern und dem gesamten Lernfortschritt endgültig gelöscht. Öffentliche Bücher dieses Nutzers gehen an dich über. Das kann nicht rückgängig gemacht werden.`}
             {confirm.kind === 'block' &&
               `${confirm.user.display_name} kann sich nicht mehr anmelden und verliert sofort den Zugriff. Alle Daten bleiben erhalten; du kannst das Konto jederzeit entsperren.`}
-          </Notice>
+          </Notice>}
           <div className="mt-5 flex justify-end gap-2">
             <Button variant="ghost" onClick={() => setConfirm(null)}>Abbrechen</Button>
             <Button
-              variant="danger"
+              variant={confirm.kind === 'points' ? 'primary' : 'danger'}
               busy={busy}
+              disabled={confirm.kind === 'points' && !Number.isInteger(Number.parseInt(pts, 10))}
               onClick={() => {
                 const u = confirm.user
                 if (confirm.kind === 'reset') void run(() => adminResetProgress(u.user_id), `Fortschritt von ${u.display_name} zurückgesetzt.`)
                 if (confirm.kind === 'delete') void run(() => adminDeleteUser(u.user_id), `${u.display_name} wurde gelöscht.`)
+                if (confirm.kind === 'points') void run(async () => { await adminAdjustPoints(u.user_id, Number.parseInt(pts, 10), ptsReason); adjustments.reload() }, `${u.display_name}: ${Number.parseInt(pts, 10) > 0 ? '+' : ''}${pts} Punkte.`)
                 if (confirm.kind === 'block') void run(() => adminSetBlocked(u.user_id, true), `${u.display_name} ist gesperrt.`)
               }}
             >
-              {confirm.kind === 'reset' ? 'Zurücksetzen' : confirm.kind === 'delete' ? 'Endgültig löschen' : 'Sperren'}
+              {confirm.kind === 'points' ? 'Buchen' : confirm.kind === 'reset' ? 'Zurücksetzen' : confirm.kind === 'delete' ? 'Endgültig löschen' : 'Sperren'}
             </Button>
           </div>
         </Modal>

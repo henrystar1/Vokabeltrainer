@@ -4,12 +4,14 @@ import Sidebar from './Sidebar'
 import MobileNav from './MobileNav'
 import StarField from '../ui/StarField'
 import { FocusProvider } from '../../features/koins/focusMode'
+import { ChatProvider } from '../../features/chat/ChatProvider'
 
 export default function AppShell() {
   const [collapsed, setCollapsed] = useState(false)
   const [focus, setFocus] = useState(false)
 
   return (
+    <ChatProvider>
     <FocusProvider value={setFocus}>
       <div className="min-h-full">
         <StarField />
@@ -26,5 +28,6 @@ export default function AppShell() {
         {!focus && <MobileNav />}
       </div>
     </FocusProvider>
+    </ChatProvider>
   )
 }

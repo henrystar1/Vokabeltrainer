@@ -133,6 +133,9 @@ body {
 /* ---------- Tags ---------- */
 .tag { display: inline-flex; align-items: center; border-radius: 9999px; padding: 1px 8px; font-family: 'JetBrains Mono', ui-monospace, monospace; font-size: 10px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; white-space: nowrap; line-height: 1.5; }
 .tag-mod { color: #031a20; background: linear-gradient(90deg, #22d3ee, #67e8f9); box-shadow: 0 0 10px rgb(34 211 238 / 0.6); }
+.tag-alphamod { color: #3b2600; background: linear-gradient(100deg, #b8860b, #ffd700 30%, #fff3a8 50%, #ffd700 70%, #b8860b); background-size: 200% 100%; box-shadow: 0 0 12px rgb(255 215 0 / 0.65); animation: tag-gold 3.5s linear infinite; }
+@keyframes tag-gold { to { background-position: -200% 0; } }
+@media (prefers-reduced-motion: reduce) { .tag-alphamod { animation: none; } }
 .tag-admin { color: #2a0a00; background: linear-gradient(90deg, #fbbf24, #f97316, #ef4444); box-shadow: 0 0 12px rgb(249 115 22 / 0.7); }
 .tag-supporter { color: #bbf7d0; border: 1px solid rgb(74 222 128 / 0.5); background: rgb(34 197 94 / 0.12); }
 .tag-big { color: #fef3c7; border: 1px solid rgb(251 191 36 / 0.6); background: rgb(245 158 11 / 0.18); box-shadow: 0 0 8px rgb(251 191 36 / 0.35); }
@@ -155,3 +158,6 @@ body {
 .typing-dots i:nth-child(3) { animation-delay: 0.3s; }
 @keyframes typing-bounce { 0%, 60%, 100% { transform: translateY(0); opacity: 0.4; } 30% { transform: translateY(-4px); opacity: 1; } }
 @media (prefers-reduced-motion: reduce) { .typing-dots i { animation: none; } }
+
+/* Ältere Chat-Beiträge: Animationen anhalten, damit viele Nachrichten flüssig bleiben. */
+.av-still, .av-still *, .av-still *::before, .av-still *::after { animation-play-state: paused !important; }

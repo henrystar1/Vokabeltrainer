@@ -3,7 +3,8 @@ import { ChevronsLeft, ChevronsRight, LogOut, Rocket } from 'lucide-react'
 import { useAuth } from '../../features/auth/AuthProvider'
 import KoinBadge from '../profile/KoinBadge'
 import PlayerTag from '../profile/PlayerTag'
-import { navItemsFor } from '../../lib/navigation'
+import { navGroupsFor } from '../../lib/navigation'
+import { useChat } from '../../features/chat/ChatProvider'
 
 interface SidebarProps {
   collapsed: boolean
@@ -12,6 +13,7 @@ interface SidebarProps {
 
 export default function Sidebar({ collapsed, onToggle }: SidebarProps) {
   const { displayName, user, signOut, isStaff, cosmetics } = useAuth()
+  const { unread } = useChat()
   return (
     <aside
       className={`glass fixed inset-y-0 left-0 z-30 hidden flex-col border-y-0 border-l-0 transition-[width] duration-300 ease-out md:flex ${
@@ -25,24 +27,42 @@ export default function Sidebar({ collapsed, onToggle }: SidebarProps) {
         {!collapsed && <span className="truncate text-[15px] font-semibold tracking-tight">Vokabeltrainer</span>}
       </div>
 
-      <nav className="mt-2 flex-1 space-y-1 overflow-y-auto px-3">
-        {navItemsFor(isStaff).map(({ to, label, icon: Icon }) => (
-          <NavLink
-            key={to}
-            to={to}
-            end={to === '/'}
-            title={collapsed ? label : undefined}
-            className={({ isActive }) =>
-              `group relative flex min-h-[44px] items-center gap-3 rounded-xl px-3 text-sm font-medium transition ${
-                isActive
-                  ? 'bg-accent-cyan/10 text-accent-cyan shadow-[inset_0_0_0_1px_rgb(var(--c-cyan)/0.25)]'
-                  : 'text-slate-400 hover:bg-white/5 hover:text-slate-100'
-              }`
-            }
-          >
-            <Icon size={19} className="shrink-0" />
-            {!collapsed && <span className="truncate">{label}</span>}
-          </NavLink>
+      <nav className="mt-2 flex-1 overflow-y-auto px-3 pb-2">
+        {navGroupsFor(isStaff).map((grp, gi) => (
+          <div key={grp.title || 'top'} className={gi > 0 ? 'mt-3' : ''}>
+            {grp.title &&
+              (collapsed ? (
+                <div className="mx-3 mb-1 border-t border-white/10" aria-hidden />
+              ) : (
+                <p className="label-mono px-3 pb-1 pt-1 text-[10px] uppercase tracking-widest text-slate-500">{grp.title}</p>
+              ))}
+            <div className="space-y-0.5">
+              {grp.items.map(({ to, label, icon: Icon }) => (
+                <NavLink
+                  key={to}
+                  to={to}
+                  end={to === '/'}
+                  title={collapsed ? label : undefined}
+                  className={({ isActive }) =>
+                    `group relative flex min-h-[40px] items-center gap-3 rounded-xl px-3 text-sm font-medium transition ${
+                      isActive
+                        ? 'bg-accent-cyan/10 text-accent-cyan shadow-[inset_0_0_0_1px_rgb(var(--c-cyan)/0.25)]'
+                        : 'text-slate-400 hover:bg-white/5 hover:text-slate-100'
+                    }`
+                  }
+                >
+                  <span className="relative shrink-0">
+                    <Icon size={19} />
+                    {to === '/chat' && unread > 0 && <span className="absolute -right-1 -top-1 h-2.5 w-2.5 rounded-full bg-rose-500 ring-2 ring-space-900" aria-label="Neue Nachrichten" />}
+                  </span>
+                  {!collapsed && <span className="truncate">{label}</span>}
+                  {!collapsed && to === '/chat' && unread > 0 && (
+                    <span className="ml-auto rounded-full bg-rose-500 px-1.5 text-[10px] font-semibold text-white">{unread > 99 ? '99+' : unread}</span>
+                  )}
+                </NavLink>
+              ))}
+            </div>
+          </div>
         ))}
       </nav>
 

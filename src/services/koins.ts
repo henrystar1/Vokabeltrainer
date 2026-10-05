@@ -85,3 +85,5 @@ export const markMessagesRead = (ids: string[]) => rpc<void>('mark_messages_read
 /** userId = null → an alle. Gibt die Zahl der Empfänger zurück. */
 export const adminSendMessage = (userId: string | null, body: string) => rpc<number>('admin_send_message', { p_user: userId, p_body: body })
 export const adminListMessages = () => rpc<SentMessage[]>('admin_list_messages')
+
+export const deleteMyMessages = (ids: string[]) => rpc<void>('delete_my_messages', { p_ids: ids })

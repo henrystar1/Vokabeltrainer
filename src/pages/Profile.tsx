@@ -29,12 +29,15 @@ const REASONS: Record<string, string> = {
   duel: 'Duell gewonnen',
   sprint: 'Sprint',
   game_fee: 'Spiel-Eintritt',
-  game_win: 'Spiel gewonnen',
+  game_win: 'Spiel-Rekord',
+  gambling_bet: 'Gambling-Einsatz',
+  gambling_win: 'Gambling-Gewinn',
+  choice: 'Multiple Choice',
   pay_in: 'Coins erhalten',
   pay_out: 'Coins verschickt',
 }
 
-const ROLE_LABEL = { user: 'Lernender', mod: 'Moderator', admin: 'Admin' } as const
+const ROLE_LABEL = { user: 'Lernender', mod: 'Moderator', alphamod: 'Alphamod', admin: 'Admin' } as const
 
 export default function Profile() {
   const { displayName, cosmetics, role } = useAuth()

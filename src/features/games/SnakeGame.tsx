@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef } from 'react'
-import { ArrowDown, ArrowLeft, ArrowRight, ArrowUp } from 'lucide-react'
+import { RotateCcw, RotateCw } from 'lucide-react'
+import { PadButton } from './controls'
 import { SNAKE_SIZE, newSnake, snakeDelay, step, turn, type Dir, type SnakeState } from './snake'
 
 const PX = 20
@@ -82,19 +83,12 @@ export default function SnakeGame({ onScore, onOver }: GameProps) {
   }, [])
 
   const touch = useRef<{ x: number; y: number } | null>(null)
-  const dirButton = (d: Dir, icon: React.ReactNode, label: string) => (
-    <button
-      type="button"
-      aria-label={label}
-      onPointerDown={(e) => {
-        e.preventDefault()
-        state.current = turn(state.current, d)
-      }}
-      className="flex h-14 w-14 items-center justify-center rounded-2xl border border-white/15 bg-white/5 active:bg-white/15"
-    >
-      {icon}
-    </button>
-  )
+  /** Relative Drehung: aus Sicht der Schlange nach links oder rechts abbiegen. */
+  const rel = (side: 'left' | 'right') => {
+    const order: Dir[] = ['up', 'right', 'down', 'left']
+    const i = order.indexOf(state.current.next)
+    state.current = turn(state.current, order[(i + (side === 'right' ? 1 : 3)) % 4])
+  }
 
   return (
     <div className="flex flex-col items-center gap-4">
@@ -114,13 +108,11 @@ export default function SnakeGame({ onScore, onOver }: GameProps) {
           state.current = turn(state.current, Math.abs(dx) > Math.abs(dy) ? (dx > 0 ? 'right' : 'left') : dy > 0 ? 'down' : 'up')
         }}
       />
-      <div className="grid grid-cols-3 gap-2 md:hidden">
-        <span />{dirButton('up', <ArrowUp />, 'Hoch')}<span />
-        {dirButton('left', <ArrowLeft />, 'Links')}
-        {dirButton('down', <ArrowDown />, 'Runter')}
-        {dirButton('right', <ArrowRight />, 'Rechts')}
+      <div className="flex w-full max-w-[360px] items-center justify-between">
+        <PadButton label="Nach links abbiegen" size="lg" onPress={() => rel('left')}><RotateCcw size={36} /></PadButton>
+        <PadButton label="Nach rechts abbiegen" size="lg" onPress={() => rel('right')}><RotateCw size={36} /></PadButton>
       </div>
-      <p className="hidden text-xs text-slate-500 md:block">Pfeiltasten oder WASD</p>
+      <p className="text-xs text-slate-500">Tasten unten: links/rechts abbiegen · Wischen oder Pfeiltasten gehen auch</p>
     </div>
   )
 }

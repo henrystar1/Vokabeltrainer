@@ -59,6 +59,8 @@ export const EFFECT_CLASSES: Record<string, string> = {
   effect_admin_void: 'fx-admin-void',
   effect_vortex: 'fx-vortex',
   effect_piano: 'fx-piano',
+  effect_bike: 'fx-bike',
+  effect_frog: 'fx-frog',
 }
 
 /** Spender-Tags aus dem Shop (Klasse in index.css). */
@@ -73,6 +75,7 @@ export const TAGS: Record<string, { label: string; className: string }> = {
 /** Automatische Rollen-Tags (nicht kaufbar). */
 export const ROLE_TAGS: Partial<Record<Role, { label: string; className: string }>> = {
   mod: { label: 'MOD', className: 'tag-mod' },
+  alphamod: { label: 'MOD', className: 'tag-alphamod' },
   admin: { label: 'ADMIN', className: 'tag-admin' },
 }
 

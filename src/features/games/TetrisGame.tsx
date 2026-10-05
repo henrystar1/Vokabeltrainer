@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef } from 'react'
 import { ArrowDown, ArrowLeft, ArrowRight, ChevronsDown, RotateCw } from 'lucide-react'
+import { PadButton } from './controls'
 import type { GameProps } from './SnakeGame'
 import { COLS, ROWS, TYPES, cells, ghost, hardDrop, move, newTetris, rotate, tetrisDelay, tick, type TetrisState } from './tetris'
 
@@ -85,31 +86,21 @@ export default function TetrisGame({ onScore, onOver }: GameProps) {
     return () => window.removeEventListener('keydown', onKey)
   }, [act])
 
-  const btn = (label: string, icon: React.ReactNode, fn: () => void) => (
-    <button
-      type="button"
-      aria-label={label}
-      onPointerDown={(e) => {
-        e.preventDefault()
-        fn()
-      }}
-      className="flex h-14 w-14 items-center justify-center rounded-2xl border border-white/15 bg-white/5 active:bg-white/15"
-    >
-      {icon}
-    </button>
-  )
-
   return (
     <div className="flex flex-col items-center gap-4">
-      <canvas ref={canvas} width={COLS * PX} height={ROWS * PX} className="max-h-[62vh] w-auto max-w-full touch-none rounded-2xl border border-white/10" />
-      <div className="flex gap-2 md:hidden">
-        {btn('Links', <ArrowLeft />, () => act((s) => move(s, -1)))}
-        {btn('Drehen', <RotateCw />, () => act(rotate))}
-        {btn('Rechts', <ArrowRight />, () => act((s) => move(s, 1)))}
-        {btn('Runter', <ArrowDown />, () => act((s) => tick(s)))}
-        {btn('Fallen lassen', <ChevronsDown />, () => act((s) => hardDrop(s)))}
+      <canvas ref={canvas} width={COLS * PX} height={ROWS * PX} className="max-h-[52vh] w-auto max-w-full touch-none rounded-2xl border border-white/10" />
+      <div className="flex w-full max-w-[420px] items-center justify-between gap-2">
+        <PadButton label="Links" size="lg" repeat onPress={() => act((st) => move(st, -1))}><ArrowLeft size={36} /></PadButton>
+        <div className="flex flex-col items-center gap-2">
+          <div className="flex gap-2">
+            <PadButton label="Drehen" onPress={() => act(rotate)}><RotateCw size={26} /></PadButton>
+            <PadButton label="Fallen lassen" onPress={() => act((st) => hardDrop(st))}><ChevronsDown size={26} /></PadButton>
+          </div>
+          <PadButton label="Runter" repeat onPress={() => act((st) => tick(st))}><ArrowDown size={26} /></PadButton>
+        </div>
+        <PadButton label="Rechts" size="lg" repeat onPress={() => act((st) => move(st, 1))}><ArrowRight size={36} /></PadButton>
       </div>
-      <p className="hidden text-xs text-slate-500 md:block">← → bewegen · ↑ drehen · ↓ schneller · Leertaste fallen lassen</p>
+      <p className="text-xs text-slate-500">← → bewegen · ↑ drehen · ↓ schneller · Leertaste fallen lassen</p>
     </div>
   )
 }

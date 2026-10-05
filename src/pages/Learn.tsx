@@ -19,6 +19,7 @@ import { useWallet } from '../features/koins/WalletProvider'
 import { getWallet } from '../services/koins'
 import { activateNextPage } from '../services/community'
 import { getMistakePool } from '../services/play'
+import { getAppSettings } from '../services/koins'
 import { addRepeatAnswers, getLearningPool, submitSession } from '../services/learning'
 
 type Phase = 'setup' | 'loading' | 'main' | 'result' | 'repeat' | 'repeat-result'
@@ -84,9 +85,11 @@ export default function Learn() {
         : await getLearningPool(bookId ? null : settings.learn_language, bookId || null)
       levels.current = Object.fromEntries(pool.map((v) => [v.vocabulary_id, v.level]))
       const build = mistakeMode ? buildMistakeQuestions : buildLearningQuestions
-      const qs = build(pool, { directions, questionCount: settings.words_per_round })
+      const rules = await getAppSettings().catch(() => ({}) as Record<string, number>)
+      const gapMinutes = [rules.learn_gap_l1 ?? 0, rules.learn_gap_l2 ?? 0, rules.learn_gap_l3 ?? 0, rules.learn_gap_l4 ?? 0]
+      const qs = build(pool, { directions, questionCount: settings.words_per_round, gapMinutes })
       if (qs.length === 0) {
-        setError(mistakeMode ? 'Keine Fehler in den letzten 30 Tagen – es gibt nichts zu trainieren. Starke Leistung!' : pool.length === 0 ? 'Hier gibt es keine aktiven Vokabeln. Aktiviere im Buch zuerst Vokabeln (Seite „Buch“ → „Vokabeln aktivieren“) oder trage welche ein.' : 'Alle Vokabeln sind schon auf Stufe 5 – es gibt gerade nichts zu lernen. Stark!')
+        setError(mistakeMode ? 'Keine Fehler in den letzten 30 Tagen – es gibt nichts zu trainieren. Starke Leistung!' : pool.length === 0 ? 'Hier gibt es keine aktiven Vokabeln. Aktiviere im Buch zuerst Vokabeln (Seite „Buch“ → „Vokabeln aktivieren“) oder trage welche ein.' : (pool.some((v) => v.level < 5) ? 'Alle fälligen Vokabeln sind noch in der Wartezeit – komm später wieder, dann sitzen sie besser. (Die Wartezeiten stellt ein Admin ein.)' : 'Alle Vokabeln sind schon auf Stufe 5 – es gibt gerade nichts zu lernen. Stark!'))
         setPhase('setup')
         return
       }

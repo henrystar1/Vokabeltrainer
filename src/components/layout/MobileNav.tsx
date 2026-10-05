@@ -1,7 +1,8 @@
 import { useState } from 'react'
 import { NavLink, useLocation } from 'react-router-dom'
 import { LogOut, MoreHorizontal, X } from 'lucide-react'
-import { navItemsFor } from '../../lib/navigation'
+import { navGroupsFor, navItemsFor } from '../../lib/navigation'
+import { useChat } from '../../features/chat/ChatProvider'
 import KoinBadge from '../profile/KoinBadge'
 import { useAuth } from '../../features/auth/AuthProvider'
 
@@ -11,7 +12,11 @@ const PRIMARY = ['/', '/buecher', '/lernen', '/test']
 export default function MobileNav() {
   const [open, setOpen] = useState(false)
   const { displayName, signOut, isStaff } = useAuth()
+  const { unread } = useChat()
   const NAV_ITEMS = navItemsFor(isStaff)
+  const groups = navGroupsFor(isStaff)
+    .map((grp) => ({ ...grp, items: grp.items.filter((i) => !PRIMARY.includes(i.to)) }))
+    .filter((grp) => grp.items.length > 0)
   const { pathname } = useLocation()
   const primary = NAV_ITEMS.filter((i) => PRIMARY.includes(i.to))
   const more = NAV_ITEMS.filter((i) => !PRIMARY.includes(i.to))
@@ -39,18 +44,26 @@ export default function MobileNav() {
                 <X size={18} />
               </button>
             </div>
-            {more.map(({ to, label, icon: Icon }) => (
-              <NavLink
-                key={to}
-                to={to}
-                onClick={() => setOpen(false)}
-                className={({ isActive }) =>
-                  `flex min-h-[48px] items-center gap-3 rounded-xl px-3 text-sm ${isActive ? 'bg-accent-cyan/10 text-accent-cyan' : 'text-slate-200'}`
-                }
-              >
-                <Icon size={19} />
-                {label}
-              </NavLink>
+            {groups.map((grp) => (
+              <div key={grp.title || 'top'} className="pb-1">
+                {grp.title && <p className="label-mono px-3 pb-1 pt-2 text-[10px] uppercase tracking-widest text-slate-500">{grp.title}</p>}
+                <div className="grid grid-cols-2 gap-1">
+                  {grp.items.map(({ to, label, icon: Icon }) => (
+                    <NavLink
+                      key={to}
+                      to={to}
+                      onClick={() => setOpen(false)}
+                      className={({ isActive }) =>
+                        `relative flex min-h-[48px] items-center gap-2.5 rounded-xl px-3 text-sm ${isActive ? 'bg-accent-cyan/10 text-accent-cyan' : 'bg-white/[0.03] text-slate-200'}`
+                      }
+                    >
+                      <Icon size={18} className="shrink-0" />
+                      <span className="truncate">{label}</span>
+                      {to === '/chat' && unread > 0 && <span className="absolute right-2 top-2 h-2.5 w-2.5 rounded-full bg-rose-500" aria-label="Neue Nachrichten" />}
+                    </NavLink>
+                  ))}
+                </div>
+              </div>
             ))}
             <button
               onClick={() => void signOut()}
@@ -70,7 +83,10 @@ export default function MobileNav() {
           </NavLink>
         ))}
         <button onClick={() => setOpen((o) => !o)} className={tab(open || moreActive)} aria-expanded={open}>
-          <MoreHorizontal size={20} />
+          <span className="relative">
+            <MoreHorizontal size={20} />
+            {unread > 0 && <span className="absolute -right-1.5 -top-1 h-2.5 w-2.5 rounded-full bg-rose-500 ring-2 ring-space-900" aria-label="Neue Nachrichten" />}
+          </span>
           Mehr
         </button>
       </nav>

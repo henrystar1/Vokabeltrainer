@@ -1,5 +1,7 @@
 import type { CSSProperties } from 'react'
 import './avatars.css'
+import BikeSvg from './Bike'
+import { FrogScene } from './Frog'
 
 /** Ids der animierten Profilbilder (alles andere sind Emojis aus catalog.ts). */
 export const ANIMATED_AVATARS = [
@@ -16,6 +18,8 @@ export const ANIMATED_AVATARS = [
   'avatar_aurora',
   'avatar_eclipse',
   'avatar_piano',
+  'avatar_bike',
+  'avatar_frog',
 ] as const
 
 export const isAnimatedAvatar = (id: string | null | undefined): boolean => !!id && (ANIMATED_AVATARS as readonly string[]).includes(id)
@@ -123,6 +127,21 @@ export default function AnimatedAvatar({ id, size }: { id: string; size: number 
           {WHITE_DELAYS.map((d, k) => (
             <em key={k} style={{ ...dly(d), left: `${8 + (k + 0.5) * 12}%`, color: NOTE_COLORS[k] }}>{k % 2 ? '♫' : '♪'}</em>
           ))}
+        </span>
+      )
+    case 'avatar_bike':
+      return (
+        <span aria-hidden className="av av-bike" style={style}>
+          <span className="scene">
+            <i className="sun" /><i className="hills" /><i className="road" /><i className="dash" />
+          </span>
+          <span className="rider"><BikeSvg /></span>
+        </span>
+      )
+    case 'avatar_frog':
+      return (
+        <span aria-hidden className="av av-frog av-clip" style={style}>
+          <FrogScene />
         </span>
       )
     default:

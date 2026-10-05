@@ -39,7 +39,7 @@ export interface PublicBook {
   purchased: boolean
 }
 
-export type Role = 'user' | 'mod' | 'admin'
+export type Role = 'user' | 'mod' | 'alphamod' | 'admin'
 
 export interface Cosmetics {
   avatar_id: string | null
@@ -179,6 +179,8 @@ export interface PoolVocab {
   german_alts: string[]
   translations: string[]
   level: number
+  /** Zeitpunkt der letzten Antwort (für Wartezeiten). */
+  last_at?: string | null
 }
 
 export interface SearchResult {
@@ -278,6 +280,8 @@ export interface ShopItem {
   equipped: boolean
   /** Nur für Mods bzw. Admins (nicht kaufbar). */
   required_role: 'mod' | 'admin' | null
+  /** false = nicht mehr im Shop, aber du besitzt es noch. */
+  active?: boolean
 }
 
 export interface LedgerEntry {
@@ -454,7 +458,8 @@ export interface DuelSubmitResult {
 
 export interface ChatMessage extends Flair {
   id: number
-  kind: 'text' | 'pay'
+  kind: 'text' | 'pay' | 'whisper'
+  recipient_name?: string | null
   body: string
   created_at: string
   is_me: boolean

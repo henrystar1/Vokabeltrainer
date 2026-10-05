@@ -17,6 +17,10 @@ import Learn from './pages/Learn'
 import Placeholder from './pages/Placeholder'
 import Feedback from './pages/Feedback'
 import Games from './pages/Games'
+import Gambling from './pages/Gambling'
+import Practice from './pages/Practice'
+import Conjugate from './pages/Conjugate'
+import Gender from './pages/Gender'
 import Chat from './pages/Chat'
 import Duels from './pages/Duels'
 import DuelPlay from './pages/DuelPlay'
@@ -59,6 +63,10 @@ export default function App() {
           <Route path="lernen" element={<Learn />} />
           <Route path="test" element={<Test />} />
           <Route path="spiele" element={<Games />} />
+          <Route path="gambling" element={<Gambling />} />
+          <Route path="ueben" element={<Practice />} />
+          <Route path="konjugieren" element={<Conjugate />} />
+          <Route path="genus" element={<Gender />} />
           <Route path="chat" element={<Chat />} />
           <Route path="quests" element={<Quests />} />
           <Route path="sprint" element={<Sprint />} />

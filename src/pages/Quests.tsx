@@ -10,20 +10,22 @@ import { ErrorBox, Notice, Spinner } from '../components/ui/States'
 import { useWallet } from '../features/koins/WalletProvider'
 import { errorMessage } from '../lib/errors'
 import { useAsync } from '../lib/useAsync'
+import { getAppSettings } from '../services/koins'
 import { claimQuest, getQuests, getStreak } from '../services/play'
 import type { Quest, QuestId } from '../types'
 
-const INFO: Record<QuestId, { title: string; text: (q: Quest) => string; to: string; cta: string }> = {
+const INFO: Record<QuestId, { title: string; text: (q: Quest, rules: Record<string, number>) => string; to: string; cta: string }> = {
   answers: { title: 'Fleißig', text: (q) => `${q.goal} Vokabeln richtig beantworten`, to: '/lernen', cta: 'Lernen' },
-  perfect: { title: 'Fehlerfrei', text: () => 'Eine Runde mit mindestens 10 Fragen ohne einen Fehler', to: '/lernen', cta: 'Lernen' },
+  perfect: { title: 'Fehlerfrei', text: (_q, r) => `Eine Runde mit mindestens ${r.quest_goal_perfect ?? 10} Fragen ohne einen Fehler`, to: '/lernen', cta: 'Lernen' },
   sprint: { title: 'Sprinter', text: (q) => `${q.goal} richtige Antworten in einem Sprint`, to: '/sprint', cta: 'Sprint' },
-  duel: { title: 'Herausforderer', text: () => 'Ein Duell gegen einen Freund abschließen', to: '/duell', cta: 'Duell' },
+  duel: { title: 'Herausforderer', text: (q) => (q.goal > 1 ? `${q.goal} Duelle abschließen` : 'Ein Duell gegen einen Freund abschließen'), to: '/duell', cta: 'Duell' },
 }
 
 export default function Quests() {
   const wallet = useWallet()
   const quests = useAsync(getQuests, [])
   const streak = useAsync(getStreak, [])
+  const rules = useAsync(getAppSettings, [])
   const [busy, setBusy] = useState<QuestId | null>(null)
   const [msg, setMsg] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -71,7 +73,7 @@ export default function Quests() {
                 <h2 className="text-lg font-semibold">{info.title}</h2>
                 <span className="flex items-center gap-1 font-mono text-sm text-amber-300"><CoinIcon size={15} /> {q.reward}</span>
               </div>
-              <p className="text-sm text-slate-300">{info.text(q)}</p>
+              <p className="text-sm text-slate-300">{info.text(q, rules.data ?? {})}</p>
               <div>
                 <div className="mb-1 flex justify-between font-mono text-xs text-slate-400">
                   <span>{Math.min(q.progress, q.goal)} / {q.goal}</span>

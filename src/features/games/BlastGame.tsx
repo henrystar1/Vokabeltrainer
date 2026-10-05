@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import type { GameProps } from './SnakeGame'
 import { BLAST_SIZE, canPlace, newBlast, place, shapeSize, type BlastState } from './blast'
 
+const LIFT = 1.6
 const TRAY_COLORS = ['#22d3ee', '#a78bfa', '#fb923c']
 
 export default function BlastGame({ onScore, onOver }: GameProps) {
@@ -22,16 +23,24 @@ export default function BlastGame({ onScore, onOver }: GameProps) {
     }
   }, [s])
 
+  /** Misst das echte Raster (inkl. Rand und Abstände) und rechnet den Finger auf Zellen um. */
   const geometry = (d: { i: number; x: number; y: number }) => {
-    const rect = board.current?.getBoundingClientRect()
+    const cells = board.current?.children
     const shape = sRef.current.tray[d.i]
-    if (!rect || !shape) return null
-    const cell = rect.width / BLAST_SIZE
+    if (!cells || cells.length < BLAST_SIZE * BLAST_SIZE || !shape) return null
+    const first = cells[0].getBoundingClientRect()
+    const last = cells[BLAST_SIZE * BLAST_SIZE - 1].getBoundingClientRect()
+    const step = (last.left - first.left) / (BLAST_SIZE - 1)
+    const cell = first.width
     const { w, h } = shapeSize(shape)
     // Das Teil schwebt etwas über dem Finger, damit man es sieht.
-    const col = Math.round((d.x - rect.left) / cell - w / 2)
-    const row = Math.round((d.y - rect.top - cell * 1.6) / cell - h / 2)
-    return { cell, col, row, shape }
+    const col = Math.round((d.x - first.left) / step - w / 2 + (step - cell) / (2 * step))
+    const row = Math.round((d.y - LIFT * step - first.top) / step - h / 2 + (step - cell) / (2 * step))
+    const inside = col > -w && row > -h && col < BLAST_SIZE && row < BLAST_SIZE
+    // Über dem Feld rastet das Teil auf dem Raster ein – genau dort, wo auch das Grün/Rot erscheint.
+    const px = inside ? first.left + col * step + (w * step - (step - cell)) / 2 : d.x
+    const py = inside ? first.top + row * step + (h * step - (step - cell)) / 2 : d.y - LIFT * step
+    return { cell, step, col, row, shape, px, py, inside }
   }
 
   useEffect(() => {
@@ -58,7 +67,7 @@ export default function BlastGame({ onScore, onOver }: GameProps) {
     if (!g) return null
     const ok = canPlace(s.grid, g.shape, g.col, g.row)
     const set = new Set(g.shape.map(([x, y]) => `${g.col + x},${g.row + y}`))
-    return { ok, set, cell: g.cell, shape: g.shape }
+    return { ok, set, cell: g.cell, shape: g.shape, px: g.px, py: g.py, inside: g.inside }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [drag, s.grid])
 
@@ -107,14 +116,14 @@ export default function BlastGame({ onScore, onOver }: GameProps) {
       </div>
 
       {drag && preview && (
-        <div className="pointer-events-none fixed z-50" style={{ left: drag.x, top: drag.y - preview.cell * 1.6, transform: 'translate(-50%, -50%)' }}>
+        <div className="pointer-events-none fixed z-50" style={{ left: preview.px, top: preview.py, transform: 'translate(-50%, -50%)', opacity: preview.inside ? 0.6 : 1 }}>
           {(() => {
             const { w, h } = shapeSize(preview.shape)
             const on = new Set(preview.shape.map(([x, y]) => `${x},${y}`))
             return (
-              <div className="grid gap-[3px]" style={{ gridTemplateColumns: `repeat(${w}, ${preview.cell - 3}px)`, gridTemplateRows: `repeat(${h}, ${preview.cell - 3}px)` }}>
+              <div className="grid gap-[3px]" style={{ gridTemplateColumns: `repeat(${w}, ${preview.cell}px)`, gridTemplateRows: `repeat(${h}, ${preview.cell}px)` }}>
                 {Array.from({ length: w * h }, (_, k) => (
-                  <div key={k} className="rounded-md" style={{ background: on.has(`${k % w},${Math.floor(k / w)}`) ? TRAY_COLORS[drag.i % 3] : 'transparent', opacity: 0.9 }} />
+                  <div key={k} className="rounded-md" style={{ background: on.has(`${k % w},${Math.floor(k / w)}`) ? TRAY_COLORS[drag.i % 3] : 'transparent' }} />
                 ))}
               </div>
             )

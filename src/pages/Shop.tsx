@@ -107,6 +107,7 @@ export default function Shop() {
                   <div className="flex items-center justify-between gap-2">
                     <span className="font-medium">{item.name}</span>
                     {item.kind === 'avatar' && AVATARS[item.id] && <span className="text-lg">{AVATARS[item.id]}</span>}
+                    {item.active === false && <span className="rounded-full border border-white/15 px-2 py-0.5 text-[10px] text-slate-400">Nicht mehr im Shop</span>}
                     {item.required_role && <span className="tag tag-admin">{item.required_role === 'admin' ? 'Nur Admin' : 'Nur Mods'}</span>}
                   </div>
                   {item.price > 0 && item.kind !== 'theme' && <p className="-mt-1 text-xs text-slate-500">{item.price >= 4000 ? 'Sehr selten' : item.price >= 1000 ? 'Selten' : ''}</p>}

@@ -2,6 +2,8 @@ import { describe, expect, it } from 'vitest'
 import { mulberry32 } from '../learning/random'
 import { SNAKE_SIZE, newSnake, snakeDelay, step, turn } from './snake'
 import { COLS, ROWS, cells, fits, hardDrop, move, newTetris, rotate, tick, type TetrisState } from './tetris'
+import { flap, newFlappy, stepFlappy, FH } from './flappy'
+import { COLS as CCOLS, move as cmove, newCrossy, stepCrossy } from './crossy'
 import { BLAST_SIZE, SHAPES, canPlace, newBlast, place, shapeSize } from './blast'
 
 describe('Snake', () => {
@@ -119,6 +121,62 @@ describe('Block Blast', () => {
     // Schachbrett: 1x1 passt noch, 2er-Teile nicht
     const s0 = { grid, tray: [[[0, 0], [1, 0]], [[0, 0], [1, 0]], [[0, 0]]] as number[][][], score: 0, over: false }
     const s = place(s0, 2, 1, 0)
+    expect(s.over).toBe(true)
+  })
+})
+
+describe('Flappy Bird', () => {
+  it('schwebt bis zum ersten Flügelschlag', () => {
+    let s = newFlappy()
+    for (let i = 0; i < 100; i++) s = stepFlappy(s, 0.016, mulberry32(1))
+    expect(s.over).toBe(false)
+    expect(s.started).toBe(false)
+  })
+
+  it('fällt ohne Flattern zu Boden', () => {
+    let s = flap(newFlappy())
+    for (let i = 0; i < 300 && !s.over; i++) s = stepFlappy(s, 0.016, mulberry32(1))
+    expect(s.over).toBe(true)
+    expect(s.y).toBeLessThan(FH)
+  })
+
+  it('zählt passierte Röhren', () => {
+    let s = flap(newFlappy())
+    s = { ...s, pipes: [{ x: 10, gapY: s.y, passed: false }] }
+    for (let i = 0; i < 40; i++) s = { ...stepFlappy({ ...s, vy: 0 }, 0.016, mulberry32(2)), vy: 0 }
+    expect(s.score).toBeGreaterThanOrEqual(1)
+  })
+})
+
+describe('Crossy Road', () => {
+  it('Startreihen sind Gras ohne Bäume, Vorwärts erhöht den Rekord', () => {
+    let s = newCrossy(mulberry32(5))
+    expect(s.rows[0].type).toBe('grass')
+    s = cmove(s, 0, 1, mulberry32(6))
+    expect(s.best).toBe(1)
+    expect(s.over).toBe(false)
+  })
+
+  it('bleibt im Feld und geht nicht unter Reihe 0', () => {
+    let s = newCrossy(mulberry32(5))
+    s = cmove(s, 0, -1)
+    expect(s.row).toBe(0)
+    for (let i = 0; i < 20; i++) s = cmove(s, -1, 0)
+    expect(s.col).toBe(0)
+    for (let i = 0; i < 20; i++) s = cmove(s, 1, 0)
+    expect(s.col).toBe(CCOLS - 1)
+  })
+
+  it('ein Auto auf der eigenen Zelle ist tödlich', () => {
+    let s = newCrossy(mulberry32(5))
+    s = { ...s, rows: s.rows.map((r, i) => (i === 0 ? { ...r, type: 'road' as const, cars: [{ x: s.col, len: 1 }] } : r)) }
+    s = stepCrossy(s, 0.01)
+    expect(s.over).toBe(true)
+  })
+
+  it('Trödeln beendet das Spiel', () => {
+    let s = newCrossy(mulberry32(5))
+    for (let i = 0; i < 100 && !s.over; i++) s = stepCrossy(s, 0.2)
     expect(s.over).toBe(true)
   })
 })

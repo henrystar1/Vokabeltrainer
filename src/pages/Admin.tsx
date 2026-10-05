@@ -14,7 +14,7 @@ type Tab = 'reviews' | 'feedback' | 'users' | 'koins' | 'online' | 'rules'
 
 /** Verwaltung für Mods (Prüfanfragen) und Admins (zusätzlich Benutzer). */
 export default function Admin() {
-  const { isAdmin, role } = useAuth()
+  const { isAdmin, role, canEditRules } = useAuth()
   const [tab, setTab] = useState<Tab>('reviews')
 
   const button = (t: Tab, label: string, icon: ReactNode) => (
@@ -35,14 +35,14 @@ export default function Admin() {
       <div className="mb-5 flex flex-wrap gap-2">
         {button('reviews', 'Prüfanfragen', <Flag size={16} />)}
         {button('feedback', 'Feedback', <MessageSquarePlus size={16} />)}
-        {button('rules', 'Regeln', <SlidersHorizontal size={16} />)}
+        {canEditRules && button('rules', 'Regeln', <SlidersHorizontal size={16} />)}
         {isAdmin && button('online', 'Online & Nachrichten', <Radio size={16} />)}
         {isAdmin && button('users', 'Benutzer', <Users size={16} />)}
         {isAdmin && button('koins', 'Coins & Shop', <CoinIcon size={16} />)}
       </div>
       {tab === 'reviews' && <ReviewsTab />}
       {tab === 'feedback' && <FeedbackTab />}
-      {tab === 'rules' && <RulesTab />}
+      {tab === 'rules' && canEditRules && <RulesTab />}
       {tab === 'users' && isAdmin && <UsersTab />}
       {tab === 'koins' && isAdmin && <KoinsTab />}
       {tab === 'online' && isAdmin && <OnlineTab />}

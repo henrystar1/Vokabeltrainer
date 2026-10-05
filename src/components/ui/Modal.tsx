@@ -1,4 +1,5 @@
 import { useEffect, type ReactNode } from 'react'
+import { createPortal } from 'react-dom'
 import { X } from 'lucide-react'
 
 interface ModalProps {
@@ -16,8 +17,10 @@ export default function Modal({ title, onClose, children, wide = false }: ModalP
     return () => window.removeEventListener('keydown', onKey)
   }, [onClose])
 
-  return (
-    <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/60 p-4 backdrop-blur-sm sm:items-center" onMouseDown={onClose}>
+  // Per Portal an <body> hängen: In einem Container mit transform (Einblend-Animation) würde „fixed“
+  // sich auf den Container beziehen, und das Fenster erschiene mitten auf der langen Seite statt im Sichtfeld.
+  return createPortal(
+    <div className="fixed inset-0 z-[60] flex items-end justify-center bg-black/60 p-4 backdrop-blur-sm sm:items-center" onMouseDown={onClose}>
       <div
         role="dialog"
         aria-modal="true"
@@ -33,6 +36,7 @@ export default function Modal({ title, onClose, children, wide = false }: ModalP
         </div>
         {children}
       </div>
-    </div>
+    </div>,
+    document.body,
   )
 }
