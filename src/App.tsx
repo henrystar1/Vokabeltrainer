@@ -22,6 +22,8 @@ import Practice from './pages/Practice'
 import Conjugate from './pages/Conjugate'
 import Gender from './pages/Gender'
 import Chat from './pages/Chat'
+import Board from './pages/Board'
+import Presence from './pages/Presence'
 import Duels from './pages/Duels'
 import DuelPlay from './pages/DuelPlay'
 import Quests from './pages/Quests'
@@ -68,6 +70,8 @@ export default function App() {
           <Route path="konjugieren" element={<Conjugate />} />
           <Route path="genus" element={<Gender />} />
           <Route path="chat" element={<Chat />} />
+          <Route path="online" element={<Presence />} />
+          <Route path="brett" element={<Board />} />
           <Route path="quests" element={<Quests />} />
           <Route path="sprint" element={<Sprint />} />
           <Route path="duell" element={<Duels />} />

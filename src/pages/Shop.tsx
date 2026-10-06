@@ -1,16 +1,18 @@
 import { useMemo, useState } from 'react'
 import CoinIcon from '../components/ui/CoinIcon'
-import { Check } from 'lucide-react'
+import { Check, Pencil, Plus } from 'lucide-react'
 import Button from '../components/ui/Button'
 import Card from '../components/ui/Card'
 import Modal from '../components/ui/Modal'
 import PageHeader from '../components/ui/PageHeader'
 import { ErrorBox, Notice, Spinner } from '../components/ui/States'
 import KoinBadge from '../components/profile/KoinBadge'
-import { Avatar, StyledName } from '../components/profile/PlayerTag'
+import { Avatar, StyledName, Tags } from '../components/profile/PlayerTag'
+import ItemEditor from '../components/shop/ItemEditor'
 import { useAuth } from '../features/auth/AuthProvider'
 import { useWallet } from '../features/koins/WalletProvider'
-import { AVATARS, KIND_LABEL, TAGS, THEMES } from '../features/shop/catalog'
+import { AVATARS, KIND_LABEL, TAGS, resolveTheme } from '../features/shop/catalog'
+import { refreshCustomItems, useCustomVersion } from '../features/shop/custom'
 import { errorMessage } from '../lib/errors'
 import { useAsync } from '../lib/useAsync'
 import { buyItem, equipItem, getShop, unequipItem } from '../services/koins'
@@ -20,15 +22,17 @@ const KINDS: ShopKind[] = ['avatar', 'color', 'effect', 'tag', 'theme']
 
 function Preview({ item, name, cosmetics }: { item: ShopItem; name: string; cosmetics: { color_id: string | null; effect_id: string | null } }) {
   if (item.kind === 'avatar') return <Avatar name={name} avatarId={item.id} size={item.price >= 700 ? 76 : 56} />
-  if (item.kind === 'tag') return <span className={`tag ${TAGS[item.id]?.className ?? ''} !text-xs`}>{TAGS[item.id]?.label ?? item.name}</span>
+  if (item.kind === 'tag') return TAGS[item.id] ? <span className={`tag ${TAGS[item.id].className} !text-xs`}>{TAGS[item.id].label}</span> : <Tags tagId={item.id} />
   if (item.kind === 'color') return <StyledName name={name} colorId={item.id} className="text-xl font-semibold" />
   if (item.kind === 'effect') return <StyledName name={name} colorId={cosmetics.color_id} effectId={item.id} className="text-xl font-semibold" />
-  const t = THEMES[item.id]
+  const t = resolveTheme(item.id)
   return <div className="h-14 w-full rounded-xl border border-white/10" style={{ background: t?.preview ?? '#222' }} />
 }
 
 export default function Shop() {
-  const { displayName, cosmetics, themeId, refreshProfile } = useAuth()
+  const { displayName, cosmetics, themeId, refreshProfile, isAdmin } = useAuth()
+  useCustomVersion()
+  const [editing, setEditing] = useState<ShopItem | 'new' | null>(null)
   const wallet = useWallet()
   const shop = useAsync(getShop, [])
   const [kind, setKind] = useState<ShopKind>('avatar')
@@ -60,7 +64,16 @@ export default function Shop() {
 
   return (
     <div>
-      <PageHeader eyebrow="Coins ausgeben" title="Shop" actions={<KoinBadge />} />
+      <PageHeader
+        eyebrow="Coins ausgeben"
+        title="Shop"
+        actions={
+          <div className="flex items-center gap-2">
+            {isAdmin && <Button variant="secondary" onClick={() => setEditing('new')}><Plus size={16} /> Neuer Artikel</Button>}
+            <KoinBadge />
+          </div>
+        }
+      />
       <p className="mb-4 max-w-2xl text-sm text-slate-400">
         Profilbilder, Namensfarben, Effekte und Tags siehst du auf deinem Profil und in der Rangliste – alle anderen sehen sie auch.
         Designs ändern die Farben und den Hintergrund der ganzen Website, aber nur für dich.
@@ -109,6 +122,11 @@ export default function Shop() {
                     {item.kind === 'avatar' && AVATARS[item.id] && <span className="text-lg">{AVATARS[item.id]}</span>}
                     {item.active === false && <span className="rounded-full border border-white/15 px-2 py-0.5 text-[10px] text-slate-400">Nicht mehr im Shop</span>}
                     {item.required_role && <span className="tag tag-admin">{item.required_role === 'admin' ? 'Nur Admin' : 'Nur Mods'}</span>}
+                    {isAdmin && item.custom && (
+                      <button type="button" aria-label="Artikel bearbeiten" title="Bearbeiten" onClick={() => setEditing(item)} className="flex min-h-[36px] w-9 items-center justify-center rounded-lg text-slate-400 hover:text-white">
+                        <Pencil size={15} />
+                      </button>
+                    )}
                   </div>
                   {item.price > 0 && item.kind !== 'theme' && <p className="-mt-1 text-xs text-slate-500">{item.price >= 4000 ? 'Sehr selten' : item.price >= 1000 ? 'Selten' : ''}</p>}
                   {equipped ? (
@@ -130,6 +148,18 @@ export default function Shop() {
             })}
           </div>
         </>
+      )}
+
+      {editing && (
+        <ItemEditor
+          item={editing === 'new' ? null : editing}
+          onClose={() => setEditing(null)}
+          onSaved={(msg) => {
+            setEditing(null)
+            setMessage(msg)
+            void refreshCustomItems().then(() => Promise.all([shop.reload(), refreshProfile()]))
+          }}
+        />
       )}
 
       {confirm && (

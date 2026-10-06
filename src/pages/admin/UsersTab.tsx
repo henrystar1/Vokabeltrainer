@@ -19,7 +19,7 @@ import {
   adminSetBlocked,
   adminSetRole,
 } from '../../services/admin'
-import { adminGrantItem, adminListItems } from '../../services/koins'
+import { adminGrantItem, adminListItems, adminListUserItems, adminRevokeItem } from '../../services/koins'
 import type { AdminUser } from '../../types'
 
 type Confirm =
@@ -34,7 +34,7 @@ const ROLE_LABEL = { user: 'Nutzer', mod: 'Mod', alphamod: 'Alphamod', admin: 'A
 
 /** Benutzerverwaltung (nur Admins): Rollen, Sperren, Zurücksetzen, Speicher einsehen und löschen. */
 export default function UsersTab() {
-  const { user: me } = useAuth()
+  const { user: me, refreshProfile } = useAuth()
   const users = useAsync(adminListUsers, [])
   const [confirm, setConfirm] = useState<Confirm>(null)
   const [busy, setBusy] = useState(false)
@@ -45,6 +45,7 @@ export default function UsersTab() {
   const [ptsReason, setPtsReason] = useState('')
   const adjustments = useAsync(adminListPointAdjustments, [])
   const items = useAsync(adminListItems, [])
+  const userItems = useAsync(() => (confirm?.kind === 'gift' ? adminListUserItems(confirm.user.user_id) : Promise.resolve([])), [confirm?.kind, confirm?.kind === 'gift' ? confirm.user.user_id : ''])
   const [giftItem, setGiftItem] = useState('')
   const [giftEquip, setGiftEquip] = useState(true)
 
@@ -132,7 +133,7 @@ export default function UsersTab() {
                 <Plus size={15} /> Punkte ±
               </Button>
               <Button variant="secondary" className="!min-h-[40px] !px-3 text-sm" onClick={() => { setGiftItem(''); setGiftEquip(true); setConfirm({ kind: 'gift', user: u }) }}>
-                <Gift size={15} /> Artikel schenken
+                <Gift size={15} /> Artikel
               </Button>
               {!protectedUser && (
                 <>
@@ -179,7 +180,7 @@ export default function UsersTab() {
 
       {confirm && (
         <Modal
-          title={confirm.kind === 'gift' ? `Artikel schenken: ${confirm.user.display_name}` : confirm.kind === 'points' ? `Ranglistenpunkte: ${confirm.user.display_name}` : confirm.kind === 'reset' ? 'Fortschritt zurücksetzen?' : confirm.kind === 'delete' ? 'Konto löschen?' : 'Konto sperren?'}
+          title={confirm.kind === 'gift' ? `Artikel von ${confirm.user.display_name}` : confirm.kind === 'points' ? `Ranglistenpunkte: ${confirm.user.display_name}` : confirm.kind === 'reset' ? 'Fortschritt zurücksetzen?' : confirm.kind === 'delete' ? 'Konto löschen?' : 'Konto sperren?'}
           onClose={() => setConfirm(null)}
         >
           {confirm.kind === 'points' && (
@@ -215,6 +216,25 @@ export default function UsersTab() {
                 <input type="checkbox" className="h-4 w-4 accent-cyan-400" checked={giftEquip} onChange={(e) => setGiftEquip(e.target.checked)} />
                 Gleich anziehen (der Nutzer trägt es sofort)
               </label>
+              <div>
+                <p className="label-mono mb-2">Besitzt bereits</p>
+                {userItems.loading && !userItems.data && <p className="text-sm text-slate-500">Lädt …</p>}
+                {userItems.data?.length === 0 && <p className="text-sm text-slate-500">Noch keine Artikel.</p>}
+                <ul className="max-h-48 space-y-1 overflow-y-auto">
+                  {userItems.data?.map((it) => (
+                    <li key={it.item_id} className="flex min-h-[40px] items-center justify-between gap-2 rounded-lg bg-white/5 px-3 text-sm">
+                      <span className="truncate">{it.name} <span className="text-xs text-slate-500">{it.equipped ? '· getragen' : ''}</span></span>
+                      <button
+                        type="button"
+                        className="rounded-lg px-2 py-1 text-xs text-rose-300 hover:bg-rose-500/10"
+                        onClick={() => void adminRevokeItem(confirm.user.user_id, it.item_id).then(() => { userItems.reload(); if (confirm.user.user_id === me?.id) void refreshProfile() }).catch((e) => setError(errorMessage(e)))}
+                      >
+                        Entziehen
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              </div>
             </div>
           )}
           {confirm.kind !== 'points' && confirm.kind !== 'gift' && <Notice tone="warn">
@@ -236,7 +256,7 @@ export default function UsersTab() {
                 if (confirm.kind === 'reset') void run(() => adminResetProgress(u.user_id), `Fortschritt von ${u.display_name} zurückgesetzt.`)
                 if (confirm.kind === 'delete') void run(() => adminDeleteUser(u.user_id), `${u.display_name} wurde gelöscht.`)
                 if (confirm.kind === 'points') void run(async () => { await adminAdjustPoints(u.user_id, Number.parseInt(pts, 10), ptsReason); adjustments.reload() }, `${u.display_name}: ${Number.parseInt(pts, 10) > 0 ? '+' : ''}${pts} Punkte.`)
-                if (confirm.kind === 'gift') void run(() => adminGrantItem(u.user_id, giftItem, giftEquip), `${u.display_name} hat den Artikel bekommen${giftEquip ? ' und trägt ihn jetzt' : ''}.`)
+                if (confirm.kind === 'gift') void run(async () => { await adminGrantItem(u.user_id, giftItem, giftEquip); if (u.user_id === me?.id) await refreshProfile() }, `${u.display_name} hat den Artikel bekommen${giftEquip ? ' und trägt ihn jetzt' : ''}.`)
                 if (confirm.kind === 'block') void run(() => adminSetBlocked(u.user_id, true), `${u.display_name} ist gesperrt.`)
               }}
             >

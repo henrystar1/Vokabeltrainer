@@ -2,6 +2,7 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useState, t
 import type { Session, User } from '@supabase/supabase-js'
 import { supabase } from '../../lib/supabaseClient'
 import { loadProfile } from '../../services/settings'
+import { clearCustomItems, refreshCustomItems } from '../shop/custom'
 import type { Flair, Profile, Role } from '../../types'
 
 interface AuthState {
@@ -25,6 +26,8 @@ interface AuthState {
   cosmetics: Flair
   /** true, wenn der Benutzer seine Tags (Rolle und gekauftes Tag) ausgeblendet hat. */
   tagsHidden: boolean
+  /** true, wenn der Benutzer in „Wer ist da?“ nicht auftauchen will. */
+  hidePresence: boolean
   /** Ausgewähltes Design der ganzen Website. */
   themeId: string | null
   /** Lädt das Profil neu (z. B. nach Kauf/Auswahl im Shop). */
@@ -56,6 +59,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [profileReady, setProfileReady] = useState(false)
   const [cosmetics, setCosmetics] = useState<Flair>(NO_COSMETICS)
   const [tagsHidden, setTagsHidden] = useState(false)
+  const [hidePresence, setHidePresenceState] = useState(false)
   const [themeId, setThemeId] = useState<string | null>(null)
   const [recovering, setRecovering] = useState(false)
 
@@ -94,6 +98,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setRole(p.role)
     setBlocked(p.blocked)
     setTagsHidden(p.tags_hidden)
+    setHidePresenceState(p.hide_presence)
     setCosmetics({ avatar_id: p.avatar_id, color_id: p.color_id, effect_id: p.effect_id, tag_id: p.tags_hidden ? null : p.tag_id, theme_id: p.theme_id, role: p.tags_hidden ? 'user' : p.role })
     setThemeId(p.theme_id)
   }, [])
@@ -117,6 +122,26 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const p = await loadProfile(userId)
     if (p) applyProfile(p)
   }, [userId, applyProfile])
+
+  // Eigene Artikel laden; Profil nachladen, wenn man zur Seite zurückkehrt (z. B. nach einem Geschenk eines Admins).
+  useEffect(() => {
+    if (!userId) {
+      clearCustomItems()
+      return
+    }
+    void refreshCustomItems()
+    const onVisible = () => {
+      if (document.visibilityState !== 'visible') return
+      void refreshProfile().catch(() => undefined)
+      void refreshCustomItems()
+    }
+    document.addEventListener('visibilitychange', onVisible)
+    const t = window.setInterval(onVisible, 60_000)
+    return () => {
+      document.removeEventListener('visibilitychange', onVisible)
+      window.clearInterval(t)
+    }
+  }, [userId, refreshProfile])
 
   const signIn = useCallback(async (email: string, password: string) => {
     const { error } = await supabase.auth.signInWithPassword({ email: email.trim(), password })
@@ -162,6 +187,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       profileReady,
       cosmetics,
       tagsHidden,
+      hidePresence,
       themeId,
       refreshProfile,
       recovering,
@@ -172,7 +198,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setNewPassword,
       setDisplayNameLocal: setDisplayName,
     }),
-    [loading, session, displayName, role, blocked, profileReady, cosmetics, tagsHidden, themeId, refreshProfile, recovering, signIn, signUp, signOut, sendReset, setNewPassword],
+    [loading, session, displayName, role, blocked, profileReady, cosmetics, tagsHidden, hidePresence, themeId, refreshProfile, recovering, signIn, signUp, signOut, sendReset, setNewPassword],
   )
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>
 }

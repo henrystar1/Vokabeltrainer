@@ -1,5 +1,5 @@
 import { supabase } from '../lib/supabaseClient'
-import type { AppSettings, OnlineUser, SentMessage, UserMessage, FeedbackItem, FeedbackKind, FeedbackStatus, KoinCode, LedgerEntry, RedeemResult, ShopItem } from '../types'
+import type { AppSettings, OnlineUser, SentMessage, UserMessage, FeedbackItem, FeedbackKind, FeedbackStatus, KoinCode, LedgerEntry, RedeemResult, ShopItem, ShopKind } from '../types'
 import { rpc } from './rpc'
 
 /** Guthaben, Codes, Shop, Feedback. */
@@ -126,3 +126,24 @@ export const adminSetStaffRights = (userId: string, r: Pick<StaffRights, 'books_
 export const adminSetStaffBook = (userId: string, bookId: string, allowed: boolean) => rpc<void>('admin_set_staff_book', { p_user: userId, p_book: bookId, p_allowed: allowed })
 export const adminSetStaffSetting = (userId: string, key: string, allowed: boolean) => rpc<void>('admin_set_staff_setting', { p_user: userId, p_key: key, p_allowed: allowed })
 export const adminResetStaffRights = (userId: string) => rpc<void>('admin_reset_staff_rights', { p_user: userId })
+
+/* ---------- Eigene Shop-Artikel ---------- */
+
+export const getCustomItems = () => rpc<import('../types').CustomItem[]>('get_custom_items')
+export interface SaveItemInput {
+  id: string | null
+  kind: ShopKind
+  name: string
+  price: number
+  requiredRole: 'mod' | 'admin' | null
+  style: Record<string, unknown> | null
+  svg: string | null
+  active: boolean
+}
+export const adminSaveItem = (i: SaveItemInput) =>
+  rpc<string>('admin_save_item', { p_id: i.id, p_kind: i.kind, p_name: i.name, p_price: i.price, p_required_role: i.requiredRole, p_style: i.style, p_svg: i.svg, p_active: i.active })
+export const adminDeleteItem = (id: string) => rpc<void>('admin_delete_item', { p_id: id })
+export interface UserItem { item_id: string; kind: ShopKind; name: string; equipped: boolean }
+export const adminListUserItems = (userId: string) => rpc<UserItem[]>('admin_list_user_items', { p_user: userId })
+export const adminRevokeItem = (userId: string, itemId: string) => rpc<void>('admin_revoke_item', { p_user: userId, p_item_id: itemId })
+export const setHidePresence = (hidden: boolean) => rpc<void>('set_hide_presence', { p_hidden: hidden })

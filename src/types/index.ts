@@ -61,6 +61,7 @@ export interface Profile extends Cosmetics {
   theme_id: string | null
   tag_id: string | null
   tags_hidden: boolean
+  hide_presence: boolean
 }
 
 export type ReviewStatus = 'open' | 'done' | 'dismissed'
@@ -283,6 +284,51 @@ export interface ShopItem {
   required_role: 'mod' | 'admin' | null
   /** false = nicht mehr im Shop, aber du besitzt es noch. */
   active?: boolean
+  /** Vom Admin angelegter Artikel (Aussehen steht in `style` bzw. `svg`). */
+  custom?: boolean
+  style?: Record<string, unknown> | null
+  svg?: string | null
+}
+
+/** Eigener Artikel, wie ihn alle Nutzer zum Darstellen brauchen. */
+export interface CustomItem {
+  id: string
+  kind: ShopKind
+  name: string
+  style: Record<string, unknown> | null
+  svg: string | null
+}
+
+export interface PresenceRow extends Flair {
+  user_id: string
+  display_name: string
+  last_seen_at: string
+  online: boolean
+}
+
+export interface CoinRow extends Flair {
+  rank: number
+  user_id: string
+  display_name: string
+  koins: number
+}
+
+export interface BoardPost {
+  id: string
+  title: string
+  body: string
+  status: 'planned' | 'doing' | 'done'
+  sort: number
+  updated_at: string
+}
+
+export interface GamblingWin {
+  id: number
+  display_name: string
+  bet: number
+  payout: number
+  jackpot: boolean
+  created_at: string
 }
 
 export interface LedgerEntry {

@@ -9,6 +9,8 @@ import { errorMessage } from '../lib/errors'
 import { useAsync } from '../lib/useAsync'
 import { getAppSettings } from '../services/koins'
 import { gamblingPlay } from '../services/play'
+import { getGamblingFeed } from '../services/social'
+import { lastSeenText } from './Presence'
 
 const SYMBOLS = ['🍒', '🍋', '🔔', '⭐', '💎', '🍀', '7️⃣']
 const QUICK = [1, 5, 10, 25, 50, 100]
@@ -20,6 +22,12 @@ export default function Gambling() {
   const wallet = useWallet()
   const settings = useAsync(getAppSettings, [])
   const maxBet = settings.data?.gambling_max_bet ?? 200
+  const feed = useAsync(getGamblingFeed, [])
+  useEffect(() => {
+    const t = window.setInterval(() => { if (document.visibilityState === 'visible') feed.reload() }, 15_000)
+    return () => window.clearInterval(t)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
   const [bet, setBet] = useState(10)
   const [reels, setReels] = useState<number[]>([0, 1, 2])
   const [spinning, setSpinning] = useState<boolean[]>([false, false, false])
@@ -59,6 +67,7 @@ export default function Gambling() {
       setError(errorMessage(e))
     } finally {
       setBusy(false)
+      feed.reload()
     }
   }
 
@@ -125,6 +134,19 @@ export default function Gambling() {
           <span className="mt-1 block text-xs opacity-80">Glücksspiel kostet im Schnitt Coins. Spiel nur, was du verschmerzen kannst.</span>
         </Notice>
       )}
+
+      <Card className="mt-5 space-y-2">
+        <p className="label-mono">Letzte Gewinne</p>
+        {feed.data?.length === 0 && <p className="text-sm text-slate-500">Noch hat niemand gewonnen.</p>}
+        <ul className="space-y-1">
+          {feed.data?.map((w) => (
+            <li key={w.id} className={`flex flex-wrap items-center justify-between gap-2 rounded-lg px-3 py-2 text-sm ${w.jackpot ? 'bg-amber-400/15 text-amber-200 ring-1 ring-amber-300/40' : 'bg-white/5 text-slate-200'}`}>
+              <span>{w.jackpot ? '🎰 JACKPOT! ' : '🎉 '}<b>{w.display_name}</b> gewinnt <b>{w.payout.toLocaleString('de-DE')}</b> Coins <span className="text-xs opacity-70">(Einsatz {w.bet})</span></span>
+              <span className="text-xs opacity-70">{lastSeenText(w.created_at)}</span>
+            </li>
+          ))}
+        </ul>
+      </Card>
     </div>
   )
 }

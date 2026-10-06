@@ -8,24 +8,26 @@ import { useAsync } from '../lib/useAsync'
 import { getLeaderboard } from '../services/stats'
 import type { LeaderboardPeriod } from '../types'
 import LeagueView from './LeagueView'
+import CoinBoard from './CoinBoard'
 
-const PERIODS: Array<{ id: LeaderboardPeriod | 'league'; label: string }> = [
+const PERIODS: Array<{ id: LeaderboardPeriod | 'league' | 'coins'; label: string }> = [
   { id: 'week', label: 'Woche' },
   { id: 'month', label: 'Monat' },
   { id: 'all', label: 'Gesamt' },
   { id: 'league', label: 'Liga' },
+  { id: 'coins', label: 'Coins' },
 ]
 
 const MEDAL = ['text-amber-300', 'text-slate-300', 'text-orange-400']
 
 export default function Leaderboard() {
-  const [period, setPeriod] = useState<LeaderboardPeriod | 'league'>('week')
-  const board = useAsync(() => (period === 'league' ? Promise.resolve([]) : getLeaderboard(period)), [period])
+  const [period, setPeriod] = useState<LeaderboardPeriod | 'league' | 'coins'>('week')
+  const board = useAsync(() => (period === 'league' || period === 'coins' ? Promise.resolve([]) : getLeaderboard(period)), [period])
 
   return (
     <div>
       <PageHeader eyebrow="Wettkampf" title="Rangliste" />
-      <div role="tablist" className="glass mb-4 inline-flex rounded-xl p-1">
+      <div role="tablist" className="glass mb-4 inline-flex flex-wrap rounded-xl p-1">
         {PERIODS.map((p) => (
           <button
             key={p.id}
@@ -42,7 +44,8 @@ export default function Leaderboard() {
       </div>
 
       {period === 'league' && <LeagueView />}
-      {period !== 'league' && (<>
+      {period === 'coins' && <CoinBoard />}
+      {period !== 'league' && period !== 'coins' && (<>
       {board.loading && !board.data && <Spinner />}
       {board.error && <ErrorBox message={board.error} onRetry={board.reload} />}
       {board.data && board.data.length === 0 && <EmptyState title="Noch niemand auf der Rangliste" text="Starte eine Lernrunde, um Punkte zu sammeln." />}

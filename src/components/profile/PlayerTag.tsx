@@ -2,11 +2,26 @@ import { AVATARS, EFFECT_CLASSES, ROLE_TAGS, TAGS, nameColorStyle, themeFrameCol
 import BikeSvg from '../../features/shop/Bike'
 import { FrogMini } from '../../features/shop/Frog'
 import AnimatedAvatar, { isAnimatedAvatar } from '../../features/shop/AnimatedAvatar'
+import { customEffect, customTag, getCustom, svgDataUrl, useCustomVersion } from '../../features/shop/custom'
 import type { Flair, Role } from '../../types'
 
 /** Profilbild: animiertes Bild oder Emoji aus dem Shop, sonst Anfangsbuchstabe. */
 export function Avatar({ name, avatarId, colorId, size = 32 }: { name: string; avatarId?: string | null; colorId?: string | null; size?: number }) {
+  useCustomVersion()
   if (avatarId && isAnimatedAvatar(avatarId)) return <AnimatedAvatar id={avatarId} size={size} />
+  const own = avatarId ? getCustom(avatarId) : undefined
+  if (own?.svg) {
+    return (
+      <img
+        src={svgDataUrl(own.svg)}
+        alt=""
+        aria-hidden
+        draggable={false}
+        className="shrink-0 rounded-full bg-space-600 object-cover"
+        style={{ width: size, height: size }}
+      />
+    )
+  }
   const emoji = avatarId ? AVATARS[avatarId] : undefined
   const ring = nameColorStyle(colorId).style
   const ringColor = ring.color ?? (ring.backgroundImage ? 'rgb(var(--c-violet))' : undefined)
@@ -44,6 +59,7 @@ function PianoName({ name, className }: { name: string; className: string }) {
 
 /** Name mit gekaufter Farbe und gekauftem Effekt. */
 export function StyledName({ name, colorId, effectId, className = '' }: { name: string; colorId?: string | null; effectId?: string | null; className?: string }) {
+  useCustomVersion()
   if (effectId === 'effect_piano') return <PianoName name={name} className={className} />
   const { className: c, style } = nameColorStyle(colorId)
   if (effectId === 'effect_bike' || effectId === 'effect_frog') {
@@ -59,6 +75,15 @@ export function StyledName({ name, colorId, effectId, className = '' }: { name: 
         ) : (
           <span aria-hidden className="bk-name-rider"><BikeSvg /></span>
         )}
+      </span>
+    )
+  }
+  const ownFx = effectId && !EFFECT_CLASSES[effectId] ? getCustom(effectId) : undefined
+  if (ownFx && ownFx.kind === 'effect') {
+    const e = customEffect(ownFx)
+    return (
+      <span className={`${c} ${e.className} ${className}`} style={{ ...style, ...e.style }}>
+        {name}
       </span>
     )
   }
@@ -84,12 +109,16 @@ export function StyledName({ name, colorId, effectId, className = '' }: { name: 
 /** Rollen-Tag (Mod/Admin) und gekaufter Spender-Tag. */
 export function Tags({ role, tagId }: { role?: Role; tagId?: string | null }) {
   const r = role ? ROLE_TAGS[role] : undefined
+  useCustomVersion()
   const t = tagId ? TAGS[tagId] : undefined
-  if (!r && !t) return null
+  const own = tagId && !t ? getCustom(tagId) : undefined
+  const ownTag = own && own.kind === 'tag' ? customTag(own) : undefined
+  if (!r && !t && !ownTag) return null
   return (
     <span className="flex shrink-0 items-center gap-1">
       {r && <span className={`tag ${r.className}`}>{r.label}</span>}
       {t && <span className={`tag ${t.className}`}>{t.label}</span>}
+      {ownTag && <span className={`tag ${ownTag.className}`} style={ownTag.style}>{ownTag.label}</span>}
     </span>
   )
 }

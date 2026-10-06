@@ -161,3 +161,44 @@ body {
 
 /* Ältere Chat-Beiträge: Animationen anhalten, damit viele Nachrichten flüssig bleiben. */
 .av-still, .av-still *, .av-still *::before, .av-still *::after { animation-play-state: paused !important; }
+
+/* ---------- Kurze Tags ---------- */
+.tag-gg { color: #e0f2fe; border: 1px solid rgb(125 211 252 / 0.6); background: rgb(14 165 233 / 0.16); }
+.tag-hot { color: #fff; background: linear-gradient(90deg, #ef4444, #f97316); box-shadow: 0 0 8px rgb(249 115 22 / 0.6); }
+.tag-vip { color: #1a1000; background: linear-gradient(90deg, #fde68a, #f59e0b); box-shadow: 0 0 8px rgb(245 158 11 / 0.55); }
+.tag-og { color: #fff; border: 1px solid rgb(244 114 182 / 0.7); background: rgb(190 24 93 / 0.35); }
+.tag-star { color: #fde047; border: 1px solid rgb(253 224 71 / 0.6); background: rgb(161 98 7 / 0.3); text-shadow: 0 0 6px rgb(253 224 71 / 0.8); }
+.tag-pro { color: #031a20; background: linear-gradient(90deg, #22d3ee, #34d399); box-shadow: 0 0 9px rgb(52 211 153 / 0.55); }
+.tag-mvp { color: #fff; background: linear-gradient(90deg, #7c3aed, #db2777); box-shadow: 0 0 11px rgb(219 39 119 / 0.55); }
+.tag-elite { color: #1a1000; background: linear-gradient(100deg, #94a3b8, #f8fafc 35%, #cbd5e1 55%, #f8fafc 75%, #94a3b8); background-size: 200% 100%; animation: tag-gold 3.2s linear infinite; box-shadow: 0 0 12px rgb(226 232 240 / 0.6); }
+
+/* ---------- Eigene Tags, Farben und Effekte (vom Admin im Shop angelegt) ---------- */
+.tagc-shine { animation: tag-gold 3s linear infinite; }
+.tagc-rainbow { animation: fx-rainbow 2.4s linear infinite; }
+.cname-run { animation: fx-rainbow 3s linear infinite; }
+.fxc-glow { filter: drop-shadow(0 0 7px var(--fxc)); }
+.fxc-neon { filter: drop-shadow(0 0 2px #fff) drop-shadow(0 0 8px var(--fxc)) drop-shadow(0 0 16px var(--fxc)); }
+.fxc-pulse { display: inline-block; animation: fxc-pulse var(--fxs) ease-in-out infinite; filter: drop-shadow(0 0 5px var(--fxc)); }
+.fxc-float { display: inline-block; animation: fxc-float var(--fxs) ease-in-out infinite; }
+.fxc-shimmer { animation: fxc-shimmer var(--fxs) ease-in-out infinite; filter: drop-shadow(0 0 4px var(--fxc)); }
+.fxc-rainbow { background: linear-gradient(90deg, #f43f5e, #f59e0b, #84cc16, #22d3ee, #8b5cf6, #f43f5e) 0 0 / 200% 100%; -webkit-background-clip: text; background-clip: text; color: transparent; animation: fx-rainbow var(--fxs) linear infinite; }
+@keyframes fxc-pulse { 50% { transform: scale(1.08); filter: drop-shadow(0 0 11px var(--fxc)); } }
+@keyframes fxc-float { 50% { transform: translateY(-2px); } }
+@keyframes fxc-shimmer { 50% { opacity: 0.55; filter: drop-shadow(0 0 10px var(--fxc)); } }
+
+/* ---------- Designs mit Knopf-Effekt: Glanz oder durchlaufender Regenbogen ---------- */
+[data-fx] .btn-fx, [data-fx] .btn-primary { position: relative; overflow: hidden; }
+[data-fx='shine'] .btn-fx::after, [data-fx='shine'] .btn-primary::after {
+  content: ''; position: absolute; inset: 0; pointer-events: none;
+  background: linear-gradient(105deg, transparent 34%, rgb(255 255 255 / 0.6) 50%, transparent 66%);
+  transform: translateX(-130%); animation: btn-shine 2.8s ease-in-out infinite;
+}
+[data-fx='shine'] .btn-primary { background-image: linear-gradient(135deg, #fde68a, #f59e0b 55%, #fbbf24); color: #2a1a00; box-shadow: 0 0 18px rgb(251 191 36 / 0.55); }
+[data-fx='rainbow'] .btn-fx {
+  background: linear-gradient(90deg, #f43f5e, #f59e0b, #84cc16, #22d3ee, #8b5cf6, #f43f5e) 0 0 / 200% 100%;
+  animation: fx-rainbow 3s linear infinite; color: #fff; border-color: transparent; text-shadow: 0 1px 2px rgb(0 0 0 / 0.45);
+}
+@keyframes btn-shine { 0%, 55% { transform: translateX(-130%); } 100% { transform: translateX(130%); } }
+@media (prefers-reduced-motion: reduce) {
+  .tagc-shine, .tagc-rainbow, .cname-run, .fxc-pulse, .fxc-float, .fxc-shimmer, .fxc-rainbow, .tag-elite, [data-fx] .btn-fx, [data-fx] .btn-fx::after { animation: none; }
+}

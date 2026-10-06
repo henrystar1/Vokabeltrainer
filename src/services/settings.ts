@@ -38,7 +38,7 @@ export async function loadDisplayName(userId: string): Promise<string | null> {
 export async function loadProfile(userId: string): Promise<Profile | null> {
   const { data, error } = await supabase
     .from('profiles')
-    .select('display_name,role,blocked,avatar_id,color_id,effect_id,theme_id,tag_id,tags_hidden')
+    .select('display_name,role,blocked,avatar_id,color_id,effect_id,theme_id,tag_id,tags_hidden,hide_presence')
     .eq('id', userId)
     .maybeSingle()
   if (error) throw error
@@ -53,5 +53,6 @@ export async function loadProfile(userId: string): Promise<Profile | null> {
     theme_id: (data.theme_id as string | null) ?? null,
     tag_id: (data.tag_id as string | null) ?? null,
     tags_hidden: Boolean(data.tags_hidden),
+    hide_presence: Boolean(data.hide_presence),
   }
 }

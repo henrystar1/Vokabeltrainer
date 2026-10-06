@@ -1,4 +1,4 @@
-import { BookOpen, MessageSquarePlus, ShoppingBag, UserCircle, Brain, ClipboardCheck, Home, Search, Settings, ShieldCheck, Trophy, BarChart3, Gamepad2, MessagesSquare, Target, Swords, Zap, ListChecks, Languages, ArrowLeftRight, Dices, type LucideIcon } from 'lucide-react'
+import { BookOpen, MessageSquarePlus, ShoppingBag, UserCircle, Brain, ClipboardCheck, Home, Search, Settings, ShieldCheck, Trophy, BarChart3, Gamepad2, MessagesSquare, Target, Swords, Zap, ListChecks, Languages, ArrowLeftRight, Dices, Users, Pin, type LucideIcon } from 'lucide-react'
 
 export interface NavItem {
   to: string
@@ -15,7 +15,10 @@ export interface NavGroup {
 const g = (title: string, items: NavItem[]): NavGroup => ({ title, items })
 
 export const NAV_GROUPS: NavGroup[] = [
-  g('', [{ to: '/', label: 'Start', icon: Home }]),
+  g('', [
+    { to: '/', label: 'Start', icon: Home },
+    { to: '/brett', label: 'Schwarzes Brett', icon: Pin },
+  ]),
   g('Lernen', [
     { to: '/buecher', label: 'Bücher', icon: BookOpen },
     { to: '/lernen', label: 'Lernen', icon: Brain },
@@ -36,6 +39,7 @@ export const NAV_GROUPS: NavGroup[] = [
     { to: '/spiele', label: 'Spiele', icon: Gamepad2 },
     { to: '/gambling', label: 'Gambling', icon: Dices },
     { to: '/chat', label: 'Chat', icon: MessagesSquare },
+    { to: '/online', label: 'Wer ist da?', icon: Users },
     { to: '/shop', label: 'Shop', icon: ShoppingBag },
   ]),
   g('Konto', [

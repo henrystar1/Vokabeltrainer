@@ -60,8 +60,30 @@ export default function RulesTab({ perms }: { perms: MyPermissions }) {
                 </div>
               ))}
             </div>
+            {s.title === 'Gambling' && <GamblingValue value={(k) => { const d = Number.parseInt(draft[k] ?? '', 10); return Number.isInteger(d) && d >= 0 ? d : (settings.data?.[k] ?? 0) }} />}
           </Card>
         ))}
+    </div>
+  )
+}
+
+/** Rückfluss je 1000 Coins Einsatz: Gewinnchance × Faktor + Jackpot-Chance × Jackpot-Faktor (Chancen in ‰). */
+function GamblingValue({ value }: { value: (key: string) => number }) {
+  const win = Math.min(value('gambling_win_permille'), 1000)
+  const jack = Math.min(value('gambling_jackpot_permille'), 1000)
+  const back = win * value('gambling_mult_win') + jack * value('gambling_mult_jackpot')
+  const tone = back < 1000 ? 'border-emerald-400/40 bg-emerald-500/10 text-emerald-200' : back === 1000 ? 'border-amber-300/40 bg-amber-500/10 text-amber-200' : 'border-rose-400/40 bg-rose-500/10 text-rose-200'
+  const text =
+    back < 1000
+      ? `Verlust für die Spieler: Von 1000 Coins Einsatz kommen im Schnitt nur ${back} zurück, die Seite behält ${1000 - back}.`
+      : back === 1000
+        ? 'Genau fair: Im Schnitt kommt der Einsatz komplett zurück.'
+        : `Gewinn für die Spieler: Von 1000 Coins Einsatz kommen im Schnitt ${back} zurück – die Spieler verdienen ${back - 1000} je 1000 Coins, die Coin-Menge wächst.`
+  return (
+    <div className={`rounded-xl border px-4 py-3 text-sm ${tone}`} aria-live="polite">
+      <p className="font-mono text-lg font-semibold">Aktueller Wert: {back}</p>
+      <p className="mt-1">{text}</p>
+      <p className="mt-1 text-xs opacity-80">Unter 1000 = Verlust, ab 1000 = fair oder Gewinn. Der Wert rechnet schon mit, was du gerade eintippst (vor dem Speichern).</p>
     </div>
   )
 }

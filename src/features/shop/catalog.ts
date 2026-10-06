@@ -1,5 +1,6 @@
 import type { CSSProperties } from 'react'
 import type { Role, ShopKind } from '../../types'
+import { customNameColor, customTheme, getCustom } from './custom'
 
 /**
  * Aussehen der Shop-Artikel. Die Datenbank kennt nur ID, Name und Preis;
@@ -70,6 +71,14 @@ export const TAGS: Record<string, { label: string; className: string }> = {
   tag_master: { label: 'Master Spender', className: 'tag-master' },
   tag_legend: { label: 'Legende', className: 'tag-legend' },
   tag_king: { label: 'Coin-König', className: 'tag-king' },
+  tag_gg: { label: 'GG', className: 'tag-gg' },
+  tag_hot: { label: 'HOT', className: 'tag-hot' },
+  tag_vip: { label: 'VIP', className: 'tag-vip' },
+  tag_og: { label: 'OG', className: 'tag-og' },
+  tag_star: { label: '★', className: 'tag-star' },
+  tag_pro: { label: 'PRO', className: 'tag-pro' },
+  tag_mvp: { label: 'MVP', className: 'tag-mvp' },
+  tag_elite: { label: 'ELITE', className: 'tag-elite' },
 }
 
 /** Automatische Rollen-Tags (nicht kaufbar). */
@@ -82,12 +91,23 @@ export const ROLE_TAGS: Partial<Record<Role, { label: string; className: string 
 /** Rahmenfarbe um den Namen in der Rangliste = Hauptfarbe des gewählten Designs (Standarddesign: kein Rahmen). */
 export function themeFrameColor(themeId: string | null | undefined): string | null {
   if (!themeId || themeId === DEFAULT_THEME) return null
-  return THEMES[themeId]?.cyan ?? null
+  return resolveTheme(themeId)?.cyan ?? null
+}
+
+/** Eingebautes oder eigenes Design nach ID. */
+export function resolveTheme(themeId: string | null | undefined): ThemePalette | undefined {
+  if (!themeId) return undefined
+  if (THEMES[themeId]) return THEMES[themeId]
+  const c = getCustom(themeId)
+  return c && c.kind === 'theme' ? customTheme(c) : undefined
 }
 
 export function nameColorStyle(colorId: string | null | undefined): { className: string; style: CSSProperties } {
   const c = colorId ? NAME_COLORS[colorId] : undefined
-  if (!c) return { className: '', style: {} }
+  if (!c) {
+    const own = getCustom(colorId)
+    return own && own.kind === 'color' ? customNameColor(own) : { className: '', style: {} }
+  }
   if (c.gradient) return { className: 'bg-clip-text text-transparent', style: { backgroundImage: c.gradient } }
   return { className: '', style: { color: c.solid } }
 }
@@ -109,6 +129,8 @@ export interface ThemePalette {
   decorColors: string[]
   /** Vorschau-Verlauf im Shop. */
   preview: string
+  /** Sondereffekt für alle Knöpfe: Glanz oder durchlaufender Regenbogen. */
+  fx?: 'shine' | 'rainbow'
 }
 
 export const DEFAULT_THEME = 'theme_space'
@@ -173,6 +195,46 @@ export const THEMES: Record<string, ThemePalette> = {
     s950: '#0e0b04', s900: '#171207', s800: '#241c0a', s700: '#37290e', s600: '#4d3a14',
     cyan: '#fbbf24', violet: '#f59e0b', blue: '#fcd34d',
     decor: 'sparkles', decorColors: ['#fde68a', '#fbbf24'], preview: 'linear-gradient(135deg,#0e0b04,#4d3a14 55%,#fbbf24)',
+  },
+  theme_lava: {
+    s950: '#140503', s900: '#1f0a05', s800: '#2e0f08', s700: '#45170c', s600: '#5e2210',
+    cyan: '#fb923c', violet: '#ef4444', blue: '#fbbf24',
+    decor: 'sparkles', decorColors: ['#fb923c', '#ef4444', '#fde68a'], preview: 'linear-gradient(135deg,#140503,#5e2210 50%,#ef4444,#fb923c)',
+  },
+  theme_ice: {
+    s950: '#040d16', s900: '#07151f', s800: '#0b2230', s700: '#12354a', s600: '#1b4d69',
+    cyan: '#a5f3fc', violet: '#93c5fd', blue: '#e0f2fe',
+    decor: 'stars', decorColors: ['#e0f2fe', '#a5f3fc'], preview: 'linear-gradient(135deg,#040d16,#1b4d69 50%,#a5f3fc,#e0f2fe)',
+  },
+  theme_cyber: {
+    s950: '#0a0a02', s900: '#121204', s800: '#1c1c06', s700: '#2d2d0a', s600: '#444410',
+    cyan: '#facc15', violet: '#22d3ee', blue: '#f472b6',
+    decor: 'code', decorColors: ['#facc15', '#22d3ee'], preview: 'linear-gradient(135deg,#0a0a02,#444410 45%,#facc15,#22d3ee)',
+  },
+  theme_royal: {
+    s950: '#0b0618', s900: '#120a26', s800: '#1b1038', s700: '#2a1856', s600: '#3b2275',
+    cyan: '#fbbf24', violet: '#a78bfa', blue: '#f0abfc',
+    decor: 'sparkles', decorColors: ['#fbbf24', '#c4b5fd'], preview: 'linear-gradient(135deg,#0b0618,#3b2275 50%,#a78bfa,#fbbf24)',
+  },
+  theme_mint: {
+    s950: '#03130f', s900: '#061d17', s800: '#0a2b23', s700: '#10413a', s600: '#185a50',
+    cyan: '#6ee7b7', violet: '#5eead4', blue: '#bef264',
+    decor: 'bubbles', decorColors: ['#a7f3d0', '#99f6e4'], preview: 'linear-gradient(135deg,#03130f,#185a50 50%,#6ee7b7,#bef264)',
+  },
+  theme_vapor: {
+    s950: '#0f0420', s900: '#190733', s800: '#260c4d', s700: '#3a1273', s600: '#521a9c',
+    cyan: '#22d3ee', violet: '#f472b6', blue: '#c084fc',
+    decor: 'bubbles', decorColors: ['#f472b6', '#22d3ee', '#c084fc'], preview: 'linear-gradient(135deg,#0f0420,#521a9c 45%,#f472b6,#22d3ee)',
+  },
+  theme_shine: {
+    s950: '#0c0a04', s900: '#161208', s800: '#231c0c', s700: '#382c12', s600: '#52411a',
+    cyan: '#fcd34d', violet: '#fbbf24', blue: '#fde68a', fx: 'shine',
+    decor: 'sparkles', decorColors: ['#fef3c7', '#fcd34d'], preview: 'linear-gradient(110deg,#0c0a04,#52411a 30%,#fff7d6 48%,#fcd34d 55%,#52411a 75%)',
+  },
+  theme_rainbow: {
+    s950: '#07060f', s900: '#0d0b1c', s800: '#161230', s700: '#231d4d', s600: '#322a70',
+    cyan: '#22d3ee', violet: '#e879f9', blue: '#facc15', fx: 'rainbow',
+    decor: 'confetti', decorColors: ['#f43f5e', '#f59e0b', '#84cc16', '#22d3ee', '#8b5cf6'], preview: 'linear-gradient(90deg,#f43f5e,#f59e0b,#84cc16,#22d3ee,#8b5cf6)',
   },
 }
 
