@@ -9,20 +9,22 @@ import { getLeaderboard } from '../services/stats'
 import type { LeaderboardPeriod } from '../types'
 import LeagueView from './LeagueView'
 import CoinBoard from './CoinBoard'
+import GamblingBoard from './GamblingBoard'
 
-const PERIODS: Array<{ id: LeaderboardPeriod | 'league' | 'coins'; label: string }> = [
+const PERIODS: Array<{ id: LeaderboardPeriod | 'league' | 'coins' | 'gambling'; label: string }> = [
   { id: 'week', label: 'Woche' },
   { id: 'month', label: 'Monat' },
   { id: 'all', label: 'Gesamt' },
   { id: 'league', label: 'Liga' },
   { id: 'coins', label: 'Coins' },
+  { id: 'gambling', label: 'Gambling' },
 ]
 
 const MEDAL = ['text-amber-300', 'text-slate-300', 'text-orange-400']
 
 export default function Leaderboard() {
-  const [period, setPeriod] = useState<LeaderboardPeriod | 'league' | 'coins'>('week')
-  const board = useAsync(() => (period === 'league' || period === 'coins' ? Promise.resolve([]) : getLeaderboard(period)), [period])
+  const [period, setPeriod] = useState<LeaderboardPeriod | 'league' | 'coins' | 'gambling'>('week')
+  const board = useAsync(() => (period === 'league' || period === 'coins' || period === 'gambling' ? Promise.resolve([]) : getLeaderboard(period)), [period])
 
   return (
     <div>
@@ -45,7 +47,8 @@ export default function Leaderboard() {
 
       {period === 'league' && <LeagueView />}
       {period === 'coins' && <CoinBoard />}
-      {period !== 'league' && period !== 'coins' && (<>
+      {period === 'gambling' && <GamblingBoard />}
+      {period !== 'league' && period !== 'coins' && period !== 'gambling' && (<>
       {board.loading && !board.data && <Spinner />}
       {board.error && <ErrorBox message={board.error} onRetry={board.reload} />}
       {board.data && board.data.length === 0 && <EmptyState title="Noch niemand auf der Rangliste" text="Starte eine Lernrunde, um Punkte zu sammeln." />}

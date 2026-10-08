@@ -1,5 +1,7 @@
 import type { ReactNode } from 'react'
 import { Navigate, Route, Routes } from 'react-router-dom'
+import { useLocks } from './features/locks/LocksProvider'
+import type { LockKey } from './services/koins'
 import { useAuth } from './features/auth/AuthProvider'
 import AppShell from './components/layout/AppShell'
 import RequireAuth from './components/layout/RequireAuth'
@@ -46,6 +48,13 @@ function StaffOnly({ children }: { children: ReactNode }) {
   return isStaff ? <>{children}</> : <Navigate to="/" replace />
 }
 
+/** Zeigt statt der Seite einen Hinweis, wenn der Admin die Funktion gerade abgeschaltet hat. */
+function Gate({ k, children }: { k: LockKey; children: ReactNode }) {
+  const { locked } = useLocks()
+  if (locked.has(k)) return <Placeholder title="Gerade deaktiviert" phase="Der Admin hat diese Funktion vorübergehend abgeschaltet." />
+  return <>{children}</>
+}
+
 export default function App() {
   if (!isSupabaseConfigured) return <ConfigMissing />
   return (
@@ -64,21 +73,21 @@ export default function App() {
           <Route path="suche" element={<Search />} />
           <Route path="lernen" element={<Learn />} />
           <Route path="test" element={<Test />} />
-          <Route path="spiele" element={<Games />} />
-          <Route path="gambling" element={<Gambling />} />
+          <Route path="spiele" element={<Gate k="games"><Games /></Gate>} />
+          <Route path="gambling" element={<Gate k="gambling"><Gambling /></Gate>} />
           <Route path="ueben" element={<Practice />} />
           <Route path="konjugieren" element={<Conjugate />} />
           <Route path="genus" element={<Gender />} />
-          <Route path="chat" element={<Chat />} />
+          <Route path="chat" element={<Gate k="chat"><Chat /></Gate>} />
           <Route path="online" element={<Presence />} />
           <Route path="brett" element={<Board />} />
-          <Route path="quests" element={<Quests />} />
-          <Route path="sprint" element={<Sprint />} />
-          <Route path="duell" element={<Duels />} />
-          <Route path="duell/:id" element={<DuelPlay />} />
+          <Route path="quests" element={<Gate k="quests"><Quests /></Gate>} />
+          <Route path="sprint" element={<Gate k="sprint"><Sprint /></Gate>} />
+          <Route path="duell" element={<Gate k="duels"><Duels /></Gate>} />
+          <Route path="duell/:id" element={<Gate k="duels"><DuelPlay /></Gate>} />
           <Route path="statistik" element={<Stats />} />
           <Route path="rangliste" element={<Leaderboard />} />
-          <Route path="shop" element={<Shop />} />
+          <Route path="shop" element={<Gate k="shop"><Shop /></Gate>} />
           <Route path="profil" element={<Profile />} />
           <Route path="feedback" element={<Feedback />} />
           <Route path="einstellungen" element={<Settings />} />

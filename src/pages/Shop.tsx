@@ -15,7 +15,7 @@ import { AVATARS, KIND_LABEL, TAGS, resolveTheme } from '../features/shop/catalo
 import { refreshCustomItems, useCustomVersion } from '../features/shop/custom'
 import { errorMessage } from '../lib/errors'
 import { useAsync } from '../lib/useAsync'
-import { buyItem, equipItem, getShop, unequipItem } from '../services/koins'
+import { adminSetItem, buyItem, equipItem, getMyPermissions, getShop, unequipItem } from '../services/koins'
 import type { ShopItem, ShopKind } from '../types'
 
 const KINDS: ShopKind[] = ['avatar', 'color', 'effect', 'tag', 'theme']
@@ -30,7 +30,10 @@ function Preview({ item, name, cosmetics }: { item: ShopItem; name: string; cosm
 }
 
 export default function Shop() {
-  const { displayName, cosmetics, themeId, refreshProfile, isAdmin } = useAuth()
+  const { displayName, cosmetics, themeId, refreshProfile, isAdmin, isStaff } = useAuth()
+  const perms = useAsync(() => (isStaff ? getMyPermissions() : Promise.resolve(null)), [isStaff])
+  const canPrice = isAdmin || perms.data?.shop === true
+  const [priceEdit, setPriceEdit] = useState<{ id: string; value: string } | null>(null)
   useCustomVersion()
   const [editing, setEditing] = useState<ShopItem | 'new' | null>(null)
   const wallet = useWallet()
@@ -58,6 +61,13 @@ export default function Shop() {
       setBusy(false)
       setConfirm(null)
     }
+  }
+
+  async function savePrice(item: ShopItem) {
+    const v = Number.parseInt((priceEdit?.value ?? '').replace(/\./g, ''), 10)
+    if (!Number.isInteger(v) || v < 0) { setError('Bitte einen Preis ab 0 eingeben.'); return }
+    await act(() => adminSetItem(item.id, v, item.active !== false), `Preis von „${item.name}“: ${v.toLocaleString('de-DE')} Coins.`)
+    setPriceEdit(null)
   }
 
   const equippedIn = (k: ShopKind) => (shop.data ?? []).find((i) => i.kind === k && i.equipped)
@@ -128,6 +138,18 @@ export default function Shop() {
                       </button>
                     )}
                   </div>
+                  {canPrice && (
+                    priceEdit?.id === item.id ? (
+                      <div className="flex items-center gap-2">
+                        <input autoFocus inputMode="numeric" value={priceEdit.value} onChange={(e) => setPriceEdit({ id: item.id, value: e.target.value.replace(/[^\d]/g, '') })}
+                          onKeyDown={(e) => { if (e.key === 'Enter') void savePrice(item); if (e.key === 'Escape') setPriceEdit(null) }}
+                          className="min-h-[40px] w-full min-w-0 rounded-lg border border-white/10 bg-space-900/70 px-3 text-sm" aria-label="Neuer Preis" />
+                        <Button variant="secondary" disabled={busy} onClick={() => void savePrice(item)}>OK</Button>
+                      </div>
+                    ) : (
+                      <button type="button" onClick={() => setPriceEdit({ id: item.id, value: String(item.price) })} className="self-start text-xs text-accent-cyan hover:underline">Preis ändern</button>
+                    )
+                  )}
                   {item.price > 0 && item.kind !== 'theme' && <p className="-mt-1 text-xs text-slate-500">{item.price >= 4000 ? 'Sehr selten' : item.price >= 1000 ? 'Selten' : ''}</p>}
                   {equipped ? (
                     <span className="inline-flex min-h-[44px] items-center justify-center gap-2 rounded-xl bg-accent-cyan/10 text-sm text-accent-cyan">

@@ -13,6 +13,7 @@ import {
   customNameColor,
   customTag,
   customTheme,
+  mixHex,
   safeHex,
   svgDataUrl,
 } from '../../features/shop/custom'
@@ -114,6 +115,9 @@ export default function ItemEditor({ item, onClose, onSaved }: { item: ShopItem 
   const [a3, setA3] = useState(typeof st.a3 === 'string' ? st.a3 : '#3b82f6')
   const [decor, setDecor] = useState(typeof st.decor === 'string' ? st.decor : 'stars')
   const [fx, setFx] = useState(typeof st.fx === 'string' ? st.fx : 'none')
+  const [quick, setQuick] = useState(!item)
+  const [qColor, setQColor] = useState('#2563eb')
+  const [qShine, setQShine] = useState(false)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [copied, setCopied] = useState(false)
@@ -122,11 +126,17 @@ export default function ItemEditor({ item, onClose, onSaved }: { item: ShopItem 
     if (kind === 'avatar') return null
     if (kind === 'color') return { colors, animate }
     if (kind === 'effect') return { preset, color: fxColor, speed: Number(speed) || 2 }
+    if (kind === 'tag' && quick) {
+      const n = parseInt(safeHex(qColor, '#2563eb').slice(1), 16)
+      const lum = (0.299 * ((n >> 16) & 255) + 0.587 * ((n >> 8) & 255) + 0.114 * (n & 255)) / 255
+      return { label, bg1: safeHex(qColor, '#2563eb'), bg2: mixHex(safeHex(qColor, '#2563eb'), '#000000', 0.38), fg: lum > 0.6 ? '#111827' : '#ffffff', anim: qShine ? 'shine' : 'none' }
+    }
     if (kind === 'tag') return { label, bg1, bg2, fg, anim }
     return { bg, a1, a2, a3, decor, fx: fx === 'none' ? null : fx }
-  }, [kind, colors, animate, preset, fxColor, speed, label, bg1, bg2, fg, anim, bg, a1, a2, a3, decor, fx])
+  }, [kind, colors, animate, preset, fxColor, speed, label, bg1, bg2, fg, anim, bg, a1, a2, a3, decor, fx, quick, qColor, qShine])
+  const itemName = name.trim() || (kind === 'tag' && quick ? label.trim() : '')
 
-  const preview: CustomItem = { id: 'preview', kind, name: name || 'Vorschau', style, svg: kind === 'avatar' ? svg : null }
+  const preview: CustomItem = { id: 'preview', kind, name: itemName || 'Vorschau', style, svg: kind === 'avatar' ? svg : null }
   const problem = kind === 'avatar' && svg.trim() ? svgProblem(svg) : null
 
   async function save() {
@@ -136,7 +146,7 @@ export default function ItemEditor({ item, onClose, onSaved }: { item: ShopItem 
       if (kind === 'avatar' && svgProblem(svg)) throw new Error(svgProblem(svg) ?? 'SVG ungültig.')
       const p = Number.parseInt(price, 10)
       if (!Number.isInteger(p) || p < 0) throw new Error('Bitte einen Preis ab 0 eingeben.')
-      await adminSaveItem({ id: item?.id ?? null, kind, name: name.trim(), price: p, requiredRole: role || null, style, svg: kind === 'avatar' ? svg.trim() : null, active })
+      await adminSaveItem({ id: item?.id ?? null, kind, name: itemName, price: p, requiredRole: role || null, style, svg: kind === 'avatar' ? svg.trim() : null, active })
       onSaved(item ? 'Artikel gespeichert.' : 'Artikel angelegt – er steht jetzt im Shop.')
     } catch (e) {
       setError(errorMessage(e))
@@ -232,8 +242,26 @@ export default function ItemEditor({ item, onClose, onSaved }: { item: ShopItem 
           </>,
         )}
 
-        {kind === 'tag' && (
+        {kind === 'tag' && quick && (
           <div className="space-y-3">
+            <Notice tone="info">Schnell-Tag: nur Text und eine Farbe wählen – Verlauf und lesbare Schriftfarbe macht die Seite von allein. Der Name im Shop ist gleich dem Text.</Notice>
+            {row(
+              <>
+                <Field label="Text (höchstens 10 Zeichen)">
+                  <TextInput value={label} maxLength={10} onChange={(e) => setLabel(e.target.value)} placeholder="z. B. PROFI" />
+                </Field>
+                <Color label="Farbe" value={qColor} onChange={setQColor} />
+              </>,
+            )}
+            <label className="flex min-h-[44px] items-center gap-3 text-sm">
+              <input type="checkbox" className="h-4 w-4 accent-cyan-400" checked={qShine} onChange={(e) => setQShine(e.target.checked)} /> Glanz läuft darüber
+            </label>
+            <Button variant="ghost" onClick={() => setQuick(false)}>Mehr Einstellungen</Button>
+          </div>
+        )}
+        {kind === 'tag' && !quick && (
+          <div className="space-y-3">
+            {!item && <Button variant="ghost" onClick={() => setQuick(true)}>Zurück zum Schnell-Tag</Button>}
             {row(
               <>
                 <Field label="Text (höchstens 10 Zeichen)">
@@ -306,7 +334,7 @@ export default function ItemEditor({ item, onClose, onSaved }: { item: ShopItem 
           {item ? <Button variant="danger" disabled={busy} onClick={() => void remove()}>Löschen</Button> : <span />}
           <div className="flex gap-2">
             <Button variant="ghost" onClick={onClose}>Abbrechen</Button>
-            <Button busy={busy} disabled={!name.trim() || (kind === 'avatar' && (!svg.trim() || !!problem))} onClick={() => void save()}>Speichern</Button>
+            <Button busy={busy} disabled={!itemName || (kind === 'avatar' && (!svg.trim() || !!problem))} onClick={() => void save()}>Speichern</Button>
           </div>
         </div>
       </div>

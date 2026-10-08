@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState, type ReactNode } from 'react'
+import { useLocation } from 'react-router-dom'
 import { Mail, Trash2 } from 'lucide-react'
 import Button from '../../components/ui/Button'
 import Modal from '../../components/ui/Modal'
@@ -8,6 +9,10 @@ import { useAuth } from '../auth/AuthProvider'
 import { formatDateTime } from '../../lib/format'
 
 const INTERVAL_MS = 60_000
+/** Nachrichten vom Admin werden schneller abgeholt als der Online-Status gemeldet wird. */
+const MESSAGE_MS = 7_000
+/** Während dieser Seiten wird nichts eingeblendet (Sprint, Spiele, Duelle, Lernrunden); danach erscheint die Nachricht. */
+const BUSY_PATHS = [/^\/sprint/, /^\/spiele/, /^\/gambling/, /^\/duell\/.+/, /^\/lernen/, /^\/test/, /^\/ueben/, /^\/konjugieren/, /^\/genus/]
 
 /**
  * Meldet jede Minute "ich bin online" (nur Admins sehen das) und holt Nachrichten vom Admin ab.
@@ -17,13 +22,20 @@ export default function PresenceProvider({ children }: { children: ReactNode }) 
   const { user, profileReady, blocked } = useAuth()
   const userId = user?.id
   const [messages, setMessages] = useState<UserMessage[]>([])
+  const { pathname } = useLocation()
+  const busyNow = BUSY_PATHS.some((r) => r.test(pathname))
+
+  const fetchMessages = useCallback(async () => {
+    if (document.visibilityState !== 'visible') return
+    const m = await getUnreadMessages().catch(() => null)
+    if (m) setMessages((prev) => (prev.length === m.length && prev.every((p, i) => p.id === m[i].id) ? prev : m))
+  }, [])
 
   const tick = useCallback(async () => {
     if (document.visibilityState !== 'visible') return
     await sendHeartbeat().catch(() => undefined)
-    const m = await getUnreadMessages().catch(() => null)
-    if (m) setMessages((prev) => (prev.length === m.length && prev.every((p, i) => p.id === m[i].id) ? prev : m))
-  }, [])
+    await fetchMessages()
+  }, [fetchMessages])
 
   useEffect(() => {
     if (!userId || !profileReady || blocked) {
@@ -32,12 +44,14 @@ export default function PresenceProvider({ children }: { children: ReactNode }) 
     }
     void tick()
     const timer = window.setInterval(() => void tick(), INTERVAL_MS)
+    const fast = window.setInterval(() => void fetchMessages(), MESSAGE_MS)
     document.addEventListener('visibilitychange', tick)
     return () => {
       window.clearInterval(timer)
+      window.clearInterval(fast)
       document.removeEventListener('visibilitychange', tick)
     }
-  }, [userId, profileReady, blocked, tick])
+  }, [userId, profileReady, blocked, tick, fetchMessages])
 
   async function confirm() {
     const ids = messages.map((m) => m.id)
@@ -60,7 +74,7 @@ export default function PresenceProvider({ children }: { children: ReactNode }) 
   return (
     <>
       {children}
-      {messages.length > 0 && (
+      {messages.length > 0 && !busyNow && (
         <Modal title={messages.length === 1 ? 'Nachricht' : `${messages.length} Nachrichten`} onClose={() => void confirm()}>
           <div className="space-y-3">
             {messages.map((m) => (

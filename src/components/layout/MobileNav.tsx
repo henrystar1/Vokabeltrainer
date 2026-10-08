@@ -5,6 +5,7 @@ import { navGroupsFor, navItemsFor } from '../../lib/navigation'
 import { useChat } from '../../features/chat/ChatProvider'
 import KoinBadge from '../profile/KoinBadge'
 import { useAuth } from '../../features/auth/AuthProvider'
+import { useLocks } from '../../features/locks/LocksProvider'
 
 const PRIMARY = ['/', '/buecher', '/lernen', '/test']
 
@@ -13,8 +14,9 @@ export default function MobileNav() {
   const [open, setOpen] = useState(false)
   const { displayName, signOut, isStaff } = useAuth()
   const { unread } = useChat()
-  const NAV_ITEMS = navItemsFor(isStaff)
-  const groups = navGroupsFor(isStaff)
+  const { locked } = useLocks()
+  const NAV_ITEMS = navItemsFor(isStaff, locked)
+  const groups = navGroupsFor(isStaff, locked)
     .map((grp) => ({ ...grp, items: grp.items.filter((i) => !PRIMARY.includes(i.to)) }))
     .filter((grp) => grp.items.length > 0)
   const { pathname } = useLocation()

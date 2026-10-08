@@ -202,6 +202,28 @@ export default function Chat() {
     return [...new Set(names)].filter((n) => n !== displayName).slice(0, 5)
   }, [mention, messages, remote, displayName])
 
+  const COMMANDS = [
+    { cmd: '!pay', hint: 'Coins verschicken: !pay @Name 100' },
+    { cmd: '!whisper', hint: 'Heimlich schreiben: !whisper @Name Text' },
+  ]
+  const cmdSuggestions = /^![a-zäöü]*$/i.test(text) ? COMMANDS.filter((c) => c.cmd.startsWith(text.toLowerCase())) : []
+
+  function pickCommand(cmd: string) {
+    setText(`${cmd} `)
+    setMention(null)
+    requestAnimationFrame(() => {
+      const el = inputRef.current
+      el?.focus()
+      el?.setSelectionRange(cmd.length + 1, cmd.length + 1)
+    })
+  }
+
+  function onKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
+    if (e.key !== 'Tab' || e.shiftKey) return
+    if (cmdSuggestions.length > 0) { e.preventDefault(); pickCommand(cmdSuggestions[0].cmd) }
+    else if (mention && suggestions.length > 0) { e.preventDefault(); pick(suggestions[0]) }
+  }
+
   function onType(value: string, caret: number) {
     setText(value)
     const m = /@([^\s@]*)$/.exec(value.slice(0, caret))
@@ -324,6 +346,25 @@ export default function Chat() {
           )}
         </div>
         {error && <ErrorBox message={error} />}
+        {cmdSuggestions.length > 0 && (
+          <ul className="mb-2 flex flex-wrap gap-2" role="listbox" aria-label="Befehle vorschlagen">
+            {cmdSuggestions.map((c) => (
+              <li key={c.cmd}>
+                <button
+                  type="button"
+                  role="option"
+                  aria-selected={false}
+                  onMouseDown={(e) => e.preventDefault()}
+                  onClick={() => pickCommand(c.cmd)}
+                  className="min-h-[40px] rounded-full border border-accent-violet/40 bg-accent-violet/10 px-4 text-left text-sm text-slate-100 hover:bg-accent-violet/20"
+                >
+                  <span className="font-mono text-accent-cyan">{c.cmd}</span> <span className="text-xs text-slate-400">{c.hint.split(': ')[0]}</span>
+                </button>
+              </li>
+            ))}
+            <li className="self-center text-xs text-slate-500">Tab zum Übernehmen</li>
+          </ul>
+        )}
         {mention && suggestions.length > 0 && (
           <ul className="mb-2 flex flex-wrap gap-2" role="listbox" aria-label="Namen vorschlagen">
             {suggestions.map((n) => (
@@ -347,6 +388,7 @@ export default function Chat() {
             ref={inputRef}
             value={text}
             onChange={(e) => onType(e.target.value, e.target.selectionStart ?? e.target.value.length)}
+            onKeyDown={onKeyDown}
             maxLength={500}
             placeholder="Nachricht schreiben …"
             aria-label="Nachricht"

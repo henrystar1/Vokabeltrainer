@@ -1,4 +1,5 @@
 import { Trophy } from 'lucide-react'
+import { ManageButton } from '../components/admin/ManageUser'
 import CoinIcon from '../components/ui/CoinIcon'
 import PlayerTag from '../components/profile/PlayerTag'
 import Card from '../components/ui/Card'
@@ -34,6 +35,7 @@ export default function CoinBoard() {
                     {me && <span className="label-mono shrink-0 text-accent-cyan">Du</span>}
                   </span>
                   <span className="inline-flex items-center gap-1.5 font-mono text-amber-300"><CoinIcon size={14} /> {r.koins.toLocaleString('de-DE')}</span>
+                  <ManageButton userId={r.user_id} name={r.display_name} onChanged={board.reload} />
                 </li>
               )
             })}

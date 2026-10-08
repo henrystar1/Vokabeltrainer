@@ -1,5 +1,5 @@
 import { useState, type ReactNode } from 'react'
-import { Flag, Gift, KeyRound, MessageSquarePlus, Radio, ShieldCheck, SlidersHorizontal, Store, Ticket, UserCog, Users } from 'lucide-react'
+import { Flag, Gift, KeyRound, Power, MessageSquarePlus, Radio, ShieldCheck, SlidersHorizontal, Store, Ticket, UserCog, Users } from 'lucide-react'
 import PageHeader from '../components/ui/PageHeader'
 import { ErrorBox, Spinner } from '../components/ui/States'
 import { useAuth } from '../features/auth/AuthProvider'
@@ -7,6 +7,7 @@ import { useAsync } from '../lib/useAsync'
 import { getMyPermissions } from '../services/koins'
 import FeedbackTab from './admin/FeedbackTab'
 import { CodesSection, GrantSection, ItemsSection } from './admin/KoinsTab'
+import LocksTab from './admin/LocksTab'
 import ModRightsTab from './admin/ModRightsTab'
 import StaffRightsTab from './admin/StaffRightsTab'
 import OnlineTab from './admin/OnlineTab'
@@ -14,7 +15,7 @@ import ReviewsTab from './admin/ReviewsTab'
 import RulesTab from './admin/RulesTab'
 import UsersTab from './admin/UsersTab'
 
-type Tab = 'reviews' | 'feedback' | 'online' | 'users' | 'staff' | 'modrights' | 'rules' | 'shop' | 'codes' | 'grant'
+type Tab = 'reviews' | 'feedback' | 'online' | 'users' | 'staff' | 'modrights' | 'rules' | 'shop' | 'codes' | 'grant' | 'locks'
 interface TabDef { id: Tab; label: string; icon: ReactNode }
 interface Group { id: string; label: string; icon: ReactNode; tabs: TabDef[] }
 
@@ -55,7 +56,7 @@ export default function Admin() {
           tabs: [
             ...(p.settings ? [{ id: 'rules' as const, label: 'Zahlen', icon: <SlidersHorizontal size={15} /> }] : []),
             ...(p.shop ? [{ id: 'shop' as const, label: 'Shop-Preise', icon: <Store size={15} /> }] : []),
-            ...(isAdmin ? [{ id: 'codes' as const, label: 'Codes', icon: <Ticket size={15} /> }, { id: 'grant' as const, label: 'Coins schenken', icon: <Gift size={15} /> }] : []),
+            ...(isAdmin ? [{ id: 'codes' as const, label: 'Codes', icon: <Ticket size={15} /> }, { id: 'grant' as const, label: 'Coins schenken', icon: <Gift size={15} /> }, { id: 'locks' as const, label: 'Sperren', icon: <Power size={15} /> }] : []),
           ],
         }]
       : []),
@@ -102,6 +103,7 @@ export default function Admin() {
       {active === 'shop' && p?.shop && <ItemsSection />}
       {active === 'codes' && isAdmin && <CodesSection />}
       {active === 'grant' && isAdmin && <GrantSection />}
+      {active === 'locks' && isAdmin && <LocksTab />}
     </div>
   )
 }

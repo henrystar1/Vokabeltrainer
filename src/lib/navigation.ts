@@ -1,9 +1,12 @@
+import type { LockKey } from '../services/koins'
 import { BookOpen, MessageSquarePlus, ShoppingBag, UserCircle, Brain, ClipboardCheck, Home, Search, Settings, ShieldCheck, Trophy, BarChart3, Gamepad2, MessagesSquare, Target, Swords, Zap, ListChecks, Languages, ArrowLeftRight, Dices, Users, Pin, type LucideIcon } from 'lucide-react'
 
 export interface NavItem {
   to: string
   label: string
   icon: LucideIcon
+  /** Wenn der Admin diese Funktion sperrt, verschwindet der Eintrag. */
+  lock?: LockKey
 }
 
 export interface NavGroup {
@@ -29,18 +32,18 @@ export const NAV_GROUPS: NavGroup[] = [
     { to: '/suche', label: 'Suche', icon: Search },
   ]),
   g('Wettkampf', [
-    { to: '/quests', label: 'Quests', icon: Target },
-    { to: '/sprint', label: 'Sprint', icon: Zap },
-    { to: '/duell', label: 'Duelle', icon: Swords },
+    { lock: 'quests', to: '/quests', label: 'Quests', icon: Target },
+    { lock: 'sprint', to: '/sprint', label: 'Sprint', icon: Zap },
+    { lock: 'duels', to: '/duell', label: 'Duelle', icon: Swords },
     { to: '/rangliste', label: 'Rangliste', icon: Trophy },
     { to: '/statistik', label: 'Statistik', icon: BarChart3 },
   ]),
   g('Spaß', [
-    { to: '/spiele', label: 'Spiele', icon: Gamepad2 },
-    { to: '/gambling', label: 'Gambling', icon: Dices },
-    { to: '/chat', label: 'Chat', icon: MessagesSquare },
+    { lock: 'games', to: '/spiele', label: 'Spiele', icon: Gamepad2 },
+    { lock: 'gambling', to: '/gambling', label: 'Gambling', icon: Dices },
+    { lock: 'chat', to: '/chat', label: 'Chat', icon: MessagesSquare },
     { to: '/online', label: 'Wer ist da?', icon: Users },
-    { to: '/shop', label: 'Shop', icon: ShoppingBag },
+    { lock: 'shop', to: '/shop', label: 'Shop', icon: ShoppingBag },
   ]),
   g('Konto', [
     { to: '/profil', label: 'Profil', icon: UserCircle },
@@ -54,14 +57,15 @@ export const NAV_ITEMS: NavItem[] = NAV_GROUPS.flatMap((x) => x.items)
 /** Nur für Mods und Admins sichtbar. */
 export const STAFF_NAV_ITEM: NavItem = { to: '/verwaltung', label: 'Verwaltung', icon: ShieldCheck }
 
-/** Gruppierte Menüeinträge; für Mods/Admins steht „Verwaltung“ in der Gruppe „Konto“. */
-export function navGroupsFor(isStaff: boolean): NavGroup[] {
-  if (!isStaff) return NAV_GROUPS
-  return NAV_GROUPS.map((grp) =>
+/** Gruppierte Menüeinträge; für Mods/Admins steht „Verwaltung“ in der Gruppe „Konto“. Gesperrte Funktionen fehlen. */
+export function navGroupsFor(isStaff: boolean, locked: ReadonlySet<LockKey> = new Set()): NavGroup[] {
+  const base = NAV_GROUPS.map((grp) => ({ ...grp, items: grp.items.filter((i) => !i.lock || !locked.has(i.lock)) })).filter((grp) => grp.items.length > 0)
+  if (!isStaff) return base
+  return base.map((grp) =>
     grp.title === 'Konto' ? { ...grp, items: [grp.items[0], STAFF_NAV_ITEM, ...grp.items.slice(1)] } : grp,
   )
 }
 
-export function navItemsFor(isStaff: boolean): NavItem[] {
-  return navGroupsFor(isStaff).flatMap((x) => x.items)
+export function navItemsFor(isStaff: boolean, locked: ReadonlySet<LockKey> = new Set()): NavItem[] {
+  return navGroupsFor(isStaff, locked).flatMap((x) => x.items)
 }

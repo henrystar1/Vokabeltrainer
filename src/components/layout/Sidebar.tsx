@@ -4,6 +4,7 @@ import { useAuth } from '../../features/auth/AuthProvider'
 import KoinBadge from '../profile/KoinBadge'
 import PlayerTag from '../profile/PlayerTag'
 import { navGroupsFor } from '../../lib/navigation'
+import { useLocks } from '../../features/locks/LocksProvider'
 import { useChat } from '../../features/chat/ChatProvider'
 
 interface SidebarProps {
@@ -14,6 +15,7 @@ interface SidebarProps {
 export default function Sidebar({ collapsed, onToggle }: SidebarProps) {
   const { displayName, user, signOut, isStaff, cosmetics } = useAuth()
   const { unread } = useChat()
+  const { locked } = useLocks()
   return (
     <aside
       className={`glass fixed inset-y-0 left-0 z-30 hidden flex-col border-y-0 border-l-0 transition-[width] duration-300 ease-out md:flex ${
@@ -28,7 +30,7 @@ export default function Sidebar({ collapsed, onToggle }: SidebarProps) {
       </div>
 
       <nav className="mt-2 flex-1 overflow-y-auto px-3 pb-2">
-        {navGroupsFor(isStaff).map((grp, gi) => (
+        {navGroupsFor(isStaff, locked).map((grp, gi) => (
           <div key={grp.title || 'top'} className={gi > 0 ? 'mt-3' : ''}>
             {grp.title &&
               (collapsed ? (

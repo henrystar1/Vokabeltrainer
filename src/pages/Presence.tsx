@@ -1,4 +1,5 @@
 import { useEffect } from 'react'
+import { ManageButton } from '../components/admin/ManageUser'
 import PlayerTag from '../components/profile/PlayerTag'
 import Card from '../components/ui/Card'
 import PageHeader from '../components/ui/PageHeader'
@@ -39,6 +40,7 @@ export default function Presence() {
         {x.user_id === user?.id && <span className="label-mono text-accent-cyan">Du</span>}
       </span>
       <span className={`shrink-0 text-xs ${x.online ? 'text-emerald-300' : 'text-slate-500'}`}>{x.online ? 'online' : lastSeenText(x.last_seen_at)}</span>
+      <ManageButton userId={x.user_id} name={x.display_name} />
     </li>
   )
 

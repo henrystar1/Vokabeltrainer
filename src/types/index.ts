@@ -331,6 +331,18 @@ export interface GamblingWin {
   created_at: string
 }
 
+export interface GamblingRow extends Flair {
+  rank: number
+  user_id: string
+  display_name: string
+  plays: number
+  wagered: number
+  won: number
+  net: number
+  best_win: number
+  is_me: boolean
+}
+
 export interface LedgerEntry {
   id: number
   amount: number

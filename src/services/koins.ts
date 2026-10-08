@@ -147,3 +147,12 @@ export interface UserItem { item_id: string; kind: ShopKind; name: string; equip
 export const adminListUserItems = (userId: string) => rpc<UserItem[]>('admin_list_user_items', { p_user: userId })
 export const adminRevokeItem = (userId: string, itemId: string) => rpc<void>('admin_revoke_item', { p_user: userId, p_item_id: itemId })
 export const setHidePresence = (hidden: boolean) => rpc<void>('set_hide_presence', { p_hidden: hidden })
+
+// --- Funktionen sperren (Admin) ---
+export type LockKey = 'games' | 'gambling' | 'sprint' | 'duels' | 'chat' | 'shop' | 'quests'
+export interface LockRule { days: number[]; from: string; to: string }
+export interface FeatureLock { key: LockKey; off_until: string | null; rules: LockRule[]; note: string; locked_now: boolean }
+export const getLockedFeatures = () => rpc<LockKey[]>('get_locked_features')
+export const adminGetFeatureLocks = () => rpc<FeatureLock[]>('admin_get_feature_locks')
+export const adminSetFeatureLock = (key: LockKey, offUntil: string | null, rules: LockRule[], note: string) =>
+  rpc<void>('admin_set_feature_lock', { p_key: key, p_off_until: offUntil, p_rules: rules, p_note: note })

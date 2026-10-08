@@ -3,6 +3,7 @@ import { createRoot } from 'react-dom/client'
 import { BrowserRouter } from 'react-router-dom'
 import App from './App'
 import { AuthProvider } from './features/auth/AuthProvider'
+import { LocksProvider } from './features/locks/LocksProvider'
 import PresenceProvider from './features/presence/PresenceProvider'
 import { WalletProvider } from './features/koins/WalletProvider'
 import ThemeApplier from './features/shop/ThemeProvider'
@@ -16,9 +17,11 @@ createRoot(document.getElementById('root')!).render(
         <ThemeApplier />
         <WalletProvider>
           <SettingsProvider>
-            <PresenceProvider>
-              <App />
-            </PresenceProvider>
+            <LocksProvider>
+              <PresenceProvider>
+                <App />
+              </PresenceProvider>
+            </LocksProvider>
           </SettingsProvider>
         </WalletProvider>
       </AuthProvider>
