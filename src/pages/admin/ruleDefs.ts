@@ -58,6 +58,8 @@ export const SECTIONS: Array<{ title: string; text?: string; rules: Rule[] }> = 
     text: 'Was es für Aktionen an Coins gibt.',
     rules: [
       { key: 'book_price_default', label: 'Standardpreis für neu veröffentlichte Bücher' },
+      { key: 'copy_reward', label: 'Coins fürs Abschreiben einer Lektion' },
+      { key: 'copy_daily_max', label: 'Abschreib-Belohnungen pro Tag höchstens' },
       { key: 'learn_reward', label: 'Coins pro neu gelernter Vokabel (Online-Bücher)' },
       { key: 'learn_daily_cap', label: 'Lern-Coins pro Tag höchstens' },
       { key: 'review_reward', label: 'Coins für eine sinnvolle Fehlermeldung' },

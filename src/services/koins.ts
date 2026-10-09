@@ -156,3 +156,6 @@ export const getLockedFeatures = () => rpc<LockKey[]>('get_locked_features')
 export const adminGetFeatureLocks = () => rpc<FeatureLock[]>('admin_get_feature_locks')
 export const adminSetFeatureLock = (key: LockKey, offUntil: string | null, rules: LockRule[], note: string) =>
   rpc<void>('admin_set_feature_lock', { p_key: key, p_off_until: offUntil, p_rules: rules, p_note: note })
+
+export const claimCopyReward = (bookId: string, unit: number, count: number) =>
+  rpc<{ reward: number; reason: 'ok' | 'zu_kurz' | 'schon_heute' | 'tageslimit'; balance?: number }>('claim_copy_reward', { p_book_id: bookId, p_unit: unit, p_count: count })

@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react'
 import { Navigate, Route, Routes } from 'react-router-dom'
+import { PANIC_KEYS, usePanic } from './features/panic/panic'
 import { useLocks } from './features/locks/LocksProvider'
 import type { LockKey } from './services/koins'
 import { useAuth } from './features/auth/AuthProvider'
@@ -15,6 +16,7 @@ import ConfigMissing from './pages/ConfigMissing'
 import Dashboard from './pages/Dashboard'
 import ImportBook from './pages/ImportBook'
 import Leaderboard from './pages/Leaderboard'
+import Copy from './pages/Copy'
 import Learn from './pages/Learn'
 import Placeholder from './pages/Placeholder'
 import Feedback from './pages/Feedback'
@@ -51,6 +53,9 @@ function StaffOnly({ children }: { children: ReactNode }) {
 /** Zeigt statt der Seite einen Hinweis, wenn der Admin die Funktion gerade abgeschaltet hat. */
 function Gate({ k, children }: { k: LockKey; children: ReactNode }) {
   const { locked } = useLocks()
+  const panic = usePanic()
+  // Im Panik-Modus soll nichts auf die Seite hinweisen: einfach zurück zum Start.
+  if (panic && PANIC_KEYS.includes(k)) return <Navigate to="/" replace />
   if (locked.has(k)) return <Placeholder title="Gerade deaktiviert" phase="Der Admin hat diese Funktion vorübergehend abgeschaltet." />
   return <>{children}</>
 }
@@ -72,6 +77,7 @@ export default function App() {
           <Route path="buecher/:bookId/eingabe" element={<BookPage />} />
           <Route path="suche" element={<Search />} />
           <Route path="lernen" element={<Learn />} />
+          <Route path="abschreiben" element={<Copy />} />
           <Route path="test" element={<Test />} />
           <Route path="spiele" element={<Gate k="games"><Games /></Gate>} />
           <Route path="gambling" element={<Gate k="gambling"><Gambling /></Gate>} />

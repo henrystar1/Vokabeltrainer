@@ -1,5 +1,5 @@
 import { useState, type ReactNode } from 'react'
-import { Flag, Gift, KeyRound, Power, MessageSquarePlus, Radio, ShieldCheck, SlidersHorizontal, Store, Ticket, UserCog, Users } from 'lucide-react'
+import { Flag, Gift, KeyRound, UserPlus, Power, MessageSquarePlus, Radio, ShieldCheck, SlidersHorizontal, Store, Ticket, UserCog, Users } from 'lucide-react'
 import PageHeader from '../components/ui/PageHeader'
 import { ErrorBox, Spinner } from '../components/ui/States'
 import { useAuth } from '../features/auth/AuthProvider'
@@ -7,6 +7,7 @@ import { useAsync } from '../lib/useAsync'
 import { getMyPermissions } from '../services/koins'
 import FeedbackTab from './admin/FeedbackTab'
 import { CodesSection, GrantSection, ItemsSection } from './admin/KoinsTab'
+import AccountsTab from './admin/AccountsTab'
 import LocksTab from './admin/LocksTab'
 import ModRightsTab from './admin/ModRightsTab'
 import StaffRightsTab from './admin/StaffRightsTab'
@@ -15,7 +16,7 @@ import ReviewsTab from './admin/ReviewsTab'
 import RulesTab from './admin/RulesTab'
 import UsersTab from './admin/UsersTab'
 
-type Tab = 'reviews' | 'feedback' | 'online' | 'users' | 'staff' | 'modrights' | 'rules' | 'shop' | 'codes' | 'grant' | 'locks'
+type Tab = 'reviews' | 'feedback' | 'online' | 'users' | 'staff' | 'modrights' | 'rules' | 'shop' | 'codes' | 'grant' | 'locks' | 'accounts'
 interface TabDef { id: Tab; label: string; icon: ReactNode }
 interface Group { id: string; label: string; icon: ReactNode; tabs: TabDef[] }
 
@@ -43,6 +44,7 @@ export default function Admin() {
           icon: <Users size={16} />,
           tabs: [
             { id: 'users' as const, label: 'Benutzer', icon: <Users size={15} /> },
+            { id: 'accounts' as const, label: 'Konten anlegen', icon: <UserPlus size={15} /> },
             { id: 'staff' as const, label: 'Einzelne Mods', icon: <UserCog size={15} /> },
             { id: 'modrights' as const, label: 'Standard-Rechte', icon: <KeyRound size={15} /> },
           ],
@@ -97,6 +99,7 @@ export default function Admin() {
       {active === 'feedback' && <FeedbackTab />}
       {active === 'online' && isAdmin && <OnlineTab />}
       {active === 'users' && isAdmin && <UsersTab />}
+      {active === 'accounts' && isAdmin && <AccountsTab />}
       {active === 'staff' && isAdmin && <StaffRightsTab />}
       {active === 'modrights' && isAdmin && <ModRightsTab />}
       {active === 'rules' && p?.settings && <RulesTab perms={p} />}

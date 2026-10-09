@@ -13,6 +13,7 @@ import { errorMessage } from '../lib/errors'
 import { useAsync } from '../lib/useAsync'
 import { listLanguages } from '../services/books'
 import { updateDisplayName } from '../services/settings'
+import { setPanic, usePanic } from '../features/panic/panic'
 import { setHidePresence, setTagsHidden } from '../services/koins'
 
 function Toggle({ label, checked, onChange }: { label: string; checked: boolean; onChange: (v: boolean) => void }) {
@@ -27,6 +28,7 @@ function Toggle({ label, checked, onChange }: { label: string; checked: boolean;
 export default function Settings() {
   const { user, displayName, role, setDisplayNameLocal, signOut, tagsHidden, hidePresence, refreshProfile } = useAuth()
   const { settings, update } = useSettings()
+  const panic = usePanic()
   const languages = useAsync(listLanguages, [])
   const [name, setName] = useState(displayName ?? '')
   const [count, setCount] = useState(String(settings.words_per_round))
@@ -126,6 +128,11 @@ export default function Settings() {
         {message && <Notice tone="ok">{message}</Notice>}
         {error && <ErrorBox message={error} />}
 
+        {panic && (
+          <Card className="mb-4">
+            <Toggle label="Ausgeblendete Bereiche auf diesem Gerät wieder anzeigen" checked={false} onChange={(v) => { if (v) setPanic(false) }} />
+          </Card>
+        )}
         {tab === 'konto' && (
           <Card>
             <p className="label-mono mb-4">Profil</p>

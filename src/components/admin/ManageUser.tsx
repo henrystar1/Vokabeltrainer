@@ -7,7 +7,8 @@ import { ErrorBox, Notice } from '../ui/States'
 import { useAuth } from '../../features/auth/AuthProvider'
 import { errorMessage } from '../../lib/errors'
 import { useAsync } from '../../lib/useAsync'
-import { adminAdjustPoints } from '../../services/admin'
+import { randomPassword } from '../../pages/admin/AccountsTab'
+import { adminAdjustPoints, adminSetPassword } from '../../services/admin'
 import { adminGrantItem, adminGrantKoins, adminListItems, adminListUserItems, adminRevokeItem } from '../../services/koins'
 
 const MAX = 1_000_000_000
@@ -27,7 +28,7 @@ export function ManageButton({ userId, name, onChanged }: { userId: string; name
   )
 }
 
-type Tab = 'coins' | 'items' | 'points'
+type Tab = 'coins' | 'items' | 'points' | 'password'
 
 /** Schnellaktionen für eine Person: Coins buchen (auch sehr hohe Beträge auf einmal), Artikel schenken/entziehen, Punkte. */
 export default function ManageUser({ userId, name, onClose, onChanged }: { userId: string; name: string; onClose: () => void; onChanged?: () => void }) {
@@ -38,6 +39,7 @@ export default function ManageUser({ userId, name, onClose, onChanged }: { userI
   const [pts, setPts] = useState('')
   const [giftItem, setGiftItem] = useState('')
   const [equip, setEquip] = useState(true)
+  const [newPw, setNewPw] = useState('')
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [message, setMessage] = useState<string | null>(null)
@@ -63,7 +65,7 @@ export default function ManageUser({ userId, name, onClose, onChanged }: { userI
   const n = Number.parseInt(amount.replace(/\./g, ''), 10)
   const validAmount = Number.isInteger(n) && n !== 0 && Math.abs(n) <= MAX
   const p = Number.parseInt(pts, 10)
-  const tabs: Array<[Tab, string]> = [['coins', 'Coins'], ['items', 'Artikel'], ['points', 'Punkte']]
+  const tabs: Array<[Tab, string]> = [['coins', 'Coins'], ['items', 'Artikel'], ['points', 'Punkte'], ['password', 'Kennwort']]
 
   return (
     <Modal title={`${name} verwalten`} onClose={onClose}>
@@ -122,6 +124,18 @@ export default function ManageUser({ userId, name, onClose, onChanged }: { userI
         <div className="space-y-3">
           <Field label="Ranglistenpunkte" hint="Plus oder Minus."><TextInput inputMode="numeric" value={pts} onChange={(e) => setPts(e.target.value.replace(/[^\d-]/g, ''))} /></Field>
           <Button disabled={busy || !Number.isInteger(p) || p === 0} onClick={() => void run(() => adminAdjustPoints(userId, p, 'Schnellaktion'), `${name}: ${p > 0 ? '+' : ''}${p} Punkte.`)}>Buchen</Button>
+        </div>
+      )}
+
+      {tab === 'password' && (
+        <div className="space-y-3">
+          <Field label="Neues Kennwort (mindestens 6 Zeichen)" hint="Gilt sofort. Sag es der Person selbst, es wird nirgends gespeichert.">
+            <div className="flex gap-2">
+              <TextInput value={newPw} onChange={(e) => setNewPw(e.target.value)} className="font-mono" autoComplete="off" />
+              <Button variant="secondary" onClick={() => setNewPw(randomPassword())}>Erzeugen</Button>
+            </div>
+          </Field>
+          <Button disabled={busy || newPw.length < 6} onClick={() => void run(() => adminSetPassword(userId, newPw), `Neues Kennwort für ${name}: ${newPw}`)}>Kennwort setzen</Button>
         </div>
       )}
     </Modal>

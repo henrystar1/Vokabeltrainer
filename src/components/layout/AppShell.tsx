@@ -4,6 +4,7 @@ import Sidebar from './Sidebar'
 import MobileNav from './MobileNav'
 import StarField from '../ui/StarField'
 import { FocusProvider } from '../../features/koins/focusMode'
+import PanicButton from '../../features/panic/PanicButton'
 import { ChatProvider } from '../../features/chat/ChatProvider'
 
 export default function AppShell() {
@@ -25,6 +26,7 @@ export default function AppShell() {
             <Outlet />
           </div>
         </main>
+        <PanicButton />
         {!focus && <MobileNav />}
       </div>
     </FocusProvider>

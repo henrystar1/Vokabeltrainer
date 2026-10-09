@@ -9,7 +9,7 @@ Die App ist schon dafür vorbereitet: Der Pfad der Webseite richtet sich nach de
 1. supabase.com → **New project** (z. B. Name `vokabeltrainer-test`), Region wie beim echten Projekt.
 2. Warten, bis es bereit ist.
 3. **SQL Editor → New query**. Nacheinander (in dieser Reihenfolge, jede Datei komplett einfügen und **Run** drücken):
-   `0001_schema.sql`, `0002_functions.sql`, `0003_german_alts.sql`, `0004_roles_public_books.sql`, `0005_koins_shop.sql`, `0006_presence_messages_tags.sql`, `0007_league_quests_sprint_duels.sql`, `0008_chat.sql`, `0009_coins_pay_rules.sql`, `0010_sprint_coins_games_piano.sql`, `0011_alphamod_gambling_highscores.sql`, `0012_mod_rights_tags_gifts.sql`, `0013_per_staff_rights.sql`, `0014_shop_editor_board_presence.sql`, `0015_locks_gambling_stats_limits.sql`
+   `0001_schema.sql`, `0002_functions.sql`, `0003_german_alts.sql`, `0004_roles_public_books.sql`, `0005_koins_shop.sql`, `0006_presence_messages_tags.sql`, `0007_league_quests_sprint_duels.sql`, `0008_chat.sql`, `0009_coins_pay_rules.sql`, `0010_sprint_coins_games_piano.sql`, `0011_alphamod_gambling_highscores.sql`, `0012_mod_rights_tags_gifts.sql`, `0013_per_staff_rights.sql`, `0014_shop_editor_board_presence.sql`, `0015_locks_gambling_stats_limits.sql`, `0016_accounts_copy_items.sql`
    (Die Dateien liegen im Ordner `supabase/migrations`. Alle sind wiederholbar – doppeltes Ausführen schadet nicht.)
 4. **Project Settings → API**: Notiere die **Project URL** und den **Publishable key** (`sb_publishable_…`). Niemals den Secret-Key verwenden.
 

@@ -53,6 +53,7 @@ export const EFFECT_CLASSES: Record<string, string> = {
   effect_shimmer: 'fx-shimmer',
   effect_rainbow: 'fx-rainbow',
   effect_fire: 'fx-fire',
+  effect_zocker: 'fx-zocker',
   // Nur für Mods/Admins
   effect_mod_aura: 'fx-mod-aura',
   effect_mod_bolt: 'fx-mod-bolt',
@@ -130,7 +131,7 @@ export interface ThemePalette {
   /** Vorschau-Verlauf im Shop. */
   preview: string
   /** Sondereffekt für alle Knöpfe: Glanz oder durchlaufender Regenbogen. */
-  fx?: 'shine' | 'rainbow'
+  fx?: 'shine' | 'rainbow' | 'hue'
 }
 
 export const DEFAULT_THEME = 'theme_space'
@@ -231,6 +232,11 @@ export const THEMES: Record<string, ThemePalette> = {
     cyan: '#fcd34d', violet: '#fbbf24', blue: '#fde68a', fx: 'shine',
     decor: 'sparkles', decorColors: ['#fef3c7', '#fcd34d'], preview: 'linear-gradient(110deg,#0c0a04,#52411a 30%,#fff7d6 48%,#fcd34d 55%,#52411a 75%)',
   },
+  theme_chroma: {
+    s950: '#05080f', s900: '#0a0f1d', s800: '#111a30', s700: '#1b2848', s600: '#283a66',
+    cyan: '#22d3ee', violet: '#a78bfa', blue: '#3b82f6', fx: 'hue',
+    decor: 'sparkles', decorColors: ['#e0f2fe', '#fbcfe8', '#d9f99d'], preview: 'linear-gradient(90deg,#0ea5e9,#8b5cf6,#ec4899,#f59e0b,#22c55e,#0ea5e9)',
+  },
   theme_rainbow: {
     s950: '#07060f', s900: '#0d0b1c', s800: '#161230', s700: '#231d4d', s600: '#322a70',
     cyan: '#22d3ee', violet: '#e879f9', blue: '#facc15', fx: 'rainbow',
@@ -250,4 +256,14 @@ export function hexToTriplet(hex: string): string {
   const h = hex.replace('#', '')
   const n = parseInt(h, 16)
   return `${(n >> 16) & 255} ${(n >> 8) & 255} ${n & 255}`
+}
+
+/** HSL (Grad, %, %) → "r g b" für die CSS-Variablen. */
+export function hslTriplet(h: number, sat: number, light: number): string {
+  const s = sat / 100
+  const l = light / 100
+  const k = (n: number) => (n + h / 30) % 12
+  const a = s * Math.min(l, 1 - l)
+  const f = (n: number) => Math.round(255 * (l - a * Math.max(-1, Math.min(k(n) - 3, Math.min(9 - k(n), 1)))))
+  return `${f(0)} ${f(8)} ${f(4)}`
 }

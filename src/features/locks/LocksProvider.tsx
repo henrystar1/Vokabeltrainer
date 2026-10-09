@@ -1,6 +1,7 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react'
 import { getLockedFeatures, type LockKey } from '../../services/koins'
 import { useAuth } from '../auth/AuthProvider'
+import { PANIC_KEYS, usePanic } from '../panic/panic'
 
 interface Ctx { locked: ReadonlySet<LockKey>; reload: () => void }
 const LocksContext = createContext<Ctx>({ locked: new Set(), reload: () => undefined })
@@ -22,7 +23,9 @@ export function LocksProvider({ children }: { children: ReactNode }) {
     document.addEventListener('visibilitychange', reload)
     return () => { window.clearInterval(t); document.removeEventListener('visibilitychange', reload) }
   }, [userId, profileReady, reload])
-  const value = useMemo(() => ({ locked, reload }), [locked, reload])
+  const panic = usePanic()
+  const all = useMemo<ReadonlySet<LockKey>>(() => (panic ? new Set([...locked, ...PANIC_KEYS]) : locked), [locked, panic])
+  const value = useMemo(() => ({ locked: all, reload }), [all, reload])
   return <LocksContext.Provider value={value}>{children}</LocksContext.Provider>
 }
 

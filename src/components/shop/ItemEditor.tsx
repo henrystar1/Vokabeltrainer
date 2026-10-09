@@ -232,7 +232,7 @@ export default function ItemEditor({ item, onClose, onSaved }: { item: ShopItem 
           <>
             <Field label="Vorlage">
               <Select value={preset} onChange={(e) => setPreset(e.target.value)}>
-                {EFFECT_PRESETS.map((p) => <option key={p} value={p}>{{ glow: 'Leuchten', pulse: 'Pulsieren', rainbow: 'Regenbogen', shimmer: 'Flimmern', neon: 'Neon', float: 'Schweben' }[p]}</option>)}
+                {EFFECT_PRESETS.map((p) => <option key={p} value={p}>{{ glow: 'Leuchten', pulse: 'Pulsieren', rainbow: 'Regenbogen', shimmer: 'Flimmern', neon: 'Neon', float: 'Schweben', dollar: 'Dollar-Regen' }[p]}</option>)}
               </Select>
             </Field>
             <Color label="Farbe" value={fxColor} onChange={setFxColor} />

@@ -240,3 +240,10 @@ Nach 0006 im Supabase-SQL-Editor ausführen (wiederholbar).
 - Schnell-Tag im `ItemEditor` (Text + Farbe → Verlauf und Schriftfarbe automatisch). Chat: `!`-Befehlsvorschläge (Tab/Tippen).
 - `PresenceProvider`: Nachrichten alle 7 s abgeholt, Anzeige zurückgestellt auf Sprint/Spiele/Gambling/Duell/Lernseiten.
 - Testversion: siehe `TESTVERSION.md`.
+
+## 0016 – Konten anlegen, Abschreiben, Panik-Modus, neue Artikel
+
+- `admin_create_user`, `admin_create_users` (bis 60 Zeilen), `admin_set_password`: schreiben direkt in `auth.users`/`auth.identities` (bestätigt, Kennwort per `extensions.crypt`), Profil entsteht über den bestehenden Trigger. Nur gegen PGlite-Attrappen getestet – in echtem Supabase zuerst in der Testversion ausprobieren. UI: Verwaltung → Nutzer → „Konten anlegen“, Kennwort setzen im „Verwalten“-Fenster (`ManageUser`).
+- `claim_copy_reward(book, unit, count)`: `copy_rewards`, Einstellungen `copy_reward` (5) und `copy_daily_max` (5); je Buch/Unit und Tag einmal, mindestens 5 Wörter. Seite `/abschreiben` (`pages/Copy.tsx`): „Alles sichtbar“ oder „Erst Deutsch, dann aufdecken“ (Gekonnt/Nochmal), mischen, umgekehrt.
+- Panik-Modus (`features/panic`): nur lokal (`localStorage vt_panic`), roter Knopf/Esc auf `/spiele` und `/gambling`; blendet Spiele, Gambling, Chat, Shop aus (Menü über `LocksProvider`, Seiten leiten per `Gate` auf `/` um); Rückgängig in den Einstellungen.
+- Neue Artikel: `effect_zocker` („Reicher Zocker“, Dollar-Regen, `.fx-zocker`; Vorlage `dollar` auch im Editor) und `theme_chroma` („Farbwechsel“, `fx: 'hue'`, Palette wandert per `ThemeApplier` durch den Farbkreis).

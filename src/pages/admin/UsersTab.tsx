@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { Ban, BookOpen, Crown, Gift, Plus, RotateCcw, ShieldCheck, ShieldOff, Trash2, UserCheck } from 'lucide-react'
+import { ManageButton } from '../../components/admin/ManageUser'
 import Button from '../../components/ui/Button'
 import Modal from '../../components/ui/Modal'
 import { Field, Select, TextInput } from '../../components/ui/Field'
@@ -132,6 +133,7 @@ export default function UsersTab() {
               <Button variant="secondary" className="!min-h-[40px] !px-3 text-sm" onClick={() => { setPts(''); setPtsReason(''); setConfirm({ kind: 'points', user: u }) }}>
                 <Plus size={15} /> Punkte ±
               </Button>
+              <ManageButton userId={u.user_id} name={u.display_name} onChanged={users.reload} />
               <Button variant="secondary" className="!min-h-[40px] !px-3 text-sm" onClick={() => { setGiftItem(''); setGiftEquip(true); setConfirm({ kind: 'gift', user: u }) }}>
                 <Gift size={15} /> Artikel
               </Button>

@@ -70,7 +70,7 @@ export function customNameColor(item: CustomItem): { className: string; style: C
   }
 }
 
-export const EFFECT_PRESETS = ['glow', 'pulse', 'rainbow', 'shimmer', 'neon', 'float'] as const
+export const EFFECT_PRESETS = ['glow', 'pulse', 'rainbow', 'shimmer', 'neon', 'float', 'dollar'] as const
 export type EffectPreset = (typeof EFFECT_PRESETS)[number]
 
 /** Effekt: Klasse und Variablen (Farbe, Dauer). */
