@@ -4,6 +4,7 @@ import Button from '../../components/ui/Button'
 import { Field, Select, TextInput } from '../../components/ui/Field'
 import { ErrorBox, Notice, Spinner } from '../../components/ui/States'
 import { formatDateTime } from '../../lib/format'
+import { MAX_GRANT, parseCoins } from '../../lib/coins'
 import { errorMessage } from '../../lib/errors'
 import { useAsync } from '../../lib/useAsync'
 import { adminListUsers } from '../../services/admin'
@@ -127,14 +128,14 @@ export function GrantSection() {
   const [done, setDone] = useState<string | null>(null)
 
   async function grant() {
-    const a = Number.parseInt(amount, 10)
-    if (!userId || !Number.isInteger(a) || a === 0) return setError('Bitte Nutzer und einen Betrag (ungleich 0) wählen.')
+    const a = parseCoins(amount)
+    if (!userId || !Number.isSafeInteger(a) || a === 0 || Math.abs(a) > MAX_GRANT) return setError('Bitte Nutzer und einen Betrag (ungleich 0, höchstens 1 Billiarde) wählen.')
     setBusy(true)
     setError(null)
     setDone(null)
     try {
       const balance = await adminGrantKoins(userId, a, note)
-      setDone(`Erledigt. Neues Guthaben: ${balance} Coins.`)
+      setDone(`Erledigt. Neues Guthaben: ${Number(balance).toLocaleString('de-DE')} Coins.`)
       users.reload()
     } catch (e) {
       setError(errorMessage(e))
@@ -151,13 +152,13 @@ export function GrantSection() {
             <option value="">Auswählen …</option>
             {users.data?.map((u) => (
               <option key={u.user_id} value={u.user_id}>
-                {u.display_name} ({u.koins})
+                {u.display_name} ({Number(u.koins).toLocaleString('de-DE')})
               </option>
             ))}
           </Select>
         </Field>
-        <Field label="Betrag (negativ = abziehen)">
-          <TextInput type="number" inputMode="numeric" value={amount} onChange={(e) => setAmount(e.target.value)} />
+        <Field label="Betrag (negativ = abziehen)" hint="Auch 1k, 2,5m, 1mrd, 1b (Billion)">
+          <TextInput inputMode="text" value={amount} onChange={(e) => setAmount(e.target.value)} />
         </Field>
         <Field label="Notiz">
           <TextInput value={note} maxLength={100} onChange={(e) => setNote(e.target.value)} />

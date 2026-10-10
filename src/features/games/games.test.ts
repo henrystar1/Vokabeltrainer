@@ -4,6 +4,7 @@ import { SNAKE_SIZE, newSnake, snakeDelay, step, turn } from './snake'
 import { COLS, ROWS, cells, fits, hardDrop, move, newTetris, rotate, tick, type TetrisState } from './tetris'
 import { flap, newFlappy, stepFlappy, FH } from './flappy'
 import { COLS as CCOLS, move as cmove, newCrossy, stepCrossy } from './crossy'
+import { WH, newWave, stepWave } from './wave'
 import { BLAST_SIZE, SHAPES, canPlace, newBlast, place, shapeSize } from './blast'
 
 describe('Snake', () => {
@@ -178,5 +179,41 @@ describe('Crossy Road', () => {
     let s = newCrossy(mulberry32(5))
     for (let i = 0; i < 100 && !s.over; i++) s = stepCrossy(s, 0.2)
     expect(s.over).toBe(true)
+  })
+})
+
+describe('Wave', () => {
+  it('wartet bis zum ersten Halten', () => {
+    let s = newWave()
+    for (let i = 0; i < 100; i++) s = stepWave(s, 0.016, false, mulberry32(1))
+    expect(s.started).toBe(false)
+    expect(s.over).toBe(false)
+  })
+
+  it('Dauerhalten fliegt gegen die Decke, Loslassen gegen den Boden', () => {
+    let up = newWave()
+    for (let i = 0; i < 300 && !up.over; i++) up = stepWave(up, 0.016, true, mulberry32(1))
+    expect(up.over).toBe(true)
+    let down = stepWave(newWave(), 0.016, true, mulberry32(1))
+    for (let i = 0; i < 300 && !down.over; i++) down = stepWave(down, 0.016, false, mulberry32(1))
+    expect(down.over).toBe(true)
+  })
+
+  it('steigt und fällt im 45°-Winkel (gleiche Strecke wie nach vorn)', () => {
+    let s = stepWave(newWave(), 0.016, true, mulberry32(1))
+    const y0 = s.y
+    s = stepWave(s, 0.1, true, mulberry32(1))
+    expect(y0 - s.y).toBeCloseTo(s.speed * 0.1, 1)
+  })
+
+  it('ein Bot, der die Mitte der Öffnung ansteuert, kommt weit', () => {
+    let s = newWave()
+    const rng = mulberry32(7)
+    for (let i = 0; i < 4000 && !s.over; i++) {
+      const next = s.cols.find((c) => c.x > 80 - 20)
+      const target = next ? next.c : WH / 2
+      s = stepWave(s, 0.016, s.y > target, rng)
+    }
+    expect(s.score).toBeGreaterThan(15)
   })
 })

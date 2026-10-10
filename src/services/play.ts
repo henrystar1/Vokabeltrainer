@@ -24,7 +24,7 @@ export const getChat = (limit = 100) => rpc<ChatMessage[]>('get_chat', { p_limit
 export const postChat = (body: string) => rpc<number>('post_chat', { p_body: body })
 export const deleteChatMessage = (id: number) => rpc<void>('delete_chat_message', { p_id: id })
 
-export type GameId = 'snake' | 'tetris' | 'blast' | 'crossy' | 'flappy'
+export type GameId = 'snake' | 'tetris' | 'blast' | 'crossy' | 'flappy' | 'wave'
 export interface GameStart { id: string; record: number; fee: number; balance: number }
 export interface GameResult { score: number; record: boolean; prev_record: number; reward: number; balance: number }
 export interface GameBoardRow extends Flair { rank: number; display_name: string; score: number; is_me: boolean }

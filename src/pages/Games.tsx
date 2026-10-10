@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { Blocks, Bird, Crown, Footprints, Gamepad2, Grid3x3, Trophy } from 'lucide-react'
+import { Blocks, Bird, Crown, Footprints, Gamepad2, Grid3x3, Trophy, Zap } from 'lucide-react'
 import PlayerTag from '../components/profile/PlayerTag'
 import CoinIcon from '../components/ui/CoinIcon'
 import Button from '../components/ui/Button'
@@ -13,6 +13,7 @@ import { useFocusMode } from '../features/koins/focusMode'
 import BlastGame from '../features/games/BlastGame'
 import CrossyGame from '../features/games/CrossyGame'
 import FlappyGame from '../features/games/FlappyGame'
+import WaveGame from '../features/games/WaveGame'
 import SnakeGame from '../features/games/SnakeGame'
 import TetrisGame from '../features/games/TetrisGame'
 import { errorMessage } from '../lib/errors'
@@ -25,6 +26,7 @@ const GAMES: Array<{ id: GameId; name: string; text: string; unit: string; icon:
   { id: 'tetris', name: 'Tetris', text: 'Stapel die Blöcke und lösche Reihen.', unit: 'Punkte', icon: Blocks },
   { id: 'blast', name: 'Block Blast', text: 'Zieh Teile aufs Feld und räum Reihen und Spalten ab.', unit: 'Punkte', icon: Grid3x3 },
   { id: 'crossy', name: 'Crossy Road', text: 'Bring das Huhn über Straßen und Wiesen – ohne überfahren zu werden.', unit: 'Reihen', icon: Footprints },
+  { id: 'wave', name: 'Wave', text: 'Halten = hoch, loslassen = runter. Weich den Stacheln aus.', unit: 'Stacheln', icon: Zap },
   { id: 'flappy', name: 'Flappy Bird', text: 'Flatter durch die Lücken der Röhren.', unit: 'Röhren', icon: Bird },
 ]
 
@@ -192,6 +194,7 @@ function Playing({ game, run, onDone }: { game: GameId; run: GameStart; onDone: 
       {game === 'blast' && <BlastGame {...props} />}
       {game === 'crossy' && <CrossyGame {...props} />}
       {game === 'flappy' && <FlappyGame {...props} />}
+      {game === 'wave' && <WaveGame {...props} />}
       {confirmQuit && (
         <Modal title="Aufgeben?" onClose={() => setConfirmQuit(false)}>
           <p className="text-sm text-slate-300">Die Runde wird mit deinem aktuellen Stand gewertet. Der Eintritt ist weg.</p>

@@ -108,7 +108,7 @@ const GroupRow = memo(function GroupRow({ g, live, isStaff, onDelete, onTimeout 
 
 /** Gemeinsamer Chat für alle; aktualisiert sich alle paar Sekunden, solange die Seite sichtbar ist. */
 export default function Chat() {
-  const { isStaff, displayName } = useAuth()
+  const { isStaff, isAdmin, displayName } = useAuth()
   const chat = useChat()
   const [typing, setTyping] = useState<Record<string, number>>({})
   const lastTypingSent = useRef(0)
@@ -402,7 +402,7 @@ export default function Chat() {
         </form>
       </Card>
       <p className="mt-3 text-xs text-slate-500">
-        Coins verschicken: <span className="font-mono text-slate-300">!pay @Anzeigename 100</span> · Heimlich schreiben:{' '}
+        Coins verschicken: <span className="font-mono text-slate-300">!pay @Anzeigename 100</span>{isAdmin && <> (Admin auch <span className="font-mono text-slate-300">1k</span>, <span className="font-mono text-slate-300">2,5m</span>, <span className="font-mono text-slate-300">1mrd</span>, <span className="font-mono text-slate-300">1b</span> = Billion)</>} · Heimlich schreiben:{' '}
         <span className="font-mono text-slate-300">!whisper @Anzeigename Text</span> (nur ihr beide seht es). Sei nett zueinander – Mods können Nachrichten löschen und kurz stummschalten.
       </p>
 

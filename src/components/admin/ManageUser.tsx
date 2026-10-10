@@ -5,13 +5,13 @@ import Modal from '../ui/Modal'
 import { Field, Select, TextInput } from '../ui/Field'
 import { ErrorBox, Notice } from '../ui/States'
 import { useAuth } from '../../features/auth/AuthProvider'
+import { MAX_GRANT as MAX, parseCoins } from '../../lib/coins'
 import { errorMessage } from '../../lib/errors'
 import { useAsync } from '../../lib/useAsync'
 import { randomPassword } from '../../pages/admin/AccountsTab'
 import { adminAdjustPoints, adminSetPassword } from '../../services/admin'
 import { adminGrantItem, adminGrantKoins, adminListItems, adminListUserItems, adminRevokeItem } from '../../services/koins'
 
-const MAX = 1_000_000_000
 
 /** Kleiner Schraubenschlüssel neben einem Namen – nur für Admins sichtbar. */
 export function ManageButton({ userId, name, onChanged }: { userId: string; name: string; onChanged?: () => void }) {
@@ -62,8 +62,8 @@ export default function ManageUser({ userId, name, onClose, onChanged }: { userI
     }
   }
 
-  const n = Number.parseInt(amount.replace(/\./g, ''), 10)
-  const validAmount = Number.isInteger(n) && n !== 0 && Math.abs(n) <= MAX
+  const n = parseCoins(amount)
+  const validAmount = Number.isSafeInteger(n) && n !== 0 && Math.abs(n) <= MAX
   const p = Number.parseInt(pts, 10)
   const tabs: Array<[Tab, string]> = [['coins', 'Coins'], ['items', 'Artikel'], ['points', 'Punkte'], ['password', 'Kennwort']]
 
@@ -79,12 +79,12 @@ export default function ManageUser({ userId, name, onClose, onChanged }: { userI
 
       {tab === 'coins' && (
         <div className="space-y-3">
-          <Field label="Betrag" hint={`Plus = schenken, Minus = abziehen (höchstens bis 0). Bis ${MAX.toLocaleString('de-DE')} auf einmal.`}>
-            <TextInput inputMode="numeric" value={amount} onChange={(e) => setAmount(e.target.value.replace(/[^\d-]/g, ''))} placeholder="z. B. 50000 oder -2000" />
+          <Field label="Betrag" hint={`Plus = schenken, Minus = abziehen (höchstens bis 0). Kurzschreibweise: k = Tausend, m = Million, mrd = Milliarde, b = Billion. Bis ${MAX.toLocaleString('de-DE')} auf einmal.`}>
+            <TextInput inputMode="numeric" value={amount} onChange={(e) => setAmount(e.target.value)} placeholder="z. B. 50000, 1k, 2,5m, 1mrd, 1b" />
           </Field>
           <Field label="Notiz (optional)"><TextInput value={note} maxLength={100} onChange={(e) => setNote(e.target.value)} /></Field>
           <Button disabled={busy || !validAmount} onClick={() => void run(() => adminGrantKoins(userId, n, note), `${name}: ${n > 0 ? '+' : ''}${n.toLocaleString('de-DE')} Coins.`)}>
-            {n < 0 ? 'Abziehen' : 'Überweisen'}
+            {n < 0 ? 'Abziehen' : 'Überweisen'}{validAmount ? ` (${n.toLocaleString('de-DE')})` : ''}
           </Button>
         </div>
       )}
