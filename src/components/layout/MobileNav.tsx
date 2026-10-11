@@ -3,6 +3,7 @@ import { NavLink, useLocation } from 'react-router-dom'
 import { LogOut, MoreHorizontal, X } from 'lucide-react'
 import { navGroupsFor, navItemsFor } from '../../lib/navigation'
 import { useChat } from '../../features/chat/ChatProvider'
+import { usePrintTodo } from '../../features/print/hooks'
 import KoinBadge from '../profile/KoinBadge'
 import { useAuth } from '../../features/auth/AuthProvider'
 import { useLocks } from '../../features/locks/LocksProvider'
@@ -14,6 +15,7 @@ export default function MobileNav() {
   const [open, setOpen] = useState(false)
   const { displayName, signOut, isStaff } = useAuth()
   const { unread } = useChat()
+  const todo = usePrintTodo()?.todo ?? 0
   const { locked } = useLocks()
   const NAV_ITEMS = navItemsFor(isStaff, locked)
   const groups = navGroupsFor(isStaff, locked)
@@ -62,6 +64,7 @@ export default function MobileNav() {
                       <Icon size={18} className="shrink-0" />
                       <span className="truncate">{label}</span>
                       {to === '/chat' && unread > 0 && <span className="absolute right-2 top-2 h-2.5 w-2.5 rounded-full bg-rose-500" aria-label="Neue Nachrichten" />}
+                      {to === '/druckshop' && todo > 0 && <span className="absolute right-2 top-2 h-2.5 w-2.5 rounded-full bg-amber-400" aria-label="Offene Druckaufträge" />}
                     </NavLink>
                   ))}
                 </div>

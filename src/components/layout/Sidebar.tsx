@@ -6,6 +6,7 @@ import PlayerTag from '../profile/PlayerTag'
 import { navGroupsFor } from '../../lib/navigation'
 import { useLocks } from '../../features/locks/LocksProvider'
 import { useChat } from '../../features/chat/ChatProvider'
+import { usePrintTodo } from '../../features/print/hooks'
 
 interface SidebarProps {
   collapsed: boolean
@@ -16,6 +17,7 @@ export default function Sidebar({ collapsed, onToggle }: SidebarProps) {
   const { displayName, user, signOut, isStaff, cosmetics } = useAuth()
   const { unread } = useChat()
   const { locked } = useLocks()
+  const todo = usePrintTodo()?.todo ?? 0
   return (
     <aside
       className={`glass fixed inset-y-0 left-0 z-30 hidden flex-col border-y-0 border-l-0 transition-[width] duration-300 ease-out md:flex ${
@@ -56,8 +58,12 @@ export default function Sidebar({ collapsed, onToggle }: SidebarProps) {
                   <span className="relative shrink-0">
                     <Icon size={19} />
                     {to === '/chat' && unread > 0 && <span className="absolute -right-1 -top-1 h-2.5 w-2.5 rounded-full bg-rose-500 ring-2 ring-space-900" aria-label="Neue Nachrichten" />}
+                    {to === '/druckshop' && todo > 0 && <span className="absolute -right-1 -top-1 h-2.5 w-2.5 rounded-full bg-amber-400 ring-2 ring-space-900" aria-label="Offene Druckaufträge" />}
                   </span>
                   {!collapsed && <span className="truncate">{label}</span>}
+                  {!collapsed && to === '/druckshop' && todo > 0 && (
+                    <span className="ml-auto rounded-full bg-amber-400 px-1.5 text-[10px] font-semibold text-space-950">{todo > 99 ? '99+' : todo}</span>
+                  )}
                   {!collapsed && to === '/chat' && unread > 0 && (
                     <span className="ml-auto rounded-full bg-rose-500 px-1.5 text-[10px] font-semibold text-white">{unread > 99 ? '99+' : unread}</span>
                   )}

@@ -254,3 +254,17 @@ Nach 0006 im Supabase-SQL-Editor ausführen (wiederholbar).
 - `admin_grant_koins(uuid, bigint, text)`: bis 1 Billiarde je Buchung (auch Minus). `_parse_coins` (k, m/mio, mrd, b/bio = 10¹², nur für Admins), `_fmt_coins` (Punkte-Schreibweise). `post_chat`: Admin-`!pay` erzeugt die Coins neu (kein Abzug, keine Tages-/Höchstgrenze, höchstens 1 Billiarde); normale Nutzer unverändert (nur Ziffern, `pay_max`/`pay_daily_cap`).
 - Client: `lib/coins.ts` (`parseCoins`, `shortCoins`, `MAX_GRANT`), Kurzanzeige im `KoinBadge` ab 1 Mrd., Eingabefelder in „Verwalten“ und „Coins schenken“ verstehen k/m/mrd/b.
 - Spiel „Wave“ (`features/games/wave.ts`, `WaveGame.tsx`): Spitze fliegt im 45°-Winkel, Halten = hoch, Loslassen = runter; Stacheln (Dreiecke) von Decke und Boden, Öffnung wird enger, Tempo steigt; Punkte = passierte Stachel-Paare. Server: `game_runs`-Check, `start_game`/`get_game_board`/`finish_game` (Rate 2/s) kennen `wave`.
+
+## 0018 – 3D-Druck-Shop
+- Tabellen `print_settings` (alle Preiswerte, vom Admin änderbar), `print_colors`, `print_products`, `print_bans`, `print_orders`. Alle nur über RPC erreichbar (RLS an, keine Grants).
+- Preis wird nur serverseitig berechnet (`_print_calc`): STL-Volumen × Filament + Strom + Maschine + Grundgebühr + Marge, Mindestpreis, Beschleunigt-Aufschlag, einmaliger Coin-Rabatt je Bestellung (`discount_coins` → `discount_percent`).
+- Status: angefragt → preis_vorgeschlagen → in_bearbeitung → druckt → lieferbereit → geliefert (plus abgelehnt/storniert). Fortschritt wird aus Druckminuten und Serverzeit berechnet (`orderProgress`, 10–90 % beim Druck). Erweiterungspunkt für Klipper/Timelapse: `progress_override`.
+- Storage-Bucket `print-files` (privat) mit Policies; Dateien nur Besitzer/Admin.
+- Spam-Schutz: Sperren, max. offene Anfragen, Bestellungen pro Tag, max. Menge/Volumen.
+- Verdienst-Ziel („Pro-Abo“) zählt Umsatz übergebener Bestellungen, bleibt beim Löschen erhalten (`goal_offset_eur`).
+- Client: `/druckshop` (lazy, three.js in eigenem Chunk), Admin-Gruppe „3D-Druck“.
+
+## 0019 – Brett für Mods, Fehler-Wiederholung, Lern-Coins
+- Schwarzes Brett: `is_staff()` statt Admin.
+- `user_settings.repeat_until_correct`: Learn.tsx wiederholt falsche Fragen in Runden, bis alle stimmen; Lernstand bleibt unverändert, Wiederholungsantworten werden nur einmal gespeichert.
+- Trigger `award_answer_koins`: 1 Coin je `learn_coin_every` richtige Antworten (nur Lernen, Online-Bücher, keine Wiederholung), Tageslimit `learn_coin_cap`.

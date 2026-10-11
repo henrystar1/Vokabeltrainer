@@ -211,6 +211,8 @@ export default function Settings() {
                 />
               </Field>
               <Toggle label="Groß-/Kleinschreibung beachten" checked={settings.case_sensitive} onChange={(v) => void run(() => update({ case_sensitive: v }))} />
+              <Toggle label="Falsche Vokabeln am Ende wiederholen, bis alle richtig sind" checked={settings.repeat_until_correct} onChange={(v) => void run(() => update({ repeat_until_correct: v }))} />
+              <p className="text-xs text-slate-500">Nach der Lernrunde kommen alle falsch beantworteten Fragen so lange noch einmal dran, bis du jede richtig hattest. Dein Lernstand ändert sich dadurch nicht.</p>
             </Card>
           </>
         )}

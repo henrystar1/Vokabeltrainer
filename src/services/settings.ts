@@ -7,12 +7,13 @@ export const DEFAULT_SETTINGS: UserSettings = {
   direction_to_german: true,
   words_per_round: 20,
   case_sensitive: false,
+  repeat_until_correct: false,
 }
 
 export async function loadSettings(userId: string): Promise<UserSettings> {
   const { data, error } = await supabase
     .from('user_settings')
-    .select('learn_language,direction_to_foreign,direction_to_german,words_per_round,case_sensitive')
+    .select('learn_language,direction_to_foreign,direction_to_german,words_per_round,case_sensitive,repeat_until_correct')
     .eq('user_id', userId)
     .maybeSingle()
   if (error) throw error

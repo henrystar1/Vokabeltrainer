@@ -1,5 +1,5 @@
 import type { LockKey } from '../services/koins'
-import { BookOpen, MessageSquarePlus, ShoppingBag, UserCircle, Brain, ClipboardCheck, Home, Search, Settings, ShieldCheck, Trophy, BarChart3, Gamepad2, MessagesSquare, Target, Swords, Zap, ListChecks, Languages, ArrowLeftRight, Dices, Users, Pin, PenLine, type LucideIcon } from 'lucide-react'
+import { BookOpen, MessageSquarePlus, ShoppingBag, UserCircle, Brain, ClipboardCheck, Home, Search, Settings, ShieldCheck, Trophy, BarChart3, Gamepad2, MessagesSquare, Target, Swords, Zap, ListChecks, Languages, ArrowLeftRight, Dices, Users, Pin, PenLine, Printer, type LucideIcon } from 'lucide-react'
 
 export interface NavItem {
   to: string
@@ -45,6 +45,7 @@ export const NAV_GROUPS: NavGroup[] = [
     { lock: 'chat', to: '/chat', label: 'Chat', icon: MessagesSquare },
     { to: '/online', label: 'Wer ist da?', icon: Users },
     { lock: 'shop', to: '/shop', label: 'Shop', icon: ShoppingBag },
+    { to: '/druckshop', label: '3D-Druck-Shop', icon: Printer },
   ]),
   g('Konto', [
     { to: '/profil', label: 'Profil', icon: UserCircle },

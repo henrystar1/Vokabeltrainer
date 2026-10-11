@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react'
+import { lazy, Suspense, type ReactNode } from 'react'
 import { Navigate, Route, Routes } from 'react-router-dom'
 import { PANIC_KEYS, usePanic } from './features/panic/panic'
 import { useLocks } from './features/locks/LocksProvider'
@@ -34,6 +34,8 @@ import Quests from './pages/Quests'
 import Sprint from './pages/Sprint'
 import Profile from './pages/Profile'
 import Shop from './pages/Shop'
+// three.js ist groß: der 3D-Druck-Shop wird erst beim Öffnen geladen.
+const PrintShop = lazy(() => import('./pages/PrintShop'))
 import Search from './pages/Search'
 import Settings from './pages/Settings'
 import Stats from './pages/Stats'
@@ -94,6 +96,7 @@ export default function App() {
           <Route path="statistik" element={<Stats />} />
           <Route path="rangliste" element={<Leaderboard />} />
           <Route path="shop" element={<Gate k="shop"><Shop /></Gate>} />
+          <Route path="druckshop" element={<Suspense fallback={<Spinner />}><PrintShop /></Suspense>} />
           <Route path="profil" element={<Profile />} />
           <Route path="feedback" element={<Feedback />} />
           <Route path="einstellungen" element={<Settings />} />

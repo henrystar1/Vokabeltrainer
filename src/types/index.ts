@@ -204,6 +204,8 @@ export interface UserSettings {
   direction_to_german: boolean
   words_per_round: number
   case_sensitive: boolean
+  /** Falsche Vokabeln am Ende so oft wiederholen, bis alle richtig sind. */
+  repeat_until_correct: boolean
 }
 
 export interface HistoryDay {

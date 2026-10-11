@@ -1,5 +1,6 @@
 import { useState, type ReactNode } from 'react'
-import { Flag, Gift, KeyRound, UserPlus, Power, MessageSquarePlus, Radio, ShieldCheck, SlidersHorizontal, Store, Ticket, UserCog, Users } from 'lucide-react'
+import { useSearchParams } from 'react-router-dom'
+import { Ban, Box, ListOrdered, Palette, Printer, Calculator, Flag, Gift, KeyRound, UserPlus, Power, MessageSquarePlus, Radio, ShieldCheck, SlidersHorizontal, Store, Ticket, UserCog, Users } from 'lucide-react'
 import PageHeader from '../components/ui/PageHeader'
 import { ErrorBox, Spinner } from '../components/ui/States'
 import { useAuth } from '../features/auth/AuthProvider'
@@ -15,8 +16,17 @@ import OnlineTab from './admin/OnlineTab'
 import ReviewsTab from './admin/ReviewsTab'
 import RulesTab from './admin/RulesTab'
 import UsersTab from './admin/UsersTab'
+import QueueTab from './admin/print/QueueTab'
+import CatalogTab from './admin/print/CatalogTab'
+import ColorsTab from './admin/print/ColorsTab'
+import PricesTab from './admin/print/PricesTab'
+import BansTab from './admin/print/BansTab'
+import { usePrintTodo } from '../features/print/hooks'
 
-type Tab = 'reviews' | 'feedback' | 'online' | 'users' | 'staff' | 'modrights' | 'rules' | 'shop' | 'codes' | 'grant' | 'locks' | 'accounts'
+type Tab = 'reviews' | 'feedback' | 'online' | 'users' | 'staff' | 'modrights' | 'rules' | 'shop' | 'codes' | 'grant' | 'locks' | 'accounts' | 'pqueue' | 'pcatalog' | 'pcolors' | 'pprices' | 'pbans'
+
+/** Adresse ?bereich=… → Startseite der Verwaltung. */
+const DEEP_LINKS: Record<string, Tab> = { druck: 'pqueue', 'druck-katalog': 'pcatalog', 'druck-preise': 'pprices' }
 interface TabDef { id: Tab; label: string; icon: ReactNode }
 interface Group { id: string; label: string; icon: ReactNode; tabs: TabDef[] }
 
@@ -25,6 +35,8 @@ export default function Admin() {
   const { isAdmin, role } = useAuth()
   const perms = useAsync(getMyPermissions, [])
   const p = perms.data
+  const todo = usePrintTodo()
+  const [params] = useSearchParams()
 
   const groups: Group[] = [
     {
@@ -62,9 +74,23 @@ export default function Admin() {
           ],
         }]
       : []),
+    ...(isAdmin
+      ? [{
+          id: 'print',
+          label: todo && todo.todo > 0 ? `3D-Druck (${todo.todo})` : '3D-Druck',
+          icon: <Printer size={16} />,
+          tabs: [
+            { id: 'pqueue' as const, label: todo && todo.todo > 0 ? `Warteschlange (${todo.todo})` : 'Warteschlange', icon: <ListOrdered size={15} /> },
+            { id: 'pcatalog' as const, label: 'Katalog', icon: <Box size={15} /> },
+            { id: 'pcolors' as const, label: 'Farben', icon: <Palette size={15} /> },
+            { id: 'pprices' as const, label: 'Preise & Werte', icon: <Calculator size={15} /> },
+            { id: 'pbans' as const, label: 'Gesperrt', icon: <Ban size={15} /> },
+          ],
+        }]
+      : []),
   ]
 
-  const [tab, setTab] = useState<Tab>('reviews')
+  const [tab, setTab] = useState<Tab>(DEEP_LINKS[params.get('bereich') ?? ''] ?? 'reviews')
   const group = groups.find((g) => g.tabs.some((t) => t.id === tab)) ?? groups[0]
   const active = group.tabs.some((t) => t.id === tab) ? tab : group.tabs[0].id
 
@@ -107,6 +133,11 @@ export default function Admin() {
       {active === 'codes' && isAdmin && <CodesSection />}
       {active === 'grant' && isAdmin && <GrantSection />}
       {active === 'locks' && isAdmin && <LocksTab />}
+      {active === 'pqueue' && isAdmin && <QueueTab />}
+      {active === 'pcatalog' && isAdmin && <CatalogTab />}
+      {active === 'pcolors' && isAdmin && <ColorsTab />}
+      {active === 'pprices' && isAdmin && <PricesTab />}
+      {active === 'pbans' && isAdmin && <BansTab />}
     </div>
   )
 }

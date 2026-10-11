@@ -19,9 +19,9 @@ const STATUS = {
   done: { label: 'Fertig', icon: CheckCircle2, tone: 'text-emerald-300 border-emerald-300/40 bg-emerald-500/10' },
 } as const
 
-/** Schwarzes Brett: was im nächsten Update kommt. Alle lesen, Admins schreiben. */
+/** Schwarzes Brett: was im nächsten Update kommt. Alle lesen, Mods und Admins schreiben. */
 export default function Board() {
-  const { isAdmin } = useAuth()
+  const { isStaff } = useAuth()
   const board = useAsync(getBoard, [])
   const [edit, setEdit] = useState<BoardPost | 'new' | null>(null)
   const [title, setTitle] = useState('')
@@ -57,12 +57,12 @@ export default function Board() {
       <PageHeader
         eyebrow="Neuigkeiten"
         title="Schwarzes Brett"
-        actions={isAdmin ? <Button variant="secondary" onClick={() => open('new')}><Plus size={16} /> Eintrag</Button> : undefined}
+        actions={isStaff ? <Button variant="secondary" onClick={() => open('new')}><Plus size={16} /> Eintrag</Button> : undefined}
       />
       <p className="mb-5 max-w-2xl text-sm text-slate-400">Hier steht, was als Nächstes kommt: was gerade gebaut wird, was geplant ist und was schon fertig ist.</p>
       {board.loading && !board.data && <Spinner />}
       {board.error && <ErrorBox message={board.error} onRetry={board.reload} />}
-      {board.data?.length === 0 && <EmptyState title="Noch nichts angeschlagen" text={isAdmin ? 'Mit „Eintrag“ schreibst du das Erste.' : 'Schau später noch einmal vorbei.'} />}
+      {board.data?.length === 0 && <EmptyState title="Noch nichts angeschlagen" text={isStaff ? 'Mit „Eintrag“ schreibst du das Erste.' : 'Schau später noch einmal vorbei.'} />}
       <div className="space-y-3">
         {board.data?.map((p) => {
           const st = STATUS[p.status]
@@ -76,7 +76,7 @@ export default function Board() {
               {p.body && <p className="whitespace-pre-wrap text-sm text-slate-300">{p.body}</p>}
               <div className="flex items-center justify-between gap-2">
                 <p className="text-xs text-slate-500">Stand {formatDate(p.updated_at)}</p>
-                {isAdmin && (
+                {isStaff && (
                   <div className="flex gap-1">
                     <button type="button" aria-label="Bearbeiten" className="flex min-h-[40px] w-10 items-center justify-center rounded-lg text-slate-400 hover:text-white" onClick={() => open(p)}><Pencil size={16} /></button>
                     <button

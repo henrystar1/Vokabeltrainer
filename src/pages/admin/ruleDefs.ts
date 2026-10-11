@@ -62,6 +62,8 @@ export const SECTIONS: Array<{ title: string; text?: string; rules: Rule[] }> = 
       { key: 'copy_daily_max', label: 'Abschreib-Belohnungen pro Tag höchstens' },
       { key: 'learn_reward', label: 'Coins pro neu gelernter Vokabel (Online-Bücher)' },
       { key: 'learn_daily_cap', label: 'Lern-Coins pro Tag höchstens' },
+      { key: 'learn_coin_every', label: 'Lernen: 1 Coin je so viele richtige Antworten', hint: 'Zählt in Online-Büchern, nicht im Test und nicht in der Wiederholung' },
+      { key: 'learn_coin_cap', label: 'Lernen: solche Coins pro Tag höchstens', hint: '0 = aus' },
       { key: 'review_reward', label: 'Coins für eine sinnvolle Fehlermeldung' },
       { key: 'code_default_amount', label: 'Coins pro Code (Standard)' },
       { key: 'daily_bonus_mod', label: 'Tagesbonus Mods' },

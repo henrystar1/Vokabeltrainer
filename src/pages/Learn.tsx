@@ -43,6 +43,10 @@ export default function Learn() {
   const [repeatWrong, setRepeatWrong] = useState<WrongAnswer[]>([])
   const [repeatCorrect, setRepeatCorrect] = useState(0)
   const [repeatSaved, setRepeatSaved] = useState(true)
+  const [repeatRound, setRepeatRound] = useState(1)
+  /** Wie viele automatische Wiederholungsrunden waren nötig (0 = Funktion aus oder keine Fehler). */
+  const [autoRounds, setAutoRounds] = useState(0)
+  const [mainTotal, setMainTotal] = useState(0)
 
   const directions = useMemo(() => activeDirections(settings), [settings])
   const language = bookId ? (books.data?.find((b) => b.id === bookId)?.language ?? settings.learn_language) : settings.learn_language
@@ -54,6 +58,8 @@ export default function Learn() {
   const correctRef = useRef(0)
   const repeatWrongRef = useRef<WrongAnswer[]>([])
   const repeatCorrectRef = useRef(0)
+  const savedRepeat = useRef(0)
+  const mainSave = useRef<Promise<void>>(Promise.resolve())
 
   const selected = bookId ? books.data?.find((b) => b.id === bookId) : undefined
   const [unlocking, setUnlocking] = useState(false)
@@ -145,17 +151,43 @@ export default function Learn() {
   async function finishMain() {
     setWrong([...wrongRef.current])
     setCorrectCount(correctRef.current)
-    setPhase('result')
-    await saveMain()
+    setMainTotal(questions.length)
+    savedRepeat.current = 0
+    setAutoRounds(0)
+    mainSave.current = saveMain()
+    if (settings.repeat_until_correct && wrongRef.current.length > 0) {
+      // Direkt weiter: die falschen Fragen kommen so lange dran, bis alle richtig waren.
+      startRepeat([...wrongRef.current], 1)
+    } else {
+      setPhase('result')
+    }
+    await mainSave.current
   }
 
-  function startRepeat(list: WrongAnswer[]) {
+  function startRepeat(list: WrongAnswer[], round = 1) {
     // Nur die falsch beantworteten Fragen, neu gemischt.
     const qs = [...list.map((w) => w.question)].sort(() => Math.random() - 0.5)
     repeatWrongRef.current = []
     repeatCorrectRef.current = 0
+    setRepeatRound(round)
     setQuestions(qs)
     setPhase('repeat')
+  }
+
+  /** Speichert die Wiederholungs-Antworten, die noch nicht gespeichert sind (erst wenn die Hauptrunde gespeichert ist). */
+  async function flushRepeat() {
+    await mainSave.current
+    if (!sessionId.current) return
+    const fresh = session.current.repeatAnswers().slice(savedRepeat.current)
+    if (fresh.length === 0) return
+    try {
+      setRepeatSaved(false)
+      await addRepeatAnswers(sessionId.current, fresh)
+      savedRepeat.current += fresh.length
+      setRepeatSaved(true)
+    } catch (e) {
+      setSaveError(errorMessage(e))
+    }
   }
 
   function onRepeatAnswer(q: Question, given: string, correct: boolean) {
@@ -165,18 +197,23 @@ export default function Learn() {
   }
 
   async function finishRepeat() {
-    setRepeatWrong([...repeatWrongRef.current])
+    const stillWrong = [...repeatWrongRef.current]
+    if (settings.repeat_until_correct) {
+      if (stillWrong.length > 0) {
+        startRepeat(stillWrong, repeatRound + 1)
+        await flushRepeat()
+        return
+      }
+      // Alles war richtig: zurück zur Auswertung der Hauptrunde.
+      setAutoRounds(repeatRound)
+      setPhase('result')
+      await flushRepeat()
+      return
+    }
+    setRepeatWrong(stillWrong)
     setRepeatCorrect(repeatCorrectRef.current)
     setPhase('repeat-result')
-    if (sessionId.current) {
-      try {
-        setRepeatSaved(false)
-        await addRepeatAnswers(sessionId.current, session.current.repeatAnswers())
-        setRepeatSaved(true)
-      } catch (e) {
-        setSaveError(errorMessage(e))
-      }
-    }
+    await flushRepeat()
   }
 
   if (phase === 'loading') return <Spinner label="Lernrunde wird vorbereitet …" />
@@ -184,11 +221,11 @@ export default function Learn() {
   if (phase === 'main' || phase === 'repeat') {
     return (
       <QuizRunner
-        key={phase}
+        key={`${phase}-${repeatRound}`}
         questions={questions}
         caseSensitive={settings.case_sensitive}
         accents={language === 'fr'}
-        title={phase === 'repeat' ? 'Fehler wiederholen' : mistakeMode ? 'Fehler-Training' : 'Lernrunde'}
+        title={phase === 'repeat' ? (settings.repeat_until_correct ? `Fehler wiederholen · Runde ${repeatRound}` : 'Fehler wiederholen') : mistakeMode ? 'Fehler-Training' : 'Lernrunde'}
         onAnswer={phase === 'repeat' ? onRepeatAnswer : onMainAnswer}
         onFinish={() => void (phase === 'repeat' ? finishRepeat() : finishMain())}
         onCancel={() => setPhase('setup')}
@@ -200,18 +237,19 @@ export default function Learn() {
     return (
       <div>
         <PageHeader eyebrow={mistakeMode ? 'Fehler-Training' : 'Lernrunde'} title="Geschafft" />
-        <ResultSummary total={questions.length} correct={correctCount} wrong={wrong} />
+        <ResultSummary total={mainTotal || questions.length} correct={correctCount} wrong={wrong} />
         <div className="mt-4 space-y-3">
           {levelChanges && (
             <Notice tone="info">
               Lernstand: {levelChanges.up} Vokabeln aufgestiegen, {levelChanges.down} abgestiegen.
             </Notice>
           )}
+          {autoRounds > 0 && <Notice tone="ok">Alle falschen Vokabeln wiederholt, bis sie richtig waren ({autoRounds} {autoRounds === 1 ? 'Runde' : 'Runden'}).</Notice>}
           {earned > 0 && <Notice tone="info">+{earned} Coins fürs Lernen – gut gemacht!</Notice>}
           {saveError && <ErrorBox message={`Die Runde konnte nicht gespeichert werden: ${saveError}`} onRetry={() => void saveMain()} />}
         </div>
         <div className="mt-6 flex flex-wrap gap-3">
-          {wrong.length > 0 && (
+          {wrong.length > 0 && autoRounds === 0 && (
             <Button onClick={() => startRepeat(wrong)} disabled={!sessionId.current && !saveError}>
               <RotateCcw size={18} /> Fehler wiederholen
             </Button>

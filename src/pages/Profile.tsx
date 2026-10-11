@@ -36,6 +36,9 @@ const REASONS: Record<string, string> = {
   copy: 'Abschreiben',
   pay_in: 'Coins erhalten',
   pay_out: 'Coins verschickt',
+  print_discount: '3D-Druck-Rabatt',
+  print_refund: '3D-Druck: Coins zurück',
+  learn_answers: 'Lernen (richtige Antworten)',
 }
 
 const ROLE_LABEL = { user: 'Lernender', mod: 'Moderator', alphamod: 'Alphamod', admin: 'Admin' } as const
