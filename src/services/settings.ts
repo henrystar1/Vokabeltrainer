@@ -8,12 +8,16 @@ export const DEFAULT_SETTINGS: UserSettings = {
   words_per_round: 20,
   case_sensitive: false,
   repeat_until_correct: false,
+  notify_mentions: true,
+  notify_chat: false,
+  notify_print: true,
+  notify_online: 'off',
 }
 
 export async function loadSettings(userId: string): Promise<UserSettings> {
   const { data, error } = await supabase
     .from('user_settings')
-    .select('learn_language,direction_to_foreign,direction_to_german,words_per_round,case_sensitive,repeat_until_correct')
+    .select('learn_language,direction_to_foreign,direction_to_german,words_per_round,case_sensitive,repeat_until_correct,notify_mentions,notify_chat,notify_print,notify_online')
     .eq('user_id', userId)
     .maybeSingle()
   if (error) throw error

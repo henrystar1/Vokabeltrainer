@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { activeDirections, normalizeQuestionCount, normalizeSettings } from './rules'
 
-const base = { learn_language: 'en', direction_to_foreign: true, direction_to_german: true, words_per_round: 21, case_sensitive: false, repeat_until_correct: false }
+const base = { learn_language: 'en', direction_to_foreign: true, direction_to_german: true, words_per_round: 21, case_sensitive: false, repeat_until_correct: false, notify_mentions: true, notify_chat: false, notify_print: true, notify_online: 'off' as const }
 
 describe('settings rules', () => {
   it('macht die Anzahl bei zwei Richtungen gerade', () => {

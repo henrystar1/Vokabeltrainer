@@ -268,3 +268,9 @@ Nach 0006 im Supabase-SQL-Editor ausführen (wiederholbar).
 - Schwarzes Brett: `is_staff()` statt Admin.
 - `user_settings.repeat_until_correct`: Learn.tsx wiederholt falsche Fragen in Runden, bis alle stimmen; Lernstand bleibt unverändert, Wiederholungsantworten werden nur einmal gespeichert.
 - Trigger `award_answer_koins`: 1 Coin je `learn_coin_every` richtige Antworten (nur Lernen, Online-Bücher, keine Wiederholung), Tageslimit `learn_coin_cap`.
+
+## 0020 – Kleine Hinweise (Benachrichtigungen)
+- `user_settings`: `notify_mentions` (an), `notify_chat` (aus), `notify_print` (an), `notify_online` (`off|staff|all`, Standard aus).
+- `notify_poll(chat_after, since)` liefert neue Ereignisse als JSON: Chat-Nachrichten (nach Einstellung gefiltert: @-Erwähnung oder Flüstern an mich, bzw. alle), fertige Druckaufträge (`print_orders.ready_at`, per Trigger gesetzt) und wer online kommt (`profiles.online_since`, von `heartbeat` gesetzt; `hide_presence` wird respektiert). Ohne `chat_after` nur Startwerte, damit beim Öffnen kein Nachrichten-Schwall kommt.
+- `_print_notify` unterdrückt die „Fertig“-Meldung als großes Fenster, wenn der kleine Hinweis aktiv ist.
+- Client: `NotifyProvider` (in `AppShell`) fragt alle 8 s ab und zeigt Hinweise oben rechts (ohne Fokus, auch beim Lernen/Spielen); im Chat selbst keine Hinweise für normale Nachrichten. `lib/mentions.ts` markiert `@Name`-Nachrichten im Chat gelb (gleiche Wortgrenzen-Regel wie die Datenbank).

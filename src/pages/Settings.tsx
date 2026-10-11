@@ -1,5 +1,5 @@
 import { useEffect, useState, type FormEvent } from 'react'
-import { BookOpen, KeyRound, LogOut, User } from 'lucide-react'
+import { Bell, BookOpen, KeyRound, LogOut, User } from 'lucide-react'
 import Button from '../components/ui/Button'
 import Card from '../components/ui/Card'
 import { Field, Select, TextInput } from '../components/ui/Field'
@@ -13,6 +13,8 @@ import { errorMessage } from '../lib/errors'
 import { useAsync } from '../lib/useAsync'
 import { listLanguages } from '../services/books'
 import { updateDisplayName } from '../services/settings'
+import { useNotify } from '../features/notify/NotifyProvider'
+import type { NotifyOnline } from '../types'
 import { setPanic, usePanic } from '../features/panic/panic'
 import { setHidePresence, setTagsHidden } from '../services/koins'
 
@@ -29,13 +31,14 @@ export default function Settings() {
   const { user, displayName, role, setDisplayNameLocal, signOut, tagsHidden, hidePresence, refreshProfile } = useAuth()
   const { settings, update } = useSettings()
   const panic = usePanic()
+  const notify = useNotify()
   const languages = useAsync(listLanguages, [])
   const [name, setName] = useState(displayName ?? '')
   const [count, setCount] = useState(String(settings.words_per_round))
   const [message, setMessage] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
-  const [tab, setTab] = useState<'konto' | 'lernen' | 'sicherheit'>('konto')
+  const [tab, setTab] = useState<'konto' | 'lernen' | 'hinweise' | 'sicherheit'>('konto')
   const [oldPw, setOldPw] = useState('')
   const [newPw, setNewPw] = useState('')
   const [newPw2, setNewPw2] = useState('')
@@ -104,6 +107,7 @@ export default function Settings() {
   const tabs = [
     { id: 'konto', label: 'Konto', icon: User },
     { id: 'lernen', label: 'Lernen', icon: BookOpen },
+    { id: 'hinweise', label: 'Hinweise', icon: Bell },
     { id: 'sicherheit', label: 'Passwort', icon: KeyRound },
   ] as const
 
@@ -215,6 +219,24 @@ export default function Settings() {
               <p className="text-xs text-slate-500">Nach der Lernrunde kommen alle falsch beantworteten Fragen so lange noch einmal dran, bis du jede richtig hattest. Dein Lernstand ändert sich dadurch nicht.</p>
             </Card>
           </>
+        )}
+
+        {tab === 'hinweise' && (
+          <Card className="space-y-4">
+            <p className="label-mono">Kleine Hinweise am Rand</p>
+            <p className="text-sm text-slate-400">Sie erscheinen oben am Bildschirmrand, nehmen keinen Fokus und stören dich auch beim Lernen und Spielen nicht.</p>
+            <Toggle label="Wenn mich jemand im Chat mit @ erwähnt" checked={settings.notify_mentions} onChange={(v) => void run(() => update({ notify_mentions: v }))} />
+            <Toggle label="Bei jeder neuen Chat-Nachricht" checked={settings.notify_chat} onChange={(v) => void run(() => update({ notify_chat: v }))} />
+            <Toggle label="Wenn mein 3D-Druck fertig ist" checked={settings.notify_print} onChange={(v) => void run(() => update({ notify_print: v }))} />
+            <Field label="Wenn jemand online kommt" hint="Wer seinen Online-Status versteckt hat, löst nie einen Hinweis aus.">
+              <Select value={settings.notify_online} onChange={(e) => void run(() => update({ notify_online: e.target.value as NotifyOnline }))}>
+                <option value="off">Nie</option>
+                <option value="staff">Nur Mods und Admins</option>
+                <option value="all">Alle</option>
+              </Select>
+            </Field>
+            <Button variant="secondary" onClick={notify.preview}>Beispiel-Hinweis zeigen</Button>
+          </Card>
         )}
 
         {tab === 'sicherheit' && (

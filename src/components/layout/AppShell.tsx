@@ -6,6 +6,7 @@ import StarField from '../ui/StarField'
 import { FocusProvider } from '../../features/koins/focusMode'
 import PanicButton from '../../features/panic/PanicButton'
 import { ChatProvider } from '../../features/chat/ChatProvider'
+import { NotifyProvider } from '../../features/notify/NotifyProvider'
 
 export default function AppShell() {
   const [collapsed, setCollapsed] = useState(false)
@@ -13,6 +14,7 @@ export default function AppShell() {
 
   return (
     <ChatProvider>
+    <NotifyProvider>
     <FocusProvider value={setFocus}>
       <div className="min-h-full">
         <StarField />
@@ -30,6 +32,7 @@ export default function AppShell() {
         {!focus && <MobileNav />}
       </div>
     </FocusProvider>
+    </NotifyProvider>
     </ChatProvider>
   )
 }

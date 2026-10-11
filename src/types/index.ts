@@ -206,7 +206,17 @@ export interface UserSettings {
   case_sensitive: boolean
   /** Falsche Vokabeln am Ende so oft wiederholen, bis alle richtig sind. */
   repeat_until_correct: boolean
+  /** Kleine Hinweise am Rand: bei @-Erwähnung im Chat. */
+  notify_mentions: boolean
+  /** … bei jeder neuen Chat-Nachricht. */
+  notify_chat: boolean
+  /** … wenn ein 3D-Druck fertig ist. */
+  notify_print: boolean
+  /** … wenn jemand online kommt. */
+  notify_online: NotifyOnline
 }
+
+export type NotifyOnline = 'off' | 'staff' | 'all'
 
 export interface HistoryDay {
   day: string

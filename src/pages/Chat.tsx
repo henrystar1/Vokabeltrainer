@@ -9,6 +9,7 @@ import { ErrorBox } from '../components/ui/States'
 import { useAuth } from '../features/auth/AuthProvider'
 import { useChat } from '../features/chat/ChatProvider'
 import { errorMessage } from '../lib/errors'
+import { mentionsName } from '../lib/mentions'
 import { deleteChatMessage, getChat, postChat, searchPlayers, timeoutChatUser } from '../services/play'
 import { getMyPermissions } from '../services/koins'
 import type { ChatMessage } from '../types'
@@ -58,11 +59,13 @@ interface RowProps {
   g: Group
   live: boolean
   isStaff: boolean
+  /** Eigener Anzeigename: Nachrichten mit @Name werden gelb hervorgehoben. */
+  me: string | null
   onDelete: (id: number) => void
   onTimeout: (m: ChatMessage) => void
 }
 
-const GroupRow = memo(function GroupRow({ g, live, isStaff, onDelete, onTimeout }: RowProps) {
+const GroupRow = memo(function GroupRow({ g, live, isStaff, me, onDelete, onTimeout }: RowProps) {
   const h = g.head
   const whisper = h.kind === 'whisper'
   const toMe = whisper && !h.is_me
@@ -81,8 +84,9 @@ const GroupRow = memo(function GroupRow({ g, live, isStaff, onDelete, onTimeout 
           {g.items.map((m) => {
             const canDelete = isStaff || m.is_me || (m.kind === 'whisper' && !m.is_me)
             const canMute = isStaff && !m.is_me && m.kind === 'text' && m.role === 'user'
+            const pinged = !m.is_me && m.kind === 'text' && mentionsName(m.body, me)
             return (
-              <li key={m.id} className="group flex items-start gap-2">
+              <li key={m.id} className={`group flex items-start gap-2 ${pinged ? '-mx-2 rounded-lg bg-amber-300/15 px-2 py-1 ring-1 ring-amber-300/30' : ''}`} data-pinged={pinged || undefined}>
                 <p className="min-w-0 flex-1 whitespace-pre-wrap break-words text-sm text-slate-100">{m.body}</p>
                 <span className="mt-0.5 flex shrink-0 items-center gap-1.5 text-[11px] text-slate-500">
                   {time(m.created_at)}
@@ -334,7 +338,7 @@ export default function Chat() {
               )
             }
             const live = seen++ >= liveFrom
-            return <GroupRow key={x.key} g={x} live={live} isStaff={isStaff} onDelete={(id) => void remove(id)} onTimeout={setMuteFor} />
+            return <GroupRow key={x.key} g={x} live={live} isStaff={isStaff} me={displayName} onDelete={(id) => void remove(id)} onTimeout={setMuteFor} />
           })}
         </div>
         <div className="h-5 px-1 text-xs text-slate-400" aria-live="polite">
