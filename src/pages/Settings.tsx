@@ -14,7 +14,7 @@ import { useAsync } from '../lib/useAsync'
 import { listLanguages } from '../services/books'
 import { updateDisplayName } from '../services/settings'
 import { useNotify } from '../features/notify/NotifyProvider'
-import type { NotifyOnline } from '../types'
+import type { NotifyDm, NotifyOnline } from '../types'
 import { setPanic, usePanic } from '../features/panic/panic'
 import { setHidePresence, setTagsHidden } from '../services/koins'
 
@@ -233,6 +233,12 @@ export default function Settings() {
                 <option value="off">Nie</option>
                 <option value="staff">Nur Mods und Admins</option>
                 <option value="all">Alle</option>
+              </Select>
+            </Field>
+            <Field label="Nachrichten vom Team" hint="„Am Rand“ erscheint sofort, auch beim Lernen und Spielen, und bleibt, bis du sie wegklickst. „Fenster“ wartet, bis du fertig bist.">
+              <Select value={settings.notify_dm} onChange={(e) => void run(() => update({ notify_dm: e.target.value as NotifyDm }))}>
+                <option value="window">Als Fenster (nach dem Lernen/Spielen)</option>
+                <option value="edge">Als Hinweis am Rand (sofort)</option>
               </Select>
             </Field>
             <Button variant="secondary" onClick={notify.preview}>Beispiel-Hinweis zeigen</Button>

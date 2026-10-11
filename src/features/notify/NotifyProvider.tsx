@@ -1,21 +1,25 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
-import { AtSign, MessageCircle, Printer, UserRound, X, type LucideIcon } from 'lucide-react'
+import { AtSign, Mail, MessageCircle, Printer, UserRound, X, type LucideIcon } from 'lucide-react'
 import { notifyPoll } from '../../services/notify'
+import { getUnreadMessages, markMessagesRead } from '../../services/koins'
 import { useAuth } from '../auth/AuthProvider'
 import { useSettings } from '../settings/SettingsProvider'
 
-type Kind = 'mention' | 'chat' | 'print' | 'online'
-interface Toast { key: string; kind: Kind; title: string; text: string; to: string; until: number }
+type Kind = 'mention' | 'chat' | 'print' | 'online' | 'dm'
+/** `to` = null: kein Ziel (Nachricht vom Team); `until` = Infinity: bleibt, bis man sie wegklickt. */
+interface Toast { key: string; kind: Kind; title: string; text: string; to: string | null; until: number; messageId?: string }
 
 const POLL_MS = 8_000
 const MAX_TOASTS = 3
-const LIFETIME: Record<Kind, number> = { mention: 10_000, chat: 6_000, print: 12_000, online: 5_000 }
+const LIFETIME: Record<Kind, number> = { mention: 10_000, chat: 6_000, print: 12_000, online: 5_000, dm: Infinity }
+const DM_MS = 7_000
 
 const LOOK: Record<Kind, { icon: LucideIcon; box: string; icon_: string }> = {
   mention: { icon: AtSign, box: 'border-amber-300/40 bg-amber-300/15', icon_: 'text-amber-300' },
   chat: { icon: MessageCircle, box: 'border-white/15 bg-space-800/90', icon_: 'text-slate-300' },
   print: { icon: Printer, box: 'border-emerald-300/40 bg-emerald-300/10', icon_: 'text-emerald-300' },
+  dm: { icon: Mail, box: 'border-accent-violet/50 bg-accent-violet/15', icon_: 'text-accent-violet' },
   online: { icon: UserRound, box: 'border-accent-cyan/40 bg-accent-cyan/10', icon_: 'text-accent-cyan' },
 }
 
@@ -40,7 +44,9 @@ export function NotifyProvider({ children }: { children: ReactNode }) {
   const path = useRef(pathname)
   path.current = pathname
 
-  const enabled = !!user && profileReady && !blocked && loaded &&
+  const live = !!user && profileReady && !blocked && loaded
+  const dmEdge = live && settings.notify_dm === 'edge'
+  const enabled = live &&
     (settings.notify_mentions || settings.notify_chat || settings.notify_print || settings.notify_online !== 'off')
 
   const push = useCallback((items: Omit<Toast, 'until'>[]) => {
@@ -58,7 +64,7 @@ export function NotifyProvider({ children }: { children: ReactNode }) {
       // Beim Wiedereinschalten neu starten, damit keine alten Nachrichten auf einmal kommen.
       chatAfter.current = null
       since.current = null
-      setToasts([])
+      setToasts((prev) => prev.filter((t) => t.kind === 'dm'))
       return
     }
     let alive = true
@@ -105,10 +111,34 @@ export function NotifyProvider({ children }: { children: ReactNode }) {
     }
   }, [enabled, push])
 
+  // Nachrichten vom Team als Hinweis am Rand (nur wenn so eingestellt). Sie bleiben, bis man sie wegklickt.
+  useEffect(() => {
+    if (!dmEdge) return
+    let alive = true
+    const fetchDm = async () => {
+      if (document.visibilityState !== 'visible') return
+      const m = await getUnreadMessages().catch(() => null)
+      if (!alive || !m) return
+      push(m.map((x) => ({ key: `m${x.id}`, kind: 'dm' as const, title: `Nachricht von ${x.from_name}`, text: x.body.replace(/\bKoins\b/g, 'Coins'), to: null, messageId: x.id })))
+    }
+    void fetchDm()
+    const timer = window.setInterval(() => void fetchDm(), DM_MS)
+    return () => {
+      alive = false
+      window.clearInterval(timer)
+    }
+  }, [dmEdge, push])
+
+  const dismiss = useCallback((t: Toast) => {
+    setToasts((prev) => prev.filter((x) => x.key !== t.key))
+    if (t.messageId) void markMessagesRead([t.messageId]).catch(() => undefined)
+  }, [])
+
   // Abgelaufene Hinweise entfernen.
   useEffect(() => {
-    if (toasts.length === 0) return
-    const next = Math.min(...toasts.map((t) => t.until)) - Date.now()
+    const finite = toasts.filter((t) => Number.isFinite(t.until))
+    if (finite.length === 0) return
+    const next = Math.min(...finite.map((t) => t.until)) - Date.now()
     const timer = window.setTimeout(() => setToasts((prev) => prev.filter((t) => t.until > Date.now())), Math.max(next, 50) + 20)
     return () => window.clearTimeout(timer)
   }, [toasts])
@@ -125,27 +155,33 @@ export function NotifyProvider({ children }: { children: ReactNode }) {
       <div
         role="status"
         aria-live="polite"
-        className="pointer-events-none fixed inset-x-3 top-3 z-[60] flex flex-col items-end gap-2 sm:left-auto sm:right-4 sm:w-80"
+        className="pointer-events-none fixed inset-x-3 top-3 z-[70] flex flex-col items-end gap-2 sm:left-auto sm:right-4 sm:w-80"
       >
         {toasts.map((t) => {
           const { icon: Icon, box, icon_ } = LOOK[t.kind]
           return (
             <div key={t.key} className={`pointer-events-auto flex w-full animate-rise items-start gap-3 rounded-2xl border p-3 shadow-lg backdrop-blur ${box}`}>
+              {(() => {
+                const inner = (
+                  <>
+                    <Icon size={18} className={`mt-0.5 shrink-0 ${icon_}`} aria-hidden />
+                    <span className="min-w-0">
+                      <span className="block truncate text-sm font-medium text-slate-100">{t.title}</span>
+                      <span className={`mt-0.5 break-words text-xs text-slate-300 ${t.kind === 'dm' ? 'line-clamp-6 whitespace-pre-wrap' : 'line-clamp-2'}`}>{t.text}</span>
+                    </span>
+                  </>
+                )
+                const to = t.to
+                return to === null ? (
+                  <div className="flex min-w-0 flex-1 items-start gap-3">{inner}</div>
+                ) : (
+                  <button type="button" onClick={() => { dismiss(t); navigate(to) }} className="flex min-w-0 flex-1 items-start gap-3 text-left">{inner}</button>
+                )
+              })()}
               <button
                 type="button"
-                onClick={() => { setToasts((prev) => prev.filter((x) => x.key !== t.key)); navigate(t.to) }}
-                className="flex min-w-0 flex-1 items-start gap-3 text-left"
-              >
-                <Icon size={18} className={`mt-0.5 shrink-0 ${icon_}`} aria-hidden />
-                <span className="min-w-0">
-                  <span className="block truncate text-sm font-medium text-slate-100">{t.title}</span>
-                  <span className="mt-0.5 line-clamp-2 break-words text-xs text-slate-300">{t.text}</span>
-                </span>
-              </button>
-              <button
-                type="button"
-                aria-label="Hinweis schließen"
-                onClick={() => setToasts((prev) => prev.filter((x) => x.key !== t.key))}
+                aria-label={t.kind === 'dm' ? 'Gelesen' : 'Hinweis schließen'}
+                onClick={() => dismiss(t)}
                 className="-m-1 shrink-0 rounded-lg p-2 text-slate-400 hover:bg-white/10 hover:text-white"
               >
                 <X size={14} />

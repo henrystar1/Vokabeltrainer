@@ -214,7 +214,11 @@ export interface UserSettings {
   notify_print: boolean
   /** … wenn jemand online kommt. */
   notify_online: NotifyOnline
+  /** Nachrichten vom Team: als Fenster (wie bisher) oder sofort als Hinweis am Rand. */
+  notify_dm: NotifyDm
 }
+
+export type NotifyDm = 'window' | 'edge'
 
 export type NotifyOnline = 'off' | 'staff' | 'all'
 

@@ -78,7 +78,8 @@ export async function adminListItems(): Promise<AdminShopItem[]> {
 
 /* ---------- Online-Anzeige und Nachrichten ---------- */
 
-export const sendHeartbeat = () => rpc<void>('heartbeat')
+/** Meldet „ich bin online“ und was ich gerade mache (Kennung aus lib/activity). */
+export const sendHeartbeat = (activity: string | null = null) => rpc<void>('heartbeat', { p_activity: activity })
 export const adminListOnline = () => rpc<OnlineUser[]>('admin_list_online')
 export const getUnreadMessages = () => rpc<UserMessage[]>('get_unread_messages')
 export const markMessagesRead = (ids: string[]) => rpc<void>('mark_messages_read', { p_ids: ids })

@@ -24,3 +24,9 @@ export const adminCreateUser = (a: NewAccount) =>
   rpc<{ user_id: string; email: string; display_name: string }>('admin_create_user', { p_email: a.email, p_password: a.password, p_name: a.name })
 export const adminCreateUsers = (rows: NewAccount[]) => rpc<NewAccountResult[]>('admin_create_users', { p_rows: rows })
 export const adminSetPassword = (userId: string, password: string) => rpc<void>('admin_set_password', { p_user: userId, p_password: password })
+
+// --- Was machen die Leute gerade? ---
+export interface UserStatus { user_id: string; last_seen_at: string | null; online: boolean; activity: string | null; activity_at: string | null }
+export const adminUserStatus = () => rpc<UserStatus[]>('admin_user_status')
+export interface DirectMessage { id: string; body: string; created_at: string; read_at: string | null }
+export const adminListMessagesTo = (userId: string) => rpc<DirectMessage[]>('admin_list_messages_to', { p_user: userId })
