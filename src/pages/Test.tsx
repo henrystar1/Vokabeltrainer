@@ -23,6 +23,8 @@ import type { BookEntry } from '../types'
 import { usePlus } from '../features/plus/PlusProvider'
 import { deleteResult, generateSentences, getResult, LEVELS, myResults, type Lang, type Level, type StoredResult } from '../services/ai'
 import type { GapItem } from '../lib/gaps'
+import { shuffle } from '../features/learning/random'
+import { pickSheetVocab } from '../features/test/sheetPick'
 import { formatDateTime } from '../lib/format'
 import { GRADE_WORD, gradeFromScore } from '../lib/grade'
 
@@ -48,6 +50,7 @@ export default function Test() {
   const [affectsLevel, setAffectsLevel] = useState(false)
   const plus = usePlus()
   const [style, setStyle] = useState<'quiz' | 'sheet'>('quiz')
+  const [sheetCount, setSheetCount] = useState('20')
   const [withSentences, setWithSentences] = useState(false)
   const [sLevel, setSLevel] = useState<Level>('mittel')
   const [sentences, setSentences] = useState<GapItem[]>([])
@@ -83,7 +86,12 @@ export default function Test() {
     setError(null)
     setSaveError(null)
     try {
-      const qs = buildTestQuestions(vocabInRange, distinctVocabulary(all), { directions })
+      const sheetPick = style === 'sheet'
+        ? pickSheetVocab(vocabInRange, Math.min(100, Math.max(3, Number.parseInt(sheetCount, 10) || 20)), withSentences && plus.active, plus.status?.test_sentences ?? 20, directions.length)
+        : null
+      const qs = sheetPick
+        ? shuffle(buildTestQuestions(sheetPick.rows, distinctVocabulary(all), { directions })).slice(0, sheetPick.rowCount)
+        : buildTestQuestions(vocabInRange, distinctVocabulary(all), { directions })
       if (qs.length === 0) {
         setError('Im gewählten Bereich gibt es keine Vokabeln.')
         setPhase('setup')
@@ -96,12 +104,11 @@ export default function Test() {
       if (style === 'sheet') {
         let extra: GapItem[] = []
         let note: string | null = null
-        if (withSentences && plus.active && (language === 'en' || language === 'fr')) {
-          const max = plus.status?.test_sentences ?? 20
+        if (sheetPick && sheetPick.sentenceVocab.length > 0 && (language === 'en' || language === 'fr')) {
           const r = await generateSentences({
             language: language as Lang,
             level: sLevel,
-            vocab: vocabInRange.filter((v) => v.translations.length > 0).slice(0, max).map((v) => ({ foreign: v.translations[0], german: v.german })),
+            vocab: sheetPick.sentenceVocab.map((v) => ({ foreign: v.translations[0], german: v.german })),
           })
           if (r.ok) {
             extra = r.sentences.flatMap((x) => (x.item ? [{ text: x.item.text, answers: [x.item.answers], hints: [x.item.hint || x.german], explanation: '' }] : []))
@@ -229,7 +236,10 @@ export default function Test() {
         </div>
         {style === 'sheet' && (
           <div className="space-y-3 rounded-xl border border-white/10 bg-space-900/40 p-3">
-            <p className="text-sm text-slate-400">Alle Vokabeln stehen auf einem Blatt zum Ausfüllen. Am Ende bekommst du eine Note, und der Test wird gespeichert.</p>
+            <p className="text-sm text-slate-400">Die Aufgaben stehen auf einem Blatt zum Ausfüllen, in zufälliger Reihenfolge. Am Ende bekommst du eine Note, und der Test wird gespeichert.</p>
+            <Field label="Länge des Tests" hint={`So viele Aufgaben insgesamt (3–100). Die Vokabeln werden zufällig aus dem Bereich gezogen${vocabInRange.length > 0 ? ` (im Bereich: ${vocabInRange.length})` : ''}.`}>
+              <TextInput inputMode="numeric" value={sheetCount} onChange={(e) => setSheetCount(e.target.value.replace(/[^\d]/g, '').slice(0, 3))} aria-label="Anzahl Aufgaben" />
+            </Field>
             <button type="button" onClick={() => { if (!plus.active) plus.openDialog(); else setWithSentences((w) => !w) }}
               className="flex min-h-[44px] w-full items-center gap-3 rounded-xl px-3 text-left text-sm hover:bg-white/5" aria-pressed={withSentences && plus.active}>
               <span className={`flex h-5 w-5 items-center justify-center rounded border ${withSentences && plus.active ? 'border-fuchsia-400 bg-fuchsia-500/30' : 'border-white/30'}`}>{withSentences && plus.active ? '✓' : ''}</span>
@@ -278,8 +288,9 @@ export default function Test() {
               </Field>
             </div>
             <p className="text-sm text-slate-400">
-              {vocabInRange.length} Vokabeln im Bereich → {vocabInRange.length * directions.length} Abfragen
-              {directions.length === 2 ? ' (erst Fremdsprache → Deutsch, dann zurück)' : ''}
+              {style === 'sheet'
+                ? `${vocabInRange.length} Vokabeln im Bereich, davon werden zufällig so viele gezogen, dass das Blatt ${Math.min(100, Math.max(3, Number.parseInt(sheetCount, 10) || 20))} Aufgaben hat.`
+                : `${vocabInRange.length} Vokabeln im Bereich → ${vocabInRange.length * directions.length} Abfragen${directions.length === 2 ? ' (erst Fremdsprache → Deutsch, dann zurück)' : ''}`}
             </p>
             {style === 'quiz' && <label className="flex min-h-[44px] items-center gap-3 rounded-xl border border-white/10 bg-space-900/50 px-4 text-sm">
               <input type="checkbox" className="h-5 w-5 accent-cyan-400" checked={affectsLevel} onChange={(e) => setAffectsLevel(e.target.checked)} />
