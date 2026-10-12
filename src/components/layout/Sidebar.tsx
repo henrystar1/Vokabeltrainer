@@ -7,6 +7,8 @@ import { navGroupsFor } from '../../lib/navigation'
 import { useLocks } from '../../features/locks/LocksProvider'
 import { useChat } from '../../features/chat/ChatProvider'
 import { usePrintTodo } from '../../features/print/hooks'
+import { usePlus } from '../../features/plus/PlusProvider'
+import { Lock } from 'lucide-react'
 
 interface SidebarProps {
   collapsed: boolean
@@ -18,6 +20,7 @@ export default function Sidebar({ collapsed, onToggle }: SidebarProps) {
   const { unread } = useChat()
   const { locked } = useLocks()
   const todo = usePrintTodo()?.todo ?? 0
+  const plus = usePlus()
   return (
     <aside
       className={`glass fixed inset-y-0 left-0 z-30 hidden flex-col border-y-0 border-l-0 transition-[width] duration-300 ease-out md:flex ${
@@ -41,7 +44,9 @@ export default function Sidebar({ collapsed, onToggle }: SidebarProps) {
                 <p className="label-mono px-3 pb-1 pt-1 text-[10px] uppercase tracking-widest text-slate-500">{grp.title}</p>
               ))}
             <div className="space-y-0.5">
-              {grp.items.map(({ to, label, icon: Icon }) => (
+              {grp.items.map(({ to, label, icon: Icon, plus: isPlus }) => {
+                const teaser = !!isPlus && !plus.active
+                return (
                 <NavLink
                   key={to}
                   to={to}
@@ -51,7 +56,9 @@ export default function Sidebar({ collapsed, onToggle }: SidebarProps) {
                     `group relative flex min-h-[40px] items-center gap-3 rounded-xl px-3 text-sm font-medium transition ${
                       isActive
                         ? 'bg-accent-cyan/10 text-accent-cyan shadow-[inset_0_0_0_1px_rgb(var(--c-cyan)/0.25)]'
-                        : 'text-slate-400 hover:bg-white/5 hover:text-slate-100'
+                        : teaser
+                          ? 'plus-nav text-fuchsia-300 hover:bg-fuchsia-400/10'
+                          : 'text-slate-400 hover:bg-white/5 hover:text-slate-100'
                     }`
                   }
                 >
@@ -61,6 +68,7 @@ export default function Sidebar({ collapsed, onToggle }: SidebarProps) {
                     {to === '/druckshop' && todo > 0 && <span className="absolute -right-1 -top-1 h-2.5 w-2.5 rounded-full bg-amber-400 ring-2 ring-space-900" aria-label="Offene Druckaufträge" />}
                   </span>
                   {!collapsed && <span className="truncate">{label}</span>}
+                  {teaser && !collapsed && <Lock size={13} className="ml-auto shrink-0 opacity-80" aria-label="Mit Plus" />}
                   {!collapsed && to === '/druckshop' && todo > 0 && (
                     <span className="ml-auto rounded-full bg-amber-400 px-1.5 text-[10px] font-semibold text-space-950">{todo > 99 ? '99+' : todo}</span>
                   )}
@@ -68,7 +76,8 @@ export default function Sidebar({ collapsed, onToggle }: SidebarProps) {
                     <span className="ml-auto rounded-full bg-rose-500 px-1.5 text-[10px] font-semibold text-white">{unread > 99 ? '99+' : unread}</span>
                   )}
                 </NavLink>
-              ))}
+                )
+              })}
             </div>
           </div>
         ))}

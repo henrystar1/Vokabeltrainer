@@ -24,6 +24,9 @@ export const AVATARS: Record<string, string> = {
   avatar_ninja: '🥷',
   avatar_crown: '👑',
   avatar_diamond: '💎',
+  // Vokabeltrainer +
+  avatar_plus_stern: '🌟',
+  avatar_plus_kristall: '🔮',
 }
 
 /** Namensfarben: Einzelfarbe oder Verlauf. */
@@ -41,6 +44,10 @@ export const NAME_COLORS: Record<string, { solid?: string; gradient?: string }> 
   color_candy: { gradient: 'linear-gradient(90deg,#f9a8d4,#c4b5fd,#93c5fd)' },
   color_void: { gradient: 'linear-gradient(90deg,#1d4ed8,#38bdf8,#e0f2fe,#38bdf8,#1d4ed8)' },
   color_aurora: { gradient: 'linear-gradient(90deg,#34d399,#22d3ee,#a78bfa,#f472b6)' },
+  // Vokabeltrainer +
+  color_plus_nordlicht: { gradient: 'linear-gradient(90deg,#34d399,#06b6d4,#8b5cf6,#d946ef,#34d399)' },
+  color_plus_rosegold: { gradient: 'linear-gradient(90deg,#fda4af,#fde68a,#fb7185,#fcd9b6)' },
+  color_plus_eis: { gradient: 'linear-gradient(90deg,#e0f2fe,#7dd3fc,#ffffff,#a5f3fc)' },
 }
 
 /** Effekt-Artikel → CSS-Klasse (Definition in index.css). */
@@ -63,6 +70,8 @@ export const EFFECT_CLASSES: Record<string, string> = {
   effect_piano: 'fx-piano',
   effect_bike: 'fx-bike',
   effect_frog: 'fx-frog',
+  // Vokabeltrainer +
+  effect_plus_glanz: 'fx-plus-glanz',
 }
 
 /** Spender-Tags aus dem Shop (Klasse in index.css). */
@@ -80,6 +89,7 @@ export const TAGS: Record<string, { label: string; className: string }> = {
   tag_pro: { label: 'PRO', className: 'tag-pro' },
   tag_mvp: { label: 'MVP', className: 'tag-mvp' },
   tag_elite: { label: 'ELITE', className: 'tag-elite' },
+  tag_plus: { label: '+', className: 'tag-plus' },
 }
 
 /** Automatische Rollen-Tags (nicht kaufbar). */
@@ -137,6 +147,17 @@ export interface ThemePalette {
 export const DEFAULT_THEME = 'theme_space'
 
 export const THEMES: Record<string, ThemePalette> = {
+  // Vokabeltrainer +
+  theme_plus_mitternacht: {
+    s950: '#060616', s900: '#0b0b24', s800: '#12123a', s700: '#1c1b55', s600: '#2a2878',
+    cyan: '#c084fc', violet: '#818cf8', blue: '#38bdf8',
+    decor: 'sparkles', decorColors: ['#e9d5ff', '#a5b4fc', '#67e8f9'], preview: 'linear-gradient(135deg,#060616,#2a2878 50%,#c084fc,#38bdf8)', fx: 'shine',
+  },
+  theme_plus_glut: {
+    s950: '#14070a', s900: '#1e0b10', s800: '#2e1018', s700: '#481826', s600: '#66223a',
+    cyan: '#fb7185', violet: '#f59e0b', blue: '#f472b6',
+    decor: 'fireflies', decorColors: ['#fdba74', '#fb7185', '#fde68a'], preview: 'linear-gradient(135deg,#14070a,#66223a 50%,#fb7185,#f59e0b)', fx: 'hue',
+  },
   theme_space: {
     s950: '#05070f', s900: '#080c1a', s800: '#0d1326', s700: '#141c36', s600: '#1d2747',
     cyan: '#22d3ee', violet: '#8b5cf6', blue: '#3b82f6',

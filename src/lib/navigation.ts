@@ -1,5 +1,5 @@
 import type { LockKey } from '../services/koins'
-import { BookOpen, MessageSquarePlus, ShoppingBag, UserCircle, Brain, ClipboardCheck, Home, Search, Settings, ShieldCheck, Trophy, BarChart3, Gamepad2, MessagesSquare, Target, Swords, Zap, ListChecks, Languages, ArrowLeftRight, Dices, Users, Pin, PenLine, Printer, type LucideIcon } from 'lucide-react'
+import { BookOpen, MessageSquarePlus, ShoppingBag, UserCircle, Brain, ClipboardCheck, Home, Search, Settings, ShieldCheck, Trophy, BarChart3, Gamepad2, MessagesSquare, Target, Swords, Zap, ListChecks, Languages, ArrowLeftRight, Dices, Users, Pin, PenLine, Printer, Sparkles, type LucideIcon } from 'lucide-react'
 
 export interface NavItem {
   to: string
@@ -7,6 +7,8 @@ export interface NavItem {
   icon: LucideIcon
   /** Wenn der Admin diese Funktion sperrt, verschwindet der Eintrag. */
   lock?: LockKey
+  /** Vokabeltrainer +: ohne Plus farbig mit Schloss, mit Plus normal. */
+  plus?: boolean
 }
 
 export interface NavGroup {
@@ -27,6 +29,7 @@ export const NAV_GROUPS: NavGroup[] = [
     { to: '/lernen', label: 'Lernen', icon: Brain },
     { to: '/abschreiben', label: 'Abschreiben', icon: PenLine },
     { to: '/test', label: 'Test', icon: ClipboardCheck },
+    { to: '/grammatik', label: 'Grammatik', icon: Sparkles, plus: true },
     { to: '/ueben', label: 'Multiple Choice', icon: ListChecks },
     { to: '/konjugieren', label: 'Konjugieren (FR)', icon: Languages },
     { to: '/genus', label: 'le oder la?', icon: ArrowLeftRight },

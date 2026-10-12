@@ -37,6 +37,8 @@ const REASONS: Record<string, string> = {
   pay_in: 'Coins erhalten',
   pay_out: 'Coins verschickt',
   print_discount: '3D-Druck-Rabatt',
+  plus_day: 'Vokabeltrainer + (1 Tag)',
+  plus_refund: 'Vokabeltrainer +: Rückerstattung',
   print_refund: '3D-Druck: Coins zurück',
   learn_answers: 'Lernen (richtige Antworten)',
 }

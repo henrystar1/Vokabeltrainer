@@ -42,7 +42,10 @@ export default function PricesTab() {
   )
 }
 
-function SettingRow({ s, onSaved }: { s: PrintSetting; onSaved: () => void }) {
+export interface SettingLike { key: string; value: number; label: string; unit: string; hint: string; min_value: number; max_value: number }
+
+/** Eine Einstellung mit Eingabefeld; `save` entscheidet, wohin gespeichert wird (Standard: Druck-Einstellungen). */
+export function SettingRow({ s, onSaved, save: saveFn = adminPrintSetSetting }: { s: SettingLike; onSaved: () => void; save?: (key: string, value: number) => Promise<unknown> }) {
   const [text, setText] = useState(String(s.value).replace('.', ','))
   const [state, setState] = useState<'idle' | 'busy' | 'ok' | string>('idle')
   useEffect(() => setText(String(s.value).replace('.', ',')), [s.value])
@@ -53,7 +56,7 @@ function SettingRow({ s, onSaved }: { s: PrintSetting; onSaved: () => void }) {
   async function save() {
     setState('busy')
     try {
-      await adminPrintSetSetting(s.key, n)
+      await saveFn(s.key, n)
       setState('ok')
       onSaved()
       window.setTimeout(() => setState('idle'), 1500)

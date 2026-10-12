@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { BookOpen, Crown, Gift, Plus, RotateCcw, Send, ShieldCheck, ShieldOff, Trash2, UserCheck, Ban, Wrench } from 'lucide-react'
 import ManageUser from './ManageUser'
+import PlusSection from './PlusSection'
 import { Avatar } from '../profile/PlayerTag'
 import Button from '../ui/Button'
 import Modal from '../ui/Modal'
@@ -266,6 +267,8 @@ export default function PersonSheet({ user: u, status, onClose, onChanged }: { u
           </p>
           <p className="text-xs text-slate-500">Zuletzt angemeldet {formatDateTime(u.last_sign_in_at)}. Speicherangaben sind Schätzungen; fremde Inhalte siehst du nicht.</p>
         </section>
+
+        <PlusSection userId={u.user_id} name={u.display_name} />
 
         <section className="space-y-2">
           <h3 className="label-mono">Coins, Punkte, Artikel</h3>

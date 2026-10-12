@@ -304,6 +304,8 @@ export interface ShopItem {
   custom?: boolean
   style?: Record<string, unknown> | null
   svg?: string | null
+  /** Nur mit Vokabeltrainer + nutzbar (Preis 0, nicht kaufbar). */
+  plus_only?: boolean
 }
 
 /** Eigener Artikel, wie ihn alle Nutzer zum Darstellen brauchen. */

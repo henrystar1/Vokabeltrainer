@@ -1,12 +1,13 @@
 import { useState } from 'react'
 import { NavLink, useLocation } from 'react-router-dom'
-import { LogOut, MoreHorizontal, X } from 'lucide-react'
+import { Lock, LogOut, MoreHorizontal, X } from 'lucide-react'
 import { navGroupsFor, navItemsFor } from '../../lib/navigation'
 import { useChat } from '../../features/chat/ChatProvider'
 import { usePrintTodo } from '../../features/print/hooks'
 import KoinBadge from '../profile/KoinBadge'
 import { useAuth } from '../../features/auth/AuthProvider'
 import { useLocks } from '../../features/locks/LocksProvider'
+import { usePlus } from '../../features/plus/PlusProvider'
 
 const PRIMARY = ['/', '/buecher', '/lernen', '/test']
 
@@ -17,6 +18,7 @@ export default function MobileNav() {
   const { unread } = useChat()
   const todo = usePrintTodo()?.todo ?? 0
   const { locked } = useLocks()
+  const plus = usePlus()
   const NAV_ITEMS = navItemsFor(isStaff, locked)
   const groups = navGroupsFor(isStaff, locked)
     .map((grp) => ({ ...grp, items: grp.items.filter((i) => !PRIMARY.includes(i.to)) }))
@@ -52,21 +54,25 @@ export default function MobileNav() {
               <div key={grp.title || 'top'} className="pb-1">
                 {grp.title && <p className="label-mono px-3 pb-1 pt-2 text-[10px] uppercase tracking-widest text-slate-500">{grp.title}</p>}
                 <div className="grid grid-cols-2 gap-1">
-                  {grp.items.map(({ to, label, icon: Icon }) => (
+                  {grp.items.map(({ to, label, icon: Icon, plus: isPlus }) => {
+                    const teaser = !!isPlus && !plus.active
+                    return (
                     <NavLink
                       key={to}
                       to={to}
                       onClick={() => setOpen(false)}
                       className={({ isActive }) =>
-                        `relative flex min-h-[48px] items-center gap-2.5 rounded-xl px-3 text-sm ${isActive ? 'bg-accent-cyan/10 text-accent-cyan' : 'bg-white/[0.03] text-slate-200'}`
+                        `relative flex min-h-[48px] items-center gap-2.5 rounded-xl px-3 text-sm ${isActive ? 'bg-accent-cyan/10 text-accent-cyan' : teaser ? 'plus-nav bg-fuchsia-400/10 text-fuchsia-200' : 'bg-white/[0.03] text-slate-200'}`
                       }
                     >
                       <Icon size={18} className="shrink-0" />
                       <span className="truncate">{label}</span>
+                      {teaser && <Lock size={13} className="ml-auto shrink-0 opacity-80" aria-label="Mit Plus" />}
                       {to === '/chat' && unread > 0 && <span className="absolute right-2 top-2 h-2.5 w-2.5 rounded-full bg-rose-500" aria-label="Neue Nachrichten" />}
                       {to === '/druckshop' && todo > 0 && <span className="absolute right-2 top-2 h-2.5 w-2.5 rounded-full bg-amber-400" aria-label="Offene Druckaufträge" />}
                     </NavLink>
-                  ))}
+                    )
+                  })}
                 </div>
               </div>
             ))}

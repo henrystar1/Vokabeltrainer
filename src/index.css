@@ -211,3 +211,37 @@ body {
 @media (prefers-reduced-motion: reduce) {
   .tagc-shine, .tagc-rainbow, .cname-run, .fx-zocker::before, .fx-zocker::after, .fxc-dollar::before, .fxc-dollar::after, .fxc-pulse, .fxc-float, .fxc-shimmer, .fxc-rainbow, .tag-elite, [data-fx] .btn-fx, [data-fx] .btn-fx::after { animation: none; }
 }
+
+/* ---------- Vokabeltrainer +: Menü, Hinweisfeld, Tag ---------- */
+.plus-nav { background-image: linear-gradient(90deg, rgb(217 70 239 / 0.14), rgb(34 211 238 / 0.08)); box-shadow: inset 0 0 0 1px rgb(217 70 239 / 0.28); }
+.plus-banner { color: #fae8ff; background: linear-gradient(120deg, rgb(147 51 234 / 0.45), rgb(219 39 119 / 0.35) 55%, rgb(34 211 238 / 0.3)); background-size: 200% 100%; animation: tag-gold 6s linear infinite; box-shadow: 0 0 24px rgb(217 70 239 / 0.25); }
+.tag-plus { color: #fff; background: linear-gradient(100deg, #a855f7, #ec4899 45%, #22d3ee 90%); background-size: 200% 100%; animation: tag-gold 3s linear infinite; box-shadow: 0 0 12px rgb(217 70 239 / 0.6); }
+
+/* ---------- Aufgabenblatt (wie Papier) ---------- */
+.sheet-paper { background: #fbfaf6; color: #1f2937; border-radius: 1rem; padding: 1.5rem 1.25rem; box-shadow: 0 10px 40px rgb(0 0 0 / 0.35); background-image: repeating-linear-gradient(transparent, transparent 2.55rem, rgb(148 163 184 / 0.18) 2.55rem, rgb(148 163 184 / 0.18) 2.6rem); background-position: 0 4.5rem; }
+@media (min-width: 640px) { .sheet-paper { padding: 2rem 2.25rem; } }
+.sheet-item { padding-left: 0.25rem; }
+.sheet-item::marker { font-weight: 700; color: #64748b; }
+.sheet-heading { font-family: ui-serif, Georgia, serif; font-weight: 700; font-size: 1.05rem; margin: 0.5rem 0 0.6rem -1.5rem; padding-bottom: 0.2rem; border-bottom: 1px solid #cbd5e1; }
+.sheet-gap-wrap { display: inline-flex; align-items: baseline; gap: 0.25rem; margin: 0 0.25rem; }
+.sheet-gap { background: transparent; border: 0; border-bottom: 2px solid #64748b; color: #3730a3; font-weight: 600; text-align: center; padding: 0 0.25rem; min-height: 2.2rem; outline: none; border-radius: 0; font-size: 1rem; }
+.sheet-gap:focus { border-bottom-color: #7c3aed; background: rgb(124 58 237 / 0.07); }
+.sheet-gap-ok { color: #047857; border-bottom-color: #10b981; background: rgb(16 185 129 / 0.12); }
+.sheet-gap-bad { color: #be123c; border-bottom-color: #f43f5e; background: rgb(244 63 94 / 0.1); text-decoration: line-through; }
+.sheet-hint { font-size: 0.8rem; color: #64748b; }
+.sheet-solution { margin-top: 0.25rem; font-size: 0.85rem; line-height: 1.4; padding: 0.35rem 0.6rem; border-left: 3px solid #10b981; background: rgb(255 255 255 / 0.7); }
+.sheet-accents { display: flex; flex-wrap: wrap; gap: 0.35rem; margin-bottom: 1rem; }
+.sheet-accent { min-width: 2.25rem; min-height: 2.25rem; border-radius: 0.5rem; border: 1px solid #cbd5e1; background: #fff; color: #334155; font-weight: 600; }
+.sheet-accent:active { background: #e2e8f0; }
+
+@media print {
+  aside, nav.fixed, .no-print { display: none !important; }
+  main { padding: 0 !important; }
+  body { background: #fff !important; }
+  .sheet-paper { box-shadow: none; background-image: none; }
+}
+
+/* Plus-Effekt: weicher violetter Glanz, der über den Namen läuft */
+.fx-plus-glanz { filter: drop-shadow(0 0 5px rgb(217 70 239 / 0.75)); animation: fx-plus-glanz 2.6s ease-in-out infinite; }
+@keyframes fx-plus-glanz { 0%, 100% { filter: drop-shadow(0 0 3px rgb(217 70 239 / 0.6)) brightness(1); } 50% { filter: drop-shadow(0 0 9px rgb(34 211 238 / 0.85)) brightness(1.35); } }
+@media (prefers-reduced-motion: reduce) { .fx-plus-glanz, .tag-plus, .plus-banner { animation: none; } }

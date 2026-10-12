@@ -39,6 +39,7 @@ const PrintShop = lazy(() => import('./pages/PrintShop'))
 import Search from './pages/Search'
 import Settings from './pages/Settings'
 import Stats from './pages/Stats'
+import Grammar from './pages/Grammar'
 import Test from './pages/Test'
 import ForgotPassword from './pages/auth/ForgotPassword'
 import Login from './pages/auth/Login'
@@ -81,6 +82,7 @@ export default function App() {
           <Route path="lernen" element={<Learn />} />
           <Route path="abschreiben" element={<Copy />} />
           <Route path="test" element={<Test />} />
+          <Route path="grammatik" element={<Grammar />} />
           <Route path="spiele" element={<Gate k="games"><Games /></Gate>} />
           <Route path="gambling" element={<Gate k="gambling"><Gambling /></Gate>} />
           <Route path="ueben" element={<Practice />} />

@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react'
 import CoinIcon from '../components/ui/CoinIcon'
-import { Check, Pencil, Plus } from 'lucide-react'
+import { Check, Lock, Pencil, Plus } from 'lucide-react'
+import { usePlus } from '../features/plus/PlusProvider'
 import Button from '../components/ui/Button'
 import Card from '../components/ui/Card'
 import Modal from '../components/ui/Modal'
@@ -37,6 +38,7 @@ export default function Shop() {
   useCustomVersion()
   const [editing, setEditing] = useState<ShopItem | 'new' | null>(null)
   const wallet = useWallet()
+  const plus = usePlus()
   const shop = useAsync(getShop, [])
   const [kind, setKind] = useState<ShopKind>('avatar')
   const [confirm, setConfirm] = useState<ShopItem | null>(null)
@@ -131,6 +133,7 @@ export default function Shop() {
                     <span className="font-medium">{item.name}</span>
                     {item.kind === 'avatar' && AVATARS[item.id] && <span className="text-lg">{AVATARS[item.id]}</span>}
                     {item.active === false && <span className="rounded-full border border-white/15 px-2 py-0.5 text-[10px] text-slate-400">Nicht mehr im Shop</span>}
+                    {item.plus_only && <span className="tag tag-plus !text-[10px]">PLUS</span>}
                     {item.required_role && <span className="tag tag-admin">{item.required_role === 'admin' ? 'Nur Admin' : 'Nur Mods'}</span>}
                     {isAdmin && item.custom && (
                       <button type="button" aria-label="Artikel bearbeiten" title="Bearbeiten" onClick={() => setEditing(item)} className="flex min-h-[36px] w-9 items-center justify-center rounded-lg text-slate-400 hover:text-white">
@@ -159,12 +162,14 @@ export default function Shop() {
                     <Button variant="secondary" disabled={busy} onClick={() => void act(() => equipItem(item.id), 'Ausgewählt.')}>
                       Verwenden
                     </Button>
+                  ) : item.plus_only ? (
+                    <Button variant="secondary" onClick={plus.openDialog}><Lock size={16} /> Mit Plus freischalten</Button>
                   ) : (
                     <Button disabled={busy || !affordable} onClick={() => setConfirm(item)}>
                       <CoinIcon size={16} /> {item.price.toLocaleString('de-DE')} Coins
                     </Button>
                   )}
-                  {!item.owned && !affordable && <p className="text-xs text-slate-500">Dir fehlen {item.price - wallet.balance} Coins.</p>}
+                  {!item.owned && !item.plus_only && !affordable && <p className="text-xs text-slate-500">Dir fehlen {item.price - wallet.balance} Coins.</p>}
                 </Card>
               )
             })}

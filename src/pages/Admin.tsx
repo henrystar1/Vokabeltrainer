@@ -1,6 +1,6 @@
-import { useState, type ReactNode } from 'react'
+import { useEffect, useState, type ReactNode } from 'react'
 import { useSearchParams } from 'react-router-dom'
-import { Ban, Box, ListOrdered, Palette, Printer, Calculator, Flag, Gift, KeyRound, UserPlus, Power, MessageSquarePlus, Radio, ShieldCheck, SlidersHorizontal, Store, Ticket, UserCog, Users } from 'lucide-react'
+import { Ban, Box, Sparkles, ListOrdered, Palette, Printer, Calculator, Flag, Gift, KeyRound, UserPlus, Power, MessageSquarePlus, Radio, ShieldCheck, SlidersHorizontal, Store, Ticket, UserCog, Users } from 'lucide-react'
 import PageHeader from '../components/ui/PageHeader'
 import { ErrorBox, Spinner } from '../components/ui/States'
 import { useAuth } from '../features/auth/AuthProvider'
@@ -21,9 +21,12 @@ import CatalogTab from './admin/print/CatalogTab'
 import ColorsTab from './admin/print/ColorsTab'
 import PricesTab from './admin/print/PricesTab'
 import BansTab from './admin/print/BansTab'
+import PlusTab from './admin/PlusTab'
+import PlusMoneyTab from './admin/PlusMoneyTab'
+import { adminPlusCounts } from '../services/plus'
 import { usePrintTodo } from '../features/print/hooks'
 
-type Tab = 'reviews' | 'feedback' | 'online' | 'users' | 'staff' | 'modrights' | 'rules' | 'shop' | 'codes' | 'grant' | 'locks' | 'accounts' | 'pqueue' | 'pcatalog' | 'pcolors' | 'pprices' | 'pbans'
+type Tab = 'reviews' | 'feedback' | 'online' | 'users' | 'staff' | 'modrights' | 'rules' | 'shop' | 'codes' | 'grant' | 'locks' | 'accounts' | 'pqueue' | 'pcatalog' | 'pcolors' | 'pprices' | 'pbans' | 'plus' | 'plusmoney'
 
 /** Adresse ?bereich=… → Startseite der Verwaltung. */
 const DEEP_LINKS: Record<string, Tab> = { druck: 'pqueue', 'druck-katalog': 'pcatalog', 'druck-preise': 'pprices' }
@@ -37,6 +40,12 @@ export default function Admin() {
   const p = perms.data
   const todo = usePrintTodo()
   const [params] = useSearchParams()
+  const plusCounts = useAsync(() => (isAdmin ? adminPlusCounts() : Promise.resolve({ requests: 0, ai_problem: false })), [isAdmin])
+  useEffect(() => {
+    const t = window.setInterval(() => plusCounts.reload(), 60_000)
+    return () => window.clearInterval(t)
+  }, [plusCounts.reload])
+  const plusTodo = (plusCounts.data?.requests ?? 0) + (plusCounts.data?.ai_problem ? 1 : 0)
 
   const groups: Group[] = [
     {
@@ -85,6 +94,15 @@ export default function Admin() {
             { id: 'pcolors' as const, label: 'Farben', icon: <Palette size={15} /> },
             { id: 'pprices' as const, label: 'Preise & Werte', icon: <Calculator size={15} /> },
             { id: 'pbans' as const, label: 'Gesperrt', icon: <Ban size={15} /> },
+          ],
+        },
+        {
+          id: 'plus',
+          label: plusTodo > 0 ? `Plus (${plusTodo})` : 'Plus',
+          icon: <Sparkles size={16} />,
+          tabs: [
+            { id: 'plus' as const, label: plusTodo > 0 ? `Anfragen & KI (${plusTodo})` : 'Anfragen & KI', icon: <Sparkles size={15} /> },
+            { id: 'plusmoney' as const, label: 'Preise & Verdienst', icon: <Calculator size={15} /> },
           ],
         }]
       : []),
@@ -138,6 +156,8 @@ export default function Admin() {
       {active === 'pcolors' && isAdmin && <ColorsTab />}
       {active === 'pprices' && isAdmin && <PricesTab />}
       {active === 'pbans' && isAdmin && <BansTab />}
+      {active === 'plus' && isAdmin && <PlusTab />}
+      {active === 'plusmoney' && isAdmin && <PlusMoneyTab />}
     </div>
   )
 }
