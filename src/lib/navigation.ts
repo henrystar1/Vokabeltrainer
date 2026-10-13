@@ -1,5 +1,5 @@
 import type { LockKey } from '../services/koins'
-import { BookOpen, MessageSquarePlus, ShoppingBag, UserCircle, Brain, ClipboardCheck, Home, Search, Settings, ShieldCheck, Trophy, BarChart3, Gamepad2, MessagesSquare, Target, Swords, Zap, ListChecks, Languages, ArrowLeftRight, Dices, Users, Pin, PenLine, Printer, Sparkles, Crown, type LucideIcon } from 'lucide-react'
+import { BookOpen, MessageSquarePlus, ShoppingBag, UserCircle, Brain, ClipboardCheck, Home, Search, Settings, ShieldCheck, Trophy, BarChart3, Gamepad2, MessagesSquare, Target, Swords, Zap, ListChecks, Languages, ArrowLeftRight, Dices, Users, Pin, PenLine, Printer, Sparkles, Crown, Calculator, type LucideIcon } from 'lucide-react'
 
 export interface NavItem {
   to: string
@@ -32,6 +32,7 @@ export const NAV_GROUPS: NavGroup[] = [
     { to: '/abschreiben', label: 'Abschreiben', icon: PenLine },
     { to: '/test', label: 'Test', icon: ClipboardCheck },
     { to: '/grammatik', label: 'Grammatik', icon: Sparkles, plus: true },
+    { to: '/mathe', label: 'Mathe', icon: Calculator },
     { to: '/ueben', label: 'Multiple Choice', icon: ListChecks },
     { to: '/konjugieren', label: 'Konjugieren (FR)', icon: Languages },
     { to: '/genus', label: 'le oder la?', icon: ArrowLeftRight },

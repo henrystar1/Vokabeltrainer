@@ -303,3 +303,7 @@ Nach 0006 im Supabase-SQL-Editor ausführen (wiederholbar).
 - `_push_send` ruft per `pg_net` die Edge Function `push` auf (Header `x-push-secret`). Fehler werden protokolliert und blockieren nie die auslösende Aktion. Fehlt pg_net, steht `kein pg_net` im Protokoll.
 - Auslöser: `chat_messages` (Erwähnung/Flüstern/optional alles), `user_messages` (Team-Nachricht), `print_orders` (lieferbereit). Es gelten die Schalter aus 0020. Wer in den letzten 90 s aktiv war, bekommt keinen Push (der Rand-Hinweis übernimmt).
 - Client: `public/sw.js` (Service Worker), `src/lib/serviceWorker.ts`, `src/services/push.ts`, `src/features/push/PushSettings.tsx` (Einstellungen → Hinweise). Einrichtung: `supabase/functions/push/README.md`.
+
+## Mathe (nur Client, keine Migration)
+- `src/features/math/problems.ts`: Aufgaben-Generator für + − × ÷ in 5 Stufen (Division immer ohne Rest, Minus erst ab Stufe 5 negativ), `parseAnswer` liest Eingaben tolerant. Tests in `problems.test.ts`.
+- `src/pages/Math.tsx` (Route `/mathe`, Menü „Lernen“): Rechenarten und Stufe wählen, 10/20/30 Aufgaben, Auswertung mit Zeit und Fehlerliste. Die Auswahl merkt sich der Browser. Es gibt keine Coins.
