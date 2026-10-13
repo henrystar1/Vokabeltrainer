@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef } from 'react'
 import { RotateCcw, RotateCw } from 'lucide-react'
 import { PadButton } from './controls'
 import { SNAKE_SIZE, newSnake, snakeDelay, step, turn, type Dir, type SnakeState } from './snake'
+import { plusOverlay } from './plusfx'
 
 const PX = 20
 const KEYS: Record<string, Dir> = { ArrowUp: 'up', ArrowDown: 'down', ArrowLeft: 'left', ArrowRight: 'right', w: 'up', s: 'down', a: 'left', d: 'right' }
@@ -9,13 +10,17 @@ const KEYS: Record<string, Dir> = { ArrowUp: 'up', ArrowDown: 'down', ArrowLeft:
 export interface GameProps {
   onScore: (score: number) => void
   onOver: (score: number) => void
+  /** Plus-Grafik an. */
+  plus?: boolean
 }
 
-export default function SnakeGame({ onScore, onOver }: GameProps) {
+export default function SnakeGame({ onScore, onOver, plus }: GameProps) {
   const canvas = useRef<HTMLCanvasElement>(null)
   const state = useRef<SnakeState>(newSnake())
   const cb = useRef({ onScore, onOver })
   cb.current = { onScore, onOver }
+  const plusOn = useRef(!!plus)
+  plusOn.current = !!plus
 
   const draw = useCallback(() => {
     const ctx = canvas.current?.getContext('2d')
@@ -45,6 +50,7 @@ export default function SnakeGame({ onScore, onOver }: GameProps) {
       ctx.roundRect(p.x * PX + 1, p.y * PX + 1, PX - 2, PX - 2, 5)
       ctx.fill()
     })
+    if (plusOn.current) plusOverlay(ctx, SNAKE_SIZE * PX, SNAKE_SIZE * PX)
   }, [])
 
   useEffect(() => {

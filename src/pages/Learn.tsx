@@ -21,6 +21,9 @@ import { activateNextPage } from '../services/community'
 import { getMistakePool } from '../services/play'
 import { getAppSettings } from '../services/koins'
 import { addRepeatAnswers, getLearningPool, submitSession } from '../services/learning'
+import PlusHint from '../features/plus/PlusHint'
+import { usePlus } from '../features/plus/PlusProvider'
+import { plusMakeDue } from '../services/plus'
 
 type Phase = 'setup' | 'loading' | 'main' | 'result' | 'repeat' | 'repeat-result'
 
@@ -28,6 +31,9 @@ export default function Learn() {
   const [params] = useSearchParams()
   const { settings } = useSettings()
   const wallet = useWallet()
+  const plus = usePlus()
+  const [dueBusy, setDueBusy] = useState(false)
+  const [dueMsg, setDueMsg] = useState<string | null>(null)
   const balanceAtStart = useRef(0)
   const [earned, setEarned] = useState(0)
   const books = useAsync(listBooks, [])
@@ -290,6 +296,21 @@ export default function Learn() {
   }
 
   const bothDirs = directions.length === 2
+
+  async function makeDue() {
+    if (!plus.active) { plus.openDialog(); return }
+    setDueBusy(true)
+    setDueMsg(null)
+    setError(null)
+    try {
+      const n = await plusMakeDue(bookId || null)
+      setDueMsg(n > 0 ? `${n} gelernte Vokabeln sind wieder fällig.` : 'Es gab keine gelernten Vokabeln, die man wieder fällig machen kann.')
+    } catch (e) {
+      setError(errorMessage(e))
+    } finally {
+      setDueBusy(false)
+    }
+  }
   return (
     <div>
       <PageHeader eyebrow="Trainingsraum" title="Lernen" />
@@ -352,10 +373,18 @@ export default function Learn() {
             {unlockMsg && <p className="mt-2 text-xs text-emerald-300">{unlockMsg}</p>}
           </div>
         )}
+        <div className="rounded-xl border border-fuchsia-400/20 bg-fuchsia-400/[0.05] p-4 text-sm">
+          <p className="text-slate-300">Gelernte Vokabeln {bookId ? 'dieses Buchs' : 'aller Bücher'} sofort wieder fällig machen.</p>
+          <Button variant="secondary" className="mt-3" busy={dueBusy} onClick={() => void makeDue()}>
+            {plus.active ? 'Wieder fällig machen' : 'Mit Plus: wieder fällig machen'}
+          </Button>
+          {dueMsg && <p className="mt-2 text-xs text-emerald-300">{dueMsg}</p>}
+        </div>
         <Button className="w-full min-h-[52px]" onClick={() => void start()}>
           <Play size={18} /> {mistakeMode ? 'Fehler-Training starten' : 'Runde starten'}
         </Button>
       </Card>
+      <PlusHint ctx="learn" />
     </div>
   )
 }

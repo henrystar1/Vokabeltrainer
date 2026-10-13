@@ -27,6 +27,10 @@ export const AVATARS: Record<string, string> = {
   // Vokabeltrainer +
   avatar_plus_stern: '🌟',
   avatar_plus_kristall: '🔮',
+  avatar_plus_supernova: '💥',
+  avatar_plus_portal: '🌀',
+  avatar_plus_aurora: '🌌',
+  avatar_plus_galaxie: '🪐',
 }
 
 /** Namensfarben: Einzelfarbe oder Verlauf. */
@@ -48,6 +52,9 @@ export const NAME_COLORS: Record<string, { solid?: string; gradient?: string }> 
   color_plus_nordlicht: { gradient: 'linear-gradient(90deg,#34d399,#06b6d4,#8b5cf6,#d946ef,#34d399)' },
   color_plus_rosegold: { gradient: 'linear-gradient(90deg,#fda4af,#fde68a,#fb7185,#fcd9b6)' },
   color_plus_eis: { gradient: 'linear-gradient(90deg,#e0f2fe,#7dd3fc,#ffffff,#a5f3fc)' },
+  color_plus_lava: { gradient: 'linear-gradient(90deg,#fde047,#fb923c,#ef4444,#7f1d1d,#ef4444,#fb923c)' },
+  color_plus_galaxie: { gradient: 'linear-gradient(90deg,#818cf8,#c084fc,#f472b6,#22d3ee,#818cf8)' },
+  color_plus_hologramm: { gradient: 'linear-gradient(90deg,#a7f3d0,#67e8f9,#c4b5fd,#fbcfe8,#fde68a,#a7f3d0)' },
 }
 
 /** Effekt-Artikel → CSS-Klasse (Definition in index.css). */
@@ -72,6 +79,8 @@ export const EFFECT_CLASSES: Record<string, string> = {
   effect_frog: 'fx-frog',
   // Vokabeltrainer +
   effect_plus_glanz: 'fx-plus-glanz',
+  effect_plus_blitz: 'fx-plus-blitz',
+  effect_plus_hologramm: 'fx-plus-hologramm',
 }
 
 /** Spender-Tags aus dem Shop (Klasse in index.css). */
@@ -157,6 +166,16 @@ export const THEMES: Record<string, ThemePalette> = {
     s950: '#14070a', s900: '#1e0b10', s800: '#2e1018', s700: '#481826', s600: '#66223a',
     cyan: '#fb7185', violet: '#f59e0b', blue: '#f472b6',
     decor: 'fireflies', decorColors: ['#fdba74', '#fb7185', '#fde68a'], preview: 'linear-gradient(135deg,#14070a,#66223a 50%,#fb7185,#f59e0b)', fx: 'hue',
+  },
+  theme_plus_nebel: {
+    s950: '#0a0716', s900: '#120b26', s800: '#1c1238', s700: '#2d1b5a', s600: '#43287f',
+    cyan: '#f0abfc', violet: '#a78bfa', blue: '#67e8f9',
+    decor: 'sparkles', decorColors: ['#f5d0fe', '#c4b5fd', '#a5f3fc'], preview: 'linear-gradient(135deg,#0a0716,#43287f 45%,#f0abfc,#67e8f9)', fx: 'hue',
+  },
+  theme_plus_cyber: {
+    s950: '#020a0a', s900: '#041413', s800: '#072423', s700: '#0b3a37', s600: '#10524d',
+    cyan: '#2dfcc4', violet: '#f0abfc', blue: '#22d3ee',
+    decor: 'stars', decorColors: ['#2dfcc4', '#f0abfc', '#67e8f9'], preview: 'linear-gradient(135deg,#020a0a,#10524d 50%,#2dfcc4,#f0abfc)', fx: 'rainbow',
   },
   theme_space: {
     s950: '#05070f', s900: '#080c1a', s800: '#0d1326', s700: '#141c36', s600: '#1d2747',

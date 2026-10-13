@@ -1,12 +1,15 @@
 import { useEffect, useRef } from 'react'
 import type { GameProps } from './SnakeGame'
 import { BIRD_R, BIRD_X, FH, FW, GROUND, PIPE_GAP, PIPE_W, flap, newFlappy, stepFlappy, type FlappyState } from './flappy'
+import { plusOverlay } from './plusfx'
 
-export default function FlappyGame({ onScore, onOver }: GameProps) {
+export default function FlappyGame({ onScore, onOver, plus }: GameProps) {
   const canvas = useRef<HTMLCanvasElement>(null)
   const state = useRef<FlappyState>(newFlappy())
   const cb = useRef({ onScore, onOver })
   cb.current = { onScore, onOver }
+  const plusOn = useRef(!!plus)
+  plusOn.current = !!plus
 
   useEffect(() => {
     let raf = 0
@@ -59,6 +62,7 @@ export default function FlappyGame({ onScore, onOver }: GameProps) {
         ctx.fillStyle = '#cbd5e1'
         ctx.fillText('Tippen zum Flattern', FW / 2, FH / 2 + 60)
       }
+      if (plusOn.current) plusOverlay(ctx, FW, FH)
     }
     const loop = (now: number) => {
       const dt = Math.min((now - last) / 1000, 0.05)

@@ -16,8 +16,9 @@ import { AVATARS, KIND_LABEL, TAGS, resolveTheme } from '../features/shop/catalo
 import { refreshCustomItems, useCustomVersion } from '../features/shop/custom'
 import { errorMessage } from '../lib/errors'
 import { useAsync } from '../lib/useAsync'
-import { adminSetItem, buyItem, equipItem, getMyPermissions, getShop, unequipItem } from '../services/koins'
+import { adminSetItem, buyItem, equipItem, getCoinLockStatus, getMyPermissions, getShop, unequipItem } from '../services/koins'
 import type { ShopItem, ShopKind } from '../types'
+import PlusHint from '../features/plus/PlusHint'
 
 const KINDS: ShopKind[] = ['avatar', 'color', 'effect', 'tag', 'theme']
 
@@ -39,6 +40,7 @@ export default function Shop() {
   const [editing, setEditing] = useState<ShopItem | 'new' | null>(null)
   const wallet = useWallet()
   const plus = usePlus()
+  const coinLock = useAsync(getCoinLockStatus, [])
   const shop = useAsync(getShop, [])
   const [kind, setKind] = useState<ShopKind>('avatar')
   const [confirm, setConfirm] = useState<ShopItem | null>(null)
@@ -105,6 +107,7 @@ export default function Shop() {
         ))}
       </div>
 
+      {coinLock.data?.locked && <div className="mb-4"><Notice tone="warn">Dein Guthaben ist vom Admin gesperrt{coinLock.data.note ? `: ${coinLock.data.note}` : '.'} Du kannst gerade nichts kaufen, aber weiter spielen und gamblen.</Notice></div>}
       {message && <div className="mb-4"><Notice tone="ok">{message}</Notice></div>}
       {error && <div className="mb-4"><ErrorBox message={error} /></div>}
       {shop.loading && !shop.data && <Spinner />}
@@ -205,6 +208,7 @@ export default function Shop() {
           </div>
         </Modal>
       )}
+      <PlusHint ctx="shop" />
     </div>
   )
 }

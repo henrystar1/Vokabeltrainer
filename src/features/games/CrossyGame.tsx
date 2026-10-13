@@ -3,14 +3,17 @@ import { ArrowLeft, ArrowRight, ArrowUp, ArrowDown } from 'lucide-react'
 import type { GameProps } from './SnakeGame'
 import { PadButton } from './controls'
 import { COLS, VIEW_ROWS, move, newCrossy, stepCrossy, type CrossyState } from './crossy'
+import { plusOverlay } from './plusfx'
 
 const PX = 34
 
-export default function CrossyGame({ onScore, onOver }: GameProps) {
+export default function CrossyGame({ onScore, onOver, plus }: GameProps) {
   const canvas = useRef<HTMLCanvasElement>(null)
   const state = useRef<CrossyState>(newCrossy())
   const cb = useRef({ onScore, onOver })
   cb.current = { onScore, onOver }
+  const plusOn = useRef(!!plus)
+  plusOn.current = !!plus
   const touch = useRef<{ x: number; y: number } | null>(null)
   const doneRef = useRef(false)
 
@@ -76,6 +79,7 @@ export default function CrossyGame({ onScore, onOver }: GameProps) {
         ctx.textAlign = 'center'
         ctx.fillText('Weiter! Der Adler kommt …', (COLS * PX) / 2, 20)
       }
+      if (plusOn.current) plusOverlay(ctx, COLS * PX, VIEW_ROWS * PX)
     }
     const loop = (now: number) => {
       const dt = Math.min((now - last) / 1000, 0.05)

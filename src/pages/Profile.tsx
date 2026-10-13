@@ -14,6 +14,7 @@ import { formatDateTime } from '../lib/format'
 import { errorMessage } from '../lib/errors'
 import { useAsync } from '../lib/useAsync'
 import { listLedger, redeemCode } from '../services/koins'
+import PlusHint from '../features/plus/PlusHint'
 
 const REASONS: Record<string, string> = {
   daily: 'Tagesbonus',
@@ -38,6 +39,7 @@ const REASONS: Record<string, string> = {
   pay_out: 'Coins verschickt',
   print_discount: '3D-Druck-Rabatt',
   plus_day: 'Vokabeltrainer + (1 Tag)',
+  plus_buy: 'Vokabeltrainer + gekauft',
   plus_refund: 'Vokabeltrainer +: Rückerstattung',
   print_refund: '3D-Druck: Coins zurück',
   learn_answers: 'Lernen (richtige Antworten)',
@@ -149,6 +151,7 @@ export default function Profile() {
         Coins gibt es für Codes, fürs Lernen (nur Vokabeln aus Online-Büchern, begrenzt pro Tag) für sinnvolle Fehlermeldungen oder Feedback und von Freunden: Im Chat verschickst du Coins mit !pay @Name Betrag.
         Sie haben keinen Geldwert und lassen sich nicht kaufen oder auszahlen.
       </p>
+      <PlusHint ctx="profile" />
     </div>
   )
 }

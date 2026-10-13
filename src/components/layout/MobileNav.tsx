@@ -54,7 +54,7 @@ export default function MobileNav() {
               <div key={grp.title || 'top'} className="pb-1">
                 {grp.title && <p className="label-mono px-3 pb-1 pt-2 text-[10px] uppercase tracking-widest text-slate-500">{grp.title}</p>}
                 <div className="grid grid-cols-2 gap-1">
-                  {grp.items.map(({ to, label, icon: Icon, plus: isPlus }) => {
+                  {grp.items.map(({ to, label, icon: Icon, plus: isPlus, brand }) => {
                     const teaser = !!isPlus && !plus.active
                     return (
                     <NavLink
@@ -62,7 +62,7 @@ export default function MobileNav() {
                       to={to}
                       onClick={() => setOpen(false)}
                       className={({ isActive }) =>
-                        `relative flex min-h-[48px] items-center gap-2.5 rounded-xl px-3 text-sm ${isActive ? 'bg-accent-cyan/10 text-accent-cyan' : teaser ? 'plus-nav bg-fuchsia-400/10 text-fuchsia-200' : 'bg-white/[0.03] text-slate-200'}`
+                        `relative flex min-h-[48px] items-center gap-2.5 rounded-xl px-3 text-sm ${isActive ? 'bg-accent-cyan/10 text-accent-cyan' : brand ? 'bg-fuchsia-400/10 text-fuchsia-200' : teaser ? 'plus-nav bg-fuchsia-400/10 text-fuchsia-200' : 'bg-white/[0.03] text-slate-200'}`
                       }
                     >
                       <Icon size={18} className="shrink-0" />

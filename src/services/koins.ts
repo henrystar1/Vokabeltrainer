@@ -150,7 +150,7 @@ export const adminRevokeItem = (userId: string, itemId: string) => rpc<void>('ad
 export const setHidePresence = (hidden: boolean) => rpc<void>('set_hide_presence', { p_hidden: hidden })
 
 // --- Funktionen sperren (Admin) ---
-export type LockKey = 'games' | 'gambling' | 'sprint' | 'duels' | 'chat' | 'shop' | 'quests'
+export type LockKey = 'games' | 'gambling' | 'sprint' | 'duels' | 'chat' | 'shop' | 'quests' | 'print'
 export interface LockRule { days: number[]; from: string; to: string }
 export interface FeatureLock { key: LockKey; off_until: string | null; rules: LockRule[]; note: string; locked_now: boolean }
 export const getLockedFeatures = () => rpc<LockKey[]>('get_locked_features')
@@ -160,3 +160,10 @@ export const adminSetFeatureLock = (key: LockKey, offUntil: string | null, rules
 
 export const claimCopyReward = (bookId: string, unit: number, count: number) =>
   rpc<{ reward: number; reason: 'ok' | 'zu_kurz' | 'schon_heute' | 'tageslimit'; balance?: number }>('claim_copy_reward', { p_book_id: bookId, p_unit: unit, p_count: count })
+
+// --- Coin-Sperre pro Person ---
+export interface CoinLockStatus { locked: boolean; note: string }
+export interface CoinLockRow { user_id: string; locked_at: string; note: string }
+export const getCoinLockStatus = () => rpc<CoinLockStatus>('coin_lock_status')
+export const adminSetCoinLock = (user: string, locked: boolean, note: string) => rpc<void>('admin_set_coin_lock', { p_user: user, p_locked: locked, p_note: note })
+export const adminCoinLocks = () => rpc<CoinLockRow[]>('admin_coin_locks')

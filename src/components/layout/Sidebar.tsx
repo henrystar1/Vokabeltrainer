@@ -44,7 +44,7 @@ export default function Sidebar({ collapsed, onToggle }: SidebarProps) {
                 <p className="label-mono px-3 pb-1 pt-1 text-[10px] uppercase tracking-widest text-slate-500">{grp.title}</p>
               ))}
             <div className="space-y-0.5">
-              {grp.items.map(({ to, label, icon: Icon, plus: isPlus }) => {
+              {grp.items.map(({ to, label, icon: Icon, plus: isPlus, brand }) => {
                 const teaser = !!isPlus && !plus.active
                 return (
                 <NavLink
@@ -56,7 +56,9 @@ export default function Sidebar({ collapsed, onToggle }: SidebarProps) {
                     `group relative flex min-h-[40px] items-center gap-3 rounded-xl px-3 text-sm font-medium transition ${
                       isActive
                         ? 'bg-accent-cyan/10 text-accent-cyan shadow-[inset_0_0_0_1px_rgb(var(--c-cyan)/0.25)]'
-                        : teaser
+                        : brand
+                          ? 'text-fuchsia-300 hover:bg-fuchsia-400/10'
+                          : teaser
                           ? 'plus-nav text-fuchsia-300 hover:bg-fuchsia-400/10'
                           : 'text-slate-400 hover:bg-white/5 hover:text-slate-100'
                     }`

@@ -1,14 +1,17 @@
 import { useEffect, useRef } from 'react'
 import type { GameProps } from './SnakeGame'
 import { SPIKE_W, WAVE_R, WAVE_X, WH, WW, newWave, stepWave, type WaveState } from './wave'
+import { plusOverlay } from './plusfx'
 
-export default function WaveGame({ onScore, onOver }: GameProps) {
+export default function WaveGame({ onScore, onOver, plus }: GameProps) {
   const canvas = useRef<HTMLCanvasElement>(null)
   const state = useRef<WaveState>(newWave())
   const holding = useRef(false)
   const trail = useRef<Array<{ x: number; y: number }>>([])
   const cb = useRef({ onScore, onOver })
   cb.current = { onScore, onOver }
+  const plusOn = useRef(!!plus)
+  plusOn.current = !!plus
 
   useEffect(() => {
     let raf = 0
@@ -81,6 +84,7 @@ export default function WaveGame({ onScore, onOver }: GameProps) {
         ctx.fillStyle = '#cbd5e1'
         ctx.fillText('Halten = hoch, loslassen = runter', WW / 2, WH / 2 + 60)
       }
+      if (plusOn.current) plusOverlay(ctx, WW, WH)
     }
     const loop = (now: number) => {
       const dt = Math.min((now - last) / 1000, 0.05)

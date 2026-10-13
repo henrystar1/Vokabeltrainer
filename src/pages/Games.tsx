@@ -20,6 +20,10 @@ import { errorMessage } from '../lib/errors'
 import { useAsync } from '../lib/useAsync'
 import { getAppSettings } from '../services/koins'
 import { finishGame, getGameBoard, startGame, type GameBoardRow, type GameId, type GameResult, type GameStart } from '../services/play'
+import PlusHint from '../features/plus/PlusHint'
+import { usePlus } from '../features/plus/PlusProvider'
+import { plusRevive } from '../services/plus'
+import { Heart } from 'lucide-react'
 
 const GAMES: Array<{ id: GameId; name: string; text: string; unit: string; icon: typeof Gamepad2 }> = [
   { id: 'snake', name: 'Snake', text: 'Friss Äpfel, werde länger, stoß nirgends an.', unit: 'Äpfel', icon: Gamepad2 },
@@ -131,6 +135,7 @@ export default function Games() {
         </Modal>
       )}
       {wallet.balance < fee && <p className="mt-3 text-sm text-amber-200">Dir fehlen Coins – lerne ein paar Vokabeln oder mach einen Sprint.</p>}
+      <PlusHint ctx="games" />
     </div>
   )
 }
@@ -144,6 +149,17 @@ function Playing({ game, run, onDone }: { game: GameId; run: GameStart; onDone: 
   const [error, setError] = useState<string | null>(null)
   const [confirmQuit, setConfirmQuit] = useState(false)
   const sent = useRef(false)
+  const plus = usePlus()
+  const wallet = useWallet()
+  /** Punktestand nach einem Game-over, solange man noch wiederbeleben kann. */
+  const [pending, setPending] = useState<number | null>(null)
+  const [offset, setOffset] = useState(0)
+  const [attempt, setAttempt] = useState(0)
+  const [revives, setRevives] = useState(0)
+  const [reviveBusy, setReviveBusy] = useState(false)
+  const maxRevives = 3
+  const price = plus.status?.revive_price ?? 1000
+  const canRevive = plus.active && revives < maxRevives
 
   useEffect(() => {
     const guard = (e: BeforeUnloadEvent) => e.preventDefault()
@@ -160,19 +176,48 @@ function Playing({ game, run, onDone }: { game: GameId; run: GameStart; onDone: 
     }
   }
 
-  function over(s: number) {
+  function finish(s: number) {
     if (sent.current) return
     sent.current = true
+    setPending(null)
     setFinalScore(s)
     void send(s)
   }
 
+  /** Ende der Spielfigur: mit Plus erst fragen, ob man sich wiederbeleben möchte. */
+  function over(s: number) {
+    if (sent.current) return
+    const total = offset + s
+    scoreRef.current = total
+    setScore(total)
+    if (canRevive) setPending(total)
+    else finish(total)
+  }
+
+  async function revive() {
+    setReviveBusy(true)
+    setError(null)
+    try {
+      const r = await plusRevive(run.id)
+      wallet.setBalance(r.balance)
+      setRevives(r.revives)
+      setOffset(pending ?? scoreRef.current)
+      setPending(null)
+      setAttempt((a) => a + 1)
+    } catch (e) {
+      setError(errorMessage(e))
+    } finally {
+      setReviveBusy(false)
+    }
+  }
+
   const props = {
     onScore: (s: number) => {
-      scoreRef.current = s
-      setScore(s)
+      scoreRef.current = offset + s
+      setScore(offset + s)
     },
     onOver: over,
+    plus: plus.active,
   }
 
   return (
@@ -183,24 +228,40 @@ function Playing({ game, run, onDone }: { game: GameId; run: GameStart; onDone: 
           <span className="font-mono text-sm text-slate-300">
             <span className="text-accent-cyan">{score}</span> {g.unit} · Rekord {Math.max(run.record, score)}
           </span>
-          <Button variant="ghost" onClick={() => setConfirmQuit(true)} disabled={finalScore !== null}>Aufgeben</Button>
+          <Button variant="ghost" onClick={() => setConfirmQuit(true)} disabled={finalScore !== null || pending !== null}>Aufgeben</Button>
         </div>
         <ProgressBar value={(score / Math.max(run.record, 1)) * 100} label="Fortschritt zum Rekord" />
       </div>
       {finalScore !== null && !error && <p className="mb-3 text-center text-sm text-slate-400">Ergebnis wird gewertet …</p>}
       {error && <ErrorBox message={error} onRetry={() => void send(finalScore ?? scoreRef.current)} />}
-      {game === 'snake' && <SnakeGame {...props} />}
-      {game === 'tetris' && <TetrisGame {...props} />}
-      {game === 'blast' && <BlastGame {...props} />}
-      {game === 'crossy' && <CrossyGame {...props} />}
-      {game === 'flappy' && <FlappyGame {...props} />}
-      {game === 'wave' && <WaveGame {...props} />}
+      {pending !== null && (
+        <div className="mb-3 rounded-xl border border-fuchsia-400/30 bg-fuchsia-400/[0.08] p-4 text-center" role="alertdialog" aria-label="Wiederbeleben">
+          <p className="font-medium text-white">Game over – {pending} {g.unit}</p>
+          <p className="mt-1 text-xs text-slate-300">Mit Plus kannst du weiterspielen ({revives} von {maxRevives} Wiederbelebungen genutzt).</p>
+          <div className="mt-3 flex flex-col justify-center gap-2 sm:flex-row">
+            <Button busy={reviveBusy} disabled={wallet.balance < price} onClick={() => void revive()}>
+              <Heart size={16} /> Wiederbeleben für {price.toLocaleString('de-DE')} Coins
+            </Button>
+            <Button variant="ghost" onClick={() => finish(pending)}>Beenden</Button>
+          </div>
+          {wallet.balance < price && <p className="mt-2 text-xs text-amber-300">Dir fehlen {(price - wallet.balance).toLocaleString('de-DE')} Coins.</p>}
+        </div>
+      )}
+      {finalScore !== null && !plus.active && <p className="mb-3 text-center text-xs text-fuchsia-200/80">Mit Plus kannst du dich nach dem Game over für {price.toLocaleString('de-DE')} Coins wiederbeleben.</p>}
+      <div key={attempt} className={`${plus.active ? 'plus-game ' : ''}${pending !== null ? 'pointer-events-none opacity-60' : ''}`}>
+        {game === 'snake' && <SnakeGame {...props} />}
+        {game === 'tetris' && <TetrisGame {...props} />}
+        {game === 'blast' && <BlastGame {...props} />}
+        {game === 'crossy' && <CrossyGame {...props} />}
+        {game === 'flappy' && <FlappyGame {...props} />}
+        {game === 'wave' && <WaveGame {...props} />}
+      </div>
       {confirmQuit && (
         <Modal title="Aufgeben?" onClose={() => setConfirmQuit(false)}>
           <p className="text-sm text-slate-300">Die Runde wird mit deinem aktuellen Stand gewertet. Der Eintritt ist weg.</p>
           <div className="mt-5 flex flex-col gap-2 sm:flex-row sm:justify-end">
             <Button variant="ghost" onClick={() => setConfirmQuit(false)}>Weiterspielen</Button>
-            <Button onClick={() => { setConfirmQuit(false); over(scoreRef.current) }}>Beenden</Button>
+            <Button onClick={() => { setConfirmQuit(false); finish(scoreRef.current) }}>Beenden</Button>
           </div>
         </Modal>
       )}

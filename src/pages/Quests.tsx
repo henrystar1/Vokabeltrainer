@@ -12,17 +12,23 @@ import { errorMessage } from '../lib/errors'
 import { useAsync } from '../lib/useAsync'
 import { getAppSettings } from '../services/koins'
 import { claimQuest, getQuests, getStreak } from '../services/play'
-import type { Quest, QuestId } from '../types'
+import { Crown } from 'lucide-react'
+import { usePlus } from '../features/plus/PlusProvider'
+import PlusHint from '../features/plus/PlusHint'
+import type { Quest, QuestFamily, QuestId } from '../types'
 
-const INFO: Record<QuestId, { title: string; text: (q: Quest, rules: Record<string, number>) => string; to: string; cta: string }> = {
+const INFO: Record<QuestFamily, { title: string; text: (q: Quest, rules: Record<string, number>) => string; to: string; cta: string }> = {
   answers: { title: 'Fleißig', text: (q) => `${q.goal} Vokabeln richtig beantworten`, to: '/lernen', cta: 'Lernen' },
   perfect: { title: 'Fehlerfrei', text: (_q, r) => `Eine Runde mit mindestens ${r.quest_goal_perfect ?? 10} Fragen ohne einen Fehler`, to: '/lernen', cta: 'Lernen' },
   sprint: { title: 'Sprinter', text: (q) => `${q.goal} richtige Antworten in einem Sprint`, to: '/sprint', cta: 'Sprint' },
   duel: { title: 'Herausforderer', text: (q) => (q.goal > 1 ? `${q.goal} Duelle abschließen` : 'Ein Duell gegen einen Freund abschließen'), to: '/duell', cta: 'Duell' },
+  plus_answers: { title: 'Plus: Vielschreiber', text: (q) => `${q.goal} Vokabeln an einem Tag richtig beantworten`, to: '/lernen', cta: 'Lernen' },
+  plus_games: { title: 'Plus: Spieler', text: (q) => `${q.goal} Spiele an einem Tag beenden`, to: '/spiele', cta: 'Spiele' },
 }
 
 export default function Quests() {
   const wallet = useWallet()
+  const plus = usePlus()
   const quests = useAsync(getQuests, [])
   const streak = useAsync(getStreak, [])
   const rules = useAsync(getAppSettings, [])
@@ -38,6 +44,7 @@ export default function Quests() {
       wallet.setBalance(await claimQuest(q.id))
       setMsg(`+${q.reward} Coins eingesammelt!`)
       quests.reload()
+      void plus.reload()
     } catch (e) {
       setError(errorMessage(e))
     } finally {
@@ -64,13 +71,21 @@ export default function Quests() {
       {quests.loading && !quests.data && <Spinner />}
       <div className="grid gap-4 sm:grid-cols-2">
         {quests.data?.map((q) => {
-          const info = INFO[q.id]
+          const info = INFO[q.family]
           if (!info) return null
           const done = q.progress >= q.goal
+          const locked = q.plus_only && !plus.active
+          const finished = q.claimed && q.stage >= q.stages
           return (
             <Card key={q.id} className="flex flex-col gap-3">
               <div className="flex items-start justify-between gap-3">
-                <h2 className="text-lg font-semibold">{info.title}</h2>
+                <div>
+                  <h2 className="flex items-center gap-1.5 text-lg font-semibold">
+                    {q.plus_only && <Crown size={15} className="text-fuchsia-300" aria-label="Plus" />}
+                    {info.title}
+                  </h2>
+                  {q.stages > 1 && <p className="font-mono text-[11px] text-slate-500">Stufe {q.stage} von {q.stages}</p>}
+                </div>
                 <span className="flex items-center gap-1 font-mono text-sm text-amber-300"><CoinIcon size={15} /> {q.reward}</span>
               </div>
               <p className="text-sm text-slate-300">{info.text(q, rules.data ?? {})}</p>
@@ -80,8 +95,12 @@ export default function Quests() {
                 </div>
                 <ProgressBar value={(q.progress / q.goal) * 100} label={info.title} />
               </div>
-              {q.claimed ? (
-                <p className="flex items-center gap-2 text-sm text-emerald-300"><Check size={16} /> Heute eingesammelt</p>
+              {locked ? (
+                <button type="button" className="text-left text-sm text-fuchsia-200 hover:underline" onClick={plus.openDialog}>Mit Plus freischalten →</button>
+              ) : finished ? (
+                <p className="flex items-center gap-2 text-sm text-emerald-300"><Check size={16} /> Alle Stufen für heute geschafft</p>
+              ) : q.claimed ? (
+                <p className="flex items-center gap-2 text-sm text-emerald-300"><Check size={16} /> Eingesammelt</p>
               ) : done ? (
                 <Button busy={busy === q.id} onClick={() => void claim(q)}>Belohnung einsammeln</Button>
               ) : (
@@ -91,7 +110,8 @@ export default function Quests() {
           )
         })}
       </div>
-      <p className="mt-4 max-w-xl text-xs text-slate-500">Quests setzen sich jeden Tag zurück. Belohnungen gibt es nur für Vokabeln aus deinen aktiven Büchern.</p>
+      <p className="mt-4 max-w-xl text-xs text-slate-500">Quests setzen sich jeden Tag zurück. Hast du eine Stufe eingesammelt, erscheint die nächste, größere. Belohnungen gibt es nur für Vokabeln aus deinen aktiven Büchern.</p>
+      <PlusHint ctx="quests" />
     </div>
   )
 }

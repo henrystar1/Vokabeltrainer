@@ -40,6 +40,7 @@ import Search from './pages/Search'
 import Settings from './pages/Settings'
 import Stats from './pages/Stats'
 import Grammar from './pages/Grammar'
+import PlusPage from './pages/PlusPage'
 import Test from './pages/Test'
 import ForgotPassword from './pages/auth/ForgotPassword'
 import Login from './pages/auth/Login'
@@ -83,6 +84,7 @@ export default function App() {
           <Route path="abschreiben" element={<Copy />} />
           <Route path="test" element={<Test />} />
           <Route path="grammatik" element={<Grammar />} />
+          <Route path="plus" element={<PlusPage />} />
           <Route path="spiele" element={<Gate k="games"><Games /></Gate>} />
           <Route path="gambling" element={<Gate k="gambling"><Gambling /></Gate>} />
           <Route path="ueben" element={<Practice />} />
@@ -98,7 +100,7 @@ export default function App() {
           <Route path="statistik" element={<Stats />} />
           <Route path="rangliste" element={<Leaderboard />} />
           <Route path="shop" element={<Gate k="shop"><Shop /></Gate>} />
-          <Route path="druckshop" element={<Suspense fallback={<Spinner />}><PrintShop /></Suspense>} />
+          <Route path="druckshop" element={<Gate k="print"><Suspense fallback={<Spinner />}><PrintShop /></Suspense></Gate>} />
           <Route path="profil" element={<Profile />} />
           <Route path="feedback" element={<Feedback />} />
           <Route path="einstellungen" element={<Settings />} />

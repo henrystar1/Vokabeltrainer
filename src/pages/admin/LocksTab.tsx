@@ -18,6 +18,7 @@ const LABEL: Record<LockKey, string> = {
   chat: 'Chat',
   shop: 'Shop',
   quests: 'Quests',
+  print: '3D-Druck-Shop',
 }
 const DAYS = ['Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa', 'So']
 const QUICK: Array<[string, number | null]> = [['15 Min.', 15], ['1 Std.', 60], ['1 Tag', 1440], ['bis auf Widerruf', null]]

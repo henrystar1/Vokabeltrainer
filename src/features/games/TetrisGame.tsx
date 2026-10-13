@@ -3,15 +3,18 @@ import { ArrowDown, ArrowLeft, ArrowRight, ChevronsDown, RotateCw } from 'lucide
 import { PadButton } from './controls'
 import type { GameProps } from './SnakeGame'
 import { COLS, ROWS, TYPES, cells, ghost, hardDrop, move, newTetris, rotate, tetrisDelay, tick, type TetrisState } from './tetris'
+import { plusOverlay } from './plusfx'
 
 const PX = 24
 const COLORS = ['', '#22d3ee', '#fbbf24', '#a78bfa', '#4ade80', '#f87171', '#60a5fa', '#fb923c']
 
-export default function TetrisGame({ onScore, onOver }: GameProps) {
+export default function TetrisGame({ onScore, onOver, plus }: GameProps) {
   const canvas = useRef<HTMLCanvasElement>(null)
   const state = useRef<TetrisState>(newTetris())
   const cb = useRef({ onScore, onOver })
   cb.current = { onScore, onOver }
+  const plusOn = useRef(!!plus)
+  plusOn.current = !!plus
   const timer = useRef(0)
   const done = useRef(false)
 
@@ -38,6 +41,7 @@ export default function TetrisGame({ onScore, onOver }: GameProps) {
       for (const [cx, cy] of cells(g.type, g.rot)) if (g.y + cy >= 0) block(g.x + cx, g.y + cy, COLORS[TYPES.indexOf(g.type) + 1], 0.22)
       for (const [cx, cy] of cells(s.piece.type, s.piece.rot)) if (s.piece.y + cy >= 0) block(s.piece.x + cx, s.piece.y + cy, COLORS[TYPES.indexOf(s.piece.type) + 1])
     }
+    if (plusOn.current) plusOverlay(ctx, COLS * PX, ROWS * PX)
   }, [])
 
   const after = useCallback(() => {

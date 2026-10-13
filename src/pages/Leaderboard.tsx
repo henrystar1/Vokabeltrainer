@@ -10,6 +10,7 @@ import type { LeaderboardPeriod } from '../types'
 import LeagueView from './LeagueView'
 import CoinBoard from './CoinBoard'
 import GamblingBoard from './GamblingBoard'
+import PlusHint from '../features/plus/PlusHint'
 
 const PERIODS: Array<{ id: LeaderboardPeriod | 'league' | 'coins' | 'gambling'; label: string }> = [
   { id: 'week', label: 'Woche' },
@@ -78,6 +79,7 @@ export default function Leaderboard() {
         Die Größe deiner Bücher spielt keine Rolle.
       </p>
       </>)}
+      <PlusHint ctx="league" />
     </div>
   )
 }

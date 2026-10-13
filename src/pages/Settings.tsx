@@ -14,6 +14,7 @@ import { useAsync } from '../lib/useAsync'
 import { listLanguages } from '../services/books'
 import { updateDisplayName } from '../services/settings'
 import { useNotify } from '../features/notify/NotifyProvider'
+import PushSettings from '../features/push/PushSettings'
 import type { NotifyDm, NotifyOnline } from '../types'
 import { setPanic, usePanic } from '../features/panic/panic'
 import { setHidePresence, setTagsHidden } from '../services/koins'
@@ -242,6 +243,7 @@ export default function Settings() {
               </Select>
             </Field>
             <Button variant="secondary" onClick={notify.preview}>Beispiel-Hinweis zeigen</Button>
+            <PushSettings />
           </Card>
         )}
 

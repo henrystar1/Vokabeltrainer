@@ -6,6 +6,7 @@ import { ErrorBox } from '../components/ui/States'
 import { useAuth } from '../features/auth/AuthProvider'
 import { useAsync } from '../lib/useAsync'
 import { getMyStats, getRecentSessions } from '../services/stats'
+import PlusHint from '../features/plus/PlusHint'
 
 const ACTIONS = [
   { to: '/lernen', label: 'Lernen', text: 'Gewichtete Lernrunde starten', icon: Brain },
@@ -100,6 +101,7 @@ export default function Dashboard() {
           </Card>
         </section>
       )}
+      <PlusHint ctx="dashboard" />
     </div>
   )
 }

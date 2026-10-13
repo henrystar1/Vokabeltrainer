@@ -20,6 +20,10 @@ export const ANIMATED_AVATARS = [
   'avatar_piano',
   'avatar_bike',
   'avatar_frog',
+  'avatar_plus_supernova',
+  'avatar_plus_portal',
+  'avatar_plus_aurora',
+  'avatar_plus_galaxie',
 ] as const
 
 export const isAnimatedAvatar = (id: string | null | undefined): boolean => !!id && (ANIMATED_AVATARS as readonly string[]).includes(id)
@@ -90,6 +94,33 @@ export default function AnimatedAvatar({ id, size }: { id: string; size: number 
             {ARMS_MAIN.map((d, k) => <path key={`m${k}`} d={d} pathLength={100} />)}
           </svg>
           <i className="arcs2" /><i className="arcs" /><i className="lens" /><i className="core" /><span className="disc" />
+        </span>
+      )
+    case 'avatar_plus_supernova':
+      return (
+        <span aria-hidden className="av av-pn" style={style}>
+          <i className="wave" /><i className="wave w2" /><i className="rays" /><i className="rays r2" /><i className="core" />
+          <i className="orbit"><b /></i><i className="orbit o2"><b /></i>
+        </span>
+      )
+    case 'avatar_plus_portal':
+      return (
+        <span aria-hidden className="av av-pp av-clip" style={style}>
+          <i className="bg" /><i className="ring" /><i className="ring r2" /><i className="ring r3" /><i className="ring r4" />
+          <i className="swirl" /><i className="swirl s2" /><i className="eye" />
+        </span>
+      )
+    case 'avatar_plus_aurora':
+      return (
+        <span aria-hidden className="av av-pa av-clip" style={style}>
+          <i className="bg" /><i className="band" /><i className="band b2" /><i className="band b3" /><i className="stars" /><i className="gloss" />
+        </span>
+      )
+    case 'avatar_plus_galaxie':
+      return (
+        <span aria-hidden className="av av-pg av-clip" style={style}>
+          <i className="bg" /><i className="arms" /><i className="arms a2" /><i className="stars" /><i className="core" />
+          <i className="planet"><b /></i><i className="planet p2"><b /></i>
         </span>
       )
     case 'avatar_lava':

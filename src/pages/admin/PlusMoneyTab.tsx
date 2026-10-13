@@ -10,7 +10,8 @@ import { adminGoalAdd, adminGoalBreakdown, adminGoalDelete, adminPlusGetSettings
 import { SettingRow } from './print/PricesTab'
 
 const GROUPS: { title: string; text?: string; keys: string[] }[] = [
-  { title: 'Preis und Laufzeit', keys: ['plus_price_eur', 'plus_days', 'plus_coin_enabled', 'plus_coin_price', 'plus_coin_days'] },
+  { title: 'Preise (nur Coins)', text: 'Plus wird nur mit Coins gekauft. Du kannst es weiterhin im Personen-Fenster vergeben.', keys: ['plus_price_d1', 'plus_price_d7', 'plus_price_d30', 'plus_price_d90', 'plus_price_life'] },
+  { title: 'Vorteile', keys: ['plus_coin_mult', 'plus_points_mult', 'plus_gamble_boost_percent', 'plus_revive_price', 'plus_revive_max'] },
   { title: 'KI-Grenzen', text: 'Setze zusätzlich im OpenAI-Konto ein Ausgabenlimit. Das hier ist die zweite Sicherung.', keys: ['ai_enabled', 'ai_user_month_eur', 'ai_user_day_gens', 'ai_global_month_eur', 'ai_max_items', 'ai_test_sentences'] },
   { title: 'Modellpreise (für die Kostenberechnung)', keys: ['ai_usd_in', 'ai_usd_out', 'ai_usd_eur'] },
 ]

@@ -9,6 +9,9 @@ import { WalletProvider } from './features/koins/WalletProvider'
 import ThemeApplier from './features/shop/ThemeProvider'
 import { SettingsProvider } from './features/settings/SettingsProvider'
 import './index.css'
+import { registerServiceWorker } from './lib/serviceWorker'
+
+registerServiceWorker()
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>

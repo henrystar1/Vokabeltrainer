@@ -4,9 +4,17 @@ import { rpc } from './rpc'
 
 export type AiState = 'no_key' | 'ok' | 'empty' | 'error'
 
+export interface PlusTier { id: 'd1' | 'd7' | 'd30' | 'd90' | 'life'; label: string; days: number; price: number }
+
 export interface PlusStatus {
   active: boolean
   until: string | null
+  lifetime: boolean
+  tiers: PlusTier[]
+  coin_mult: number
+  points_mult: number
+  gamble_boost: number
+  revive_price: number
   is_admin: boolean
   trial_available: boolean
   requested: boolean
@@ -25,6 +33,10 @@ export const getPlusStatus = () => rpc<PlusStatus>('plus_status')
 export const plusRequest = () => rpc<void>('plus_request')
 export const plusCancelRequest = () => rpc<void>('plus_cancel_request')
 export const plusBuyDay = () => rpc<PlusStatus>('plus_buy_day')
+export const plusBuy = (tier: PlusTier['id']) => rpc<PlusStatus>('plus_buy', { p_tier: tier })
+/** Stufe 5 → Stufe 4: macht gelernte Vokabeln wieder fällig (optional nur ein Buch). Gibt die Anzahl zurück. */
+export const plusMakeDue = (book: string | null = null) => rpc<number>('plus_make_due', { p_book: book })
+export const plusRevive = (run: string) => rpc<{ balance: number; revives: number; price: number }>('plus_revive', { p_run: run })
 
 export interface PlusRequestRow { user_id: string; name: string; created_at: string; plus_until: string | null }
 export interface PlusActiveRow { user_id: string; name: string; until: string }

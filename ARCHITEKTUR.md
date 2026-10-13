@@ -286,3 +286,20 @@ Nach 0006 im Supabase-SQL-Editor ausführen (wiederholbar).
 
 ## 0022 – Höchstguthaben und automatische Belohnungen
 - `_grant_koins` kürzt positive Belohnungen (Liga, Quests, Lernen, Duelle, Sprint …) auf den freien Platz unter 9 Billiarden oder lässt sie entfallen, statt einen Fehler zu werfen. Vorher brach `_league_rollover` ab, sobald ein Top-3-Platz fast am Limit war, und die ganze Liga lud nicht mehr. Strikt (mit Fehler) bleiben Reasons `admin`, `pay_in`, `print_refund`, `plus_refund`.
+
+## 0023 – 3D-Druck ausschaltbar, Coin-Sperre pro Person
+- `feature_locks` kennt jetzt den Schlüssel `print` (Verwaltung → Regeln & Wirtschaft → Sperren). `print_get_info`, `print_quote`, `print_create_order` haben `_feature_guard('print')`; Menüpunkt und Seite verschwinden über `NavItem.lock` und `Gate`. Bestehende Aufträge bleiben für Admin und Kunden einsehbar.
+- Coin-Sperre: `profiles.coins_locked_at/coins_lock_note`. `_grant_koins` verweigert Abbuchungen gesperrter Personen außer `gambling_bet`, `game_fee`, `admin` (Shop, Bücher, Überweisung/!pay, 3D-Druck-Rabatt, Plus gesperrt); Gutschriften laufen weiter. RPCs `admin_set_coin_lock` (Admins nicht sperrbar, Nachricht an die Person), `admin_coin_locks`, `coin_lock_status`. UI: `CoinLockSection` im Personen-Fenster, Hinweis im Shop.
+
+## 0024 – Plus nur mit Coins, Vorteile
+- Stufen (`_plus_tiers`): 1 Tag 100, 1 Woche 600, 1 Monat 3000, 3 Monate 8000, für immer 100000 Coins. Preise stehen in `plus_settings` (Verwaltung → Plus → Preise & Verdienst). `plus_buy(stufe)` bucht über `_grant_koins(…,'plus_buy',…)`; der Verkauf steht mit `kind='coins'` in `plus_sales`. Rückgängig macht die Coins zurück (`plus_refund`).
+- Plus-Vorteile: Coins ×1,5 und Ranglistenpunkte ×1,5 (zentral in `_grant_koins` und `_week_points`, Gambling-Gewinne ausgenommen), höhere Gambling-Gewinnchance (`plus_gamble_boost_percent`, in `gambling_play` eingefügt), `plus_make_due` (Stufe 5 → 4), `plus_revive(run)` (Wiederbeleben im Spiel, höchstens `plus_revive_max` pro Runde), zusätzliche Quests.
+- Quests in Stufen (`get_quests`/`claim_quest`): pro Familie (answers, perfect, sprint, duel, plus_answers, plus_games) erscheint nach dem Einsammeln die nächste, größere Stufe. Quest-ID = `familie_stufe`.
+- Neue Plus-Artikel: Profilbilder Supernova, Portal, Aurora-Kugel, Spiralgalaxie (animiert, `avatars.css`), Effekte Blitzschlag und Hologramm, Farben Lava, Galaxie, Hologramm, Designs Nebel und Cyber.
+- Spiele: `Games.tsx` fragt bei Game over mit Plus nach dem Wiederbeleben; der Punktestand läuft mit Versatz weiter. Plus-Grafik: `features/games/plusfx.ts` (Schimmer, Funkeln, Vignette) und `.plus-game` in `index.css`.
+
+## 0025 – Push-Nachrichten (Web Push)
+- Tabellen `push_subscriptions` (Geräte), `push_config` (url, public_key, secret), `push_log` (Protokoll). Kein direkter Zugriff, nur über Funktionen.
+- `_push_send` ruft per `pg_net` die Edge Function `push` auf (Header `x-push-secret`). Fehler werden protokolliert und blockieren nie die auslösende Aktion. Fehlt pg_net, steht `kein pg_net` im Protokoll.
+- Auslöser: `chat_messages` (Erwähnung/Flüstern/optional alles), `user_messages` (Team-Nachricht), `print_orders` (lieferbereit). Es gelten die Schalter aus 0020. Wer in den letzten 90 s aktiv war, bekommt keinen Push (der Rand-Hinweis übernimmt).
+- Client: `public/sw.js` (Service Worker), `src/lib/serviceWorker.ts`, `src/services/push.ts`, `src/features/push/PushSettings.tsx` (Einstellungen → Hinweise). Einrichtung: `supabase/functions/push/README.md`.

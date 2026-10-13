@@ -446,10 +446,16 @@ export interface Streak {
   today_done: boolean
 }
 
-export type QuestId = 'answers' | 'perfect' | 'sprint' | 'duel'
+export type QuestFamily = 'answers' | 'perfect' | 'sprint' | 'duel' | 'plus_answers' | 'plus_games'
+/** Quest-ID = Familie_Stufe, z. B. „answers_2“. */
+export type QuestId = string
 
 export interface Quest {
   id: QuestId
+  family: QuestFamily
+  stage: number
+  stages: number
+  plus_only: boolean
   progress: number
   goal: number
   reward: number

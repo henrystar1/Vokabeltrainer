@@ -245,3 +245,27 @@ body {
 .fx-plus-glanz { filter: drop-shadow(0 0 5px rgb(217 70 239 / 0.75)); animation: fx-plus-glanz 2.6s ease-in-out infinite; }
 @keyframes fx-plus-glanz { 0%, 100% { filter: drop-shadow(0 0 3px rgb(217 70 239 / 0.6)) brightness(1); } 50% { filter: drop-shadow(0 0 9px rgb(34 211 238 / 0.85)) brightness(1.35); } }
 @media (prefers-reduced-motion: reduce) { .fx-plus-glanz, .tag-plus, .plus-banner { animation: none; } }
+
+/* Plus: schönere Spiele-Grafik (Glühen, Farbtiefe) um das Spielfeld */
+.plus-game {
+  border-radius: 1rem;
+  filter: saturate(1.2) contrast(1.04);
+  box-shadow: 0 0 0 1px rgba(217, 70, 239, 0.35), 0 0 28px rgba(217, 70, 239, 0.25), 0 0 60px rgba(34, 211, 238, 0.12);
+  animation: plus-game-glow 4s ease-in-out infinite alternate;
+}
+@keyframes plus-game-glow {
+  from { box-shadow: 0 0 0 1px rgba(217, 70, 239, 0.3), 0 0 22px rgba(217, 70, 239, 0.18), 0 0 50px rgba(34, 211, 238, 0.1); }
+  to { box-shadow: 0 0 0 1px rgba(34, 211, 238, 0.4), 0 0 34px rgba(34, 211, 238, 0.28), 0 0 70px rgba(217, 70, 239, 0.18); }
+}
+@media (prefers-reduced-motion: reduce) { .plus-game { animation: none; } }
+
+/* Plus-Effekte für Namen */
+.fx-plus-blitz { animation: fx-plus-blitz 3s steps(1, end) infinite; }
+@keyframes fx-plus-blitz {
+  0%, 62%, 70%, 100% { filter: drop-shadow(0 0 3px rgb(129 140 248 / 0.7)); }
+  64%, 68% { filter: drop-shadow(0 0 2px #fff) drop-shadow(0 0 12px rgb(165 180 252)) brightness(2); }
+  66% { filter: drop-shadow(0 0 4px rgb(129 140 248)) brightness(0.8); }
+}
+.fx-plus-hologramm { background-size: 300% 100%; animation: fx-plus-holo 4s linear infinite; filter: drop-shadow(0 0 6px rgb(103 232 249 / 0.6)); }
+@keyframes fx-plus-holo { to { background-position: 300% 0; } }
+@media (prefers-reduced-motion: reduce) { .fx-plus-blitz, .fx-plus-hologramm { animation: none; } }

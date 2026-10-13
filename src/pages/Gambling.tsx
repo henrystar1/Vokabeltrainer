@@ -12,6 +12,7 @@ import { gamblingPlay } from '../services/play'
 import { getGamblingFeed } from '../services/social'
 import { lastSeenText } from './Presence'
 import GamblingBoard from './GamblingBoard'
+import PlusHint from '../features/plus/PlusHint'
 
 const SYMBOLS = ['🍒', '🍋', '🔔', '⭐', '💎', '🍀', '7️⃣']
 const QUICK = [1, 5, 10, 25, 50, 100]
@@ -160,6 +161,7 @@ export default function Gambling() {
         <p className="label-mono mb-2">Bilanz-Rangliste</p>
         <GamblingBoard limit={10} />
       </div>
+      <PlusHint ctx="gambling" />
     </div>
   )
 }

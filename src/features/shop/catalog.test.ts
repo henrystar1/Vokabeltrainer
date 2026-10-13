@@ -21,6 +21,22 @@ describe('Shop-Katalog', () => {
     }
   })
 
+  it('kennt alle Plus-Artikel aus den Migrationen 0021 und 0024', () => {
+    const plusFiles = import.meta.glob('../../../supabase/migrations/00{21,24}_*.sql', { query: '?raw', import: 'default', eager: true }) as Record<string, string>
+    const text = Object.values(plusFiles).join('\n')
+    const ids = [...text.matchAll(/\('((?:avatar|color|effect|theme|tag)_plus_[a-z_]+)',\s*'(avatar|color|effect|theme|tag)'/g)].map((m) => [m[1], m[2]])
+    expect(ids.length).toBeGreaterThanOrEqual(15)
+    for (const [id, kind] of ids) {
+      const known =
+        kind === 'avatar' ? { ...AVATARS, ...Object.fromEntries(ANIMATED_AVATARS.map((a) => [a, true])) }
+        : kind === 'color' ? NAME_COLORS
+        : kind === 'effect' ? EFFECT_CLASSES
+        : kind === 'tag' ? TAGS
+        : THEMES
+      expect(known[id as keyof typeof known], id).toBeDefined()
+    }
+  })
+
   it('wandelt Hex in RGB-Triplets um', () => {
     expect(hexToTriplet('#22d3ee')).toBe('34 211 238')
     expect(hexToTriplet('#000000')).toBe('0 0 0')
