@@ -5,7 +5,8 @@ import PlayerTag from '../components/profile/PlayerTag'
 import Card from '../components/ui/Card'
 import { ErrorBox, Notice, Spinner } from '../components/ui/States'
 import { useAsync } from '../lib/useAsync'
-import { getLeague } from '../services/play'
+import { useAuth } from '../features/auth/AuthProvider'
+import { adminGetLeague, getLeague } from '../services/play'
 
 export const TIERS = [
   { name: 'Bronze', color: '#cd7f32' },
@@ -25,7 +26,10 @@ function countdown(iso: string, now: number): string {
 
 /** Wochenliga: eine Gruppe je Stufe, Auf- und Abstieg am Wochenende, Coins für die Top 3. */
 export default function LeagueView() {
-  const league = useAsync(getLeague, [])
+  const { isAdmin } = useAuth()
+  /** Nur Admins: eine beliebige Liga ansehen (null = die eigene). */
+  const [viewTier, setViewTier] = useState<number | null>(null)
+  const league = useAsync(() => (viewTier ? adminGetLeague(viewTier) : getLeague()), [viewTier])
   const [now, setNow] = useState(() => Date.now())
   useEffect(() => {
     const t = window.setInterval(() => setNow(Date.now()), 30_000)
@@ -42,11 +46,30 @@ export default function LeagueView() {
   const relegStart = l.relegation_active && l.tier > 1 ? rows.length - 3 : rows.length
   const last = l.last
 
+  const counts = viewTier ? (league.data as { counts?: { tier: number; members: number; active: number }[] } | null)?.counts : undefined
   return (
     <div className="space-y-4">
+      {isAdmin && (
+        <div className="flex flex-wrap items-center gap-2" role="group" aria-label="Liga ansehen (Admin)">
+          <span className="label-mono mr-1">Admin: Liga ansehen</span>
+          {TIERS.map((t, i) => (
+            <button
+              key={t.name}
+              type="button"
+              aria-pressed={(viewTier ?? l.tier) === i + 1}
+              onClick={() => setViewTier(i + 1 === l.tier && viewTier === null ? null : i + 1)}
+              className={`min-h-[36px] rounded-lg border px-3 text-sm transition ${(viewTier ?? l.tier) === i + 1 ? 'bg-white/10 text-white' : 'border-white/10 text-slate-400 hover:text-white'}`}
+              style={{ borderColor: (viewTier ?? l.tier) === i + 1 ? t.color : undefined }}
+            >
+              {t.name}{counts ? ` (${counts.find((c) => c.tier === i + 1)?.members ?? 0})` : ''}
+            </button>
+          ))}
+          {viewTier !== null && <button type="button" className="text-xs text-accent-cyan hover:underline" onClick={() => setViewTier(null)}>Zurück zu meiner Liga</button>}
+        </div>
+      )}
       <Card className="flex flex-wrap items-center justify-between gap-4" style={{ boxShadow: `0 0 0 1px ${tier.color}55, 0 0 30px ${tier.color}22` }}>
         <div>
-          <p className="label-mono">Deine Liga</p>
+          <p className="label-mono">{viewTier ? 'Liga (Admin-Ansicht)' : 'Deine Liga'}</p>
           <p className="text-3xl font-semibold" style={{ color: tier.color }}>{tier.name}</p>
           <p className="text-sm text-slate-400">{l.participants} Teilnehmer diese Woche</p>
         </div>

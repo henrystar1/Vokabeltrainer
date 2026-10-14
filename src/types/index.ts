@@ -490,6 +490,11 @@ export interface League {
   last: LeagueLast | null
 }
 
+/** Admin-Ansicht einer beliebigen Liga: wie `League`, dazu Zähler je Stufe. */
+export interface AdminLeague extends League {
+  counts: { tier: number; members: number; active: number }[]
+}
+
 export interface PlayerHit extends Flair {
   user_id: string
   display_name: string

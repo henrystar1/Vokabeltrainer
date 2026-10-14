@@ -58,8 +58,9 @@ Außerdem muss die Erweiterung **pg_net** an sein (Supabase → *Database* → *
 - eine Nachricht vom Team
 - dein 3D-Druck ist fertig
 - optional jede Chat-Nachricht (Schalter „Bei jeder neuen Chat-Nachricht“)
+- optional wenn jemand online kommt (Einstellung „Wenn jemand online kommt“, nicht öfter als alle 10 Minuten pro Person; ab Migration 0026)
 
-Es gelten die Schalter in den Einstellungen. Ist die App gerade offen (zuletzt vor weniger als 90 Sekunden aktiv), wird nichts gepusht, dann erscheint der kleine Hinweis am Rand.
+Es gelten die Schalter in den Einstellungen, auch wenn die App gerade offen ist (ab Migration 0026).
 
 ## Fehlersuche
 

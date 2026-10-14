@@ -27,6 +27,7 @@ import { shuffle } from '../features/learning/random'
 import { pickSheetVocab } from '../features/test/sheetPick'
 import { formatDateTime } from '../lib/format'
 import { GRADE_WORD, gradeFromScore } from '../lib/grade'
+import PageRules from '../components/admin/PageRules'
 
 type Phase = 'setup' | 'loading' | 'run' | 'result' | 'sheet'
 
@@ -333,6 +334,7 @@ export default function Test() {
           </>
         )}
       </section>
+      <PageRules title="Test" info="Antworten im Test zählen wie beim Lernen für die Ranglistenpunkte (Liga und Rangliste). Der Test bringt keine Coins, und der Lernstand ändert sich nicht." keys={['points_per_answer', 'points_daily_cap', 'points_active_day', 'points_accuracy_bonus', 'points_accuracy_min']} />
     </div>
   )
 }

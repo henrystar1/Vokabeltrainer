@@ -13,6 +13,7 @@ import { listBooks } from '../services/books'
 import { getLearningPool } from '../services/learning'
 import { getAppSettings } from '../services/koins'
 import { buildChoiceQuestions } from '../features/learning/choice'
+import PageRules from '../components/admin/PageRules'
 
 type Phase = { name: 'setup' } | { name: 'loading' } | { name: 'run'; questions: ChoiceQuestion[] } | { name: 'result'; answers: ChoiceAnswer[] }
 
@@ -69,6 +70,7 @@ export default function Practice() {
         {error && <ErrorBox message={error} />}
         <Button onClick={() => void start()} className="w-full"><Play size={16} /> Starten</Button>
       </Card>
+      <PageRules title="Multiple Choice" info="Bringt bewusst weniger als normales Lernen und ändert den Lernstand nicht." keys={['mc_points_per_answer', 'mc_daily_cap', 'mc_coin_every', 'mc_coin_cap']} />
     </div>
   )
 }

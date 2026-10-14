@@ -34,6 +34,7 @@ const REASONS: Record<string, string> = {
   gambling_bet: 'Gambling-Einsatz',
   gambling_win: 'Gambling-Gewinn',
   choice: 'Multiple Choice',
+  math: 'Mathe',
   copy: 'Abschreiben',
   pay_in: 'Coins erhalten',
   pay_out: 'Coins verschickt',

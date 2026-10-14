@@ -43,6 +43,17 @@ export const SECTIONS: Array<{ title: string; text?: string; rules: Rule[] }> = 
     ],
   },
   {
+    title: 'Mathe',
+    text: 'Kopfrechnen mit + − × ÷. Die Ergebnisse werden vom Browser gemeldet; die Mindestzeit pro Aufgabe schützt vor Schummeln.',
+    rules: [
+      { key: 'math_points_per_answer', label: 'Ranglistenpunkte pro richtiger Antwort' },
+      { key: 'math_daily_cap', label: 'Richtige Antworten pro Tag, die zählen' },
+      { key: 'math_coin_every', label: '1 Coin je so viele richtige Antworten' },
+      { key: 'math_coin_cap', label: 'Coins pro Tag höchstens', hint: '0 = keine Coins' },
+      { key: 'math_min_seconds', label: 'Mindestzeit pro Aufgabe (Sekunden)', hint: 'Schneller gemeldete Runden zählen nicht' },
+    ],
+  },
+  {
     title: 'Gambling',
     text: 'Chancen in Promille (1000 = immer). Erwartung pro Einsatz = Gewinnchance × Faktor + Jackpot × Jackpot-Faktor; unter 1000 ‰ Summe bleibt es ein Verlustgeschäft.',
     rules: [

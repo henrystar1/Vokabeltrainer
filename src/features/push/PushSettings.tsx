@@ -62,7 +62,7 @@ export default function PushSettings() {
   return (
     <div className="space-y-3 rounded-xl border border-white/10 bg-space-900/50 p-4">
       <p className="flex items-center gap-2 text-sm font-medium text-slate-100"><BellRing size={16} className="text-accent-cyan" aria-hidden /> Mitteilungen auch bei geschlossener App</p>
-      <p className="text-xs text-slate-400">Du bekommst @-Erwähnungen, Geflüster, Nachrichten vom Team und „Druck fertig“ als echte Mitteilung, auch wenn die App zu ist. Es gelten deine Schalter oben. Ist die App gerade offen, kommt stattdessen der Hinweis am Rand.</p>
+      <p className="text-xs text-slate-400">Du bekommst @-Erwähnungen, Geflüster, Nachrichten vom Team und „Druck fertig“ als echte Mitteilung, auch wenn die App zu ist. Dazu kommt, wenn jemand online kommt oder jede Chat-Nachricht, sofern du das oben eingeschaltet hast. Es gelten deine Schalter oben, auch bei geöffneter App.</p>
       {support === 'ios-install' && (
         <Notice tone="warn">Auf dem iPad geht das nur, wenn du die App zum Home-Bildschirm hinzufügst: In Safari auf „Teilen“ tippen, dann „Zum Home-Bildschirm“, und die App dort öffnen. Dafür brauchst du iPadOS 16.4 oder neuer.</Notice>
       )}

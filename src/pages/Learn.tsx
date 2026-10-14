@@ -24,6 +24,7 @@ import { addRepeatAnswers, getLearningPool, submitSession } from '../services/le
 import PlusHint from '../features/plus/PlusHint'
 import { usePlus } from '../features/plus/PlusProvider'
 import { plusMakeDue } from '../services/plus'
+import PageRules from '../components/admin/PageRules'
 
 type Phase = 'setup' | 'loading' | 'main' | 'result' | 'repeat' | 'repeat-result'
 
@@ -384,6 +385,7 @@ export default function Learn() {
           <Play size={18} /> {mistakeMode ? 'Fehler-Training starten' : 'Runde starten'}
         </Button>
       </Card>
+      <PageRules title="Lernen" info="Richtige Antworten beim Lernen geben Ranglistenpunkte und, in Online-Büchern, Coins (je N richtige Antworten und für neu gelernte Vokabeln). Dazu kommt die Wartezeit, nach der eine Vokabel wieder dran ist." keys={['points_per_answer', 'points_daily_cap', 'points_active_day', 'points_accuracy_bonus', 'points_accuracy_min', 'learn_reward', 'learn_daily_cap', 'learn_coin_every', 'learn_coin_cap', 'learn_gap_l1', 'learn_gap_l2', 'learn_gap_l3', 'learn_gap_l4']} />
       <PlusHint ctx="learn" />
     </div>
   )

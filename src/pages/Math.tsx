@@ -5,7 +5,12 @@ import Card from '../components/ui/Card'
 import { Field, Select, TextInput } from '../components/ui/Field'
 import PageHeader from '../components/ui/PageHeader'
 import ProgressBar from '../components/ui/ProgressBar'
-import { Notice } from '../components/ui/States'
+import { ErrorBox, Notice } from '../components/ui/States'
+import PageRules from '../components/admin/PageRules'
+import CoinIcon from '../components/ui/CoinIcon'
+import { useWallet } from '../features/koins/WalletProvider'
+import { errorMessage } from '../lib/errors'
+import { submitMath } from '../services/play'
 import { LEVELS, OPS, generateProblems, parseAnswer, type Level, type Op, type Problem } from '../features/math/problems'
 
 const KEY = 'mathe-auswahl'
@@ -22,7 +27,7 @@ function load(): Choice {
 
 interface Answered { p: Problem; given: number | null; ok: boolean }
 
-/** Kopfrechnen mit + − × ÷, frei wählbar nach Rechenart und Schwierigkeit. Nur zum Üben, es gibt keine Coins. */
+/** Kopfrechnen mit + − × ÷, frei wählbar nach Rechenart und Schwierigkeit. Bringt Ranglistenpunkte und Coins (Werte stellt der Admin ein). */
 export default function MathPage() {
   const [choice, setChoice] = useState<Choice>(load)
   const [phase, setPhase] = useState<'setup' | 'run' | 'done'>('setup')
@@ -33,6 +38,10 @@ export default function MathPage() {
   const [feedback, setFeedback] = useState<Answered | null>(null)
   const [invalid, setInvalid] = useState(false)
   const startedAt = useRef(0)
+  const wallet = useWallet()
+  const [reward, setReward] = useState<{ points: number; coins: number } | null>(null)
+  const [rewardError, setRewardError] = useState<string | null>(null)
+  const reported = useRef(false)
   const [seconds, setSeconds] = useState(0)
 
   useEffect(() => {
@@ -55,6 +64,9 @@ export default function MathPage() {
     setFeedback(null)
     setInvalid(false)
     startedAt.current = Date.now()
+    reported.current = false
+    setReward(null)
+    setRewardError(null)
     setPhase('run')
   }
 
@@ -79,6 +91,16 @@ export default function MathPage() {
   }
 
   const correct = results.filter((r) => r.ok).length
+
+  // Ergebnis einmal pro Runde melden (Punkte und Coins).
+  useEffect(() => {
+    if (phase !== 'done' || reported.current || results.length === 0) return
+    reported.current = true
+    void submitMath(correct, results.length, Math.max(seconds, 1))
+      .then((r) => { setReward(r); void wallet.refresh() })
+      .catch((e) => setRewardError(errorMessage(e)))
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [phase])
   const wrong = useMemo(() => results.filter((r) => !r.ok), [results])
   const levelInfo = LEVELS.find((l) => l.level === choice.level)!
 
@@ -127,6 +149,12 @@ export default function MathPage() {
         <Card className="mx-auto max-w-md space-y-4">
           <p className="text-center font-mono text-4xl text-accent-cyan">{correct} / {results.length}</p>
           <p className="text-center text-sm text-slate-400">{pct} % richtig · {Math.floor(seconds / 60)}:{String(seconds % 60).padStart(2, '0')} min · ⌀ {(seconds / Math.max(results.length, 1)).toFixed(1).replace('.', ',')} s pro Aufgabe</p>
+          {reward && (
+            <Notice tone="ok">
+              <span className="inline-flex items-center gap-1">+{reward.points} Ranglistenpunkte{reward.coins > 0 && <> · +{reward.coins} <CoinIcon size={14} /> Coins</>}{reward.points === 0 && reward.coins === 0 && ' (das Tageslimit ist erreicht)'}</span>
+            </Notice>
+          )}
+          {rewardError && <ErrorBox message={rewardError} />}
           {wrong.length > 0 ? (
             <div>
               <p className="label-mono mb-2">Das war falsch</p>
@@ -190,7 +218,9 @@ export default function MathPage() {
           </Select>
         </Field>
         <Button className="w-full min-h-[52px]" onClick={start}><Play size={18} /> Starten</Button>
+        <p className="text-center text-xs text-slate-500">Richtige Antworten bringen Ranglistenpunkte und Coins, bis zum Tageslimit.</p>
       </Card>
+      <PageRules title="Mathe" info="Richtige Antworten bringen Ranglistenpunkte (Liga und Rangliste) und Coins. Die Mindestzeit pro Aufgabe verhindert, dass jemand Ergebnisse einfach hinschickt." keys={['math_points_per_answer', 'math_daily_cap', 'math_coin_every', 'math_coin_cap', 'math_min_seconds']} />
     </div>
   )
 }

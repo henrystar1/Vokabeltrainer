@@ -307,3 +307,14 @@ Nach 0006 im Supabase-SQL-Editor ausführen (wiederholbar).
 ## Mathe (nur Client, keine Migration)
 - `src/features/math/problems.ts`: Aufgaben-Generator für + − × ÷ in 5 Stufen (Division immer ohne Rest, Minus erst ab Stufe 5 negativ), `parseAnswer` liest Eingaben tolerant. Tests in `problems.test.ts`.
 - `src/pages/Math.tsx` (Route `/mathe`, Menü „Lernen“): Rechenarten und Stufe wählen, 10/20/30 Aufgaben, Auswertung mit Zeit und Fehlerliste. Die Auswahl merkt sich der Browser. Es gibt keine Coins.
+
+## 0026 – Push auch bei offener App, Push bei „kommt online“
+- `_push_idle` liefert immer true (früher: kein Push, wenn die Person in den letzten 90 s aktiv war).
+- Trigger `profiles_push_online` (auf `online_since`): Push je nach `notify_online` (alle oder nur Mods/Admins), nicht an sich selbst, nicht bei versteckter Anwesenheit, höchstens alle 10 Minuten pro Person.
+
+## 0027 – Mathe mit Coins/Punkten, Admin-Liga, Korrektur Wochenpunkte
+- Mathe: `daily_stats.math_correct`, `submit_math(correct, total, seconds)` (Einstellungen `math_*`, Mindestzeit `math_min_seconds` gegen Schummeln, Coins mit Grund `math`). Punkte fließen in `_week_points` und `get_leaderboard`.
+- Korrektur: `_week_points` (in 0024 versehentlich fest verdrahtet) rechnet wieder mit den Einstellungen, Multiple-Choice-, Mathe-Punkten und Admin-Anpassungen; Plus ×1,5 gilt nur für erspielte Punkte (`_plus_points_factor`), auch in der Rangliste.
+- `admin_get_league(tier)`: Admins sehen jede Liga (auch fremde). UI: Stufen-Knöpfe in `LeagueView`.
+- `components/admin/PageRules.tsx`: aufklappbarer Admin-Bereich unter Lernen, Test, Multiple Choice und Mathe, mit Erklärung und direkt änderbaren Werten.
+- Antwortvergleich (`features/learning/answer.ts`): „to“ am Anfang und Bindestriche egal, Schrägstrich-Alternativen (`qc/qn`), Kürzel (qc, qn, sth, sb, etw., jdn. …) und Klammern optional.

@@ -1,4 +1,4 @@
-import type { Flair, ChatMessage, Duel, DuelDetail, DuelSubmitResult, League, PlayerHit, PoolVocab, Quest, QuestId, SprintRow, Streak } from '../types'
+import type { AdminLeague, Flair, ChatMessage, Duel, DuelDetail, DuelSubmitResult, League, PlayerHit, PoolVocab, Quest, QuestId, SprintRow, Streak } from '../types'
 import { rpc } from './rpc'
 
 export const getMistakePool = (bookId: string | null) => rpc<PoolVocab[]>('get_mistake_pool', { p_book_id: bookId })
@@ -11,6 +11,15 @@ export const getQuests = () => rpc<Quest[]>('get_quests')
 export const claimQuest = (id: QuestId) => rpc<number>('claim_quest', { p_id: id })
 
 export const getLeague = () => rpc<League>('get_league')
+/** Nur Admins: jede Liga ansehen, auch fremde. */
+export async function adminGetLeague(tier: number): Promise<AdminLeague> {
+  const r = await rpc<Omit<AdminLeague, 'participants' | 'relegation_active' | 'last'>>('admin_get_league', { p_tier: tier })
+  const active = r.counts.find((c) => c.tier === tier)?.active ?? 0
+  return { ...r, participants: active, relegation_active: active >= 8, last: null }
+}
+/** Mathe-Ergebnis melden: Punkte und Coins. */
+export const submitMath = (correct: number, total: number, seconds: number) =>
+  rpc<{ points: number; coins: number }>('submit_math', { p_correct: correct, p_total: total, p_seconds: seconds })
 
 export const searchPlayers = (query: string) => rpc<PlayerHit[]>('search_players', { p_query: query })
 export const createDuel = (opponent: string, count = 10) => rpc<string>('create_duel', { p_opponent: opponent, p_count: count })
