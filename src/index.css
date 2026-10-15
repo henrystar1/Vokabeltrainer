@@ -269,3 +269,11 @@ body {
 .fx-plus-hologramm { background-size: 300% 100%; animation: fx-plus-holo 4s linear infinite; filter: drop-shadow(0 0 6px rgb(103 232 249 / 0.6)); }
 @keyframes fx-plus-holo { to { background-position: 300% 0; } }
 @media (prefers-reduced-motion: reduce) { .fx-plus-blitz, .fx-plus-hologramm { animation: none; } }
+
+/* Karteikarten (Crashkurs) */
+.flip-scene { perspective: 1000px; }
+.flip-card { position: relative; min-height: 220px; transform-style: preserve-3d; transition: transform 0.55s cubic-bezier(0.4, 0.2, 0.2, 1); }
+.flip-card.is-flipped { transform: rotateY(180deg); }
+.flip-face { position: absolute; inset: 0; backface-visibility: hidden; -webkit-backface-visibility: hidden; }
+.flip-back { transform: rotateY(180deg); }
+@media (prefers-reduced-motion: reduce) { .flip-card { transition: none; } }

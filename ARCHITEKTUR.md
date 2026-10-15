@@ -318,3 +318,8 @@ Nach 0006 im Supabase-SQL-Editor ausführen (wiederholbar).
 - `admin_get_league(tier)`: Admins sehen jede Liga (auch fremde). UI: Stufen-Knöpfe in `LeagueView`.
 - `components/admin/PageRules.tsx`: aufklappbarer Admin-Bereich unter Lernen, Test, Multiple Choice und Mathe, mit Erklärung und direkt änderbaren Werten.
 - Antwortvergleich (`features/learning/answer.ts`): „to“ am Anfang und Bindestriche egal, Schrägstrich-Alternativen (`qc/qn`), Kürzel (qc, qn, sth, sb, etw., jdn. …) und Klammern optional.
+
+## Crashkurs („Noch nichts gelernt“)
+Seite `/crashkurs` (`pages/Cram.tsx`), Logik in `features/cram/cram.ts` (+Tests), Karteikarte `features/cram/FlipCard.tsx` (CSS-3D-Flip in `index.css`).
+Ablauf: Merken → Karteikarten → Abfrage (falsche kommen nach 3 Wörtern wieder) → schwere Wörter als Karten → Test (10 Wörter, Note per `gradeFromScore`).
+Der Stand liegt nach jedem Schritt in localStorage (`cram-session:<userId>`), kein Fokusmodus: Menü und Chat (Fenster per Knopf) bleiben erreichbar. Kein Server/Migration nötig.
