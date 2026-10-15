@@ -25,16 +25,22 @@ interface QuizRunnerProps {
   timeLimitSeconds?: number
   /** Eigene Beschriftung über der Frage (Standard: Richtung). */
   labelFor?: (q: Question) => string
+  /** „Hab ich gewusst“ nach falscher Antwort (Tippfehler): wertet die letzte Antwort nachträglich als richtig. */
+  onForgive?: (q: Question, given: string) => void
+  /** Wie oft pro Runde (Standard 3). */
+  maxForgive?: number
 }
 
 const DIRECTION_LABEL = { forward: 'Deutsch → Fremdsprache', backward: 'Fremdsprache → Deutsch' } as const
 
 /** Abfrageoberfläche: eine Frage nach der anderen, getippte Antwort, sofortige Rückmeldung. */
-export default function QuizRunner({ questions, caseSensitive, onAnswer, onFinish, showFeedback = true, title, accents = false, onCancel, timeLimitSeconds, labelFor }: QuizRunnerProps) {
+export default function QuizRunner({ questions, caseSensitive, onAnswer, onFinish, showFeedback = true, title, accents = false, onCancel, timeLimitSeconds, labelFor, onForgive, maxForgive = 3 }: QuizRunnerProps) {
   const [index, setIndex] = useState(0)
   const [value, setValue] = useState('')
   const [result, setResult] = useState<{ correct: boolean } | null>(null)
   const [confirmCancel, setConfirmCancel] = useState(false)
+  const [confirmForgive, setConfirmForgive] = useState(false)
+  const [forgiven, setForgiven] = useState(0)
   const [left, setLeft] = useState(timeLimitSeconds ?? 0)
   const finishRef = useRef(onFinish)
   finishRef.current = onFinish
@@ -185,12 +191,32 @@ export default function QuizRunner({ questions, caseSensitive, onAnswer, onFinis
         <Button type="submit" className="mt-6 w-full min-h-[52px]" disabled={result === null && value.trim() === ''}>
           {result ? (index + 1 >= questions.length ? 'Fertig' : 'Weiter') : 'Prüfen'} <ArrowRight size={18} />
         </Button>
+        {result && !result.correct && onForgive && (
+          <button
+            type="button"
+            disabled={forgiven >= maxForgive}
+            onClick={() => setConfirmForgive(true)}
+            className="mt-3 w-full min-h-[44px] rounded-xl border border-white/10 text-sm text-accent-cyan transition hover:bg-white/5 disabled:opacity-50"
+          >
+            Hab ich gewusst ({Math.max(0, maxForgive - forgiven)}/{maxForgive})
+          </button>
+        )}
         {result === null && (
           <button type="button" onClick={() => grade('', true)} className="mt-3 w-full min-h-[44px] rounded-xl text-sm text-slate-400 transition hover:bg-white/5 hover:text-slate-200">
             Weiß ich nicht
           </button>
         )}
       </form>
+
+      {confirmForgive && onForgive && (
+        <Modal title="Wirklich gewusst?" onClose={() => setConfirmForgive(false)}>
+          <p className="text-sm text-slate-300">Nur ein Tippfehler? Dann zählt die Antwort als richtig. Das geht höchstens {maxForgive}-mal pro Runde, du hast noch {Math.max(0, maxForgive - forgiven)}.</p>
+          <div className="mt-5 flex flex-col gap-2 sm:flex-row sm:justify-end">
+            <Button variant="ghost" onClick={() => setConfirmForgive(false)}>Nein</Button>
+            <Button onClick={() => { onForgive(q, value); setForgiven(forgiven + 1); setResult({ correct: true }); setConfirmForgive(false) }}>Ja, als richtig werten</Button>
+          </div>
+        </Modal>
+      )}
 
       {confirmCancel && onCancel && (
         <Modal title="Runde abbrechen?" onClose={() => setConfirmCancel(false)}>

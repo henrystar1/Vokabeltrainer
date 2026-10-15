@@ -125,6 +125,21 @@ export default function Learn() {
     else wrongRef.current.push({ question: q, given })
   }
 
+  /** „Hab ich gewusst“: die zuletzt falsche Antwort zu dieser Frage zählt nachträglich als richtig. */
+  function forgiveMain(q: Question, given: string) {
+    session.current.recordMain(q.vocabularyId, q.direction, true, given)
+    const i = wrongRef.current.map((w) => w.question.id).lastIndexOf(q.id)
+    if (i >= 0) wrongRef.current.splice(i, 1)
+    correctRef.current += 1
+  }
+
+  function forgiveRepeat(q: Question, given: string) {
+    session.current.recordRepeat(q.vocabularyId, q.direction, true, given)
+    const i = repeatWrongRef.current.map((w) => w.question.id).lastIndexOf(q.id)
+    if (i >= 0) repeatWrongRef.current.splice(i, 1)
+    repeatCorrectRef.current += 1
+  }
+
   async function saveMain() {
     setSaveError(null)
     try {
@@ -234,6 +249,7 @@ export default function Learn() {
         accents={language === 'fr'}
         title={phase === 'repeat' ? (settings.repeat_until_correct ? `Fehler wiederholen · Runde ${repeatRound}` : 'Fehler wiederholen') : mistakeMode ? 'Fehler-Training' : 'Lernrunde'}
         onAnswer={phase === 'repeat' ? onRepeatAnswer : onMainAnswer}
+        onForgive={phase === 'repeat' ? forgiveRepeat : forgiveMain}
         onFinish={() => void (phase === 'repeat' ? finishRepeat() : finishMain())}
         onCancel={() => setPhase('setup')}
       />
