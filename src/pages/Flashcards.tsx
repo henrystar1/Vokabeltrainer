@@ -36,6 +36,7 @@ export default function Flashcards() {
   const [queue, setQueue] = useState<string[]>([])
   const [total, setTotal] = useState(0)
   const [flipped, setFlipped] = useState(false)
+  const [step, setStep] = useState(0)
   const [rev, setRev] = useState<Record<string, boolean>>({})
   const [hard, setHard] = useState<string[]>([])
   const [reporting, setReporting] = useState<VocabLike | null>(null)
@@ -149,6 +150,7 @@ export default function Flashcards() {
   const r = rev[id]
   function go(known: boolean) {
     setFlipped(false)
+    setStep(step + 1)
     setQueue(known ? queue.slice(1) : requeue(queue, id))
     if (!known) setHard(addHard(hard, id))
   }
@@ -158,7 +160,7 @@ export default function Flashcards() {
       <PageHeader eyebrow="Lernen" title="Karteikarten" />
       <div className="max-w-xl space-y-4">
         <ProgressBar value={((total - new Set(queue).size) / total) * 100} label={`Noch ${queue.length} Karte(n)`} />
-        <FlipCard front={r ? foreign : v.german} back={r ? v.german : foreign} flipped={flipped} onFlip={() => setFlipped((f) => !f)} />
+        <FlipCard key={step} front={r ? foreign : v.german} back={r ? v.german : foreign} flipped={flipped} onFlip={() => setFlipped((f) => !f)} />
         <div className="flex flex-wrap gap-2">
           <Button variant="secondary" disabled={!flipped} onClick={() => go(false)}><RotateCcw size={16} /> Nochmal</Button>
           <Button disabled={!flipped} onClick={() => go(true)}><Check size={16} /> Gewusst</Button>

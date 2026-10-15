@@ -210,6 +210,7 @@ function Merken({ s, update, rep }: { s: CramSession; update: (s: CramSession) =
 function Karten({ s, update, rep }: { s: CramSession; update: (s: CramSession) => void; rep: Rep }) {
   const [flipped, setFlipped] = useState(false)
   const [reverse, setReverse] = useState(false)
+  const [step, setStep] = useState(0)
   const id = s.queue[0]
   const v = s.vocab.find((x) => x.vocabulary_id === id)
   if (!v) {
@@ -224,12 +225,13 @@ function Karten({ s, update, rep }: { s: CramSession; update: (s: CramSession) =
   const back = reverse ? german(v) : v.translations.join(', ')
   function go(known: boolean) {
     setFlipped(false)
+    setStep(step + 1)
     update({ ...s, queue: known ? s.queue.slice(1) : requeue(s.queue, id), hard: known ? s.hard : addHard(s.hard, id) })
   }
   return (
     <div className="max-w-xl space-y-4">
       <p className="text-sm text-slate-400">{s.hardOnly ? 'Diese Wörter waren schwer – noch einmal als Karten. ' : ''}Noch {s.queue.length} Karte(n).</p>
-      <FlipCard front={front} back={back} flipped={flipped} onFlip={() => setFlipped((f) => !f)} />
+      <FlipCard key={step} front={front} back={back} flipped={flipped} onFlip={() => setFlipped((f) => !f)} />
       <div className="flex flex-wrap gap-2">
         <Button variant="secondary" onClick={() => { setReverse(!reverse); setFlipped(false) }}>Seite tauschen</Button>
         <Button variant="secondary" disabled={!flipped} onClick={() => go(false)}><RotateCcw size={16} /> Nochmal</Button>
