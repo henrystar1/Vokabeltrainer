@@ -1,6 +1,6 @@
 import { useRef, useState } from 'react'
 import { Camera, Plus, Trash2 } from 'lucide-react'
-import AccentBar from '../ui/AccentBar'
+import AccentBar, { accentsFor } from '../ui/AccentBar'
 import Button from '../ui/Button'
 import { TextInput, inputClass } from '../ui/Field'
 import Modal from '../ui/Modal'
@@ -37,7 +37,7 @@ type Phase = 'pick' | 'scanning' | 'review' | 'saving'
 
 /** Foto einer Wortlisten-Seite einlesen, in Ruhe prüfen/korrigieren und dann speichern. */
 export default function ScanModal({ bookId, language, defaultUnit, defaultPage, onClose, onSaved }: ScanModalProps) {
-  const foreignName = language === 'en' ? 'Englisch' : 'Französisch'
+  const foreignName = ({ en: 'Englisch', fr: 'Französisch', la: 'Latein', es: 'Spanisch' } as Record<string, string>)[language] ?? 'Fremdsprache'
   const [phase, setPhase] = useState<Phase>('pick')
   const [progress, setProgress] = useState(0)
   const [status, setStatus] = useState('')
@@ -239,7 +239,7 @@ export default function ScanModal({ bookId, language, defaultUnit, defaultPage, 
             </button>
           </div>
 
-          {language === 'fr' && <AccentBar />}
+          {accentsFor(language) && <AccentBar lang={accentsFor(language) || undefined} />}
 
           {incomplete > 0 && <p className="text-xs text-amber-300">{incomplete} Zeile(n) ohne {foreignName} oder Deutsch werden nicht gespeichert.</p>}
 

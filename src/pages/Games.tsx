@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { Blocks, Bird, Crown, Footprints, Gamepad2, Grid3x3, Trophy, Zap } from 'lucide-react'
+import { Blocks, Bird, Brain, Crown, Footprints, Gamepad2, Grid3x3, Hammer, LayoutGrid, Trophy, Zap, Square } from 'lucide-react'
 import PlayerTag from '../components/profile/PlayerTag'
 import CoinIcon from '../components/ui/CoinIcon'
 import Button from '../components/ui/Button'
@@ -14,6 +14,10 @@ import BlastGame from '../features/games/BlastGame'
 import CrossyGame from '../features/games/CrossyGame'
 import FlappyGame from '../features/games/FlappyGame'
 import WaveGame from '../features/games/WaveGame'
+import Game2048 from '../features/games/Game2048'
+import MemoryGame from '../features/games/MemoryGame'
+import BricksGame from '../features/games/BricksGame'
+import MoleGame from '../features/games/MoleGame'
 import SnakeGame from '../features/games/SnakeGame'
 import TetrisGame from '../features/games/TetrisGame'
 import { errorMessage } from '../lib/errors'
@@ -32,6 +36,10 @@ const GAMES: Array<{ id: GameId; name: string; text: string; unit: string; icon:
   { id: 'crossy', name: 'Crossy Road', text: 'Bring das Huhn über Straßen und Wiesen – ohne überfahren zu werden.', unit: 'Reihen', icon: Footprints },
   { id: 'wave', name: 'Wave', text: 'Halten = hoch, loslassen = runter. Weich den Stacheln aus.', unit: 'Stacheln', icon: Zap },
   { id: 'flappy', name: 'Flappy Bird', text: 'Flatter durch die Lücken der Röhren.', unit: 'Röhren', icon: Bird },
+  { id: 'g2048', name: '2048', text: 'Schieb Zahlen zusammen und verschmilz gleiche Kacheln.', unit: 'Punkte', icon: LayoutGrid },
+  { id: 'memory', name: 'Memory', text: 'Finde gleiche Paare – jede Runde wird größer.', unit: 'Paare', icon: Brain },
+  { id: 'bricks', name: 'Bricks', text: 'Lenk den Ball mit dem Schläger und räum alle Steine ab.', unit: 'Steine', icon: Square },
+  { id: 'mole', name: 'Maulwurf', text: 'Tipp die Maulwürfe an, bevor sie verschwinden.', unit: 'Treffer', icon: Hammer },
 ]
 
 type Phase = { name: 'menu' } | { name: 'play'; game: GameId; run: GameStart } | { name: 'result'; game: GameId; result: GameResult }
@@ -255,6 +263,10 @@ function Playing({ game, run, onDone }: { game: GameId; run: GameStart; onDone: 
         {game === 'crossy' && <CrossyGame {...props} />}
         {game === 'flappy' && <FlappyGame {...props} />}
         {game === 'wave' && <WaveGame {...props} />}
+        {game === 'g2048' && <Game2048 {...props} />}
+        {game === 'memory' && <MemoryGame {...props} />}
+        {game === 'bricks' && <BricksGame {...props} />}
+        {game === 'mole' && <MoleGame {...props} />}
       </div>
       {confirmQuit && (
         <Modal title="Aufgeben?" onClose={() => setConfirmQuit(false)}>

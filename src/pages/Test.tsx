@@ -1,4 +1,5 @@
 import { useMemo, useRef, useState } from 'react'
+import { accentsFor } from '../components/ui/AccentBar'
 import { Link, useSearchParams } from 'react-router-dom'
 import { ClipboardCheck, FileText, Lock, Play, Trash2 } from 'lucide-react'
 import Button from '../components/ui/Button'
@@ -21,7 +22,7 @@ import { getBookEntries, listBooks } from '../services/books'
 import { getLearningPool, submitSession } from '../services/learning'
 import type { BookEntry } from '../types'
 import { usePlus } from '../features/plus/PlusProvider'
-import { deleteResult, generateSentences, getResult, LEVELS, myResults, type Lang, type Level, type StoredResult } from '../services/ai'
+import { deleteResult, generateSentences, getResult, LEVELS, myResults, type Lang, type Level, type StoredResult, isLang } from '../services/ai'
 import type { GapItem } from '../lib/gaps'
 import { shuffle } from '../features/learning/random'
 import { pickSheetVocab } from '../features/test/sheetPick'
@@ -105,7 +106,7 @@ export default function Test() {
       if (style === 'sheet') {
         let extra: GapItem[] = []
         let note: string | null = null
-        if (sheetPick && sheetPick.sentenceVocab.length > 0 && (language === 'en' || language === 'fr')) {
+        if (sheetPick && sheetPick.sentenceVocab.length > 0 && isLang(language)) {
           const r = await generateSentences({
             language: language as Lang,
             level: sLevel,
@@ -192,7 +193,8 @@ export default function Test() {
         questions={questions}
         caseSensitive={settings.case_sensitive}
         showFeedback={false}
-        accents={language === 'fr'}
+        accents={accentsFor(language)}
+        reportable
         title="Test"
         onAnswer={onAnswer}
         onFinish={() => void finish()}

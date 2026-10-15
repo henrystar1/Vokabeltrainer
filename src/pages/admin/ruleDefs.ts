@@ -90,6 +90,8 @@ export const SECTIONS: Array<{ title: string; text?: string; rules: Rule[] }> = 
       { key: 'duel_reward', label: 'Duell-Sieg: Coins' },
       { key: 'sprint_coin_every', label: 'Sprint: 1 Coin je so viele richtige Antworten' },
       { key: 'sprint_coin_cap', label: 'Sprint: Coins pro Tag höchstens' },
+      { key: 'sprint_extra_cost', label: 'Sprint: Coins je zusätzlicher Sekunde' },
+      { key: 'sprint_extra_max', label: 'Sprint: höchstens so viele Sekunden dazukaufbar' },
       { key: 'pay_max', label: '!pay: Höchstbetrag pro Überweisung (Coins)' },
       { key: 'pay_daily_cap', label: '!pay: Coins pro Tag und Person höchstens' },
       { key: 'duel_daily_cap', label: 'Duell-Siege mit Coins pro Tag' },

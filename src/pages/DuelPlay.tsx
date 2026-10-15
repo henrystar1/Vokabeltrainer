@@ -1,4 +1,5 @@
 import { useMemo, useRef, useState } from 'react'
+import { accentsFor } from '../components/ui/AccentBar'
 import { Link, useParams } from 'react-router-dom'
 import { Swords } from 'lucide-react'
 import QuizRunner from '../components/quiz/QuizRunner'
@@ -71,7 +72,7 @@ export default function DuelPlay() {
       <QuizRunner
         questions={questions}
         caseSensitive={settings.case_sensitive}
-        accents={settings.learn_language === 'fr'}
+        accents={accentsFor(settings.learn_language)}
         title={`Duell gegen ${d.opponent_name}`}
         showFeedback={false}
         onAnswer={(_q, given, ok) => {

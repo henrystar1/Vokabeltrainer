@@ -55,3 +55,12 @@ describe('answer', () => {
     expect(isAnswerCorrect('tobe', ['to be'], false)).toBe(false)
   })
 })
+
+describe('Leerzeichen dürfen fehlen', () => {
+  it('ohne Leerzeichen ist richtig', () => {
+    expect(isAnswerCorrect('icecream', ['ice cream'], false)).toBe(true)
+    expect(isAnswerCorrect('ice  cream', ['ice cream'], false)).toBe(true)
+    expect(isAnswerCorrect('be', ['to be'], false)).toBe(true)
+    expect(isAnswerCorrect('icecrem', ['ice cream'], false)).toBe(false)
+  })
+})

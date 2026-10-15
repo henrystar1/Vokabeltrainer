@@ -5,7 +5,10 @@ import { rpc } from './rpc'
 /** KI-Blätter: Erzeugen läuft über die Funktion „ai“ (dort liegt der OpenAI-Schlüssel), alles andere über die Datenbank. */
 
 export type Level = 'einfach' | 'mittel' | 'schwer'
-export type Lang = 'en' | 'fr'
+export type Lang = 'en' | 'fr' | 'la' | 'es'
+
+export const LANG_NAMES: Record<Lang, string> = { en: 'Englisch', fr: 'Französisch', la: 'Latein', es: 'Spanisch' }
+export const isLang = (x: string): x is Lang => x in LANG_NAMES
 export const LEVELS: readonly Level[] = ['einfach', 'mittel', 'schwer']
 
 export interface AiFail { ok: false; code: string; message: string }
@@ -52,6 +55,8 @@ export const deleteResult = (id: string) => rpc<void>('ai_delete_result', { p_id
 export const TOPICS: Record<Lang, string[]> = {
   en: ['Simple Past', 'Present Perfect', 'Past Perfect', 'Will-Future', 'Going-to-Future', 'Conditional I', 'Conditional II', 'Relative Clauses', 'Passive Voice', 'Reported Speech', 'Comparison of Adjectives', 'Gerund or Infinitive', 'Prepositions', 'Articles'],
   fr: ['Passé composé', 'Participe passé', 'Imparfait', 'Plus-que-parfait', 'Futur simple', 'Futur composé', 'Conditionnel', 'Subjonctif', 'Pronoms relatifs', 'Pronoms COD/COI', 'Articles partitifs', 'Adjectifs possessifs', 'Négation', 'Prépositions'],
+  la: ['Konjugationen (Präsens)', 'Imperfekt', 'Perfekt', 'Plusquamperfekt', 'Futur I', 'Deklinationen (a-/o-Dekl.)', 'Konsonantische Deklination', 'Kasus und ihre Funktionen', 'Adjektive und Steigerung', 'Pronomen (is, hic, ille)', 'Ablativus absolutus', 'AcI', 'Partizipien (PPP, PPA)', 'Konjunktiv', 'Gerundium und Gerundivum', 'Deponentia'],
+  es: ['Presente', 'Pretérito indefinido', 'Pretérito imperfecto', 'Pretérito perfecto', 'Futuro simple', 'Condicional', 'Subjuntivo presente', 'Imperativo', 'Ser y estar', 'Verbos irregulares', 'Pronombres de objeto', 'Verbos reflexivos', 'Por y para', 'Artículos y género'],
 }
 
 /** Nutzertext zu einem Fehlercode der Funktion. */

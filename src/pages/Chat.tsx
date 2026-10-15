@@ -1,5 +1,6 @@
 import { memo, useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from 'react'
-import { ChevronUp, EyeOff, Send, Timer, Trash2 } from 'lucide-react'
+import { ChevronUp, EyeOff, Send, Smile, Timer, Trash2 } from 'lucide-react'
+import { parseSticker, Sticker, StickerPicker, stickerBody } from '../features/chat/stickers'
 import PlayerTag from '../components/profile/PlayerTag'
 import Button from '../components/ui/Button'
 import Card from '../components/ui/Card'
@@ -87,7 +88,12 @@ const GroupRow = memo(function GroupRow({ g, live, isStaff, me, onDelete, onTime
             const pinged = !m.is_me && m.kind === 'text' && mentionsName(m.body, me)
             return (
               <li key={m.id} className={`group flex items-start gap-2 ${pinged ? '-mx-2 rounded-lg bg-amber-300/15 px-2 py-1 ring-1 ring-amber-300/30' : ''}`} data-pinged={pinged || undefined}>
-                <p className="min-w-0 flex-1 whitespace-pre-wrap break-words text-sm text-slate-100">{m.body}</p>
+                {(() => {
+                  const st = m.kind === 'text' ? parseSticker(m.body) : null
+                  return st
+                    ? <div className="min-w-0 flex-1"><Sticker def={st} size={112} /></div>
+                    : <p className="min-w-0 flex-1 whitespace-pre-wrap break-words text-sm text-slate-100">{m.body}</p>
+                })()}
                 <span className="mt-0.5 flex shrink-0 items-center gap-1.5 text-[11px] text-slate-500">
                   {time(m.created_at)}
                   {canMute && (
@@ -121,6 +127,7 @@ export default function Chat() {
   const [loaded, setLoaded] = useState(false)
   const [text, setText] = useState('')
   const [sending, setSending] = useState(false)
+  const [stickers, setStickers] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [muteFor, setMuteFor] = useState<ChatMessage | null>(null)
   const [maxMute, setMaxMute] = useState(1)
@@ -261,15 +268,16 @@ export default function Chat() {
     if (el && stick.current) el.scrollTop = el.scrollHeight
   }, [messages])
 
-  async function send(e: FormEvent) {
+  async function send(e: FormEvent, override?: string) {
     e.preventDefault()
-    const body = text.trim()
+    const body = (override ?? text).trim()
     if (!body || sending) return
     setSending(true)
     setError(null)
     try {
       await postChat(body)
-      setText(''); setMention(null)
+      if (override === undefined) setText('')
+      setMention(null); setStickers(false)
       stick.current = true
       if (!/^!whisper\b/i.test(body)) chat.send('posted', { name: displayName })
       await refresh()
@@ -387,6 +395,7 @@ export default function Chat() {
             ))}
           </ul>
         )}
+        {stickers && <div className="mb-3"><StickerPicker onPick={(id) => void send({ preventDefault() { /* kein Formular */ } } as FormEvent, stickerBody(id))} /></div>}
         <form onSubmit={(e) => void send(e)} className="flex gap-2">
           <input
             ref={inputRef}
@@ -400,6 +409,9 @@ export default function Chat() {
             enterKeyHint="send"
             className="min-h-[48px] min-w-0 flex-1 rounded-xl border border-white/10 bg-space-900/70 px-4 outline-none focus:border-accent-cyan/60"
           />
+          <Button variant="secondary" aria-label="Sticker" aria-pressed={stickers} onClick={() => setStickers((s) => !s)}>
+            <Smile size={18} />
+          </Button>
           <Button type="submit" busy={sending} disabled={!text.trim()} aria-label="Senden">
             <Send size={18} />
           </Button>

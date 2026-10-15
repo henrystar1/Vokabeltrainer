@@ -1,4 +1,5 @@
 import { useMemo, useRef, useState } from 'react'
+import { accentsFor } from '../components/ui/AccentBar'
 import { Link, useSearchParams } from 'react-router-dom'
 import { ChevronsRight, Play, RotateCcw, Settings as SettingsIcon } from 'lucide-react'
 import Button from '../components/ui/Button'
@@ -246,10 +247,11 @@ export default function Learn() {
         key={`${phase}-${repeatRound}`}
         questions={questions}
         caseSensitive={settings.case_sensitive}
-        accents={language === 'fr'}
+        accents={accentsFor(language)}
         title={phase === 'repeat' ? (settings.repeat_until_correct ? `Fehler wiederholen · Runde ${repeatRound}` : 'Fehler wiederholen') : mistakeMode ? 'Fehler-Training' : 'Lernrunde'}
         onAnswer={phase === 'repeat' ? onRepeatAnswer : onMainAnswer}
         onForgive={phase === 'repeat' ? forgiveRepeat : forgiveMain}
+        reportable
         onFinish={() => void (phase === 'repeat' ? finishRepeat() : finishMain())}
         onCancel={() => setPhase('setup')}
       />

@@ -4,6 +4,7 @@ import { rpc } from './rpc'
 export const getMistakePool = (bookId: string | null) => rpc<PoolVocab[]>('get_mistake_pool', { p_book_id: bookId })
 
 export const submitSprint = (score: number, total: number) => rpc<{ best: number; earned: number }>('submit_sprint', { p_score: score, p_total: total })
+export const buySprintTime = (seconds: number) => rpc<{ balance: number; seconds: number; cost: number }>('buy_sprint_time', { p_seconds: seconds })
 export const getSprintBoard = () => rpc<SprintRow[]>('get_sprint_board')
 
 export const getStreak = () => rpc<Streak>('get_streak')
@@ -33,7 +34,7 @@ export const getChat = (limit = 100) => rpc<ChatMessage[]>('get_chat', { p_limit
 export const postChat = (body: string) => rpc<number>('post_chat', { p_body: body })
 export const deleteChatMessage = (id: number) => rpc<void>('delete_chat_message', { p_id: id })
 
-export type GameId = 'snake' | 'tetris' | 'blast' | 'crossy' | 'flappy' | 'wave'
+export type GameId = 'snake' | 'tetris' | 'blast' | 'crossy' | 'flappy' | 'wave' | 'g2048' | 'memory' | 'bricks' | 'mole'
 export interface GameStart { id: string; record: number; fee: number; balance: number }
 export interface GameResult { score: number; record: boolean; prev_record: number; reward: number; balance: number }
 export interface GameBoardRow extends Flair { rank: number; display_name: string; score: number; is_me: boolean }

@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState, type FocusEvent, type FormEve
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { AlertCircle, ArrowLeft, Camera, Check, ChevronRight, Loader2, Plus, Trash2 } from 'lucide-react'
 import ScanModal from '../components/ocr/ScanModal'
-import AccentBar from '../components/ui/AccentBar'
+import AccentBar, { accentsFor } from '../components/ui/AccentBar'
 import Button from '../components/ui/Button'
 import { inputClass } from '../components/ui/Field'
 import { ErrorBox, Notice, Spinner } from '../components/ui/States'
@@ -26,7 +26,7 @@ const posInt = (v: string | null, fallback: number, min: number) => {
   return Number.isInteger(n) && n >= min ? n : fallback
 }
 
-const LANGUAGE_NAME: Record<string, string> = { en: 'Englisch', fr: 'Französisch' }
+const LANGUAGE_NAME: Record<string, string> = { en: 'Englisch', fr: 'Französisch', la: 'Latein', es: 'Spanisch' }
 const fieldName = (side: Side, i: number) => `${side === 'foreign' ? 'fr' : 'de'}-${i}`
 
 /**
@@ -432,9 +432,9 @@ export default function BookEntry() {
         </div>
       )}
 
-      {bookLanguage === 'fr' && (
+      {accentsFor(bookLanguage) && (
         <div className="sticky bottom-[76px] z-20 mt-4 md:bottom-3">
-          <AccentBar />
+          <AccentBar lang={accentsFor(bookLanguage) || undefined} />
         </div>
       )}
 

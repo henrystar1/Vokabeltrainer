@@ -13,10 +13,15 @@ interface GapSheetProps {
   title?: string
   subtitle?: string
   /** Buttons für é, è, ç … */
-  accents?: boolean
+  /** Sprachcode der Sonderzeichenleiste (fr/es/la); true = Französisch. */
+  accents?: boolean | string
 }
 
-const ACCENTS = ['é', 'è', 'ê', 'à', 'â', 'ç', 'î', 'ô', 'ù', 'û', 'œ', 'ë', 'ï']
+const ACCENTS: Record<string, string[]> = {
+  fr: ['é', 'è', 'ê', 'à', 'â', 'ç', 'î', 'ô', 'ù', 'û', 'œ', 'ë', 'ï'],
+  es: ['á', 'é', 'í', 'ó', 'ú', 'ü', 'ñ', '¿', '¡'],
+  la: ['ā', 'ē', 'ī', 'ō', 'ū'],
+}
 
 /** Aufgabenblatt wie auf Papier: nummerierte Sätze mit Textfeldern in den Lücken. */
 export default function GapSheet({ items, given, onChange, grade = null, headings, title, subtitle, accents = false }: GapSheetProps) {
@@ -44,7 +49,7 @@ export default function GapSheet({ items, given, onChange, grade = null, heading
       )}
       {accents && !done && (
         <div className="sheet-accents print:hidden" role="group" aria-label="Sonderzeichen">
-          {ACCENTS.map((c) => (
+          {ACCENTS[typeof accents === 'string' ? accents : 'fr'].map((c) => (
             <button key={c} type="button" onMouseDown={(e) => e.preventDefault()} onClick={() => insert(c)} className="sheet-accent">{c}</button>
           ))}
         </div>

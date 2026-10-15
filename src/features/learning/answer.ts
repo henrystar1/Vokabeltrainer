@@ -11,6 +11,7 @@
  *  - Alternativen mit Schrägstrich: „avoir qc/qn“ → auch „avoir qc“ oder „avoir qn“
  *  - Abkürzungen für „jemand/etwas“ (qc, qn, sth, sb, etw., jdn. …) dürfen fehlen
  *  - Klammern sind optional: „(se) lever“ → „se lever“ oder „lever“
+ *  - Leerzeichen dürfen ganz fehlen: „icecream“ = „ice cream“, „jetaime“ = „je t'aime“
  */
 export function normalizeAnswer(text: string, caseSensitive: boolean): string {
   const t = text
@@ -67,8 +68,10 @@ function canonical(text: string, caseSensitive: boolean): string {
   return m ? m[1] : t
 }
 
+const noSpaces = (s: string) => s.replace(/\s+/g, '')
+
 export function isAnswerCorrect(given: string, accepted: readonly string[], caseSensitive: boolean): boolean {
-  const g = canonical(given, caseSensitive)
+  const g = noSpaces(canonical(given, caseSensitive))
   if (g === '') return false
-  return accepted.some((a) => answerVariants(a).some((v) => canonical(v, caseSensitive) === g))
+  return accepted.some((a) => answerVariants(a).some((v) => noSpaces(canonical(v, caseSensitive)) === g))
 }

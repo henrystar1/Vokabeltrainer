@@ -42,8 +42,10 @@ export default function LeagueView() {
   if (!l) return null
   const tier = TIERS[l.tier - 1] ?? TIERS[0]
   const rows = l.rows
-  const promoCut = l.tier < TIERS.length ? 3 : 0
-  const relegStart = l.relegation_active && l.tier > 1 ? rows.length - 3 : rows.length
+  // Mitglieder ohne Punkte stehen unten (und steigen ab, ab Bronze); Auf- und Abstieg gelten nur für Aktive.
+  const active = rows.filter((r) => r.points > 0).length
+  const promoCut = l.tier < TIERS.length ? Math.min(3, active) : 0
+  const relegStart = l.tier > 1 ? (l.relegation_active ? Math.max(active - 3, promoCut) : active) : rows.length
   const last = l.last
 
   const counts = viewTier ? (league.data as { counts?: { tier: number; members: number; active: number }[] } | null)?.counts : undefined
@@ -100,10 +102,10 @@ export default function LeagueView() {
             const releg = i >= relegStart
             return (
               <li
-                key={`${r.rank}-${r.display_name}`}
+                key={`${i}-${r.display_name}`}
                 className={`flex min-h-[52px] items-center gap-4 rounded-xl px-4 ${r.is_me ? 'bg-accent-cyan/10 ring-1 ring-accent-cyan/30' : ''}`}
               >
-                <span className={`w-8 text-center font-mono ${promo ? 'text-emerald-300' : releg ? 'text-rose-300' : 'text-slate-500'}`}>{r.rank}</span>
+                <span className={`w-8 text-center font-mono ${promo ? 'text-emerald-300' : releg ? 'text-rose-300' : 'text-slate-500'}`}>{r.points > 0 ? r.rank : '–'}</span>
                 <span className="flex min-w-0 flex-1 items-center gap-2">
                   <PlayerTag name={r.display_name} cosmetics={r} framed size={36} />
                   {r.is_me && <span className="label-mono shrink-0 text-accent-cyan">Du</span>}

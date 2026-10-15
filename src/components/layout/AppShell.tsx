@@ -1,4 +1,5 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
+import { installKeepFocusVisible } from '../../lib/keepFocusVisible'
 import { Outlet } from 'react-router-dom'
 import Sidebar from './Sidebar'
 import MobileNav from './MobileNav'
@@ -12,6 +13,7 @@ import { PlusProvider } from '../../features/plus/PlusProvider'
 export default function AppShell() {
   const [collapsed, setCollapsed] = useState(false)
   const [focus, setFocus] = useState(false)
+  useEffect(() => installKeepFocusVisible(), [])
 
   return (
     <ChatProvider>

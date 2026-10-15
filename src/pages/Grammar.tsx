@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react'
+import { accentsFor } from '../components/ui/AccentBar'
 import { BookMarked, Check, History, Lock, Printer, RotateCcw, Sparkles, Trash2 } from 'lucide-react'
 import Button from '../components/ui/Button'
 import Card from '../components/ui/Card'
@@ -14,7 +15,7 @@ import { formatDateTime } from '../lib/format'
 import { gradeSheet, topicKey, toSaved, type GapItem, type SheetGrade } from '../lib/gaps'
 import { GRADE_WORD, gradeFromScore, percentOf } from '../lib/grade'
 import { useAsync } from '../lib/useAsync'
-import { aiFailText, deleteResult, generateGrammar, getResult, getSet, LEVELS, listSets, myResults, saveResult, TOPICS, type Lang, type Level, type StoredResult } from '../services/ai'
+import { aiFailText, deleteResult, generateGrammar, getResult, getSet, LEVELS, listSets, myResults, saveResult, TOPICS, isLang, LANG_NAMES, type Lang, type Level, type StoredResult } from '../services/ai'
 
 type View = 'practice' | 'history'
 interface Sheet { id: string | null; title: string; items: GapItem[]; language: Lang; level: Level }
@@ -26,7 +27,7 @@ export default function Grammar() {
   const { settings } = useSettings()
   const plus = usePlus()
   const [view, setView] = useState<View>('practice')
-  const [language, setLanguage] = useState<Lang>(settings.learn_language === 'fr' ? 'fr' : 'en')
+  const [language, setLanguage] = useState<Lang>(isLang(settings.learn_language) ? settings.learn_language : 'en')
   const [grade, setGrade] = useState(7)
   const [preset, setPreset] = useState(TOPICS[language][0])
   const [custom, setCustom] = useState('')
@@ -138,9 +139,9 @@ export default function Grammar() {
           items={sheet.items}
           given={given}
           grade={result}
-          accents={sheet.language === 'fr'}
+          accents={accentsFor(sheet.language)}
           title={sheet.title}
-          subtitle={`${sheet.language === 'fr' ? 'Französisch' : 'Englisch'} · ${sheet.level}`}
+          subtitle={`${LANG_NAMES[sheet.language]} · ${sheet.level}`}
           onChange={(i, k, v) => setGiven((g) => g.map((row, ri) => (ri === i ? row.map((x, ci) => (ci === k ? v : x)) : row)))}
         />
         <div className="no-print flex flex-wrap gap-3">
@@ -177,8 +178,7 @@ export default function Grammar() {
             <div className="grid grid-cols-2 gap-3">
               <Field label="Sprache">
                 <Select value={language} onChange={(e) => { const l = e.target.value as Lang; setLanguage(l); setPreset(TOPICS[l][0]) }}>
-                  <option value="en">Englisch</option>
-                  <option value="fr">Französisch</option>
+                  {(Object.keys(LANG_NAMES) as Lang[]).map((l) => <option key={l} value={l}>{LANG_NAMES[l]}</option>)}
                 </Select>
               </Field>
               <Field label="Klasse">

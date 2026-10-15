@@ -4,10 +4,10 @@
  */
 
 export type Level = 'einfach' | 'mittel' | 'schwer'
-export type Language = 'en' | 'fr'
+export type Language = 'en' | 'fr' | 'la' | 'es'
 
 export const LEVELS: readonly Level[] = ['einfach', 'mittel', 'schwer']
-export const LANGUAGES: readonly Language[] = ['en', 'fr']
+export const LANGUAGES: readonly Language[] = ['en', 'fr', 'la', 'es']
 
 /** Ein Lückensatz: `{{1}}`, `{{2}}` … markieren die Lücken; `answers[i]` sind alle richtigen Antworten für Lücke i+1. */
 export interface GapItem {
@@ -27,7 +27,7 @@ export class RequestError extends Error {
   }
 }
 
-const LANG_NAME: Record<Language, string> = { en: 'Englisch', fr: 'Französisch' }
+const LANG_NAME: Record<Language, string> = { en: 'Englisch', fr: 'Französisch', la: 'Latein', es: 'Spanisch' }
 
 /** Thema säubern: nur Buchstaben, Ziffern und einfache Satzzeichen, 2–60 Zeichen. */
 export function sanitizeTopic(raw: unknown): string {
@@ -92,6 +92,8 @@ export function buildGrammarPrompt(r: GrammarRequest): { system: string; user: s
     '`explanation`: ein kurzer deutscher Satz (höchstens 140 Zeichen), der die Regel nennt.',
     'Wechsle Personen, Zeiten und Situationen ab. Jeder Satz muss mit genau den angegebenen Antworten grammatisch richtig sein.',
     r.language === 'fr' ? 'Schreibe französische Akzente korrekt (é, è, à, ç …).' : '',
+    r.language === 'es' ? 'Schreibe spanische Akzente und Sonderzeichen korrekt (á, é, í, ó, ú, ñ, ü, ¿, ¡).' : '',
+    r.language === 'la' ? 'Schreibe klassisches Latein ohne Längenstriche (Makra); Sätze wie in einem Schullehrbuch, nur Wörter der Schulgrammatik.' : '',
   ].filter(Boolean).join('\n')
   return { system, user }
 }

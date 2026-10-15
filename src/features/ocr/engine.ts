@@ -14,7 +14,7 @@ const STATUS_DE: Record<string, string> = {
  * Die Bibliothek wird erst beim ersten Einlesen nachgeladen.
  */
 /** Sprachcode des Buchs → Tesseract-Sprachpaket der Fremdsprache. */
-export const OCR_LANGUAGES: Record<string, string> = { fr: 'fra', en: 'eng' }
+export const OCR_LANGUAGES: Record<string, string> = { fr: 'fra', en: 'eng', la: 'lat', es: 'spa' }
 
 export function createTesseractEngine(languageCode: string): OcrEngine {
   const foreign = OCR_LANGUAGES[languageCode] ?? 'fra'

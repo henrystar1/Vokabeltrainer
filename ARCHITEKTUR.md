@@ -324,3 +324,13 @@ Seite `/crashkurs` (`pages/Cram.tsx`), Logik in `features/cram/cram.ts` (+Tests)
 Ablauf: Merken → Karteikarten → Abfrage (falsche kommen nach 3 Wörtern wieder) → schwere Wörter als Karten → Test (10 Wörter, Note per `gradeFromScore`).
 Der Stand liegt nach jedem Schritt in localStorage (`cram-session:<userId>`), kein Fokusmodus: Menü und Chat (Fenster per Knopf) bleiben erreichbar. Kein Server/Migration nötig.
 Außerdem: eigene Seite `/karteikarten` (`pages/Flashcards.tsx`, nutzt `FlipCard`), Melden-Knopf (`features/cram/ReportBtn.tsx`, öffnet `ReportModal`) in Crashkurs und Karteikarten; „Hab ich gewusst“ (max. 3 pro Crashkurs) in `cram.ts`.
+
+## 0028 – Latein & Spanisch
+`languages` bekommt `la`/`es` (Bücher, Suche, Einstellungen lesen die Tabelle). Grammatik: `Lang` in `services/ai.ts` und `supabase/functions/ai/lib.ts`, Themen je Sprache in `TOPICS`, Check-Constraint von `ai_grammar_sets` erweitert. Sonderzeichenleiste je Sprache (`AccentBar lang=…`, `accentsFor()` in `AccentBar.tsx`). **Edge Function `ai` muss neu deployt werden.**
+
+### 0028 Teil 2 (Update 28)
+- **Sprint-Zeit kaufen:** `buy_sprint_time(n)` (Einstellungen `sprint_extra_cost` = 100 Coins/Sekunde, `sprint_extra_max` = 30), bezahlt erst beim Start (`pages/Sprint.tsx`).
+- **Liga:** alle Nutzer sind Mitglied (Nachtrag + Trigger `profiles_league_member`); `get_league` zeigt alle Mitglieder der eigenen Stufe, auch mit 0 Punkten (Anzeige „–“).
+- **Spiele:** `g2048`, `memory`, `bricks`, `mole` (`features/games/*`); `start_game`/`finish_game`/`get_game_board` werden per Text-Patch erweitert (wie bei Wave), Punkte-Obergrenzen je Sekunde im `case` von `finish_game`.
+- **Sticker:** Chat-Text `:sticker:<id>:` (`features/chat/stickers.tsx`, selbst gezeichnete SVGs), keine DB-Änderung.
+- **Antworten:** Leerzeichen dürfen fehlen (`answer.ts`). **Melden-Knopf** im `QuizRunner` (`reportable`, Lernen und Test). **Tastatur/Scroll:** `lib/keepFocusVisible.ts` (aus `AppShell`) + `preventScroll` beim Fokussieren.

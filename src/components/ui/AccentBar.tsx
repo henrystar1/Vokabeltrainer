@@ -1,8 +1,30 @@
 import { useEffect, useRef, useState, type SyntheticEvent } from 'react'
 import { ArrowBigUp } from 'lucide-react'
 
-const LOWER = ['à', 'â', 'æ', 'ç', 'é', 'è', 'ê', 'ë', 'î', 'ï', 'ô', 'œ', 'ù', 'û', 'ü', 'ÿ', '’', '«', '»']
-const UPPER = ['À', 'Â', 'Æ', 'Ç', 'É', 'È', 'Ê', 'Ë', 'Î', 'Ï', 'Ô', 'Œ', 'Ù', 'Û', 'Ü', 'Ÿ', '’', '«', '»']
+type AccentLang = 'fr' | 'es' | 'la'
+
+const CHARS: Record<AccentLang, { lower: string[]; upper: string[]; label: string }> = {
+  fr: {
+    lower: ['à', 'â', 'æ', 'ç', 'é', 'è', 'ê', 'ë', 'î', 'ï', 'ô', 'œ', 'ù', 'û', 'ü', 'ÿ', '’', '«', '»'],
+    upper: ['À', 'Â', 'Æ', 'Ç', 'É', 'È', 'Ê', 'Ë', 'Î', 'Ï', 'Ô', 'Œ', 'Ù', 'Û', 'Ü', 'Ÿ', '’', '«', '»'],
+    label: 'Französische Sonderzeichen',
+  },
+  es: {
+    lower: ['á', 'é', 'í', 'ó', 'ú', 'ü', 'ñ', '¿', '¡'],
+    upper: ['Á', 'É', 'Í', 'Ó', 'Ú', 'Ü', 'Ñ', '¿', '¡'],
+    label: 'Spanische Sonderzeichen',
+  },
+  la: {
+    lower: ['ā', 'ē', 'ī', 'ō', 'ū', 'ae', 'oe'],
+    upper: ['Ā', 'Ē', 'Ī', 'Ō', 'Ū', 'Ae', 'Oe'],
+    label: 'Lateinische Längenzeichen',
+  },
+}
+
+/** Welche Sonderzeichenleiste passt zur Sprache? `false`, wenn keine nötig ist (Englisch). */
+export function accentsFor(language: string | null | undefined): AccentLang | false {
+  return language === 'fr' || language === 'es' || language === 'la' ? language : false
+}
 
 type TextEl = HTMLInputElement | HTMLTextAreaElement
 
@@ -25,7 +47,7 @@ export function insertAtCursor(el: TextEl, text: string): void {
  * Leiste mit französischen Sonderzeichen. Schreibt in das zuletzt fokussierte Textfeld;
  * die Tasten nehmen dem Feld den Fokus nicht weg (wichtig auf dem iPad).
  */
-export default function AccentBar({ className = '' }: { className?: string }) {
+export default function AccentBar({ className = '', lang = 'fr' }: { className?: string; lang?: AccentLang }) {
   const [upper, setUpper] = useState(false)
   const last = useRef<TextEl | null>(null)
   const bar = useRef<HTMLDivElement>(null)
@@ -46,17 +68,18 @@ export default function AccentBar({ className = '' }: { className?: string }) {
     if (!el || !el.isConnected || el.readOnly || el.disabled) return
     el.focus()
     insertAtCursor(el, ch)
-    if (upper && /[A-ZÀ-Ÿ]/.test(ch)) setUpper(false)
+    if (upper && /[A-ZÀ-ŸĀĒĪŌŪ¿¡]/.test(ch)) setUpper(false)
   }
 
   const keep = (e: SyntheticEvent) => e.preventDefault()
-  const chars = upper ? UPPER : LOWER
+  const set = CHARS[lang]
+  const chars = upper ? set.upper : set.lower
 
   return (
     <div
       ref={bar}
       role="toolbar"
-      aria-label="Französische Sonderzeichen"
+      aria-label={set.label}
       className={`glass flex flex-wrap items-center justify-center gap-1.5 rounded-2xl p-2 ${className}`}
     >
       <button

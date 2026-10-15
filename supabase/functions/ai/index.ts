@@ -4,8 +4,8 @@
 // @ts-nocheck  (läuft unter Deno, nicht unter dem Projekt-tsc)
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.45.4'
 import {
-  GRAMMAR_SCHEMA, SENTENCE_SCHEMA, MESSAGES, RequestError, buildGrammarPrompt, buildSentencesPrompt,
-  classifyOpenAiError, cleanVocabList, parseGrammarRequest, parseGrammarResponse, parseSentencesResponse, titleFor, vocabKey,
+  GRAMMAR_SCHEMA, LANGUAGES, SENTENCE_SCHEMA, MESSAGES, RequestError, buildGrammarPrompt, buildSentencesPrompt,
+  classifyOpenAiError, cleanVocabList, parseGrammarRequest, parseGrammarResponse, parseSentencesResponse, titleFor, vocabKey, type Language,
 } from './lib.ts'
 
 const CORS = {
@@ -147,7 +147,7 @@ Deno.serve(async (req) => {
 
     // ---- Sätze zu Vokabeln ----
     const language = String(body.language ?? '')
-    if (language !== 'en' && language !== 'fr') return fail('bad_request')
+    if (!LANGUAGES.includes(language as Language)) return fail('bad_request')
     const level = String(body.level ?? '')
     if (!['einfach', 'mittel', 'schwer'].includes(level)) return fail('bad_request')
     const vocab = cleanVocabList(body.vocab, maxSentences)

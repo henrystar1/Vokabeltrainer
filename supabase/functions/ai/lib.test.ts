@@ -92,3 +92,12 @@ describe('classifyOpenAiError', () => {
     expect(classifyOpenAiError(500, {}).code).toBe('error')
   })
 })
+
+describe('Sprachen', () => {
+  it('Latein und Spanisch werden angenommen, Unbekanntes nicht', () => {
+    const base = { grade: 7, topic: 'Perfekt', level: 'mittel', count: 5 }
+    expect(parseGrammarRequest({ ...base, language: 'la' }, 15).language).toBe('la')
+    expect(parseGrammarRequest({ ...base, language: 'es' }, 15).language).toBe('es')
+    expect(() => parseGrammarRequest({ ...base, language: 'de' }, 15)).toThrow()
+  })
+})

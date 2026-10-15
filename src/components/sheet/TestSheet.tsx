@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react'
+import { accentsFor } from '../ui/AccentBar'
 import { Check, Printer } from 'lucide-react'
 import Button from '../ui/Button'
 import Card from '../ui/Card'
@@ -75,7 +76,7 @@ export default function TestSheet({ title, language, level, questions, sentences
         given={given}
         grade={result}
         headings={headings}
-        accents={language === 'fr'}
+        accents={accentsFor(language)}
         title={title}
         subtitle="Schreibe in jedes Feld die Lösung. Am Ende bekommst du eine Note."
         onChange={(i, k, v) => setGiven((g) => g.map((row, ri) => (ri === i ? row.map((x, ci) => (ci === k ? v : x)) : row)))}

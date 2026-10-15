@@ -1,4 +1,5 @@
 import { useRef, useState } from 'react'
+import { accentsFor } from '../components/ui/AccentBar'
 import { Link } from 'react-router-dom'
 import { Play, Trophy, Zap } from 'lucide-react'
 import PlayerTag from '../components/profile/PlayerTag'
@@ -18,7 +19,9 @@ import { errorMessage } from '../lib/errors'
 import { useAsync } from '../lib/useAsync'
 import { listBooks } from '../services/books'
 import { getLearningPool, submitSession } from '../services/learning'
-import { getSprintBoard, submitSprint } from '../services/play'
+import { buySprintTime, getSprintBoard, submitSprint } from '../services/play'
+import PageRules from '../components/admin/PageRules'
+import { getAppSettings } from '../services/koins'
 
 const SECONDS = 60
 type Phase = 'setup' | 'loading' | 'run' | 'result'
@@ -39,6 +42,11 @@ export default function Sprint() {
   const [answered, setAnswered] = useState(0)
   const [best, setBest] = useState<number | null>(null)
   const [earned, setEarned] = useState(0)
+  const rules = useAsync(getAppSettings, [])
+  const costPer = rules.data?.sprint_extra_cost ?? 100
+  const maxExtra = rules.data?.sprint_extra_max ?? 30
+  const [extra, setExtra] = useState(0)
+  const [runSeconds, setRunSeconds] = useState(SECONDS)
   const wallet = useWallet()
   const session = useRef(new LearningSession(['forward', 'backward']))
   const startedAt = useRef(new Date())
@@ -62,6 +70,14 @@ export default function Sprint() {
         setPhase('setup')
         return
       }
+      // Gekaufte Zusatzzeit erst bezahlen, wenn der Sprint wirklich starten kann.
+      let seconds = SECONDS
+      if (extra > 0) {
+        const paid = await buySprintTime(Math.min(extra, maxExtra))
+        wallet.setBalance(paid.balance)
+        seconds = SECONDS + paid.seconds
+      }
+      setRunSeconds(seconds)
       session.current = new LearningSession(['forward', 'backward'])
       startedAt.current = new Date()
       wrongRef.current = []
@@ -125,10 +141,10 @@ export default function Sprint() {
       <QuizRunner
         questions={questions}
         caseSensitive={settings.case_sensitive}
-        accents={language === 'fr'}
+        accents={accentsFor(language)}
         title="Sprint"
         showFeedback={false}
-        timeLimitSeconds={SECONDS}
+        timeLimitSeconds={runSeconds}
         onAnswer={onAnswer}
         onFinish={finish}
         onCancel={() => setPhase('setup')}
@@ -177,6 +193,20 @@ export default function Sprint() {
             </Select>
           </Field>
           <p className="text-sm text-slate-400">Beide Richtungen gemischt. Dein Lernstand ändert sich nicht.</p>
+          <div className="rounded-xl border border-white/10 bg-white/[0.03] p-3">
+            <p className="text-sm font-medium text-slate-200">Zeit dazukaufen</p>
+            <p className="text-xs text-slate-400">{costPer.toLocaleString('de-DE')} Coins pro Sekunde, höchstens {maxExtra} Sekunden.</p>
+            <div className="mt-2 flex items-center gap-2">
+              <Button variant="secondary" aria-label="Eine Sekunde weniger" disabled={extra <= 0} onClick={() => setExtra((e) => Math.max(0, e - 1))}>−</Button>
+              <span className="min-w-[7rem] text-center font-mono text-accent-cyan">+{extra} s</span>
+              <Button variant="secondary" aria-label="Eine Sekunde mehr" disabled={extra >= maxExtra || wallet.balance < (extra + 1) * costPer} onClick={() => setExtra((e) => Math.min(maxExtra, e + 1))}>+</Button>
+              <Button variant="ghost" disabled={extra === 0} onClick={() => setExtra(0)}>Zurücksetzen</Button>
+            </div>
+            <p className="mt-2 text-xs text-slate-400">
+              Gesamtzeit {SECONDS + extra} s{extra > 0 ? ` · kostet ${(extra * costPer).toLocaleString('de-DE')} Coins beim Start` : ''}.
+              {wallet.balance < costPer ? ' Dir fehlen Coins für eine Zusatzsekunde.' : ''}
+            </p>
+          </div>
           <Button className="w-full min-h-[52px]" onClick={() => void start()}>
             <Play size={18} /> Sprint starten
           </Button>
@@ -197,6 +227,7 @@ export default function Sprint() {
           </ol>
         </Card>
       </div>
+      <PageRules title="Sprint" info="Zusatzzeit kann man mit Coins kaufen. Coins fürs Sprinten gibt es je N richtige Antworten, begrenzt pro Tag." keys={['sprint_coin_every', 'sprint_coin_cap', 'sprint_extra_cost', 'sprint_extra_max']} />
     </div>
   )
 }

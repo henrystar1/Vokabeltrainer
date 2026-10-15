@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, type FormEvent } from 'react'
-import { ArrowRight, Check, X } from 'lucide-react'
+import { ArrowRight, Check, Flag, X } from 'lucide-react'
+import ReportModal from '../books/ReportModal'
 import AccentBar from '../ui/AccentBar'
 import Button from '../ui/Button'
 import Modal from '../ui/Modal'
@@ -18,7 +19,7 @@ interface QuizRunnerProps {
   showFeedback?: boolean
   title?: string
   /** Leiste mit französischen Sonderzeichen einblenden. */
-  accents?: boolean
+  accents?: false | 'fr' | 'es' | 'la' | boolean
   /** Wird nach Bestätigung des "X" aufgerufen. Die laufende Runde wird dann verworfen. */
   onCancel?: () => void
   /** Sprint: Gesamtzeit in Sekunden; danach wird onFinish automatisch aufgerufen. */
@@ -29,18 +30,22 @@ interface QuizRunnerProps {
   onForgive?: (q: Question, given: string) => void
   /** Wie oft pro Runde (Standard 3). */
   maxForgive?: number
+  /** „Vokabel melden“-Knopf (Überprüfung anfordern), z. B. beim normalen Lernen. */
+  reportable?: boolean
 }
 
 const DIRECTION_LABEL = { forward: 'Deutsch → Fremdsprache', backward: 'Fremdsprache → Deutsch' } as const
 
 /** Abfrageoberfläche: eine Frage nach der anderen, getippte Antwort, sofortige Rückmeldung. */
-export default function QuizRunner({ questions, caseSensitive, onAnswer, onFinish, showFeedback = true, title, accents = false, onCancel, timeLimitSeconds, labelFor, onForgive, maxForgive = 3 }: QuizRunnerProps) {
+export default function QuizRunner({ questions, caseSensitive, onAnswer, onFinish, showFeedback = true, title, accents = false, onCancel, timeLimitSeconds, labelFor, onForgive, maxForgive = 3, reportable = false }: QuizRunnerProps) {
   const [index, setIndex] = useState(0)
   const [value, setValue] = useState('')
   const [result, setResult] = useState<{ correct: boolean } | null>(null)
   const [confirmCancel, setConfirmCancel] = useState(false)
   const [confirmForgive, setConfirmForgive] = useState(false)
   const [forgiven, setForgiven] = useState(0)
+  const [reporting, setReporting] = useState(false)
+  const [reported, setReported] = useState<ReadonlySet<string>>(new Set())
   const [left, setLeft] = useState(timeLimitSeconds ?? 0)
   const finishRef = useRef(onFinish)
   finishRef.current = onFinish
@@ -74,7 +79,8 @@ export default function QuizRunner({ questions, caseSensitive, onAnswer, onFinis
   }, [timeLimitSeconds])
 
   useEffect(() => {
-    inputRef.current?.focus()
+    // preventScroll: Das Feld wird fokussiert, ohne dass die Seite dabei springt (iPad-Tastatur).
+    inputRef.current?.focus({ preventScroll: true })
   }, [index])
 
   if (!q) return null
@@ -186,7 +192,7 @@ export default function QuizRunner({ questions, caseSensitive, onAnswer, onFinis
           </div>
         )}
 
-        {accents && q.direction === 'forward' && result === null && <AccentBar className="mt-4" />}
+        {accents && q.direction === 'forward' && result === null && <AccentBar className="mt-4" lang={typeof accents === 'string' ? accents : 'fr'} />}
 
         <Button type="submit" className="mt-6 w-full min-h-[52px]" disabled={result === null && value.trim() === ''}>
           {result ? (index + 1 >= questions.length ? 'Fertig' : 'Weiter') : 'Prüfen'} <ArrowRight size={18} />
@@ -201,12 +207,34 @@ export default function QuizRunner({ questions, caseSensitive, onAnswer, onFinis
             Hab ich gewusst ({Math.max(0, maxForgive - forgiven)}/{maxForgive})
           </button>
         )}
+        {reportable && (
+          <button
+            type="button"
+            disabled={reported.has(q.vocabularyId)}
+            onClick={() => setReporting(true)}
+            className="mt-3 flex w-full min-h-[44px] items-center justify-center gap-2 rounded-xl text-sm text-slate-400 transition hover:bg-white/5 hover:text-slate-200 disabled:opacity-60"
+          >
+            <Flag size={14} /> {reported.has(q.vocabularyId) ? 'Gemeldet' : 'Vokabel melden'}
+          </button>
+        )}
         {result === null && (
           <button type="button" onClick={() => grade('', true)} className="mt-3 w-full min-h-[44px] rounded-xl text-sm text-slate-400 transition hover:bg-white/5 hover:text-slate-200">
             Weiß ich nicht
           </button>
         )}
       </form>
+
+      {reporting && (
+        <ReportModal
+          entry={
+            q.direction === 'forward'
+              ? { vocabulary_id: q.vocabularyId, german: q.prompt, german_alts: [], translations: q.accepted }
+              : { vocabulary_id: q.vocabularyId, german: q.accepted[0] ?? '', german_alts: q.accepted.slice(1), translations: [q.prompt] }
+          }
+          onClose={() => setReporting(false)}
+          onSent={() => { setReported((s) => new Set(s).add(q.vocabularyId)); setReporting(false) }}
+        />
+      )}
 
       {confirmForgive && onForgive && (
         <Modal title="Wirklich gewusst?" onClose={() => setConfirmForgive(false)}>
