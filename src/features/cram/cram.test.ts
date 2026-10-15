@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { answerAbfrage, answerTest, afterAbfrage, newSession, requeue, startAbfrage, startKarten, startTest, testResult, TEST_SIZE } from './cram'
+import { forgiveAbfrage, forgiveTest, overridesLeft, answerAbfrage, answerTest, afterAbfrage, newSession, requeue, startAbfrage, startKarten, startTest, testResult, TEST_SIZE } from './cram'
 import { mulberry32 } from '../learning/random'
 
 const vocab = Array.from({ length: 12 }, (_, i) => ({ vocabulary_id: `v${i}`, german: `de${i}`, german_alts: [], translations: [`en${i}`] }))
@@ -38,6 +38,20 @@ describe('cram', () => {
     for (let i = 0; i < TEST_SIZE; i++) s = answerTest(s, 'x')
     expect(s.phase).toBe('ergebnis')
     expect(testResult(s).correct).toBe(0)
+  })
+  it('„Hab ich gewusst“: höchstens 3-mal, zählt als richtig', () => {
+    let s = startAbfrage(newSession('t', 'b', vocab), rng())
+    const n = s.quiz.length
+    for (let i = 0; i < 3; i++) s = forgiveAbfrage(s)
+    expect(s.quiz).toHaveLength(n - 3)
+    expect(s.hard).toHaveLength(0)
+    expect(overridesLeft(s)).toBe(0)
+    expect(forgiveAbfrage(s).quiz).toHaveLength(n - 3)
+    let t = startTest(newSession('t', 'b', vocab), rng())
+    for (let i = 0; i < TEST_SIZE; i++) t = answerTest(t, 'x')
+    t = forgiveTest(t, t.test[0].id)
+    expect(testResult(t).correct).toBe(1)
+    expect(overridesLeft(t)).toBe(2)
   })
   it('kleine Bereiche: Test kürzer', () => {
     expect(startTest(newSession('t', 'b', vocab.slice(0, 3))).test).toHaveLength(3)

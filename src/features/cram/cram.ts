@@ -27,6 +27,26 @@ export interface CramSession {
   testPos: number
   /** Wie viele Abfragen insgesamt schon beantwortet wurden (Anzeige). */
   answered: number
+  /** Wie oft „Hab ich gewusst“ (Tippfehler) schon benutzt wurde, höchstens MAX_OVERRIDES. */
+  overrides?: number
+  /** Test-Vokabeln, die per „Hab ich gewusst“ als richtig gelten. */
+  testForced?: string[]
+}
+
+export const MAX_OVERRIDES = 3
+
+export const overridesLeft = (s: CramSession): number => Math.max(0, MAX_OVERRIDES - (s.overrides ?? 0))
+
+/** Abfrage: letzte Antwort war nur ein Tippfehler → zählt als richtig (Zähler +1). */
+export function forgiveAbfrage(before: CramSession): CramSession {
+  if (overridesLeft(before) <= 0 || before.quiz.length === 0) return before
+  return { ...advanceAbfrage(before, true), overrides: (before.overrides ?? 0) + 1 }
+}
+
+/** Ergebnis: eine falsche Test-Antwort nachträglich als richtig werten. */
+export function forgiveTest(s: CramSession, id: string): CramSession {
+  if (overridesLeft(s) <= 0 || (s.testForced ?? []).includes(id)) return s
+  return { ...s, testForced: [...(s.testForced ?? []), id], overrides: (s.overrides ?? 0) + 1 }
 }
 
 export const TEST_SIZE = 10
@@ -35,7 +55,7 @@ export function newSession(label: string, bookId: string, vocab: VocabLike[], no
   return {
     v: 1, label, bookId, startedAt: now, vocab, phase: 'merken',
     queue: vocab.map((x) => x.vocabulary_id), quiz: [], hard: [], hardOnly: false,
-    test: [], testPos: 0, answered: 0,
+    test: [], testPos: 0, answered: 0, overrides: 0, testForced: [],
   }
 }
 
@@ -85,6 +105,7 @@ export function startTest(s: CramSession, rng: Rng = Math.random): CramSession {
   const pick = shuffle(s.vocab, rng).slice(0, TEST_SIZE)
   return {
     ...s, phase: 'test', queue: [], quiz: [],
+    testForced: [],
     test: pick.map((v) => ({ id: v.vocabulary_id, dir: randomDir(rng), given: null })),
     testPos: 0,
   }
@@ -119,7 +140,7 @@ export function testResult(s: CramSession): TestResult {
   const rows = s.test.map((t) => {
     const q = questionFor(s, t.id, t.dir)!
     const given = t.given ?? ''
-    return { q, given, ok: isAnswerCorrect(given, q.accepted, false) }
+    return { q, given, ok: (s.testForced ?? []).includes(t.id) || isAnswerCorrect(given, q.accepted, false) }
   })
   return { correct: rows.filter((r) => r.ok).length, total: rows.length, rows }
 }

@@ -11,7 +11,7 @@ import { useAuth } from '../features/auth/AuthProvider'
 import { useChat } from '../features/chat/ChatProvider'
 import { useLocks } from '../features/locks/LocksProvider'
 import {
-  addHard, afterAbfrage, answerAbfrage, answerTest, loadSession, newSession, questionFor, requeue, saveSession,
+  addHard, afterAbfrage, forgiveAbfrage, forgiveTest, overridesLeft, MAX_OVERRIDES, answerAbfrage, answerTest, loadSession, newSession, questionFor, requeue, saveSession,
   startAbfrage, startKarten, startTest, testResult, TEST_SIZE, type CramPhase, type CramSession,
 } from '../features/cram/cram'
 import FlipCard from '../features/cram/FlipCard'
@@ -228,6 +228,7 @@ function Karten({ s, update }: { s: CramSession; update: (s: CramSession) => voi
 function Abfrage({ s, update }: { s: CramSession; update: (s: CramSession) => void }) {
   const [value, setValue] = useState('')
   const [fb, setFb] = useState<{ ok: boolean; accepted: string[]; next: CramSession } | null>(null)
+  const [confirm, setConfirm] = useState(false)
   const done = s.quiz.length === 0
   const cur = s.quiz[0]
   const q = cur ? questionFor(s, cur.id, cur.dir) : null
@@ -256,7 +257,23 @@ function Abfrage({ s, update }: { s: CramSession; update: (s: CramSession) => vo
         <TextInput key={`${s.quiz.length}-${s.answered}`} autoFocus autoComplete="off" autoCapitalize="none" value={value} readOnly={!!fb} onChange={(e) => setValue(e.target.value)} placeholder={cur.dir === 'forward' ? 'Übersetzung' : 'Deutsch'} />
         {fb && <div className={fb.ok ? 'text-emerald-400' : 'text-rose-400'}>{fb.ok ? 'Richtig!' : `Falsch – richtig: ${fb.accepted.join(' / ')}`}</div>}
       </Card>
-      <Button type="submit">{fb ? 'Weiter' : 'Prüfen'}</Button>
+      <div className="flex flex-wrap gap-2">
+        <Button type="submit">{fb ? 'Weiter' : 'Prüfen'}</Button>
+        {fb && !fb.ok && (
+          <Button variant="secondary" disabled={overridesLeft(s) === 0} onClick={() => setConfirm(true)}>
+            <Check size={16} /> Hab ich gewusst ({overridesLeft(s)}/{MAX_OVERRIDES})
+          </Button>
+        )}
+      </div>
+      {confirm && (
+        <Modal title="Wirklich gewusst?" onClose={() => setConfirm(false)}>
+          <p className="mb-4 text-sm text-slate-300">Nur ein Tippfehler? Dann zählt die Antwort als richtig. Das geht höchstens {MAX_OVERRIDES}-mal pro Crashkurs, du hast noch {overridesLeft(s)}.</p>
+          <div className="flex gap-2">
+            <Button onClick={() => { setConfirm(false); update(forgiveAbfrage(s)); setFb(null); setValue('') }}>Ja, als richtig werten</Button>
+            <Button variant="secondary" onClick={() => setConfirm(false)}>Nein</Button>
+          </div>
+        </Modal>
+      )}
     </form>
   )
 }
@@ -285,6 +302,7 @@ function TestRun({ s, update }: { s: CramSession; update: (s: CramSession) => vo
 function Ergebnis({ s, update }: { s: CramSession; update: (s: CramSession | null) => void }) {
   const r = useMemo(() => testResult(s), [s])
   const grade = gradeFromScore(r.correct, r.total)
+  const [confirmId, setConfirmId] = useState<string | null>(null)
   const wrongIds = useRef(r.rows.filter((x) => !x.ok).map((x) => x.q.vocabularyId))
   return (
     <div className="max-w-xl space-y-4">
@@ -298,9 +316,19 @@ function Ergebnis({ s, update }: { s: CramSession; update: (s: CramSession | nul
             <span className={x.ok ? 'text-emerald-400' : 'text-rose-400'}>{x.ok ? '✓' : '✗'}</span>
             <span className="font-medium">{x.q.prompt}</span>
             <span className="text-slate-400">{x.ok ? x.given : `${x.given || '–'} → ${x.q.accepted.join(' / ')}`}</span>
+            {!x.ok && overridesLeft(s) > 0 && <button type="button" className="ml-auto text-xs text-accent-cyan underline" onClick={() => setConfirmId(x.q.vocabularyId)}>Hab ich gewusst</button>}
           </div>
         ))}
       </Card>
+      {confirmId && (
+        <Modal title="Wirklich gewusst?" onClose={() => setConfirmId(null)}>
+          <p className="mb-4 text-sm text-slate-300">Nur ein Tippfehler? Dann zählt die Antwort als richtig. Noch {overridesLeft(s)} von {MAX_OVERRIDES} möglich.</p>
+          <div className="flex gap-2">
+            <Button onClick={() => { update(forgiveTest(s, confirmId)); setConfirmId(null) }}>Ja, als richtig werten</Button>
+            <Button variant="secondary" onClick={() => setConfirmId(null)}>Nein</Button>
+          </div>
+        </Modal>
+      )}
       <div className="flex flex-wrap gap-2">
         <Button onClick={() => update(startTest({ ...s, hard: Array.from(new Set([...s.hard, ...wrongIds.current])) }))}>Neuer Test</Button>
         {wrongIds.current.length > 0 && <Button variant="secondary" onClick={() => update(startKarten({ ...s, hard: wrongIds.current }, true))}>Fehler als Karteikarten</Button>}
