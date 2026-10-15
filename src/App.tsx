@@ -24,6 +24,7 @@ import Games from './pages/Games'
 import Gambling from './pages/Gambling'
 import MathPage from './pages/Math'
 import Cram from './pages/Cram'
+import Flashcards from './pages/Flashcards'
 import Practice from './pages/Practice'
 import Conjugate from './pages/Conjugate'
 import Gender from './pages/Gender'
@@ -91,6 +92,7 @@ export default function App() {
           <Route path="gambling" element={<Gate k="gambling"><Gambling /></Gate>} />
           <Route path="mathe" element={<MathPage />} />
           <Route path="crashkurs" element={<Cram />} />
+          <Route path="karteikarten" element={<Flashcards />} />
           <Route path="ueben" element={<Practice />} />
           <Route path="konjugieren" element={<Conjugate />} />
           <Route path="genus" element={<Gender />} />

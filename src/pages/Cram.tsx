@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react'
 import { Check, ChevronLeft, ChevronRight, MessageCircle, RotateCcw, X } from 'lucide-react'
+import ReportModal from '../components/books/ReportModal'
 import Button from '../components/ui/Button'
 import Card from '../components/ui/Card'
 import { Field, Select, TextInput } from '../components/ui/Field'
@@ -15,11 +16,13 @@ import {
   startAbfrage, startKarten, startTest, testResult, TEST_SIZE, type CramPhase, type CramSession,
 } from '../features/cram/cram'
 import FlipCard from '../features/cram/FlipCard'
+import { ReportBtn, type Rep } from '../features/cram/ReportBtn'
 import { distinctVocabulary, selectRange } from '../features/test/range'
 import { errorMessage } from '../lib/errors'
 import { GRADE_WORD, gradeFromScore, percentOf } from '../lib/grade'
 import { useAsync } from '../lib/useAsync'
 import { getBookEntries, listBooks } from '../services/books'
+import type { VocabLike } from '../features/learning/questions'
 import type { BookEntry } from '../types'
 import Chat from './Chat'
 
@@ -32,6 +35,9 @@ export default function Cram() {
   const [s, setS] = useState<CramSession | null>(() => (uid ? loadSession(uid) : null))
   const [chatOpen, setChatOpen] = useState(false)
   const [confirmCancel, setConfirmCancel] = useState(false)
+  const [reporting, setReporting] = useState<VocabLike | null>(null)
+  const [sent, setSent] = useState<ReadonlySet<string>>(new Set())
+  const rep: Rep = { report: setReporting, sent }
   const { locked } = useLocks()
   const chat = useChat()
 
@@ -69,14 +75,21 @@ export default function Cram() {
         </div>
       )}
 
-      {s.phase === 'merken' && <Merken s={s} update={update} />}
-      {s.phase === 'karten' && <Karten s={s} update={update} />}
-      {s.phase === 'abfrage' && <Abfrage s={s} update={update} />}
-      {s.phase === 'test' && <TestRun s={s} update={update} />}
-      {s.phase === 'ergebnis' && <Ergebnis s={s} update={update} />}
+      {s.phase === 'merken' && <Merken s={s} update={update} rep={rep} />}
+      {s.phase === 'karten' && <Karten s={s} update={update} rep={rep} />}
+      {s.phase === 'abfrage' && <Abfrage s={s} update={update} rep={rep} />}
+      {s.phase === 'test' && <TestRun s={s} update={update} rep={rep} />}
+      {s.phase === 'ergebnis' && <Ergebnis s={s} update={update} rep={rep} />}
 
       <p className="mt-6 text-xs text-slate-500">Dein Fortschritt wird automatisch gespeichert. Du kannst jederzeit etwas anderes machen und später hier weitermachen.</p>
 
+      {reporting && (
+        <ReportModal
+          entry={reporting}
+          onClose={() => setReporting(null)}
+          onSent={() => { setSent((x) => new Set(x).add(reporting.vocabulary_id)); setReporting(null) }}
+        />
+      )}
       {chatOpen && <Modal title="Chat" wide onClose={() => setChatOpen(false)}><Chat /></Modal>}
       {confirmCancel && (
         <Modal title="Crashkurs abbrechen?" onClose={() => setConfirmCancel(false)}>
@@ -166,7 +179,7 @@ function Setup({ onStart }: { onStart: (s: CramSession) => void }) {
 
 const german = (v: { german: string }) => v.german
 
-function Merken({ s, update }: { s: CramSession; update: (s: CramSession) => void }) {
+function Merken({ s, update, rep }: { s: CramSession; update: (s: CramSession) => void; rep: Rep }) {
   const [pos, setPos] = useState(0)
   const ids = s.queue
   const v = s.vocab.find((x) => x.vocabulary_id === ids[Math.min(pos, ids.length - 1)])
@@ -188,12 +201,13 @@ function Merken({ s, update }: { s: CramSession; update: (s: CramSession) => voi
         {!last
           ? <Button onClick={() => setPos(pos + 1)}>Weiter <ChevronRight size={16} /></Button>
           : <Button onClick={() => update(startKarten(s))}>Weiter zu den Karteikarten</Button>}
+        <ReportBtn v={v} rep={rep} />
       </div>
     </div>
   )
 }
 
-function Karten({ s, update }: { s: CramSession; update: (s: CramSession) => void }) {
+function Karten({ s, update, rep }: { s: CramSession; update: (s: CramSession) => void; rep: Rep }) {
   const [flipped, setFlipped] = useState(false)
   const [reverse, setReverse] = useState(false)
   const id = s.queue[0]
@@ -220,12 +234,13 @@ function Karten({ s, update }: { s: CramSession; update: (s: CramSession) => voi
         <Button variant="secondary" onClick={() => { setReverse(!reverse); setFlipped(false) }}>Seite tauschen</Button>
         <Button variant="secondary" disabled={!flipped} onClick={() => go(false)}><RotateCcw size={16} /> Nochmal</Button>
         <Button disabled={!flipped} onClick={() => go(true)}><Check size={16} /> Gewusst</Button>
+        <ReportBtn v={v} rep={rep} />
       </div>
     </div>
   )
 }
 
-function Abfrage({ s, update }: { s: CramSession; update: (s: CramSession) => void }) {
+function Abfrage({ s, update, rep }: { s: CramSession; update: (s: CramSession) => void; rep: Rep }) {
   const [value, setValue] = useState('')
   const [fb, setFb] = useState<{ ok: boolean; accepted: string[]; next: CramSession } | null>(null)
   const [confirm, setConfirm] = useState(false)
@@ -259,6 +274,7 @@ function Abfrage({ s, update }: { s: CramSession; update: (s: CramSession) => vo
       </Card>
       <div className="flex flex-wrap gap-2">
         <Button type="submit">{fb ? 'Weiter' : 'Prüfen'}</Button>
+        <ReportBtn v={s.vocab.find((x) => x.vocabulary_id === cur.id)} rep={rep} />
         {fb && !fb.ok && (
           <Button variant="secondary" disabled={overridesLeft(s) === 0} onClick={() => setConfirm(true)}>
             <Check size={16} /> Hab ich gewusst ({overridesLeft(s)}/{MAX_OVERRIDES})
@@ -278,7 +294,7 @@ function Abfrage({ s, update }: { s: CramSession; update: (s: CramSession) => vo
   )
 }
 
-function TestRun({ s, update }: { s: CramSession; update: (s: CramSession) => void }) {
+function TestRun({ s, update, rep }: { s: CramSession; update: (s: CramSession) => void; rep: Rep }) {
   const [value, setValue] = useState('')
   const t = s.test[s.testPos]
   const q = t ? questionFor(s, t.id, t.dir) : null
@@ -294,12 +310,15 @@ function TestRun({ s, update }: { s: CramSession; update: (s: CramSession) => vo
         <TextInput key={s.testPos} autoFocus autoComplete="off" autoCapitalize="none" value={value} onChange={(e) => setValue(e.target.value)} placeholder={t.dir === 'forward' ? 'Übersetzung' : 'Deutsch'} />
         <p className="text-xs text-slate-500">Im Test gibt es erst am Ende die Auswertung. ({TEST_SIZE} Wörter)</p>
       </Card>
-      <Button type="submit">{s.testPos + 1 >= s.test.length ? 'Abgeben' : 'Weiter'}</Button>
+      <div className="flex flex-wrap gap-2">
+        <Button type="submit">{s.testPos + 1 >= s.test.length ? 'Abgeben' : 'Weiter'}</Button>
+        <ReportBtn v={s.vocab.find((x) => x.vocabulary_id === t.id)} rep={rep} />
+      </div>
     </form>
   )
 }
 
-function Ergebnis({ s, update }: { s: CramSession; update: (s: CramSession | null) => void }) {
+function Ergebnis({ s, update, rep }: { s: CramSession; update: (s: CramSession | null) => void; rep: Rep }) {
   const r = useMemo(() => testResult(s), [s])
   const grade = gradeFromScore(r.correct, r.total)
   const [confirmId, setConfirmId] = useState<string | null>(null)
@@ -316,7 +335,8 @@ function Ergebnis({ s, update }: { s: CramSession; update: (s: CramSession | nul
             <span className={x.ok ? 'text-emerald-400' : 'text-rose-400'}>{x.ok ? '✓' : '✗'}</span>
             <span className="font-medium">{x.q.prompt}</span>
             <span className="text-slate-400">{x.ok ? x.given : `${x.given || '–'} → ${x.q.accepted.join(' / ')}`}</span>
-            {!x.ok && overridesLeft(s) > 0 && <button type="button" className="ml-auto text-xs text-accent-cyan underline" onClick={() => setConfirmId(x.q.vocabularyId)}>Hab ich gewusst</button>}
+            <button type="button" disabled={rep.sent.has(x.q.vocabularyId)} className="ml-auto text-xs text-slate-400 underline disabled:no-underline" onClick={() => { const v = s.vocab.find((y) => y.vocabulary_id === x.q.vocabularyId); if (v) rep.report(v) }}>{rep.sent.has(x.q.vocabularyId) ? 'Gemeldet' : 'Melden'}</button>
+            {!x.ok && overridesLeft(s) > 0 && <button type="button" className="text-xs text-accent-cyan underline" onClick={() => setConfirmId(x.q.vocabularyId)}>Hab ich gewusst</button>}
           </div>
         ))}
       </Card>
