@@ -4,6 +4,7 @@ import { addTile, canMove, move, newBoard, slideRow } from './game2048'
 import { makeDeck, pairsForLevel } from './memory'
 import { moleGap, moleUpTime, nextHole, MOLE_HOLES } from './mole'
 import { BH, BW, PADDLE_Y, launch, newBricks, stepBricks } from './bricks'
+import { JH, PH, jumpScore, newJump, stepJump, maxGap } from './jump'
 import { parseSticker, stickerBody, STICKERS } from '../chat/stickers'
 
 describe('2048', () => {
@@ -76,13 +77,84 @@ describe('Bricks', () => {
     s = { ...s, x: 20, y: 80, vx: 0, vy: -200 }
     for (let i = 0; i < 20; i++) s = stepBricks(s, 0.016, BW / 2)
     expect(s.score).toBeGreaterThanOrEqual(1)
-    expect(s.bricks.filter((b) => !b).length).toBe(s.score)
+    expect(s.bricks.filter((b) => b === 0).length).toBe(s.score)
   })
   it('Schläger wirft den Ball nach oben zurück', () => {
     let s = launch(newBricks())
     s = { ...s, launched: true, x: BW / 2, y: PADDLE_Y - 6, vx: 0, vy: 300 }
     s = stepBricks(s, 0.016, BW / 2)
     expect(s.vy).toBeLessThan(0)
+  })
+})
+
+describe('Bricks: feste Steine', () => {
+  it('fester Stein knackst erst an (kein Punkt) und zerbricht beim zweiten Treffer', () => {
+    // Stein 0 (Reihe 0, Spalte 0) ist fest
+    let s = launch(newBricks())
+    expect(s.bricks[0]).toBe(2)
+    const hit = (st: typeof s) => ({ ...st, launched: true, x: 20, y: 80 - 20 + 0, vx: 0, vy: -200 })
+    s = hit(s)
+    for (let i = 0; i < 30 && s.bricks[0] === 2; i++) s = stepBricks(s, 0.016, BW / 2)
+    expect(s.bricks[0]).toBe(1)
+    expect(s.score).toBe(0)
+    s = hit({ ...s, y: 80 })
+    for (let i = 0; i < 30 && s.bricks[0] === 1; i++) s = stepBricks(s, 0.016, BW / 2)
+    expect(s.bricks[0]).toBe(0)
+    expect(s.score).toBe(1)
+  })
+})
+
+describe('Hüpfer (Plattformer)', () => {
+  it('steht auf der Startinsel, fällt ins Leere und verliert', () => {
+    let s = newJump(mulberry32(1))
+    for (let i = 0; i < 60; i++) s = stepJump(s, 0.016, { move: 0, jump: false }, mulberry32(i))
+    expect(s.onGround).toBe(true)
+    expect(s.over).toBe(false)
+    s = { ...s, plats: [], y: 100, vy: 0 }
+    for (let i = 0; i < 200 && !s.over; i++) s = stepJump(s, 0.016, { move: 0, jump: false }, mulberry32(i))
+    expect(s.over).toBe(true)
+    expect(s.y).toBeGreaterThan(JH)
+  })
+  it('springt nur vom Boden (und kurz nach der Kante)', () => {
+    let s = newJump(mulberry32(2))
+    s = stepJump(s, 0.016, { move: 0, jump: true }, mulberry32(3))
+    expect(s.vy).toBeLessThan(0)
+    const air = { ...s, onGround: false, coyote: 0, vy: -100 }
+    const after = stepJump(air, 0.016, { move: 0, jump: true }, mulberry32(4))
+    expect(after.vy).toBeGreaterThan(-100) // kein Doppelsprung
+  })
+  it('Münzen zählen 5 Punkte, Strecke 1 je 50 px', () => {
+    expect(jumpScore({ maxX: 500, coinsGot: 2 })).toBe(20)
+  })
+  it('Lücken bleiben erreichbar: ein einfacher Bot kommt 3500 px weit', () => {
+    // Bot wie ein vorsichtiger Spieler: läuft bis zur Kante, springt und steuert die Weite in der Luft.
+    const rng = mulberry32(11)
+    let s = newJump(rng)
+    let mv = 1
+    let t = 0
+    for (let step = 0; step < 60 * 120 && !s.over && s.maxX < 3500; step++) {
+      const cur = s.plats.find((p) => s.x + 9 >= p.x && s.x + 9 <= p.x + p.w && Math.abs(p.y - (s.y + PH)) < 4)
+      let jump = false
+      let move = s.onGround ? 1 : mv
+      if (cur && s.onGround) {
+        const nx = s.plats.filter((p) => p.x > cur.x + cur.w).sort((a, b) => a.x - b.x)[0]
+        if (nx && s.x + 18 >= cur.x + cur.w - 4) {
+          jump = true
+          const target = nx.x + Math.min(nx.w * 0.5, 45)
+          mv = Math.max(0.25, Math.min(1, (target - s.x) / (0.6 * 230)))
+          move = mv
+        }
+      }
+      s = stepJump(s, 1 / 60, { move, jump }, rng)
+      t += 1 / 60
+    }
+    expect(s.maxX).toBeGreaterThanOrEqual(3500)
+    expect(t).toBeGreaterThan(10)
+  })
+  it('maxGap wächst, bleibt aber begrenzt und ist beim Anstieg kleiner', () => {
+    expect(maxGap(4000, 0)).toBeGreaterThan(maxGap(0, 0))
+    expect(maxGap(99999, 0)).toBeLessThanOrEqual(130)
+    expect(maxGap(2000, 50)).toBeLessThanOrEqual(95)
   })
 })
 

@@ -1,5 +1,5 @@
 import { useEffect, useRef } from 'react'
-import { BALL_R, BH, BRICK_H, BRICK_W, BW, COLS_B, PADDLE_H, PADDLE_W, PADDLE_Y, TOP, brickRect, launch, newBricks, stepBricks, type BricksState } from './bricks'
+import { BALL_R, BH, BRICK_H, BRICK_W, BW, COLS_B, PADDLE_H, PADDLE_W, PADDLE_Y, TOP, brickRect, isTough, launch, newBricks, stepBricks, type BricksState } from './bricks'
 import { plusOverlay } from './plusfx'
 import type { GameProps } from './SnakeGame'
 
@@ -26,11 +26,30 @@ export default function BricksGame({ onScore, onOver, plus }: GameProps) {
       const s = state.current
       ctx.fillStyle = '#080c1a'
       ctx.fillRect(0, 0, BW, BH)
-      s.bricks.forEach((alive, i) => {
-        if (!alive) return
+      s.bricks.forEach((hits, i) => {
+        if (hits === 0) return
         const r = brickRect(i)
-        ctx.fillStyle = ROW_COLORS[Math.floor(i / COLS_B) % ROW_COLORS.length]
+        const tough = isTough(i, s.level)
+        ctx.fillStyle = tough && hits === 2 ? '#94a3b8' : ROW_COLORS[Math.floor(i / COLS_B) % ROW_COLORS.length]
         ctx.fillRect(r.x + 1.5, r.y + 1.5, BRICK_W - 3, BRICK_H - 3)
+        if (tough && hits === 2) {
+          // fester Stein: dunkler Rand
+          ctx.strokeStyle = '#e2e8f0'
+          ctx.lineWidth = 2
+          ctx.strokeRect(r.x + 2.5, r.y + 2.5, BRICK_W - 5, BRICK_H - 5)
+        } else if (tough && hits === 1) {
+          // angeknackst: Risse
+          ctx.strokeStyle = '#0f172a'
+          ctx.lineWidth = 1.6
+          ctx.beginPath()
+          ctx.moveTo(r.x + BRICK_W * 0.35, r.y + 2)
+          ctx.lineTo(r.x + BRICK_W * 0.48, r.y + BRICK_H * 0.5)
+          ctx.lineTo(r.x + BRICK_W * 0.4, r.y + BRICK_H * 0.7)
+          ctx.lineTo(r.x + BRICK_W * 0.58, r.y + BRICK_H - 2)
+          ctx.moveTo(r.x + BRICK_W * 0.48, r.y + BRICK_H * 0.5)
+          ctx.lineTo(r.x + BRICK_W * 0.7, r.y + BRICK_H * 0.35)
+          ctx.stroke()
+        }
       })
       ctx.fillStyle = '#e2e8f0'
       ctx.fillRect(s.paddleX - PADDLE_W / 2, PADDLE_Y, PADDLE_W, PADDLE_H)
@@ -103,7 +122,7 @@ export default function BricksGame({ onScore, onOver, plus }: GameProps) {
         onPointerDown={(e) => { move(e); state.current = launch(state.current) }}
         onPointerMove={move}
       />
-      <p className="text-xs text-slate-500">Schläger mit Finger/Maus oder Pfeiltasten bewegen, Tippen oder Leertaste schießt den Ball ab. Jeder Stein = 1 Punkt.</p>
+      <p className="text-xs text-slate-500">Schläger mit Finger/Maus oder Pfeiltasten bewegen, Tippen oder Leertaste schießt den Ball ab. Graue Steine mit Rand halten zwei Treffer aus (erst anknacksen, dann zerbrechen). Jeder zerbrochene Stein = 1 Punkt.</p>
     </div>
   )
 }

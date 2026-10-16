@@ -19,7 +19,7 @@ import { errorMessage } from '../lib/errors'
 import { useAsync } from '../lib/useAsync'
 import { listBooks } from '../services/books'
 import { getLearningPool, submitSession } from '../services/learning'
-import { buySprintTime, getSprintBoard, submitSprint } from '../services/play'
+import { buySprintTime, getSprintBonus, getSprintBoard, submitSprint } from '../services/play'
 import PageRules from '../components/admin/PageRules'
 import { getAppSettings } from '../services/koins'
 
@@ -45,8 +45,25 @@ export default function Sprint() {
   const rules = useAsync(getAppSettings, [])
   const costPer = rules.data?.sprint_extra_cost ?? 100
   const maxExtra = rules.data?.sprint_extra_max ?? 30
-  const [extra, setExtra] = useState(0)
-  const [runSeconds, setRunSeconds] = useState(SECONDS)
+  const bonusQ = useAsync(getSprintBonus, [])
+  const bonus = bonusQ.data ?? 0
+  const [buyBusy, setBuyBusy] = useState(false)
+  const [buyError, setBuyError] = useState<string | null>(null)
+
+  /** Zusatzzeit dauerhaft kaufen: einmal bezahlen, gilt für alle künftigen Sprints. */
+  async function buy(seconds: number) {
+    setBuyBusy(true)
+    setBuyError(null)
+    try {
+      const r = await buySprintTime(seconds)
+      wallet.setBalance(r.balance)
+      bonusQ.reload()
+    } catch (e) {
+      setBuyError(errorMessage(e))
+    } finally {
+      setBuyBusy(false)
+    }
+  }
   const wallet = useWallet()
   const session = useRef(new LearningSession(['forward', 'backward']))
   const startedAt = useRef(new Date())
@@ -70,14 +87,6 @@ export default function Sprint() {
         setPhase('setup')
         return
       }
-      // Gekaufte Zusatzzeit erst bezahlen, wenn der Sprint wirklich starten kann.
-      let seconds = SECONDS
-      if (extra > 0) {
-        const paid = await buySprintTime(Math.min(extra, maxExtra))
-        wallet.setBalance(paid.balance)
-        seconds = SECONDS + paid.seconds
-      }
-      setRunSeconds(seconds)
       session.current = new LearningSession(['forward', 'backward'])
       startedAt.current = new Date()
       wrongRef.current = []
@@ -144,7 +153,7 @@ export default function Sprint() {
         accents={accentsFor(language)}
         title="Sprint"
         showFeedback={false}
-        timeLimitSeconds={runSeconds}
+        timeLimitSeconds={SECONDS + bonus}
         onAnswer={onAnswer}
         onFinish={finish}
         onCancel={() => setPhase('setup')}
@@ -194,18 +203,18 @@ export default function Sprint() {
           </Field>
           <p className="text-sm text-slate-400">Beide Richtungen gemischt. Dein Lernstand ändert sich nicht.</p>
           <div className="rounded-xl border border-white/10 bg-white/[0.03] p-3">
-            <p className="text-sm font-medium text-slate-200">Zeit dazukaufen</p>
-            <p className="text-xs text-slate-400">{costPer.toLocaleString('de-DE')} Coins pro Sekunde, höchstens {maxExtra} Sekunden.</p>
-            <div className="mt-2 flex items-center gap-2">
-              <Button variant="secondary" aria-label="Eine Sekunde weniger" disabled={extra <= 0} onClick={() => setExtra((e) => Math.max(0, e - 1))}>−</Button>
-              <span className="min-w-[7rem] text-center font-mono text-accent-cyan">+{extra} s</span>
-              <Button variant="secondary" aria-label="Eine Sekunde mehr" disabled={extra >= maxExtra || wallet.balance < (extra + 1) * costPer} onClick={() => setExtra((e) => Math.min(maxExtra, e + 1))}>+</Button>
-              <Button variant="ghost" disabled={extra === 0} onClick={() => setExtra(0)}>Zurücksetzen</Button>
+            <p className="text-sm font-medium text-slate-200">Mehr Zeit – einmal kaufen, für immer behalten</p>
+            <p className="text-xs text-slate-400">{costPer.toLocaleString('de-DE')} Coins pro Sekunde, insgesamt bis zu +{maxExtra} Sekunden.</p>
+            <p className="mt-2 text-sm text-slate-300">Dein Sprint dauert <span className="font-mono text-accent-cyan">{SECONDS + bonus} Sekunden</span>{bonus > 0 ? ` (60 + ${bonus})` : ''}.</p>
+            <div className="mt-2 flex flex-wrap gap-2">
+              {[1, 5, 10].map((n) => (
+                <Button key={n} variant="secondary" busy={buyBusy} disabled={bonus + n > maxExtra || wallet.balance < n * costPer} onClick={() => void buy(n)}>
+                  +{n} s · {(n * costPer).toLocaleString('de-DE')} Coins
+                </Button>
+              ))}
             </div>
-            <p className="mt-2 text-xs text-slate-400">
-              Gesamtzeit {SECONDS + extra} s{extra > 0 ? ` · kostet ${(extra * costPer).toLocaleString('de-DE')} Coins beim Start` : ''}.
-              {wallet.balance < costPer ? ' Dir fehlen Coins für eine Zusatzsekunde.' : ''}
-            </p>
+            {bonus >= maxExtra && <p className="mt-2 text-xs text-emerald-300">Du hast die maximale Zusatzzeit.</p>}
+            {buyError && <div className="mt-2"><ErrorBox message={buyError} /></div>}
           </div>
           <Button className="w-full min-h-[52px]" onClick={() => void start()}>
             <Play size={18} /> Sprint starten
@@ -227,7 +236,7 @@ export default function Sprint() {
           </ol>
         </Card>
       </div>
-      <PageRules title="Sprint" info="Zusatzzeit kann man mit Coins kaufen. Coins fürs Sprinten gibt es je N richtige Antworten, begrenzt pro Tag." keys={['sprint_coin_every', 'sprint_coin_cap', 'sprint_extra_cost', 'sprint_extra_max']} />
+      <PageRules title="Sprint" info="Zusatzzeit kauft man einmal mit Coins und behält sie für immer. Coins fürs Sprinten gibt es je N richtige Antworten, begrenzt pro Tag." keys={['sprint_coin_every', 'sprint_coin_cap', 'sprint_extra_cost', 'sprint_extra_max']} />
     </div>
   )
 }

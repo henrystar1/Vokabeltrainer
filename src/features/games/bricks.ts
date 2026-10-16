@@ -16,7 +16,8 @@ export interface BricksState {
   y: number
   vx: number
   vy: number
-  bricks: boolean[]
+  /** Verbleibende Treffer je Stein: 0 = weg, 1 = normal/angeknackst, 2 = fest (erst anknacksen). */
+  bricks: number[]
   score: number
   lives: number
   launched: boolean
@@ -24,7 +25,13 @@ export interface BricksState {
   over: boolean
 }
 
-const freshBricks = (): boolean[] => Array<boolean>(COLS_B * ROWS_B).fill(true)
+/** Feste Steine (2 Treffer): jeder dritte im Muster, mit höherem Level mehr. */
+export const isTough = (i: number, level: number): boolean => {
+  const row = Math.floor(i / COLS_B)
+  const col = i % COLS_B
+  return level >= 3 ? (row + col) % 2 === 0 : (row + col) % 3 === 0
+}
+const freshBricks = (level = 1): number[] => Array.from({ length: COLS_B * ROWS_B }, (_, i) => (isTough(i, level) ? 2 : 1))
 const baseSpeed = (level: number) => 250 + (level - 1) * 30
 
 export function newBricks(): BricksState {
@@ -69,15 +76,15 @@ export function stepBricks(s0: BricksState, dt: number, target: number): BricksS
   const bricks = [...s.bricks]
   let score = s.score
   for (let i = 0; i < bricks.length; i++) {
-    if (!bricks[i]) continue
+    if (bricks[i] === 0) continue
     const r = brickRect(i)
     const cx = Math.max(r.x, Math.min(x, r.x + r.w))
     const cy = Math.max(r.y, Math.min(y, r.y + r.h))
     const dx = x - cx
     const dy = y - cy
     if (dx * dx + dy * dy <= BALL_R * BALL_R) {
-      bricks[i] = false
-      score += 1
+      bricks[i] -= 1
+      if (bricks[i] === 0) score += 1
       if (Math.abs(dx) > Math.abs(dy)) vx = dx > 0 ? Math.abs(vx) : -Math.abs(vx)
       else vy = dy > 0 ? Math.abs(vy) : -Math.abs(vy)
       break
@@ -86,9 +93,9 @@ export function stepBricks(s0: BricksState, dt: number, target: number): BricksS
 
   let level = s.level
   let nextBricks = bricks
-  if (bricks.every((b) => !b)) {
+  if (bricks.every((b) => b === 0)) {
     level += 1
-    nextBricks = freshBricks()
+    nextBricks = freshBricks(level)
     return { ...s, x: s.paddleX, y: PADDLE_Y - BALL_R - 1, vx: 0, vy: 0, launched: false, bricks: nextBricks, score, level }
   }
 
