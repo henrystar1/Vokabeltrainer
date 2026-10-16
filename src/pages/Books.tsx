@@ -134,14 +134,14 @@ export default function Books() {
                 <Link to={`/lernen?buch=${b.id}`} className="btn-primary mt-5 w-full">
                   <Brain size={18} /> Lernen
                 </Link>
-                {b.is_public && !b.is_mine && (
+                {b.is_public && (
                   <button
                     type="button"
                     disabled={busyId === b.id}
                     onClick={() => void run(b.id, () => removeFromLibrary(b.id))}
                     className="mt-2 min-h-[36px] text-xs text-slate-500 hover:text-rose-300"
                   >
-                    Aus meinen Büchern entfernen (Fortschritt bleibt erhalten)
+                    {b.is_mine ? 'Aus meinen Büchern entfernen (bleibt online, du kannst es dort wieder verwenden)' : 'Aus meinen Büchern entfernen (Fortschritt bleibt erhalten)'}
                   </button>
                 )}
               </Card>
@@ -187,7 +187,7 @@ export default function Books() {
                   </div>
                 ) : (
                   <Button className="mt-5 w-full" busy={busyId === b.id} onClick={() => setBuying(b)}>
-                    {b.price > 0 && !b.purchased ? (
+                    {b.price > 0 && !b.purchased && !b.is_mine ? (
                       <>
                         <CoinIcon size={18} /> Kaufen · {b.price} Coins
                       </>
@@ -205,8 +205,8 @@ export default function Books() {
       )}
 
       {buying && (
-        <Modal title={buying.price > 0 && !buying.purchased ? 'Buch kaufen?' : 'Buch verwenden?'} onClose={() => setBuying(null)}>
-          {buying.price > 0 && !buying.purchased ? (
+        <Modal title={buying.price > 0 && !buying.purchased && !buying.is_mine ? 'Buch kaufen?' : 'Buch verwenden?'} onClose={() => setBuying(null)}>
+          {buying.price > 0 && !buying.purchased && !buying.is_mine ? (
             <p className="text-sm text-slate-300">
               „{buying.name}“ kostet <b>{buying.price} Coins</b>. Du hast {wallet.balance} Coins.
               {wallet.balance < buying.price && <span className="mt-2 block text-amber-300">Dir fehlen noch {buying.price - wallet.balance} Coins – z. B. mit einem Code oder durch Lernen.</span>}
@@ -218,7 +218,7 @@ export default function Books() {
             <Button variant="ghost" onClick={() => setBuying(null)}>Abbrechen</Button>
             <Button
               busy={busyId === buying.id}
-              disabled={buying.price > 0 && !buying.purchased && wallet.balance < buying.price}
+              disabled={buying.price > 0 && !buying.purchased && !buying.is_mine && wallet.balance < buying.price}
               onClick={() => {
                 const b = buying
                 setBuying(null)
@@ -229,7 +229,7 @@ export default function Books() {
                 })
               }}
             >
-              {buying.price > 0 && !buying.purchased ? 'Jetzt kaufen' : 'Verwenden'}
+              {buying.price > 0 && !buying.purchased && !buying.is_mine ? 'Jetzt kaufen' : 'Verwenden'}
             </Button>
           </div>
         </Modal>

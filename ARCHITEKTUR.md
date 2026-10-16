@@ -334,3 +334,6 @@ Außerdem: eigene Seite `/karteikarten` (`pages/Flashcards.tsx`, nutzt `FlipCard
 - **Spiele:** `g2048`, `memory`, `bricks`, `mole` (`features/games/*`); `start_game`/`finish_game`/`get_game_board` werden per Text-Patch erweitert (wie bei Wave), Punkte-Obergrenzen je Sekunde im `case` von `finish_game`.
 - **Sticker:** Chat-Text `:sticker:<id>:` (`features/chat/stickers.tsx`, selbst gezeichnete SVGs), keine DB-Änderung.
 - **Antworten:** Leerzeichen dürfen fehlen (`answer.ts`). **Melden-Knopf** im `QuizRunner` (`reportable`, Lernen und Test). **Tastatur/Scroll:** `lib/keepFocusVisible.ts` (aus `AppShell`) + `preventScroll` beim Fokussieren.
+
+## 0029 – Veröffentlichtes Buch aus „Meine Bücher“ entfernen
+Tabelle `book_library_hidden`; `in_library` blendet ein veröffentlichtes Buch des Besitzers aus, wenn dort ein Eintrag steht. `remove_from_library` (Besitzer: verstecken, andere: Bibliothekseintrag löschen) und `add_to_library` (holt es zurück). Beim Zurücknehmen der Veröffentlichung werden die Einträge gelöscht. Das Buch bleibt online und im Reiter „Online“.
