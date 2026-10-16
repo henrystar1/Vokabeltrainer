@@ -27,6 +27,7 @@ import Cram from './pages/Cram'
 import Flashcards from './pages/Flashcards'
 import Practice from './pages/Practice'
 import Conjugate from './pages/Conjugate'
+import Irregular from './pages/Irregular'
 import Gender from './pages/Gender'
 import Chat from './pages/Chat'
 import Board from './pages/Board'
@@ -95,6 +96,7 @@ export default function App() {
           <Route path="karteikarten" element={<Flashcards />} />
           <Route path="ueben" element={<Practice />} />
           <Route path="konjugieren" element={<Conjugate />} />
+          <Route path="unregelmaessig" element={<Irregular />} />
           <Route path="genus" element={<Gender />} />
           <Route path="chat" element={<Gate k="chat"><Chat /></Gate>} />
           <Route path="online" element={<Presence />} />

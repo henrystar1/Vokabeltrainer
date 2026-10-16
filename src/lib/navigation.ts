@@ -1,5 +1,5 @@
 import type { LockKey } from '../services/koins'
-import { BookOpen, MessageSquarePlus, ShoppingBag, UserCircle, Brain, ClipboardCheck, Home, Search, Settings, ShieldCheck, Trophy, BarChart3, Gamepad2, MessagesSquare, Target, Swords, Zap, ListChecks, Languages, ArrowLeftRight, Dices, Users, Pin, PenLine, Printer, Sparkles, Crown, Calculator, Timer, Layers, type LucideIcon } from 'lucide-react'
+import { BookOpen, MessageSquarePlus, ShoppingBag, UserCircle, Brain, ClipboardCheck, Home, Search, Settings, ShieldCheck, Trophy, BarChart3, Gamepad2, MessagesSquare, Target, Swords, Zap, ListChecks, Languages, ArrowLeftRight, Dices, Users, Pin, PenLine, Printer, Sparkles, Crown, Calculator, Timer, Layers, Shuffle, type LucideIcon } from 'lucide-react'
 
 export interface NavItem {
   to: string
@@ -11,9 +11,13 @@ export interface NavItem {
   plus?: boolean
   /** Immer in Plus-Farbe (Menüpunkt „Plus“ selbst). */
   brand?: boolean
+  /** Nur für diese Lernsprachen sichtbar (leer = alle). */
+  langs?: string[]
 }
 
 export interface NavGroup {
+  /** Zeigt oben die Sprachauswahl (Englisch, Französisch, Spanisch, Latein). */
+  langPicker?: boolean
   /** Überschrift im Menü (leer = ohne Überschrift). */
   title: string
   items: NavItem[]
@@ -26,20 +30,21 @@ export const NAV_GROUPS: NavGroup[] = [
     { to: '/', label: 'Start', icon: Home },
     { to: '/brett', label: 'Schwarzes Brett', icon: Pin },
   ]),
-  g('Lernen', [
-    { to: '/buecher', label: 'Bücher', icon: BookOpen },
+  { ...g('Lernen', [
     { to: '/lernen', label: 'Lernen', icon: Brain },
     { to: '/abschreiben', label: 'Abschreiben', icon: PenLine },
     { to: '/karteikarten', label: 'Karteikarten', icon: Layers },
     { to: '/crashkurs', label: 'Crashkurs', icon: Timer },
     { to: '/test', label: 'Test', icon: ClipboardCheck },
-    { to: '/grammatik', label: 'Grammatik', icon: Sparkles, plus: true },
-    { to: '/mathe', label: 'Mathe', icon: Calculator },
     { to: '/ueben', label: 'Multiple Choice', icon: ListChecks },
-    { to: '/konjugieren', label: 'Konjugieren (FR)', icon: Languages },
-    { to: '/genus', label: 'le oder la?', icon: ArrowLeftRight },
+    { to: '/grammatik', label: 'Grammatik', icon: Sparkles, plus: true },
+    { to: '/unregelmaessig', label: 'Irreguläre Verben', icon: Shuffle, langs: ['en', 'fr'] },
+    { to: '/konjugieren', label: 'Konjugieren', icon: Languages, langs: ['fr'] },
+    { to: '/genus', label: 'le oder la?', icon: ArrowLeftRight, langs: ['fr'] },
+    { to: '/buecher', label: 'Bücher', icon: BookOpen },
     { to: '/suche', label: 'Suche', icon: Search },
-  ]),
+    { to: '/mathe', label: 'Mathe', icon: Calculator },
+  ]), langPicker: true },
   g('Wettkampf', [
     { lock: 'quests', to: '/quests', label: 'Quests', icon: Target },
     { lock: 'sprint', to: '/sprint', label: 'Sprint', icon: Zap },
@@ -69,14 +74,22 @@ export const NAV_ITEMS: NavItem[] = NAV_GROUPS.flatMap((x) => x.items)
 export const STAFF_NAV_ITEM: NavItem = { to: '/verwaltung', label: 'Verwaltung', icon: ShieldCheck }
 
 /** Gruppierte Menüeinträge; für Mods/Admins steht „Verwaltung“ in der Gruppe „Konto“. Gesperrte Funktionen fehlen. */
-export function navGroupsFor(isStaff: boolean, locked: ReadonlySet<LockKey> = new Set()): NavGroup[] {
-  const base = NAV_GROUPS.map((grp) => ({ ...grp, items: grp.items.filter((i) => !i.lock || !locked.has(i.lock)) })).filter((grp) => grp.items.length > 0)
+export function navGroupsFor(isStaff: boolean, locked: ReadonlySet<LockKey> = new Set(), language = 'en'): NavGroup[] {
+  const base = NAV_GROUPS.map((grp) => ({ ...grp, items: grp.items.filter((i) => (!i.lock || !locked.has(i.lock)) && (!i.langs || i.langs.includes(language))) })).filter((grp) => grp.items.length > 0)
   if (!isStaff) return base
   return base.map((grp) =>
     grp.title === 'Konto' ? { ...grp, items: [grp.items[0], STAFF_NAV_ITEM, ...grp.items.slice(1)] } : grp,
   )
 }
 
-export function navItemsFor(isStaff: boolean, locked: ReadonlySet<LockKey> = new Set()): NavItem[] {
-  return navGroupsFor(isStaff, locked).flatMap((x) => x.items)
+export function navItemsFor(isStaff: boolean, locked: ReadonlySet<LockKey> = new Set(), language = 'en'): NavItem[] {
+  return navGroupsFor(isStaff, locked, language).flatMap((x) => x.items)
 }
+
+/** Reihenfolge der Sprachen im Menü: Englisch und Französisch oben. */
+export const NAV_LANGS: { id: string; label: string; short: string }[] = [
+  { id: 'en', label: 'Englisch', short: 'EN' },
+  { id: 'fr', label: 'Französisch', short: 'FR' },
+  { id: 'es', label: 'Spanisch', short: 'ES' },
+  { id: 'la', label: 'Latein', short: 'LA' },
+]

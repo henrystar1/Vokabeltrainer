@@ -342,3 +342,8 @@ Tabelle `book_library_hidden`; `in_library` blendet ein veröffentlichtes Buch d
 - `sprint_upgrades` + `get_sprint_bonus()`; `buy_sprint_time(n)` kauft dauerhaft (100 Coins/s, insgesamt höchstens `sprint_extra_max` = 30 s). Sprint dauert 60 s + Bonus.
 - Bricks: feste Steine (2 Treffer, erst angeknackst; `isTough` in `features/games/bricks.ts`).
 - Plattformer `jump` (`features/games/jump.ts`, `JumpGame.tsx`, Joystick `joystick.tsx`): Punkte = Strecke/50 + 5 je Münze, Obergrenze 14 Punkte/s im `finish_game`.
+
+## Update 31 – Sprachmenü, irreguläre Verben, neues Hüpfer-Design (keine SQL-Änderung)
+- Menü „Lernen“ ist nach Sprache sortiert: `LangPicker` (Englisch, Französisch oben; Spanisch, Latein darunter) setzt `learn_language`; darunter stehen die Einträge der gewählten Sprache (`NavItem.langs`, `navGroupsFor(isStaff, locked, language)`). Sprachunabhängig (unten): Bücher, Suche, Mathe.
+- Seite `/unregelmaessig` (`pages/Irregular.tsx`, `features/irregular/irregular.ts`): Englisch Simple Past/Past Participle (~95 Verben, Varianten wie learnt/learned), Französisch Présent je/nous/ils, Participe passé, Futur (22 unregelmäßige Verben), mit Wortliste.
+- `JumpGame.tsx`: nur Optik neu (Nachthimmel, Mond, Sterne, Wolken, 3 Parallax-Hügel, Gras-Plattformen, drehende Münzen, Figur mit Augen/Squash, Partikel, Anzeige). Physik in `jump.ts` unverändert.

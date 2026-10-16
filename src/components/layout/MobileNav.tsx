@@ -8,6 +8,8 @@ import KoinBadge from '../profile/KoinBadge'
 import { useAuth } from '../../features/auth/AuthProvider'
 import { useLocks } from '../../features/locks/LocksProvider'
 import { usePlus } from '../../features/plus/PlusProvider'
+import LangPicker from './LangPicker'
+import { useSettings } from '../../features/settings/SettingsProvider'
 
 const PRIMARY = ['/', '/buecher', '/lernen', '/test']
 
@@ -19,8 +21,9 @@ export default function MobileNav() {
   const todo = usePrintTodo()?.todo ?? 0
   const { locked } = useLocks()
   const plus = usePlus()
-  const NAV_ITEMS = navItemsFor(isStaff, locked)
-  const groups = navGroupsFor(isStaff, locked)
+  const { settings } = useSettings()
+  const NAV_ITEMS = navItemsFor(isStaff, locked, settings.learn_language)
+  const groups = navGroupsFor(isStaff, locked, settings.learn_language)
     .map((grp) => ({ ...grp, items: grp.items.filter((i) => !PRIMARY.includes(i.to)) }))
     .filter((grp) => grp.items.length > 0)
   const { pathname } = useLocation()
@@ -53,6 +56,7 @@ export default function MobileNav() {
             {groups.map((grp) => (
               <div key={grp.title || 'top'} className="pb-1">
                 {grp.title && <p className="label-mono px-3 pb-1 pt-2 text-[10px] uppercase tracking-widest text-slate-500">{grp.title}</p>}
+                {grp.langPicker && <LangPicker />}
                 <div className="grid grid-cols-2 gap-1">
                   {grp.items.map(({ to, label, icon: Icon, plus: isPlus, brand }) => {
                     const teaser = !!isPlus && !plus.active

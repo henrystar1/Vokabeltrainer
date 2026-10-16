@@ -9,6 +9,8 @@ import { useChat } from '../../features/chat/ChatProvider'
 import { usePrintTodo } from '../../features/print/hooks'
 import { usePlus } from '../../features/plus/PlusProvider'
 import { Lock } from 'lucide-react'
+import LangPicker from './LangPicker'
+import { useSettings } from '../../features/settings/SettingsProvider'
 
 interface SidebarProps {
   collapsed: boolean
@@ -21,6 +23,7 @@ export default function Sidebar({ collapsed, onToggle }: SidebarProps) {
   const { locked } = useLocks()
   const todo = usePrintTodo()?.todo ?? 0
   const plus = usePlus()
+  const { settings } = useSettings()
   return (
     <aside
       className={`glass fixed inset-y-0 left-0 z-30 hidden flex-col border-y-0 border-l-0 transition-[width] duration-300 ease-out md:flex ${
@@ -35,7 +38,7 @@ export default function Sidebar({ collapsed, onToggle }: SidebarProps) {
       </div>
 
       <nav className="mt-2 flex-1 overflow-y-auto px-3 pb-2">
-        {navGroupsFor(isStaff, locked).map((grp, gi) => (
+        {navGroupsFor(isStaff, locked, settings.learn_language).map((grp, gi) => (
           <div key={grp.title || 'top'} className={gi > 0 ? 'mt-3' : ''}>
             {grp.title &&
               (collapsed ? (
@@ -43,6 +46,7 @@ export default function Sidebar({ collapsed, onToggle }: SidebarProps) {
               ) : (
                 <p className="label-mono px-3 pb-1 pt-1 text-[10px] uppercase tracking-widest text-slate-500">{grp.title}</p>
               ))}
+            {grp.langPicker && <LangPicker collapsed={collapsed} />}
             <div className="space-y-0.5">
               {grp.items.map(({ to, label, icon: Icon, plus: isPlus, brand }) => {
                 const teaser = !!isPlus && !plus.active
