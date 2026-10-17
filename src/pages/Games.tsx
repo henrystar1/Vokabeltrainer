@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { Blocks, Bird, Brain, Crown, Footprints, Gamepad2, Grid3x3, Hammer, LayoutGrid, Mountain, Trophy, Zap, Square } from 'lucide-react'
+import { Blocks, Bird, Brain, Crown, Footprints, Gamepad2, Grid3x3, Hammer, LayoutGrid, Target, MousePointerClick, Gauge, Mountain, Trophy, Zap, Square } from 'lucide-react'
 import PlayerTag from '../components/profile/PlayerTag'
 import CoinIcon from '../components/ui/CoinIcon'
 import Button from '../components/ui/Button'
@@ -19,6 +19,9 @@ import MemoryGame from '../features/games/MemoryGame'
 import BricksGame from '../features/games/BricksGame'
 import MoleGame from '../features/games/MoleGame'
 import JumpGame from '../features/games/JumpGame'
+import CoreballGame from '../features/games/CoreballGame'
+import ClickerGame from '../features/games/ClickerGame'
+import CpsGame from '../features/games/CpsGame'
 import SnakeGame from '../features/games/SnakeGame'
 import TetrisGame from '../features/games/TetrisGame'
 import { errorMessage } from '../lib/errors'
@@ -42,6 +45,9 @@ const GAMES: Array<{ id: GameId; name: string; text: string; unit: string; icon:
   { id: 'bricks', name: 'Bricks', text: 'Lenk den Ball mit dem Schläger und räum alle Steine ab.', unit: 'Steine', icon: Square },
   { id: 'mole', name: 'Maulwurf', text: 'Tipp die Maulwürfe an, bevor sie verschwinden.', unit: 'Treffer', icon: Hammer },
   { id: 'jump', name: 'Hüpfer', text: 'Plattformer: lauf und spring von Insel zu Insel, sammle Münzen.', unit: 'Punkte', icon: Mountain },
+  { id: 'coreball', name: 'Coreball', text: 'Schieß Kugeln auf den drehenden Kern, ohne andere zu treffen. Jedes Level wird schwerer.', unit: 'Kugeln', icon: Target },
+  { id: 'clicker', name: 'Klicker', text: '30 Sekunden klicken: 0,1 Punkte pro Klick, gewertet werden nur gerade Zahlen.', unit: 'Punkte', icon: MousePointerClick },
+  { id: 'cps', name: 'CPS-Test', text: '10 Sekunden klicken – wer die höchste CPS (Klicks pro Sekunde) schafft, gewinnt.', unit: 'CPS', icon: Gauge },
 ]
 
 type Phase = { name: 'menu' } | { name: 'play'; game: GameId; run: GameStart } | { name: 'result'; game: GameId; result: GameResult }
@@ -270,6 +276,9 @@ function Playing({ game, run, onDone }: { game: GameId; run: GameStart; onDone: 
         {game === 'bricks' && <BricksGame {...props} />}
         {game === 'mole' && <MoleGame {...props} />}
         {game === 'jump' && <JumpGame {...props} />}
+        {game === 'coreball' && <CoreballGame {...props} />}
+        {game === 'clicker' && <ClickerGame {...props} />}
+        {game === 'cps' && <CpsGame {...props} />}
       </div>
       {confirmQuit && (
         <Modal title="Aufgeben?" onClose={() => setConfirmQuit(false)}>

@@ -1,6 +1,7 @@
 import { useMemo } from 'react'
 import { useAuth } from '../../features/auth/AuthProvider'
 import { DEFAULT_THEME, THEMES, type Decor } from '../../features/shop/catalog'
+import { BlackHoleBackdrop, BlackHoleBeams } from './BlackHole'
 
 interface Particle {
   id: number
@@ -23,7 +24,7 @@ function makeParticles(decor: Decor, colors: string[]): Particle[] {
     seed = (seed * 16807) % 2147483647
     return seed / 2147483647
   }
-  const count = { stars: 60, bubbles: 22, petals: 22, confetti: 40, fireflies: 24, code: 26, sparkles: 34 }[decor]
+  const count = { stars: 60, bubbles: 22, petals: 22, confetti: 40, fireflies: 24, code: 26, sparkles: 34, blackhole: 0 }[decor]
   return Array.from({ length: count }, (_, i) => ({
     id: i,
     left: rnd() * 100,
@@ -44,6 +45,18 @@ export default function StarField() {
   const theme = THEMES[themeId && THEMES[themeId] ? themeId : DEFAULT_THEME]
   const particles = useMemo(() => makeParticles(theme.decor, theme.decorColors), [theme])
   const { decor } = theme
+
+  if (decor === 'blackhole') {
+    return (
+      <>
+        <div aria-hidden className="pointer-events-none fixed inset-0 -z-10 overflow-hidden">
+          <div className="grid-lines absolute inset-0 opacity-30 [mask-image:radial-gradient(ellipse_at_center,black,transparent_70%)]" />
+        </div>
+        <BlackHoleBackdrop />
+        <BlackHoleBeams />
+      </>
+    )
+  }
 
   return (
     <div aria-hidden className="pointer-events-none fixed inset-0 -z-10 overflow-hidden">

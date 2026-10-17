@@ -71,7 +71,7 @@ export default function Duels() {
     <div className="space-y-6">
       <PageHeader eyebrow="Zusammenlernen" title="Duelle" actions={<Button onClick={() => setCreating(true)}><Plus size={18} /> Neues Duell</Button>} />
       <Notice tone="info">
-        Du forderst einen Freund heraus: ihr bekommt dieselben 10 Fragen aus Vokabeln, die ihr beide aktiv habt (Online-Bücher). Jeder spielt, wann er will – wer mehr richtig hat (bei Gleichstand: wer schneller war), gewinnt Coins.
+        Du forderst einen Freund heraus: ihr bekommt dieselben 10 Fragen aus Vokabeln, die ihr beide aktiv habt (Online-Bücher). Jeder spielt, wann er will – wer mehr richtig hat, gewinnt Coins. Bei gleich vielen richtigen Antworten ist es unentschieden und jeder bekommt die Hälfte.
       </Notice>
       {error && <ErrorBox message={error} />}
       {duels.loading && !duels.data && <Spinner />}

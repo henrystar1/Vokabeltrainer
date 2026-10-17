@@ -87,7 +87,7 @@ export const SECTIONS: Array<{ title: string; text?: string; rules: Rule[] }> = 
       { key: 'league_reward_2', label: 'Liga: Coins für Platz 2' },
       { key: 'league_reward_3', label: 'Liga: Coins für Platz 3' },
       { key: 'league_min_points', label: 'Liga: Mindestpunkte pro Woche (sonst Abstieg)' },
-      { key: 'duel_reward', label: 'Duell-Sieg: Coins' },
+      { key: 'duel_reward', label: 'Duell-Sieg: Coins', hint: 'Unentschieden: jeder die Hälfte' },
       { key: 'sprint_coin_every', label: 'Sprint: 1 Coin je so viele richtige Antworten' },
       { key: 'sprint_coin_cap', label: 'Sprint: Coins pro Tag höchstens' },
       { key: 'sprint_extra_cost', label: 'Sprint: Coins je zusätzlicher Sekunde' },

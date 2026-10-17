@@ -347,3 +347,11 @@ Tabelle `book_library_hidden`; `in_library` blendet ein veröffentlichtes Buch d
 - Menü „Lernen“ ist nach Sprache sortiert: `LangPicker` (Englisch, Französisch oben; Spanisch, Latein darunter) setzt `learn_language`; darunter stehen die Einträge der gewählten Sprache (`NavItem.langs`, `navGroupsFor(isStaff, locked, language)`). Sprachunabhängig (unten): Bücher, Suche, Mathe.
 - Seite `/unregelmaessig` (`pages/Irregular.tsx`, `features/irregular/irregular.ts`): Englisch Simple Past/Past Participle (~95 Verben, Varianten wie learnt/learned), Französisch Présent je/nous/ils, Participe passé, Futur (22 unregelmäßige Verben), mit Wortliste.
 - `JumpGame.tsx`: nur Optik neu (Nachthimmel, Mond, Sterne, Wolken, 3 Parallax-Hügel, Gras-Plattformen, drehende Münzen, Figur mit Augen/Squash, Partikel, Anzeige). Physik in `jump.ts` unverändert.
+
+## 0031 – Duell-Unentschieden, Coreball/Klicker/CPS, Design „Schwarzes Loch“
+- `submit_duel` (gepatcht): gleich viele richtige Antworten = Unentschieden (Zeit entscheidet nicht mehr); beide bekommen `duel_reward / 2` (Tageslimit je Person).
+- Neue Spiele (`game_runs`-Check, `start_game`/`get_game_board`/`finish_game` gepatcht; Punktegrenzen je Sekunde: coreball 6, clicker 2, cps 3):
+  - `coreball` (`coreball.ts`, `CoreballGame.tsx`): Kugeln auf drehenden Kern schießen, `levelConfig(level)` = mehr Kugeln/schneller/Richtungswechsel ab 3/Pendeln ab 6. Score = gesetzte Kugeln.
+  - `clicker` (`clicker.ts`, `ClickerGame.tsx`): 30 s, 0,1 Punkte je Klick, gewertet nur gerade ganze Zahlen (`2*floor(clicks/20)`).
+  - `cps` (`cps.ts`, `CpsGame.tsx`): 10 s, Score = meiste Klicks in einer Sekunde.
+- Design `theme_blackhole` (Shop 250 000 Coins, in 0031 eingetragen; Aussehen in `catalog.ts`, `fx: 'hole'`, `decor: 'blackhole'`): `components/ui/BlackHole.tsx` – `BlackHoleBackdrop` (Horizont, Photonenring, Scheibe, einfallende Sterne) hinter der Seite, `BlackHoleBeams` (Lichtfunken spiralen von zufälligen Menüpunkten ins Loch, über der Seite, `pointer-events:none`). CSS in `index.css`: Verlaufs-Knöpfe `[data-fx='hole']`, `.bh-ring` (Rangliste/Profil, `PlayerTag framed`) und `.bh-bubble` (Chat-Blase): rotierender doppelter Rahmen blau auf weiß. `prefers-reduced-motion` schaltet Animationen aus.

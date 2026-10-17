@@ -212,6 +212,55 @@ body {
   .tagc-shine, .tagc-rainbow, .cname-run, .fx-zocker::before, .fx-zocker::after, .fxc-dollar::before, .fxc-dollar::after, .fxc-pulse, .fxc-float, .fxc-shimmer, .fxc-rainbow, .tag-elite, [data-fx] .btn-fx, [data-fx] .btn-fx::after { animation: none; }
 }
 
+
+/* ---------- Design „Schwarzes Loch“: Verlaufs-Knöpfe, leuchtende Ränder, Menü ---------- */
+@property --bh { syntax: '<angle>'; inherits: false; initial-value: 0deg; }
+@keyframes bh-spin { to { --bh: 360deg; } }
+@keyframes bh-flow { to { background-position: 200% 50%; } }
+@keyframes bh-breathe { 0%, 100% { box-shadow: 0 0 14px rgb(56 189 248 / 0.35), 0 0 34px rgb(99 102 241 / 0.25); } 50% { box-shadow: 0 0 22px rgb(125 211 252 / 0.6), 0 0 52px rgb(99 102 241 / 0.4); } }
+[data-fx='hole'] .btn-primary, [data-fx='hole'] .btn-fx.btn-primary {
+  background: linear-gradient(115deg, #1e1b4b, #2563eb 28%, #38bdf8 50%, #f0f9ff 62%, #38bdf8 74%, #4f46e5 100%) 0 50% / 220% 100%;
+  color: #06091c; font-weight: 700; text-shadow: 0 1px 0 rgb(255 255 255 / 0.35);
+  animation: bh-flow 6s linear infinite, bh-breathe 3.4s ease-in-out infinite; border: 1px solid rgb(224 242 254 / 0.55);
+}
+[data-fx='hole'] .btn-primary::before {
+  content: ''; position: absolute; inset: 0; pointer-events: none; border-radius: inherit;
+  background: radial-gradient(120% 140% at 50% -40%, rgb(255 255 255 / 0.5), transparent 55%);
+}
+[data-fx='hole'] .btn-fx.border-white\/15 {
+  background: linear-gradient(rgb(7 10 26 / 0.92), rgb(7 10 26 / 0.92)) padding-box, linear-gradient(135deg, #38bdf8, #6366f1 45%, #e0f2fe) border-box;
+  border: 1px solid transparent;
+}
+[data-fx='hole'] .glass {
+  border-color: rgb(125 211 252 / 0.16);
+  background-image: linear-gradient(160deg, rgb(56 189 248 / 0.07), transparent 38%, rgb(99 102 241 / 0.07));
+  box-shadow: inset 0 1px 0 rgb(224 242 254 / 0.08), 0 0 0 1px rgb(2 6 23 / 0.4);
+}
+[data-fx='hole'] aside a.bg-accent-cyan\/10, [data-fx='hole'] nav a.bg-accent-cyan\/10 {
+  background: linear-gradient(90deg, rgb(56 189 248 / 0.28), rgb(99 102 241 / 0.12) 70%, transparent);
+  box-shadow: inset 2px 0 0 #7dd3fc, 0 0 22px -6px rgb(56 189 248 / 0.7);
+}
+[data-fx='hole'] .btn-fx.text-slate-300:hover { background: linear-gradient(90deg, rgb(56 189 248 / 0.16), rgb(99 102 241 / 0.12)); }
+[data-fx='hole'] aside a:hover { background: linear-gradient(90deg, rgb(125 211 252 / 0.14), transparent); }
+[data-fx='hole'] h1 { background: linear-gradient(100deg, #fff 20%, #bae6fd 50%, #a5b4fc); -webkit-background-clip: text; background-clip: text; color: transparent; }
+
+/* Rotierender Rahmen: blau auf weiß, doppelt (zwei Bögen gegenüber). Für Spieler mit dem Design „Schwarzes Loch“ (Rangliste, Profil, Chat). */
+.bh-ring {
+  --bh: 0deg; position: relative; isolation: isolate; border-radius: 9999px; padding: 2px;
+  background: conic-gradient(from var(--bh), transparent 0 4%, #1d4ed8 9%, #60a5fa 15%, #fff 22%, transparent 30%, transparent 50%, #1d4ed8 59%, #60a5fa 65%, #fff 72%, transparent 80%, transparent 100%);
+  animation: bh-spin 3.4s linear infinite; box-shadow: 0 0 14px -3px rgb(96 165 250 / 0.7);
+}
+.bh-ring > .bh-ring-in { display: flex; min-width: 0; align-items: center; gap: 0.625rem; border-radius: 9999px; background: rgb(var(--s900)); padding: 0.25rem 0.75rem 0.25rem 0.25rem; }
+.bh-bubble {
+  --bh: 0deg; border: 2px solid transparent;
+  background: linear-gradient(rgb(var(--s800) / 0.96), rgb(var(--s800) / 0.96)) padding-box,
+    conic-gradient(from var(--bh), transparent 0 4%, #1d4ed8 9%, #60a5fa 15%, #fff 22%, transparent 30%, transparent 50%, #1d4ed8 59%, #60a5fa 65%, #fff 72%, transparent 80%, transparent 100%) border-box;
+  animation: bh-spin 4s linear infinite; box-shadow: 0 0 18px -6px rgb(96 165 250 / 0.7);
+}
+@media (prefers-reduced-motion: reduce) {
+  [data-fx='hole'] .btn-primary, .bh-ring, .bh-bubble { animation: none; }
+}
+
 /* ---------- Vokabeltrainer +: Menü, Hinweisfeld, Tag ---------- */
 .plus-nav { background-image: linear-gradient(90deg, rgb(217 70 239 / 0.14), rgb(34 211 238 / 0.08)); box-shadow: inset 0 0 0 1px rgb(217 70 239 / 0.28); }
 .plus-banner { color: #fae8ff; background: linear-gradient(120deg, rgb(147 51 234 / 0.45), rgb(219 39 119 / 0.35) 55%, rgb(34 211 238 / 0.3)); background-size: 200% 100%; animation: tag-gold 6s linear infinite; box-shadow: 0 0 24px rgb(217 70 239 / 0.25); }

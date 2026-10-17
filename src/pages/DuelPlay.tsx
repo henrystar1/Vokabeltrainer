@@ -97,6 +97,7 @@ export default function DuelPlay() {
             <Notice tone={outcome.winner === 'opp' ? 'warn' : 'ok'}>
               {outcome.winner === 'me' ? 'Gewonnen! ' : outcome.winner === 'opp' ? 'Verloren. ' : 'Unentschieden. '}
               {d.opponent_name} hatte {outcome.opp_correct} richtig.
+              {outcome.winner === 'tie' && ' Ihr bekommt beide die Hälfte der Coins.'}
             </Notice>
           )}
         </div>

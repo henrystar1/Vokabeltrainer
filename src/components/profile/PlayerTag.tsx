@@ -141,6 +141,18 @@ export default function PlayerTag({
   framed?: boolean
 }) {
   const frame = framed ? themeFrameColor(cosmetics.theme_id) : null
+  if (framed && cosmetics.theme_id === 'theme_blackhole') {
+    // Schwarzes Loch: doppelter Rahmen (blau auf weiß), der sich dreht.
+    return (
+      <span className={`bh-ring flex w-fit min-w-0 max-w-full ${className}`}>
+        <span className="bh-ring-in">
+          <Avatar name={name} avatarId={cosmetics.avatar_id} colorId={cosmetics.color_id} size={size} />
+          <StyledName name={name} colorId={cosmetics.color_id} effectId={cosmetics.effect_id} className="truncate font-medium" />
+          <Tags role={cosmetics.role} tagId={cosmetics.tag_id} />
+        </span>
+      </span>
+    )
+  }
   return (
     <span
       className={`flex min-w-0 items-center gap-2.5 ${frame ? 'w-fit max-w-full rounded-full py-1 pl-1 pr-3' : ''} ${className}`}

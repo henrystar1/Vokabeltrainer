@@ -132,7 +132,7 @@ export function nameColorStyle(colorId: string | null | undefined): { className:
   return { className: '', style: { color: c.solid } }
 }
 
-export type Decor = 'stars' | 'bubbles' | 'petals' | 'confetti' | 'fireflies' | 'code' | 'sparkles'
+export type Decor = 'stars' | 'bubbles' | 'petals' | 'confetti' | 'fireflies' | 'code' | 'sparkles' | 'blackhole'
 
 export interface ThemePalette {
   /** Hex-Werte der Hintergrundtöne (dunkel → heller). */
@@ -150,7 +150,7 @@ export interface ThemePalette {
   /** Vorschau-Verlauf im Shop. */
   preview: string
   /** Sondereffekt für alle Knöpfe: Glanz oder durchlaufender Regenbogen. */
-  fx?: 'shine' | 'rainbow' | 'hue'
+  fx?: 'shine' | 'rainbow' | 'hue' | 'hole'
 }
 
 export const DEFAULT_THEME = 'theme_space'
@@ -276,6 +276,11 @@ export const THEMES: Record<string, ThemePalette> = {
     s950: '#05080f', s900: '#0a0f1d', s800: '#111a30', s700: '#1b2848', s600: '#283a66',
     cyan: '#22d3ee', violet: '#a78bfa', blue: '#3b82f6', fx: 'hue',
     decor: 'sparkles', decorColors: ['#e0f2fe', '#fbcfe8', '#d9f99d'], preview: 'linear-gradient(90deg,#0ea5e9,#8b5cf6,#ec4899,#f59e0b,#22c55e,#0ea5e9)',
+  },
+  theme_blackhole: {
+    s950: '#010103', s900: '#03040b', s800: '#070a18', s700: '#0d1230', s600: '#161d4a',
+    cyan: '#7dd3fc', violet: '#818cf8', blue: '#38bdf8', fx: 'hole',
+    decor: 'blackhole', decorColors: ['#e0f2fe', '#7dd3fc', '#818cf8'], preview: 'radial-gradient(circle at 50% 50%,#000 0 17%,#e0f2fe 19%,#38bdf8 27%,#312e81 48%,#010103 75%)',
   },
   theme_rainbow: {
     s950: '#07060f', s900: '#0d0b1c', s800: '#161230', s700: '#231d4d', s600: '#322a70',
