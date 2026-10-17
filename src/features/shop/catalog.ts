@@ -132,7 +132,7 @@ export function nameColorStyle(colorId: string | null | undefined): { className:
   return { className: '', style: { color: c.solid } }
 }
 
-export type Decor = 'stars' | 'bubbles' | 'petals' | 'confetti' | 'fireflies' | 'code' | 'sparkles' | 'blackhole' | 'mountains'
+export type Decor = 'stars' | 'bubbles' | 'petals' | 'confetti' | 'fireflies' | 'code' | 'sparkles' | 'blackhole' | 'mountains' | 'football'
 
 export interface ThemePalette {
   /** Hex-Werte der Hintergrundtöne (dunkel → heller). */
@@ -150,7 +150,7 @@ export interface ThemePalette {
   /** Vorschau-Verlauf im Shop. */
   preview: string
   /** Sondereffekt für alle Knöpfe: Glanz oder durchlaufender Regenbogen. */
-  fx?: 'shine' | 'rainbow' | 'hue' | 'hole' | 'alps'
+  fx?: 'shine' | 'rainbow' | 'hue' | 'hole' | 'alps' | 'pitch'
 }
 
 export const DEFAULT_THEME = 'theme_space'
@@ -286,6 +286,11 @@ export const THEMES: Record<string, ThemePalette> = {
     s950: '#05081a', s900: '#090f28', s800: '#0f1836', s700: '#192650', s600: '#263868',
     cyan: '#fdba74', violet: '#f472b6', blue: '#93c5fd', fx: 'alps',
     decor: 'mountains', decorColors: ['#fff7ed', '#fdba74', '#f472b6'], preview: 'linear-gradient(180deg,#1e1b4b 0%,#a8467c 48%,#f59e0b 62%,#4b4688 63%,#1c2754 82%,#050818 100%)',
+  },
+  theme_football: {
+    s950: '#03110a', s900: '#061a0f', s800: '#0b2616', s700: '#12381f', s600: '#1c5130',
+    cyan: '#4ade80', violet: '#facc15', blue: '#f8fafc', fx: 'pitch',
+    decor: 'football', decorColors: ['#f8fafc', '#4ade80', '#facc15'], preview: 'linear-gradient(180deg,#041322 0%,#0b2a3a 38%,#1f7a3d 40%,#16602f 62%,#0f4a24 100%)',
   },
   theme_rainbow: {
     s950: '#07060f', s900: '#0d0b1c', s800: '#161230', s700: '#231d4d', s600: '#322a70',

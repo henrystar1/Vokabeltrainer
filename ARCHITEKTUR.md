@@ -364,3 +364,6 @@ Tabelle `book_library_hidden`; `in_library` blendet ein veröffentlichtes Buch d
 - **Design `theme_mountain`** (Shop 250 000 Coins; `fx: 'alps'`, `decor: 'mountains'`): `components/ui/Mountains.tsx` (Canvas: Himmel, Sonnenstrahlen, 5 Bergketten mit Schneekappen, Nebel). CSS `[data-fx='alps']`, `.mt-bubble` (Gipfel über der Chat-Blase; Zeile mit `.mt-row` wegen `content-visibility`), `.mt-ring`.
 - **Verläufe:** Wechselnde Verläufe (`fx-rainbow`, `tag-gold`, `bh-flow`, `mt-flow`) laufen hin und her in einem 200 %-Bild – so wandert keine Kachelkante („Strich“) mehr durch.
 - Avatar-Emojis liegen auf einer Farbscheibe mit Glanz (`PlayerTag.tsx`), Plus-Vorteile nutzen Lucide-Icons.
+
+## 0033 – Design „Fußball“
+- `theme_football` (Shop 250 000 Coins, in 0033 eingetragen; `fx: 'pitch'`, `decor: 'football'`): `components/ui/Football.tsx` – Canvas mit Nachthimmel, Tribüne mit Kamerablitzen, Rasen mit Mähstreifen (einmal vorgerendert), flackernden Flutlichtkegeln und einem hüpfenden, rollenden Ball. CSS `[data-fx='pitch']` (Rasen-Verlaufsknöpfe), `.fb-bubble` (Nachricht als Tor: Pfosten, Latte, Netz; ein Ball fliegt per `::before` im Bogen hinein, Netz wackelt; Zeile mit `.fb-row` wegen `content-visibility`) und `.fb-ring` (Grasstreifen-Rahmen, Ball umkreist per `offset-path`).

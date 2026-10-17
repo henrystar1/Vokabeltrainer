@@ -318,6 +318,79 @@ body {
   [data-fx='alps'] .btn-primary, .mt-bubble, .mt-ring { animation: none; }
 }
 
+/* ---------- Design „Fußball“: Rasen-Verläufe, Tor mit einfliegendem Ball um die Nachricht ---------- */
+@keyframes fb-flow { 0%, 100% { background-position: 0% 50%; } 50% { background-position: 100% 50%; } }
+@keyframes fb-glow { 0%, 100% { box-shadow: 0 0 14px rgb(74 222 128 / 0.35), 0 0 30px rgb(250 204 21 / 0.15); } 50% { box-shadow: 0 0 22px rgb(134 239 172 / 0.6), 0 0 44px rgb(250 204 21 / 0.28); } }
+[data-fx='pitch'] .btn-primary, [data-fx='pitch'] .btn-fx.btn-primary {
+  background: linear-gradient(115deg, #14532d, #16a34a 24%, #4ade80 44%, #f7fee7 58%, #facc15 70%, #4ade80 84%, #15803d 100%) 0 50% / 200% 100%;
+  color: #052e16; font-weight: 700; text-shadow: 0 1px 0 rgb(255 255 255 / 0.35);
+  animation: fb-flow 7s ease-in-out infinite, fb-glow 3.4s ease-in-out infinite; border: 1px solid rgb(240 253 244 / 0.6);
+}
+[data-fx='pitch'] .btn-primary::before {
+  content: ''; position: absolute; inset: 0; pointer-events: none; border-radius: inherit;
+  background: repeating-linear-gradient(90deg, rgb(255 255 255 / 0.1) 0 12px, transparent 12px 24px), radial-gradient(120% 140% at 50% -40%, rgb(255 255 255 / 0.45), transparent 55%);
+}
+[data-fx='pitch'] .btn-fx.border-white\/15 {
+  background: linear-gradient(rgb(6 26 15 / 0.92), rgb(6 26 15 / 0.92)) padding-box, linear-gradient(135deg, #4ade80, #f8fafc 50%, #facc15) border-box;
+  border: 1px solid transparent;
+}
+[data-fx='pitch'] .glass {
+  border-color: rgb(74 222 128 / 0.18);
+  background-image: repeating-linear-gradient(90deg, rgb(74 222 128 / 0.035) 0 28px, transparent 28px 56px), linear-gradient(170deg, rgb(74 222 128 / 0.07), transparent 40%);
+  box-shadow: inset 0 1px 0 rgb(240 253 244 / 0.08), 0 0 0 1px rgb(2 6 23 / 0.4);
+}
+[data-fx='pitch'] aside a.bg-accent-cyan\/10, [data-fx='pitch'] nav a.bg-accent-cyan\/10 {
+  background: linear-gradient(90deg, rgb(74 222 128 / 0.28), rgb(250 204 21 / 0.1) 70%, transparent);
+  box-shadow: inset 2px 0 0 #4ade80, 0 0 22px -6px rgb(74 222 128 / 0.6);
+}
+[data-fx='pitch'] .btn-fx.text-slate-300:hover { background: linear-gradient(90deg, rgb(74 222 128 / 0.16), rgb(250 204 21 / 0.08)); }
+[data-fx='pitch'] aside a:hover { background: linear-gradient(90deg, rgb(74 222 128 / 0.14), transparent); }
+[data-fx='pitch'] h1 { background: linear-gradient(100deg, #fff 20%, #bbf7d0 55%, #fde047); -webkit-background-clip: text; background-clip: text; color: transparent; }
+
+/* Nachricht = Tor: weiße Pfosten und Latte, Netz dahinter, alle paar Sekunden fliegt ein Ball hinein (Netz wackelt). */
+.fb-row { padding-top: 16px; padding-bottom: 6px; }
+.fb-bubble {
+  position: relative; isolation: isolate; border: 3px solid #f8fafc; border-bottom: 4px solid #16a34a; border-radius: 10px 10px 6px 6px;
+  background:
+    repeating-linear-gradient(45deg, rgb(255 255 255 / 0.1) 0 1px, transparent 1px 9px),
+    repeating-linear-gradient(-45deg, rgb(255 255 255 / 0.1) 0 1px, transparent 1px 9px),
+    linear-gradient(180deg, rgb(var(--s800) / 0.97), rgb(var(--s900) / 0.97));
+  box-shadow: 0 0 0 1px rgb(15 23 42 / 0.6), 0 0 16px -4px rgb(248 250 252 / 0.45), 0 8px 18px -10px rgb(34 197 94 / 0.6);
+  animation: fb-net 7s ease-out infinite;
+}
+.fb-bubble::before {
+  content: ''; position: absolute; z-index: 1; width: 17px; height: 17px; left: 2%; top: 108%; opacity: 0; pointer-events: none;
+  background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20'%3E%3Cdefs%3E%3CradialGradient id='g' cx='.35' cy='.3' r='.8'%3E%3Cstop offset='0' stop-color='%23fff'/%3E%3Cstop offset='1' stop-color='%23cbd5e1'/%3E%3C/radialGradient%3E%3C/defs%3E%3Ccircle cx='10' cy='10' r='9.2' fill='url(%23g)' stroke='%230f172a' stroke-width='1'/%3E%3Cpath d='M10 6.2 L13.6 8.8 L12.2 13 L7.8 13 L6.4 8.8 Z' fill='%230f172a'/%3E%3Cpath d='M10 6.2 V1 M13.6 8.8 L18.4 7.2 M12.2 13 L15.2 17.2 M7.8 13 L4.8 17.2 M6.4 8.8 L1.6 7.2' stroke='%230f172a' stroke-width='1.2'/%3E%3C/svg%3E") center / contain no-repeat;
+  filter: drop-shadow(0 2px 2px rgb(0 0 0 / 0.5));
+  animation: fb-bx 7s linear infinite, fb-by 7s infinite, fb-bo 7s linear infinite, fb-br 7s linear infinite;
+}
+@keyframes fb-bx { 0%, 14% { left: 2%; } 44%, 100% { left: 84%; } }
+@keyframes fb-by {
+  0%, 14% { top: 108%; animation-timing-function: cubic-bezier(.2,.7,.4,1); }
+  29% { top: -26%; animation-timing-function: cubic-bezier(.6,0,.9,.5); }
+  44%, 100% { top: 46%; }
+}
+@keyframes fb-bo { 0%, 13% { opacity: 0; } 15% { opacity: 1; } 56% { opacity: 1; } 62%, 100% { opacity: 0; } }
+@keyframes fb-br { 0%, 14% { transform: rotate(0); } 44%, 100% { transform: rotate(540deg); } }
+@keyframes fb-net { 0%, 43% { transform: none; } 46% { transform: scale(1.025, 1.04); } 50% { transform: scale(0.99, 0.985); } 54%, 100% { transform: none; } }
+.fb-ring {
+  position: relative; border-radius: 9999px; padding: 2px;
+  background: repeating-linear-gradient(90deg, #15803d 0 10px, #22c55e 10px 20px) 0 0 / 40px 100%;
+  animation: fb-grass 1.6s linear infinite; box-shadow: 0 0 14px -3px rgb(74 222 128 / 0.6);
+}
+@keyframes fb-grass { to { background-position: 40px 0; } }
+.fb-ring > .fb-ring-in { display: flex; min-width: 0; align-items: center; gap: 0.625rem; border-radius: 9999px; background: rgb(var(--s900)); padding: 0.25rem 0.75rem 0.25rem 0.25rem; }
+.fb-ring::after {
+  content: ''; position: absolute; left: 0; top: 0; width: 14px; height: 14px; pointer-events: none;
+  background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20'%3E%3Cdefs%3E%3CradialGradient id='g' cx='.35' cy='.3' r='.8'%3E%3Cstop offset='0' stop-color='%23fff'/%3E%3Cstop offset='1' stop-color='%23cbd5e1'/%3E%3C/radialGradient%3E%3C/defs%3E%3Ccircle cx='10' cy='10' r='9.2' fill='url(%23g)' stroke='%230f172a' stroke-width='1'/%3E%3Cpath d='M10 6.2 L13.6 8.8 L12.2 13 L7.8 13 L6.4 8.8 Z' fill='%230f172a'/%3E%3Cpath d='M10 6.2 V1 M13.6 8.8 L18.4 7.2 M12.2 13 L15.2 17.2 M7.8 13 L4.8 17.2 M6.4 8.8 L1.6 7.2' stroke='%230f172a' stroke-width='1.2'/%3E%3C/svg%3E") center / contain no-repeat; filter: drop-shadow(0 1px 2px rgb(0 0 0 / 0.5));
+  offset-path: inset(-5px round 9999px); offset-distance: 0%; animation: fb-orbit 4.5s linear infinite;
+}
+@keyframes fb-orbit { to { offset-distance: 100%; } }
+@media (prefers-reduced-motion: reduce) {
+  [data-fx='pitch'] .btn-primary, .fb-bubble, .fb-bubble::before, .fb-ring, .fb-ring::after { animation: none; }
+  .fb-bubble::before { opacity: 0; }
+}
+
 /* ---------- Vokabeltrainer +: Menü, Hinweisfeld, Tag ---------- */
 .plus-nav { background-image: linear-gradient(90deg, rgb(217 70 239 / 0.14), rgb(34 211 238 / 0.08)); box-shadow: inset 0 0 0 1px rgb(217 70 239 / 0.28); }
 .plus-banner { color: #fae8ff; background: linear-gradient(120deg, rgb(147 51 234 / 0.45), rgb(219 39 119 / 0.35) 55%, rgb(34 211 238 / 0.3)); background-size: 200% 100%; animation: tag-gold 6s linear infinite; box-shadow: 0 0 24px rgb(217 70 239 / 0.25); }
