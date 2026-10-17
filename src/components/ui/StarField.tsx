@@ -2,6 +2,7 @@ import { useMemo } from 'react'
 import { useAuth } from '../../features/auth/AuthProvider'
 import { DEFAULT_THEME, THEMES, type Decor } from '../../features/shop/catalog'
 import { BlackHoleBackdrop, BlackHoleBeams } from './BlackHole'
+import { MountainBackdrop } from './Mountains'
 
 interface Particle {
   id: number
@@ -24,7 +25,7 @@ function makeParticles(decor: Decor, colors: string[]): Particle[] {
     seed = (seed * 16807) % 2147483647
     return seed / 2147483647
   }
-  const count = { stars: 60, bubbles: 22, petals: 22, confetti: 40, fireflies: 24, code: 26, sparkles: 34, blackhole: 0 }[decor]
+  const count = { stars: 60, bubbles: 22, petals: 22, confetti: 40, fireflies: 24, code: 26, sparkles: 34, blackhole: 0, mountains: 0 }[decor]
   return Array.from({ length: count }, (_, i) => ({
     id: i,
     left: rnd() * 100,
@@ -46,6 +47,7 @@ export default function StarField() {
   const particles = useMemo(() => makeParticles(theme.decor, theme.decorColors), [theme])
   const { decor } = theme
 
+  if (decor === 'mountains') return <MountainBackdrop />
   if (decor === 'blackhole') {
     return (
       <>

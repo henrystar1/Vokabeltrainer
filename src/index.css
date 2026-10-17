@@ -76,7 +76,8 @@ body {
 @keyframes fx-pulse { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.07); } }
 @keyframes fx-float { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-3px); } }
 @keyframes fx-shimmer { 0%, 100% { filter: brightness(1); } 50% { filter: brightness(1.7) drop-shadow(0 0 4px currentColor); } }
-@keyframes fx-rainbow { to { background-position: 200% 0; } }
+/* Verläufe schwingen hin und her (Hintergrund 200 % breit, Position 0 → 100 %): so läuft nie eine Kachelkante („Strich“) durchs Bild. */
+@keyframes fx-rainbow { 0%, 100% { background-position: 0% 50%; animation-timing-function: ease-in-out; } 50% { background-position: 100% 50%; animation-timing-function: ease-in-out; } }
 @keyframes fx-fire {
   0%, 100% { filter: drop-shadow(0 -1px 3px #f97316) drop-shadow(0 -3px 7px #ef4444); }
   50% { filter: drop-shadow(0 -2px 5px #fbbf24) drop-shadow(0 -5px 10px #f97316); }
@@ -134,7 +135,7 @@ body {
 .tag { display: inline-flex; align-items: center; border-radius: 9999px; padding: 1px 8px; font-family: 'JetBrains Mono', ui-monospace, monospace; font-size: 10px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; white-space: nowrap; line-height: 1.5; }
 .tag-mod { color: #031a20; background: linear-gradient(90deg, #22d3ee, #67e8f9); box-shadow: 0 0 10px rgb(34 211 238 / 0.6); }
 .tag-alphamod { color: #3b2600; background: linear-gradient(100deg, #b8860b, #ffd700 30%, #fff3a8 50%, #ffd700 70%, #b8860b); background-size: 200% 100%; box-shadow: 0 0 12px rgb(255 215 0 / 0.65); animation: tag-gold 3.5s linear infinite; }
-@keyframes tag-gold { to { background-position: -200% 0; } }
+@keyframes tag-gold { 0%, 100% { background-position: 0% 50%; animation-timing-function: ease-in-out; } 50% { background-position: 100% 50%; animation-timing-function: ease-in-out; } }
 @media (prefers-reduced-motion: reduce) { .tag-alphamod { animation: none; } }
 .tag-admin { color: #2a0a00; background: linear-gradient(90deg, #fbbf24, #f97316, #ef4444); box-shadow: 0 0 12px rgb(249 115 22 / 0.7); }
 .tag-supporter { color: #bbf7d0; border: 1px solid rgb(74 222 128 / 0.5); background: rgb(34 197 94 / 0.12); }
@@ -199,8 +200,8 @@ body {
 [data-fx] .btn-fx, [data-fx] .btn-primary { position: relative; overflow: hidden; }
 [data-fx='shine'] .btn-fx::after, [data-fx='shine'] .btn-primary::after {
   content: ''; position: absolute; inset: 0; pointer-events: none;
-  background: linear-gradient(105deg, transparent 34%, rgb(255 255 255 / 0.6) 50%, transparent 66%);
-  transform: translateX(-130%); animation: btn-shine 2.8s ease-in-out infinite;
+  background: linear-gradient(105deg, transparent 10%, rgb(255 255 255 / 0.05) 28%, rgb(255 255 255 / 0.22) 42%, rgb(255 255 255 / 0.32) 50%, rgb(255 255 255 / 0.22) 58%, rgb(255 255 255 / 0.05) 72%, transparent 90%);
+  transform: translateX(-130%); animation: btn-shine 3.4s ease-in-out infinite;
 }
 [data-fx='shine'] .btn-primary { background-image: linear-gradient(135deg, #fde68a, #f59e0b 55%, #fbbf24); color: #2a1a00; box-shadow: 0 0 18px rgb(251 191 36 / 0.55); }
 [data-fx='rainbow'] .btn-fx {
@@ -216,10 +217,10 @@ body {
 /* ---------- Design „Schwarzes Loch“: Verlaufs-Knöpfe, leuchtende Ränder, Menü ---------- */
 @property --bh { syntax: '<angle>'; inherits: false; initial-value: 0deg; }
 @keyframes bh-spin { to { --bh: 360deg; } }
-@keyframes bh-flow { to { background-position: 200% 50%; } }
+@keyframes bh-flow { 0%, 100% { background-position: 0% 50%; animation-timing-function: ease-in-out; } 50% { background-position: 100% 50%; animation-timing-function: ease-in-out; } }
 @keyframes bh-breathe { 0%, 100% { box-shadow: 0 0 14px rgb(56 189 248 / 0.35), 0 0 34px rgb(99 102 241 / 0.25); } 50% { box-shadow: 0 0 22px rgb(125 211 252 / 0.6), 0 0 52px rgb(99 102 241 / 0.4); } }
 [data-fx='hole'] .btn-primary, [data-fx='hole'] .btn-fx.btn-primary {
-  background: linear-gradient(115deg, #1e1b4b, #2563eb 28%, #38bdf8 50%, #f0f9ff 62%, #38bdf8 74%, #4f46e5 100%) 0 50% / 220% 100%;
+  background: linear-gradient(115deg, #1e1b4b, #2563eb 28%, #38bdf8 50%, #f0f9ff 62%, #38bdf8 74%, #4f46e5 100%) 0 50% / 200% 100%;
   color: #06091c; font-weight: 700; text-shadow: 0 1px 0 rgb(255 255 255 / 0.35);
   animation: bh-flow 6s linear infinite, bh-breathe 3.4s ease-in-out infinite; border: 1px solid rgb(224 242 254 / 0.55);
 }
@@ -259,6 +260,62 @@ body {
 }
 @media (prefers-reduced-motion: reduce) {
   [data-fx='hole'] .btn-primary, .bh-ring, .bh-bubble { animation: none; }
+}
+
+/* ---------- Design „Berge“: Sonnenaufgangs-Verläufe, Gipfel über den Nachrichten ---------- */
+@keyframes mt-flow { 0%, 100% { background-position: 0% 50%; } 50% { background-position: 100% 50%; } }
+@keyframes mt-glow { 0%, 100% { box-shadow: 0 0 14px rgb(251 146 60 / 0.35), 0 0 30px rgb(244 114 182 / 0.2); } 50% { box-shadow: 0 0 22px rgb(253 186 116 / 0.55), 0 0 46px rgb(244 114 182 / 0.32); } }
+[data-fx='alps'] .btn-primary, [data-fx='alps'] .btn-fx.btn-primary {
+  background: linear-gradient(115deg, #1e3a8a, #6366f1 22%, #f472b6 45%, #fdba74 62%, #fef3c7 72%, #fb923c 86%, #be185d 100%) 0 50% / 200% 100%;
+  color: #1c0b14; font-weight: 700; text-shadow: 0 1px 0 rgb(255 255 255 / 0.35);
+  animation: mt-flow 8s ease-in-out infinite, mt-glow 3.6s ease-in-out infinite; border: 1px solid rgb(254 243 199 / 0.55);
+}
+[data-fx='alps'] .btn-primary::before {
+  content: ''; position: absolute; inset: 0; pointer-events: none; border-radius: inherit;
+  background: radial-gradient(120% 140% at 50% -40%, rgb(255 255 255 / 0.45), transparent 55%);
+}
+[data-fx='alps'] .btn-fx.border-white\/15 {
+  background: linear-gradient(rgb(9 15 40 / 0.92), rgb(9 15 40 / 0.92)) padding-box, linear-gradient(135deg, #93c5fd, #f472b6 50%, #fdba74) border-box;
+  border: 1px solid transparent;
+}
+[data-fx='alps'] .glass {
+  border-color: rgb(253 186 116 / 0.16);
+  background-image: linear-gradient(170deg, rgb(147 197 253 / 0.07), transparent 40%, rgb(244 114 182 / 0.06));
+  box-shadow: inset 0 1px 0 rgb(254 243 199 / 0.08), 0 0 0 1px rgb(2 6 23 / 0.4);
+}
+[data-fx='alps'] aside a.bg-accent-cyan\/10, [data-fx='alps'] nav a.bg-accent-cyan\/10 {
+  background: linear-gradient(90deg, rgb(251 146 60 / 0.28), rgb(244 114 182 / 0.12) 70%, transparent);
+  box-shadow: inset 2px 0 0 #fdba74, 0 0 22px -6px rgb(251 146 60 / 0.6);
+}
+[data-fx='alps'] .btn-fx.text-slate-300:hover { background: linear-gradient(90deg, rgb(251 146 60 / 0.16), rgb(244 114 182 / 0.1)); }
+[data-fx='alps'] aside a:hover { background: linear-gradient(90deg, rgb(253 186 116 / 0.14), transparent); }
+[data-fx='alps'] h1 { background: linear-gradient(100deg, #fff 20%, #fde68a 50%, #f9a8d4); -webkit-background-clip: text; background-clip: text; color: transparent; }
+
+/* Nachrichten: Gipfel mit Schneekappe über der Blase, Sonnenaufgangs-Rand, Nebel am Fuß. */
+.mt-row { padding-top: 14px; }
+.mt-bubble {
+  position: relative; border: 1.5px solid transparent;
+  background: linear-gradient(180deg, rgb(var(--s800) / 0.97), rgb(var(--s900) / 0.97)) padding-box,
+    linear-gradient(100deg, #93c5fd, #f472b6 35%, #fdba74 65%, #93c5fd) 0 0 / 200% 100% border-box;
+  animation: mt-flow 9s ease-in-out infinite; box-shadow: 0 6px 22px -10px rgb(251 146 60 / 0.55);
+}
+.mt-bubble::before {
+  content: ''; position: absolute; left: 14px; right: 14px; top: -13px; height: 14px; pointer-events: none;
+  background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='72' height='14' viewBox='0 0 72 14' preserveAspectRatio='none'%3E%3Cpath d='M0 14 L12 4 L20 9 L34 0 L46 8 L54 4 L72 14 Z' fill='%23263868'/%3E%3Cpath d='M34 0 L28.5 4.6 L31.5 4 L34 6.4 L37 4 L40 5 L46 8 Z' fill='%23fff'/%3E%3Cpath d='M12 4 L8.4 7.4 L11 6.6 L13.4 8 L15 6 Z' fill='%23f5f3ff'/%3E%3C/svg%3E") repeat-x left bottom / 72px 14px;
+  filter: drop-shadow(0 0 4px rgb(253 186 116 / 0.45));
+}
+.mt-bubble::after {
+  content: ''; position: absolute; inset: auto 0 0 0; height: 40%; pointer-events: none; border-radius: 0 0 1rem 1rem;
+  background: linear-gradient(0deg, rgb(253 186 116 / 0.09), transparent);
+}
+.mt-ring {
+  position: relative; border-radius: 9999px; padding: 2px;
+  background: linear-gradient(100deg, #93c5fd, #f472b6 35%, #fdba74 65%, #93c5fd) 0 0 / 200% 100%;
+  animation: mt-flow 7s ease-in-out infinite; box-shadow: 0 0 14px -3px rgb(251 146 60 / 0.6);
+}
+.mt-ring > .mt-ring-in { display: flex; min-width: 0; align-items: center; gap: 0.625rem; border-radius: 9999px; background: rgb(var(--s900)); padding: 0.25rem 0.75rem 0.25rem 0.25rem; }
+@media (prefers-reduced-motion: reduce) {
+  [data-fx='alps'] .btn-primary, .mt-bubble, .mt-ring { animation: none; }
 }
 
 /* ---------- Vokabeltrainer +: Menü, Hinweisfeld, Tag ---------- */

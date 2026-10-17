@@ -35,7 +35,7 @@ export const getChat = (limit = 100) => rpc<ChatMessage[]>('get_chat', { p_limit
 export const postChat = (body: string) => rpc<number>('post_chat', { p_body: body })
 export const deleteChatMessage = (id: number) => rpc<void>('delete_chat_message', { p_id: id })
 
-export type GameId = 'snake' | 'tetris' | 'blast' | 'crossy' | 'flappy' | 'wave' | 'g2048' | 'memory' | 'bricks' | 'mole' | 'jump' | 'coreball' | 'clicker' | 'cps'
+export type GameId = 'snake' | 'tetris' | 'blast' | 'crossy' | 'flappy' | 'wave' | 'g2048' | 'memory' | 'bricks' | 'mole' | 'jump' | 'coreball'
 export interface GameStart { id: string; record: number; fee: number; balance: number }
 export interface GameResult { score: number; record: boolean; prev_record: number; reward: number; balance: number }
 export interface GameBoardRow extends Flair { rank: number; display_name: string; score: number; is_me: boolean }
@@ -45,6 +45,13 @@ export const getChatUnread = () => rpc<number>('chat_unread_count')
 export const markChatRead = (id: number) => rpc<void>('chat_mark_read', { p_id: id })
 export const timeoutChatUser = (messageId: number, minutes: number) =>
   rpc<void>('staff_timeout_message', { p_message_id: messageId, p_minutes: minutes })
+export interface RouletteBet { t: 'straight' | 'red' | 'black' | 'even' | 'odd' | 'low' | 'high' | 'dozen' | 'column'; v?: number; a: number }
+export interface RouletteResult { number: number; color: 'green' | 'red' | 'black'; bets: Array<RouletteBet & { win: boolean; pay: number }>; bet: number; payout: number; balance: number }
+export const gamblingRoulette = (bets: RouletteBet[]) => rpc<RouletteResult>('gambling_roulette', { p_bets: bets })
+export const gamblingDice = (bet: number, over: boolean, target: number) =>
+  rpc<{ roll: number; chance: number; win: boolean; bet: number; payout: number; balance: number }>('gambling_dice', { p_bet: bet, p_over: over, p_target: target })
+export const gamblingWheel = (bet: number) =>
+  rpc<{ index: number; tenths: number; segments: number[]; bet: number; payout: number; balance: number }>('gambling_wheel', { p_bet: bet })
 export const gamblingPlay = (bet: number) =>
   rpc<{ reels: number[]; mult: number; payout: number; bet: number; balance: number }>('gambling_play', { p_bet: bet })
 export const submitChoice = (correct: number, total: number) =>

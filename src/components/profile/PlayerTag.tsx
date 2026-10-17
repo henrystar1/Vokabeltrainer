@@ -25,15 +25,30 @@ export function Avatar({ name, avatarId, colorId, size = 32 }: { name: string; a
   const emoji = avatarId ? AVATARS[avatarId] : undefined
   const ring = nameColorStyle(colorId).style
   const ringColor = ring.color ?? (ring.backgroundImage ? 'rgb(var(--c-violet))' : undefined)
+  // Emoji auf einer Scheibe mit Verlauf und Glanz (statt nackt auf grauem Grund): Farbton je Avatar stabil aus der ID.
+  const hue = emoji ? hueOf(avatarId ?? '') : 0
+  const disc = emoji
+    ? `radial-gradient(circle at 30% 22%, hsl(${hue} 90% 78% / 0.55), transparent 55%), linear-gradient(145deg, hsl(${hue} 70% 38%), hsl(${(hue + 50) % 360} 65% 20%))`
+    : undefined
+  const shadows = [
+    ringColor ? `0 0 0 2px ${ringColor}` : '',
+    emoji ? `inset 0 1px 1px hsl(${hue} 100% 88% / 0.55), inset 0 -3px 6px rgb(0 0 0 / 0.3), 0 0 ${Math.round(size / 3)}px -2px hsl(${hue} 90% 60% / 0.55)` : '',
+  ].filter(Boolean).join(', ')
   return (
     <span
       aria-hidden
-      className="flex shrink-0 items-center justify-center rounded-full bg-space-600 font-semibold text-slate-200"
-      style={{ width: size, height: size, fontSize: size * 0.55, boxShadow: ringColor ? `0 0 0 2px ${ringColor}` : undefined }}
+      className={`flex shrink-0 items-center justify-center rounded-full font-semibold text-slate-200 ${emoji ? '' : 'bg-space-600'}`}
+      style={{ width: size, height: size, fontSize: size * (emoji ? 0.54 : 0.55), background: disc, boxShadow: shadows || undefined }}
     >
-      {emoji ?? (name.trim().charAt(0).toUpperCase() || '?')}
+      {emoji ? <span style={{ filter: 'drop-shadow(0 1px 1.5px rgb(0 0 0 / 0.45))', lineHeight: 1 }}>{emoji}</span> : name.trim().charAt(0).toUpperCase() || '?'}
     </span>
   )
+}
+
+function hueOf(id: string): number {
+  let h = 0
+  for (let i = 0; i < id.length; i++) h = (h * 31 + id.charCodeAt(i)) % 360
+  return h
 }
 
 /** Klaviertasten-Effekt: Buchstaben als weiße und schwarze Tasten (Muster einer Oktave). */
@@ -146,6 +161,17 @@ export default function PlayerTag({
     return (
       <span className={`bh-ring flex w-fit min-w-0 max-w-full ${className}`}>
         <span className="bh-ring-in">
+          <Avatar name={name} avatarId={cosmetics.avatar_id} colorId={cosmetics.color_id} size={size} />
+          <StyledName name={name} colorId={cosmetics.color_id} effectId={cosmetics.effect_id} className="truncate font-medium" />
+          <Tags role={cosmetics.role} tagId={cosmetics.tag_id} />
+        </span>
+      </span>
+    )
+  }
+  if (framed && cosmetics.theme_id === 'theme_mountain') {
+    return (
+      <span className={`mt-ring flex w-fit min-w-0 max-w-full ${className}`}>
+        <span className="mt-ring-in">
           <Avatar name={name} avatarId={cosmetics.avatar_id} colorId={cosmetics.color_id} size={size} />
           <StyledName name={name} colorId={cosmetics.color_id} effectId={cosmetics.effect_id} className="truncate font-medium" />
           <Tags role={cosmetics.role} tagId={cosmetics.tag_id} />

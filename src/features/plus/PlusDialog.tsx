@@ -25,7 +25,7 @@ export default function PlusDialog({ onClose }: { onClose: () => void }) {
           </div>
           <ul className="grid gap-x-4 gap-y-1.5 text-sm text-slate-300 sm:grid-cols-2">
             {plusPerks(status).slice(0, 8).map((p) => (
-              <li key={p.title} className="flex gap-2"><span aria-hidden>{p.icon}</span><span><b className="font-medium text-slate-100">{p.title}</b></span></li>
+              <li key={p.title} className="flex gap-2"><p.icon size={16} className="mt-0.5 shrink-0 text-fuchsia-300" aria-hidden /><span><b className="font-medium text-slate-100">{p.title}</b></span></li>
             ))}
           </ul>
           <PlusTiers status={status} />

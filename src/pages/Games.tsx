@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { Blocks, Bird, Brain, Crown, Footprints, Gamepad2, Grid3x3, Hammer, LayoutGrid, Target, MousePointerClick, Gauge, Mountain, Trophy, Zap, Square } from 'lucide-react'
+import { Blocks, Bird, Brain, Crown, Footprints, Gamepad2, Grid3x3, Hammer, LayoutGrid, Target, Mountain, Trophy, Zap, Square } from 'lucide-react'
 import PlayerTag from '../components/profile/PlayerTag'
 import CoinIcon from '../components/ui/CoinIcon'
 import Button from '../components/ui/Button'
@@ -20,8 +20,6 @@ import BricksGame from '../features/games/BricksGame'
 import MoleGame from '../features/games/MoleGame'
 import JumpGame from '../features/games/JumpGame'
 import CoreballGame from '../features/games/CoreballGame'
-import ClickerGame from '../features/games/ClickerGame'
-import CpsGame from '../features/games/CpsGame'
 import SnakeGame from '../features/games/SnakeGame'
 import TetrisGame from '../features/games/TetrisGame'
 import { errorMessage } from '../lib/errors'
@@ -46,8 +44,6 @@ const GAMES: Array<{ id: GameId; name: string; text: string; unit: string; icon:
   { id: 'mole', name: 'Maulwurf', text: 'Tipp die Maulwürfe an, bevor sie verschwinden.', unit: 'Treffer', icon: Hammer },
   { id: 'jump', name: 'Hüpfer', text: 'Plattformer: lauf und spring von Insel zu Insel, sammle Münzen.', unit: 'Punkte', icon: Mountain },
   { id: 'coreball', name: 'Coreball', text: 'Schieß Kugeln auf den drehenden Kern, ohne andere zu treffen. Jedes Level wird schwerer.', unit: 'Kugeln', icon: Target },
-  { id: 'clicker', name: 'Klicker', text: '30 Sekunden klicken: 0,1 Punkte pro Klick, gewertet werden nur gerade Zahlen.', unit: 'Punkte', icon: MousePointerClick },
-  { id: 'cps', name: 'CPS-Test', text: '10 Sekunden klicken – wer die höchste CPS (Klicks pro Sekunde) schafft, gewinnt.', unit: 'CPS', icon: Gauge },
 ]
 
 type Phase = { name: 'menu' } | { name: 'play'; game: GameId; run: GameStart } | { name: 'result'; game: GameId; result: GameResult }
@@ -253,7 +249,7 @@ function Playing({ game, run, onDone }: { game: GameId; run: GameStart; onDone: 
       {pending !== null && (
         <div className="mb-3 rounded-xl border border-fuchsia-400/30 bg-fuchsia-400/[0.08] p-4 text-center" role="alertdialog" aria-label="Wiederbeleben">
           <p className="font-medium text-white">Game over – {pending} {g.unit}</p>
-          <p className="mt-1 text-xs text-slate-300">Mit Plus kannst du weiterspielen ({revives} von {maxRevives} Wiederbelebungen genutzt).</p>
+          <p className="mt-1 text-xs text-slate-300">Mit Plus kannst du weiterspielen ({revives} von {maxRevives} Wiederbelebungen genutzt). Eine wiederbelebte Runde zählt nicht für den Rekord.</p>
           <div className="mt-3 flex flex-col justify-center gap-2 sm:flex-row">
             <Button busy={reviveBusy} disabled={wallet.balance < price} onClick={() => void revive()}>
               <Heart size={16} /> Wiederbeleben für {price.toLocaleString('de-DE')} Coins
@@ -263,7 +259,7 @@ function Playing({ game, run, onDone }: { game: GameId; run: GameStart; onDone: 
           {wallet.balance < price && <p className="mt-2 text-xs text-amber-300">Dir fehlen {(price - wallet.balance).toLocaleString('de-DE')} Coins.</p>}
         </div>
       )}
-      {finalScore !== null && !plus.active && <p className="mb-3 text-center text-xs text-fuchsia-200/80">Mit Plus kannst du dich nach dem Game over für {price.toLocaleString('de-DE')} Coins wiederbeleben.</p>}
+      {finalScore !== null && !plus.active && <p className="mb-3 text-center text-xs text-fuchsia-200/80">Mit Plus kannst du nach dem Game over weiterspielen (zählt dann nicht für den Rekord).</p>}
       <div key={attempt} className={`${plus.active ? 'plus-game ' : ''}${pending !== null ? 'pointer-events-none opacity-60' : ''}`}>
         {game === 'snake' && <SnakeGame {...props} />}
         {game === 'tetris' && <TetrisGame {...props} />}
@@ -277,8 +273,6 @@ function Playing({ game, run, onDone }: { game: GameId; run: GameStart; onDone: 
         {game === 'mole' && <MoleGame {...props} />}
         {game === 'jump' && <JumpGame {...props} />}
         {game === 'coreball' && <CoreballGame {...props} />}
-        {game === 'clicker' && <ClickerGame {...props} />}
-        {game === 'cps' && <CpsGame {...props} />}
       </div>
       {confirmQuit && (
         <Modal title="Aufgeben?" onClose={() => setConfirmQuit(false)}>

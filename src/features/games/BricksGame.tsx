@@ -62,7 +62,7 @@ export default function BricksGame({ onScore, onOver, plus }: GameProps) {
       ctx.textAlign = 'left'
       ctx.fillText(String(s.score), 10, 28)
       ctx.textAlign = 'right'
-      ctx.fillText('❤'.repeat(Math.max(s.lives, 0)), BW - 10, 28)
+      ctx.fillText('♥'.repeat(Math.max(s.lives, 0)), BW - 10, 28)
       ctx.textAlign = 'center'
       ctx.font = '12px system-ui, sans-serif'
       ctx.fillStyle = '#94a3b8'

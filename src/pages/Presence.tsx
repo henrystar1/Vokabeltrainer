@@ -1,4 +1,5 @@
 import { useEffect } from 'react'
+import { EyeOff } from 'lucide-react'
 import { ManageButton } from '../components/admin/ManageUser'
 import PlayerTag from '../components/profile/PlayerTag'
 import Card from '../components/ui/Card'
@@ -38,6 +39,7 @@ export default function Presence() {
         <span aria-hidden className={`h-2.5 w-2.5 shrink-0 rounded-full ${x.online ? 'bg-emerald-400 shadow-[0_0_8px_rgb(52_211_153)]' : 'bg-slate-600'}`} />
         <PlayerTag name={x.display_name} cosmetics={x} size={34} />
         {x.user_id === user?.id && <span className="label-mono text-accent-cyan">Du</span>}
+        {x.hidden && <span className="inline-flex items-center gap-1 rounded-full bg-white/10 px-2 py-0.5 text-[10px] text-slate-400" title="Diese Person hat ihre Anzeige deaktiviert – nur Admins sehen sie."><EyeOff size={11} /> versteckt</span>}
       </span>
       <span className={`shrink-0 text-xs ${x.online ? 'text-emerald-300' : 'text-slate-500'}`}>{x.online ? 'online' : lastSeenText(x.last_seen_at)}</span>
       <ManageButton userId={x.user_id} name={x.display_name} />

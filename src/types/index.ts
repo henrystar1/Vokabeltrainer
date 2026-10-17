@@ -322,6 +322,8 @@ export interface PresenceRow extends Flair {
   display_name: string
   last_seen_at: string
   online: boolean
+  /** Nur Admins sehen das: der Nutzer hat „Wer ist da?“ für sich deaktiviert. */
+  hidden?: boolean
 }
 
 export interface CoinRow extends Flair {
@@ -338,6 +340,9 @@ export interface BoardPost {
   status: 'planned' | 'doing' | 'done'
   sort: number
   updated_at: string
+  created_at: string
+  created_by_name: string | null
+  updated_by_name: string | null
 }
 
 export interface GamblingWin {

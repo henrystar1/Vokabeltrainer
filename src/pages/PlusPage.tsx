@@ -31,7 +31,7 @@ export default function PlusPage() {
         <ul className="grid gap-3 sm:grid-cols-2">
           {plusPerks(status).map((p) => (
             <li key={p.title} className="glass flex gap-3 rounded-2xl p-4">
-              <span className="text-2xl" aria-hidden>{p.icon}</span>
+              <p.icon size={26} className="shrink-0 text-fuchsia-300" aria-hidden />
               <span><b className="block">{p.title}</b><span className="text-sm text-slate-400">{p.text}</span></span>
             </li>
           ))}

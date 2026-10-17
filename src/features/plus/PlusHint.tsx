@@ -6,7 +6,7 @@ import { usePlus } from './PlusProvider'
 const TEXTS: Record<string, string> = {
   dashboard: 'Mit Plus bekommst du Coins ×1,5, mehr Quests und Grammatik-Blätter mit KI.',
   learn: 'Mit Plus: Coins ×1,5 beim Lernen und gelernte Vokabeln sofort wieder fällig machen.',
-  games: 'Mit Plus kannst du dich im Spiel wiederbeleben und bekommst schönere Grafik.',
+  games: 'Mit Plus bekommst du schönere Spielgrafik und kannst nach dem Game over weiterspielen (ohne Rekord).',
   gambling: 'Mit Plus ist deine Gewinnchance beim Gambling höher.',
   quests: 'Plus schaltet zusätzliche Quests mit größeren Belohnungen frei.',
   shop: 'Plus-Artikel: animierte Profilbilder, Farben, Effekte und Designs.',

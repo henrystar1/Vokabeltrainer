@@ -179,7 +179,7 @@ export default function Copy() {
 
       {done && (
         <Card className="mx-auto max-w-xl space-y-3 text-center">
-          <p className="text-2xl font-semibold">Fertig! 🎉</p>
+          <p className="text-2xl font-semibold">Fertig!</p>
           <p className="text-slate-300">{total} Vokabeln abgeschrieben{again.size > 0 ? `, ${again.size} davon zweimal` : ''}.</p>
           {rewardMsg && <Notice tone="ok">{rewardMsg}</Notice>}
           <div className="flex justify-center gap-2">

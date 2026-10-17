@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest'
 import { mulberry32 } from '../learning/random'
 import { addTile, canMove, move, newBoard, slideRow } from './game2048'
-import { makeDeck, pairsForLevel } from './memory'
-import { moleGap, moleUpTime, nextHole, MOLE_HOLES } from './mole'
+import { MEMORY_LIVES, heartsAfterRound, isAvoidableMiss, makeDeck, pairsForLevel } from './memory'
+import { freeHole, moleGap, moleMaxUp, molePoints, moleUpTime, pickKind, MOLE_HOLES } from './mole'
 import { BH, BW, PADDLE_Y, launch, newBricks, stepBricks } from './bricks'
 import { JH, PH, jumpScore, newJump, stepJump, maxGap } from './jump'
 import { parseSticker, stickerBody, STICKERS } from '../chat/stickers'
@@ -46,20 +46,80 @@ describe('Memory', () => {
   })
 })
 
+describe('Memory-Fairness', () => {
+  it('nur vermeidbare Fehler kosten ein Herz', () => {
+    const seen = new Set([3, 7])
+    expect(isAvoidableMiss(seen, 0, 1)).toBe(false) // zwei unbekannte Karten = Zufall
+    expect(isAvoidableMiss(seen, 3, 1)).toBe(true) // 3 war schon bekannt
+    expect(isAvoidableMiss(seen, 4, 7)).toBe(true)
+  })
+  it('fehlerfreie Runde gibt ein Herz zurück (höchstens 5)', () => {
+    expect(heartsAfterRound(3, false)).toBe(4)
+    expect(heartsAfterRound(MEMORY_LIVES, false)).toBe(MEMORY_LIVES)
+    expect(heartsAfterRound(3, true)).toBe(3)
+  })
+  it('ein Spieler mit perfektem Gedächtnis verliert nie ein Herz', () => {
+    // Simulation: Karten systematisch aufdecken und sich alles merken.
+    for (let level = 1; level <= 15; level++) {
+      const deck = makeDeck(pairsForLevel(level), mulberry32(level))
+      const seen = new Set<number>()
+      const done = new Set<number>()
+      let hearts = MEMORY_LIVES
+      const know = new Map<string, number[]>()
+      while (done.size < deck.length) {
+        // erste Karte: eine unbekannte oder eine, deren Partner bekannt ist
+        let a = deck.findIndex((c, i) => !done.has(i) && (know.get(c.symbol)?.length ?? 0) === 2 && know.get(c.symbol)![0] === i)
+        let b: number
+        if (a >= 0) b = know.get(deck[a].symbol)![1]
+        else {
+          a = deck.findIndex((_, i) => !done.has(i) && !seen.has(i))
+          const sym = deck[a].symbol
+          const partner = (know.get(sym) ?? [])[0]
+          b = partner !== undefined ? partner : deck.findIndex((_, i) => !done.has(i) && !seen.has(i) && i !== a)
+        }
+        if (deck[a].symbol === deck[b].symbol) {
+          done.add(a); done.add(b); seen.add(a); seen.add(b)
+          continue
+        }
+        if (isAvoidableMiss(seen, a, b)) hearts -= 1
+        for (const i of [a, b]) {
+          seen.add(i)
+          const arr = know.get(deck[i].symbol) ?? []
+          if (!arr.includes(i)) arr.push(i)
+          know.set(deck[i].symbol, arr)
+        }
+      }
+      expect(hearts).toBe(MEMORY_LIVES)
+    }
+  })
+})
+
 describe('Maulwurf', () => {
-  it('wird schneller und wählt nie dasselbe Loch', () => {
+  it('wird schneller, aber nur bis zu einer machbaren Grenze', () => {
     expect(moleUpTime(30)).toBeLessThan(moleUpTime(0))
     expect(moleGap(30)).toBeLessThan(moleGap(0))
-    expect(moleUpTime(999)).toBeGreaterThanOrEqual(400)
+    expect(moleUpTime(9999)).toBe(640)
+    expect(moleUpTime(500)).toBe(moleUpTime(9999))
+    expect(moleGap(9999)).toBe(300)
+    expect(moleMaxUp(0)).toBe(1)
+    expect(moleMaxUp(25)).toBe(2)
+    expect(moleMaxUp(100)).toBe(3)
+  })
+  it('Bomben erst ab 8 Punkten, golden gibt 3', () => {
+    const rng = mulberry32(9)
+    for (let i = 0; i < 300; i++) expect(pickKind(2, rng)).not.toBe('bomb')
+    let bombs = 0
+    for (let i = 0; i < 1000; i++) if (pickKind(100, rng) === 'bomb') bombs++
+    expect(bombs).toBeGreaterThan(120)
+    expect(bombs).toBeLessThan(330)
+    expect(molePoints('golden')).toBe(3)
+    expect(molePoints('bomb')).toBe(0)
+  })
+  it('wählt nur freie Löcher', () => {
     const rng = mulberry32(5)
-    let prev: number | null = null
-    for (let i = 0; i < 200; i++) {
-      const h = nextHole(prev, rng)
-      expect(h).not.toBe(prev)
-      expect(h).toBeGreaterThanOrEqual(0)
-      expect(h).toBeLessThan(MOLE_HOLES)
-      prev = h
-    }
+    const taken = new Set([0, 1, 2, 3, 4, 5, 6, 7])
+    for (let i = 0; i < 20; i++) expect(freeHole(taken, rng)).toBe(8)
+    expect(freeHole(new Set(Array.from({ length: MOLE_HOLES }, (_, i) => i)), rng)).toBeNull()
   })
 })
 

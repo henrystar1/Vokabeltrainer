@@ -129,7 +129,7 @@ function GoalBar({ goal }: { goal: Extract<PrintGoal, { visible: true }> }) {
         <div className={`h-full rounded-full transition-[width] duration-1000 ${reached ? 'bg-emerald-400' : 'bg-gradient-to-r from-accent-violet to-accent-cyan'}`} style={{ width: `${Math.min(100, pct)}%` }} />
       </div>
       <p className="mt-2 text-sm text-slate-400">
-        {reached ? 'Geschafft! Das Ziel ist erreicht – danke an alle Besteller. 🎉' : <><b className="text-slate-100">{pct.toLocaleString('de-DE', { maximumFractionDigits: 1 })} %</b> sind schon verdient. Mit jeder Bestellung kommt das Ziel näher.</>}
+        {reached ? 'Geschafft! Das Ziel ist erreicht – danke an alle Besteller.' : <><b className="text-slate-100">{pct.toLocaleString('de-DE', { maximumFractionDigits: 1 })} %</b> sind schon verdient. Mit jeder Bestellung kommt das Ziel näher.</>}
       </p>
     </section>
   )

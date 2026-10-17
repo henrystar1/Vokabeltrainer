@@ -75,7 +75,10 @@ export default function Board() {
               </div>
               {p.body && <p className="whitespace-pre-wrap text-sm text-slate-300">{p.body}</p>}
               <div className="flex items-center justify-between gap-2">
-                <p className="text-xs text-slate-500">Stand {formatDate(p.updated_at)}</p>
+                <p className="text-xs text-slate-500">
+                  Geschrieben von <b className="text-slate-300">{p.created_by_name ?? 'Unbekannt'}</b> am {formatDate(p.created_at)}
+                  {p.updated_by_name && <> · zuletzt geändert von <b className="text-slate-300">{p.updated_by_name}</b> am {formatDate(p.updated_at)}</>}
+                </p>
                 {isStaff && (
                   <div className="flex gap-1">
                     <button type="button" aria-label="Bearbeiten" className="flex min-h-[40px] w-10 items-center justify-center rounded-lg text-slate-400 hover:text-white" onClick={() => open(p)}><Pencil size={16} /></button>

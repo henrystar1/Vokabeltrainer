@@ -355,3 +355,12 @@ Tabelle `book_library_hidden`; `in_library` blendet ein veröffentlichtes Buch d
   - `clicker` (`clicker.ts`, `ClickerGame.tsx`): 30 s, 0,1 Punkte je Klick, gewertet nur gerade ganze Zahlen (`2*floor(clicks/20)`).
   - `cps` (`cps.ts`, `CpsGame.tsx`): 10 s, Score = meiste Klicks in einer Sekunde.
 - Design `theme_blackhole` (Shop 250 000 Coins, in 0031 eingetragen; Aussehen in `catalog.ts`, `fx: 'hole'`, `decor: 'blackhole'`): `components/ui/BlackHole.tsx` – `BlackHoleBackdrop` (Horizont, Photonenring, Scheibe, einfallende Sterne) hinter der Seite, `BlackHoleBeams` (Lichtfunken spiralen von zufälligen Menüpunkten ins Loch, über der Seite, `pointer-events:none`). CSS in `index.css`: Verlaufs-Knöpfe `[data-fx='hole']`, `.bh-ring` (Rangliste/Profil, `PlayerTag framed`) und `.bh-bubble` (Chat-Blase): rotierender doppelter Rahmen blau auf weiß. `prefers-reduced-motion` schaltet Animationen aus.
+
+## 0032 – Faire Spiele, Gambling-Erweiterung, Schwarzes Brett mit Autor, Design „Berge“
+- **Fairness:** `finish_game` zählt Läufe mit Wiederbelebung (`game_runs.revives > 0`) nicht mehr für Rekord/Belohnung. Memory (`memory.ts`): nur vermeidbare Fehlversuche kosten Herzen, fehlerfreie Runde heilt. Maulwurf (`mole.ts`): Plateau-Tempo, 3 Leben, Bomben, goldene Maulwürfe, 12er-Serie heilt – ohne Zeitlimit. Klicker und CPS-Test sind entfernt (Clients; die Spiel-IDs bleiben in der DB harmlos).
+- **Gambling:** `gambling_roulette(jsonb)`, `gambling_dice`, `gambling_wheel` (alle mit `_feature_guard('gambling')`, Einsatzgrenzen, `_gamble_settle`). Oberfläche in `features/gambling/` (Roulette, Dice, Wheel, Slots) mit Tab-Leiste in `pages/Gambling.tsx`.
+- **Schwarzes Brett:** `board_posts.created_by/updated_by`; `get_board()` liefert Autor- und Bearbeitername, `admin_save_board_post` setzt sie. `Board.tsx` zeigt „von … · bearbeitet von …“.
+- **Wer ist da:** `get_presence()` liefert `hidden`; Admins sehen auch Versteckte (Badge „versteckt“).
+- **Design `theme_mountain`** (Shop 250 000 Coins; `fx: 'alps'`, `decor: 'mountains'`): `components/ui/Mountains.tsx` (Canvas: Himmel, Sonnenstrahlen, 5 Bergketten mit Schneekappen, Nebel). CSS `[data-fx='alps']`, `.mt-bubble` (Gipfel über der Chat-Blase; Zeile mit `.mt-row` wegen `content-visibility`), `.mt-ring`.
+- **Verläufe:** Wechselnde Verläufe (`fx-rainbow`, `tag-gold`, `bh-flow`, `mt-flow`) laufen hin und her in einem 200 %-Bild – so wandert keine Kachelkante („Strich“) mehr durch.
+- Avatar-Emojis liegen auf einer Farbscheibe mit Glanz (`PlayerTag.tsx`), Plus-Vorteile nutzen Lucide-Icons.

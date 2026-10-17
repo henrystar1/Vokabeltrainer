@@ -1,7 +1,5 @@
 import { describe, expect, it } from 'vitest'
 import { FLIGHT, MIN_SEP, angDist, land, landingAngle, levelConfig, newCore, stepCore } from './coreball'
-import { clickerRaw, clickerScore, clicksToNext } from './clicker'
-import { currentCps, peakCps } from './cps'
 
 function rng(seed: number) {
   let x = seed
@@ -47,31 +45,5 @@ describe('Coreball', () => {
     expect(s.level).toBeGreaterThanOrEqual(16)
     expect(s.placed).toBeGreaterThan(60)
     expect(FLIGHT).toBeGreaterThan(0)
-  })
-})
-
-describe('Klicker', () => {
-  it('0,1 Punkte pro Klick, gewertet nur gerade Zahlen', () => {
-    expect(clickerRaw(7)).toBeCloseTo(0.7)
-    expect(clickerScore(19)).toBe(0)
-    expect(clickerScore(20)).toBe(2)
-    expect(clickerScore(39)).toBe(2)
-    expect(clickerScore(40)).toBe(4)
-    expect(clickerScore(200)).toBe(20)
-    expect(clicksToNext(0)).toBe(20)
-    expect(clicksToNext(5)).toBe(15)
-    expect(clicksToNext(20)).toBe(20)
-  })
-})
-
-describe('CPS', () => {
-  it('Bestwert in einer Sekunde', () => {
-    const times = [0, 100, 200, 300, 400, 2000, 2050, 2100]
-    expect(peakCps(times)).toBe(5)
-    expect(peakCps([])).toBe(0)
-    expect(peakCps([0, 1000])).toBe(1)
-    expect(peakCps([0, 999])).toBe(2)
-    expect(currentCps(times, 2200)).toBe(3)
-    expect(currentCps(times, 3500)).toBe(0)
   })
 })
