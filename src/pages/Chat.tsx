@@ -143,7 +143,8 @@ export default function Chat() {
   const refresh = useCallback(async () => {
     try {
       const m = await getChat(limit)
-      const s = m.map((x) => x.id).join(',')
+      // Auch das Aussehen (Design, Profilbild …) gehört zur Signatur, sonst bleibt nach einem Wechsel/Geschenk der alte Rahmen stehen.
+      const s = m.map((x) => `${x.id}|${x.theme_id ?? ''}|${x.avatar_id ?? ''}|${x.color_id ?? ''}|${x.effect_id ?? ''}|${x.tag_id ?? ''}|${x.role}|${x.display_name}`).join(',')
       if (s !== sig.current) {
         sig.current = s
         setMessages(m)

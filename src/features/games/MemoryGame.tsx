@@ -104,7 +104,7 @@ export default function MemoryGame({ onScore, onOver, plus }: GameProps) {
   const cols = deck.length <= 6 ? 3 : deck.length <= 12 ? 4 : 6
   return (
     <div className="flex flex-col items-center gap-4">
-      <style>{`.mm-card{perspective:600px}.mm-in{position:relative;width:100%;height:100%;transition:transform .35s;transform-style:preserve-3d}.mm-in.on{transform:rotateY(180deg)}.mm-f,.mm-b{position:absolute;inset:0;backface-visibility:hidden;-webkit-backface-visibility:hidden;border-radius:0.75rem;display:flex;align-items:center;justify-content:center}.mm-b{transform:rotateY(180deg)}@keyframes mm-shake{0%,100%{transform:translateX(0)}25%{transform:translateX(-5px)}75%{transform:translateX(5px)}}`}</style>
+      <style>{`.mm-card{perspective:600px;display:block;padding:0}.mm-in{display:block;position:relative;width:100%;height:100%;transition:transform .35s;transform-style:preserve-3d}.mm-in.on{transform:rotateY(180deg)}.mm-f,.mm-b{position:absolute;inset:0;backface-visibility:hidden;-webkit-backface-visibility:hidden;border-radius:0.75rem;display:flex;align-items:center;justify-content:center}.mm-b{transform:rotateY(180deg)}@keyframes mm-shake{0%,100%{transform:translateX(0)}25%{transform:translateX(-5px)}75%{transform:translateX(5px)}}`}</style>
       <div className="flex w-full max-w-[420px] items-center justify-between text-sm text-slate-300">
         <span>Runde {level}</span>
         <span className={`flex items-center gap-1 ${shake ? '[animation:mm-shake_.4s]' : ''}`} aria-label={`${lives} Herzen übrig`}>
