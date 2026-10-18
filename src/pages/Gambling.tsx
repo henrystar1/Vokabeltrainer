@@ -26,6 +26,7 @@ type Tab = (typeof TABS)[number]['id']
 export default function Gambling() {
   const settings = useAsync(getAppSettings, [])
   const maxBet = settings.data?.gambling_max_bet ?? 200
+  const rtp = Math.min(Math.max((settings.data?.gambling_rtp_permille ?? 900) / 10, 50), 95)
   const feed = useAsync(getGamblingFeed, [])
   const [tab, setTab] = useState<Tab>('slots')
   useEffect(() => {
@@ -63,7 +64,7 @@ export default function Gambling() {
       <Card className="space-y-5">
         {tab === 'slots' && <Slots maxBet={maxBet} onPlayed={feed.reload} info={info} />}
         {tab === 'roulette' && <Roulette maxBet={maxBet} />}
-        {tab === 'dice' && <Dice maxBet={maxBet} />}
+        {tab === 'dice' && <Dice maxBet={maxBet} rtp={rtp} />}
         {tab === 'wheel' && <Wheel maxBet={maxBet} />}
       </Card>
       <p className="mt-3 text-center text-xs text-slate-500">Glücksspiel kostet im Schnitt Coins. Spiel nur, was du verschmerzen kannst.</p>

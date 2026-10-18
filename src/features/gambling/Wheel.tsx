@@ -19,7 +19,7 @@ function polar(r: number, deg: number): [number, number] {
   return [100 + r * Math.cos(a), 100 + r * Math.sin(a)]
 }
 
-/** Glücksrad: 20 Felder mit Faktoren (Rückzahlung im Schnitt 97,5 %). */
+/** Glücksrad: 20 Felder mit Faktoren (Rückzahlung je nach Gewinnquote). */
 export default function Wheel({ maxBet }: { maxBet: number }) {
   const wallet = useWallet()
   const [bet, setBet] = useState(10)
@@ -97,7 +97,7 @@ export default function Wheel({ maxBet }: { maxBet: number }) {
         <CoinIcon size={16} /> Drehen · {stake}
       </Button>
       {error && <ErrorBox message={error} />}
-      <p className="text-center text-xs text-slate-500">Felder: ×0 (10×), ×0,5 (3×), ×1 (1×), ×2 (3×), ×3 (1×), ×4 (2×) – im Schnitt bekommst du 97,5 % zurück.</p>
+      <p className="text-center text-xs text-slate-500">Felder: ×0 (10×), ×0,5 (3×), ×1 (1×), ×2 (3×), ×3 (1×), ×4 (2×) – im Schnitt bekommst du weniger zurück, als du einsetzt.</p>
     </div>
   )
 }

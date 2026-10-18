@@ -8,7 +8,7 @@ import { gamblingDice } from '../../services/play'
 import BetBox from './BetBox'
 
 /** Würfeln: Zahl von 1 bis 100, du wählst über oder unter einer Grenze. Je kleiner die Chance, desto höher die Auszahlung. */
-export default function Dice({ maxBet }: { maxBet: number }) {
+export default function Dice({ maxBet, rtp = 90 }: { maxBet: number; rtp?: number }) {
   const wallet = useWallet()
   const [bet, setBet] = useState(10)
   const [over, setOver] = useState(true)
@@ -19,11 +19,11 @@ export default function Dice({ maxBet }: { maxBet: number }) {
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
-  const lo = over ? 10 : 6
-  const hi = over ? 95 : 91
+  const lo = over ? 25 : 6 // höchstens 75 % Gewinnchance
+  const hi = over ? 95 : 76
   const t = Math.min(hi, Math.max(lo, target))
   const chance = over ? 100 - t : t - 1
-  const mult = Math.floor((97 / chance) * 100) / 100
+  const mult = Math.floor((rtp / chance) * 100) / 100
   const stake = Math.min(Math.max(1, Math.floor(bet || 0)), maxBet)
 
   async function play() {

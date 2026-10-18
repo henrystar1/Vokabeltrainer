@@ -367,3 +367,9 @@ Tabelle `book_library_hidden`; `in_library` blendet ein veröffentlichtes Buch d
 
 ## 0033 – Design „Fußball“
 - `theme_football` (Shop 250 000 Coins, in 0033 eingetragen; `fx: 'pitch'`, `decor: 'football'`): `components/ui/Football.tsx` – Canvas mit Nachthimmel, Tribüne mit Kamerablitzen, Rasen mit Mähstreifen (einmal vorgerendert), flackernden Flutlichtkegeln und einem hüpfenden, rollenden Ball. CSS `[data-fx='pitch']` (Rasen-Verlaufsknöpfe), `.fb-bubble` (Nachricht als Tor: Pfosten, Latte, Netz; ein Ball fliegt per `::before` im Bogen hinein, Netz wackelt; Zeile mit `.fb-row` wegen `content-visibility`) und `.fb-ring` (Grasstreifen-Rahmen, Ball umkreist per `offset-path`).
+
+## 0034 – Hausvorteil bei Würfeln, Roulette, Glücksrad
+- Einstellung `gambling_rtp_permille` (Standard 900 = 90 % Rückzahlung, begrenzt auf 500–950; Admin unter Regeln › Gambling). Würfeln: Auszahlung = Einsatz × rtp / (10 × Chance), Chance höchstens 75 % (vorher 90 %, sah wie sicherer Gewinn aus). Roulette: Auszahlung je Feld × rtp / 973. Glücksrad: × rtp / 975. Der Client (`Dice.tsx`) liest die Quote aus `app_settings`.
+
+## 0035 – Lernpool nur aus eigener Bibliothek
+- `get_learning_pool` filtert wieder auf `in_library(book)` (wenn kein Buch gewählt ist) und `is_active_vocab`. Die Version aus 0011 hatte beides verloren, dadurch kamen in Multiple Choice, Lernen, Test, Sprint und Fehler-Training auch Vokabeln aus öffentlichen Büchern, die man nicht verwendet.
