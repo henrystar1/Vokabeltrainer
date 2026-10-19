@@ -1,4 +1,5 @@
 import { AVATARS, EFFECT_CLASSES, ROLE_TAGS, TAGS, nameColorStyle, themeFrameColor } from '../../features/shop/catalog'
+import { getAvatarBg, shade, useAvatarBgVersion } from '../../features/shop/avatarBg'
 import BikeSvg from '../../features/shop/Bike'
 import { FrogMini } from '../../features/shop/Frog'
 import AnimatedAvatar, { isAnimatedAvatar } from '../../features/shop/AnimatedAvatar'
@@ -8,6 +9,7 @@ import type { Flair, Role } from '../../types'
 /** Profilbild: animiertes Bild oder Emoji aus dem Shop, sonst Anfangsbuchstabe. */
 export function Avatar({ name, avatarId, colorId, size = 32 }: { name: string; avatarId?: string | null; colorId?: string | null; size?: number }) {
   useCustomVersion()
+  useAvatarBgVersion()
   if (avatarId && isAnimatedAvatar(avatarId)) return <AnimatedAvatar id={avatarId} size={size} />
   const own = avatarId ? getCustom(avatarId) : undefined
   if (own?.svg) {
@@ -27,12 +29,15 @@ export function Avatar({ name, avatarId, colorId, size = 32 }: { name: string; a
   const ringColor = ring.color ?? (ring.backgroundImage ? 'rgb(var(--c-violet))' : undefined)
   // Emoji auf einer Scheibe mit Verlauf und Glanz (statt nackt auf grauem Grund): Farbton je Avatar stabil aus der ID.
   const hue = emoji ? hueOf(avatarId ?? '') : 0
+  const myBg = emoji ? getAvatarBg(name) : undefined // selbst gewählte Hintergrundfarbe
   const disc = emoji
-    ? `radial-gradient(circle at 30% 22%, hsl(${hue} 90% 78% / 0.55), transparent 55%), linear-gradient(145deg, hsl(${hue} 70% 38%), hsl(${(hue + 50) % 360} 65% 20%))`
+    ? myBg
+      ? `radial-gradient(circle at 30% 22%, rgb(255 255 255 / 0.35), transparent 55%), linear-gradient(145deg, ${shade(myBg, 0.1)}, ${shade(myBg, -0.35)})`
+      : `radial-gradient(circle at 30% 22%, hsl(${hue} 90% 78% / 0.55), transparent 55%), linear-gradient(145deg, hsl(${hue} 70% 38%), hsl(${(hue + 50) % 360} 65% 20%))`
     : undefined
   const shadows = [
     ringColor ? `0 0 0 2px ${ringColor}` : '',
-    emoji ? `inset 0 1px 1px hsl(${hue} 100% 88% / 0.55), inset 0 -3px 6px rgb(0 0 0 / 0.3), 0 0 ${Math.round(size / 3)}px -2px hsl(${hue} 90% 60% / 0.55)` : '',
+    emoji ? `inset 0 1px 1px ${myBg ? 'rgb(255 255 255 / 0.5)' : `hsl(${hue} 100% 88% / 0.55)`}, inset 0 -3px 6px rgb(0 0 0 / 0.3), 0 0 ${Math.round(size / 3)}px -2px ${myBg ?? `hsl(${hue} 90% 60% / 0.55)`}` : '',
   ].filter(Boolean).join(', ')
   return (
     <span

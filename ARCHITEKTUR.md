@@ -377,3 +377,8 @@ Tabelle `book_library_hidden`; `in_library` blendet ein veröffentlichtes Buch d
 ## 0036 – Design „Gasthaus“ und blaue Berge
 - `theme_food` (Shop 250 000 Coins, in 0036 eingetragen; `fx: 'tavern'`, `decor: 'food'`): `components/ui/Food.tsx` – Canvas mit Karo-Tischdecke und fallenden, selbst gezeichneten Speisen (Schnitzel, Pommes in Tüte, Spätzle in Schüssel, Brezel, Bratwurst, Zitrone; keine Emojis). CSS `[data-fx='tavern']` (goldene Krusten-Verläufe), `.fd-bubble` (Karo-Rand, oben ragen Pommes heraus; Zeile `.fd-row`), `.fd-ring` (Karo-Ring). Die Karomuster sind exakt periodisch, die Animation läuft nahtlos.
 - `theme_mountain` ist jetzt komplett blau (Himmel, Strahlen, Berge, Akzente in `[data-fx='alps']`).
+
+## 0037 – Hintergrundfarbe der Emoji-Profilbilder
+- `profiles.avatar_bg` (#rrggbb oder null), gesetzt über `set_avatar_bg(text)`, gelesen über `get_avatar_bgs()` (Anzeigename → Farbe). Anzeigenamen sind eindeutig, deshalb lädt der Client die Liste einmal (`features/shop/avatarBg.ts`, wie die eigenen Shop-Artikel, Auffrischung alle 60 s) und `Avatar` schlägt per Name nach – die vielen Chat-/Ranglisten-Funktionen blieben unverändert. Auswahl in Einstellungen › Profil (Vorgaben, eigene Farbe, Zurücksetzen), nur wenn ein Emoji-Profilbild getragen wird. Ohne eigene Farbe gilt die Standard-Scheibe (Farbton aus der Avatar-ID).
+
+- Schwarzes Loch: Die Lichtstrahlen (`BlackHoleBeams`) liegen jetzt hinter dem Seiteninhalt (`-z-[9]` statt `z-[35]`) und pausieren, solange ein Eingabefeld den Fokus hat – vorher flogen sie quer über Chat-Eingabe und Texte.

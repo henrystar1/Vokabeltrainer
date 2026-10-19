@@ -175,7 +175,7 @@ export function BlackHoleBackdrop() {
 
 interface Beam { sx: number; sy: number; born: number; dur: number; spin: number; dx: number }
 
-/** Lichtstrahlen: von zufälligen Menüpunkten wandern Lichtfunken spiralförmig ins Schwarze Loch. */
+/** Lichtstrahlen (hinter dem Seiteninhalt): von zufälligen Menüpunkten wandern Lichtfunken spiralförmig ins Schwarze Loch. */
 export function BlackHoleBeams() {
   const ref = useRef<HTMLCanvasElement>(null)
   useEffect(() => {
@@ -219,6 +219,12 @@ export function BlackHoleBeams() {
       const W = cv.width
       const H = cv.height
       ctx.clearRect(0, 0, W, H)
+      // Beim Schreiben (Eingabefeld aktiv) bleiben die Strahlen aus, damit nichts durchs Textfeld fliegt.
+      const tag = document.activeElement?.tagName
+      if (tag === 'INPUT' || tag === 'TEXTAREA') {
+        beams.length = 0
+        return
+      }
       if (t * 1000 >= nextSpawn && beams.length < 5) {
         spawn(t)
         nextSpawn = t * 1000 + 450 + Math.random() * 900
@@ -301,5 +307,5 @@ export function BlackHoleBeams() {
       window.removeEventListener('resize', resize)
     }
   }, [])
-  return <canvas ref={ref} aria-hidden className="pointer-events-none fixed inset-0 z-[35] h-full w-full" />
+  return <canvas ref={ref} aria-hidden className="pointer-events-none fixed inset-0 -z-[9] h-full w-full" />
 }

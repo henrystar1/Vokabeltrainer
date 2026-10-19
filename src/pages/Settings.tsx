@@ -18,6 +18,9 @@ import PushSettings from '../features/push/PushSettings'
 import type { NotifyDm, NotifyOnline } from '../types'
 import { setPanic, usePanic } from '../features/panic/panic'
 import { setHidePresence, setTagsHidden } from '../services/koins'
+import { AVATARS } from '../features/shop/catalog'
+import { Avatar } from '../components/profile/PlayerTag'
+import { AVATAR_BG_PRESETS, getAvatarBg, setAvatarBg, useAvatarBgVersion } from '../features/shop/avatarBg'
 
 function Toggle({ label, checked, onChange }: { label: string; checked: boolean; onChange: (v: boolean) => void }) {
   return (
@@ -29,7 +32,10 @@ function Toggle({ label, checked, onChange }: { label: string; checked: boolean;
 }
 
 export default function Settings() {
-  const { user, displayName, role, setDisplayNameLocal, signOut, tagsHidden, hidePresence, refreshProfile } = useAuth()
+  const { user, displayName, role, setDisplayNameLocal, signOut, tagsHidden, hidePresence, refreshProfile, cosmetics } = useAuth()
+  useAvatarBgVersion()
+  const ownBg = displayName ? getAvatarBg(displayName) : undefined
+  const emojiAvatar = !!cosmetics.avatar_id && !!AVATARS[cosmetics.avatar_id]
   const { settings, update } = useSettings()
   const panic = usePanic()
   const notify = useNotify()
@@ -181,6 +187,39 @@ export default function Settings() {
                   <span className="block text-xs text-slate-400">Andere sehen dann weder, dass du online bist, noch wann du zuletzt da warst. Du selbst siehst dich weiterhin.</span>
                 </span>
               </label>
+              {emojiAvatar && (
+                <div className="mt-4 rounded-xl border border-white/10 bg-space-900/50 p-4">
+                  <div className="flex items-center gap-3">
+                    <Avatar name={displayName ?? ''} avatarId={cosmetics.avatar_id} colorId={cosmetics.color_id} size={48} />
+                    <div>
+                      <p className="text-sm font-medium">Hintergrund deines Profilbilds</p>
+                      <p className="text-xs text-slate-400">Such dir die Farbe aus, die dir gefällt. Alle sehen sie so.</p>
+                    </div>
+                  </div>
+                  <div className="mt-3 flex flex-wrap items-center gap-2">
+                    {AVATAR_BG_PRESETS.map((c) => (
+                      <button
+                        key={c}
+                        type="button"
+                        aria-label={`Farbe ${c}`}
+                        className={`h-9 w-9 rounded-full border-2 ${ownBg === c ? 'border-white' : 'border-white/20'}`}
+                        style={{ background: c }}
+                        onClick={() => void setAvatarBg(c).catch((err) => setError(errorMessage(err)))}
+                      />
+                    ))}
+                    <label className="flex h-9 cursor-pointer items-center gap-2 rounded-full border border-white/20 px-3 text-xs">
+                      Eigene
+                      <input
+                        type="color"
+                        className="h-6 w-8 cursor-pointer border-0 bg-transparent p-0"
+                        value={ownBg ?? '#6366f1'}
+                        onChange={(e) => void setAvatarBg(e.target.value).catch((err) => setError(errorMessage(err)))}
+                      />
+                    </label>
+                    <Button variant="ghost" disabled={!ownBg} onClick={() => void setAvatarBg(null).catch((err) => setError(errorMessage(err)))}>Zurücksetzen</Button>
+                  </div>
+                </div>
+              )}
             </div>
           </Card>
         )}

@@ -3,6 +3,7 @@ import type { Session, User } from '@supabase/supabase-js'
 import { supabase } from '../../lib/supabaseClient'
 import { loadProfile } from '../../services/settings'
 import { clearCustomItems, refreshCustomItems } from '../shop/custom'
+import { clearAvatarBgs, refreshAvatarBgs } from '../shop/avatarBg'
 import type { Flair, Profile, Role } from '../../types'
 
 interface AuthState {
@@ -127,13 +128,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (!userId) {
       clearCustomItems()
+      clearAvatarBgs()
       return
     }
     void refreshCustomItems()
+    void refreshAvatarBgs()
     const onVisible = () => {
       if (document.visibilityState !== 'visible') return
       void refreshProfile().catch(() => undefined)
       void refreshCustomItems()
+      void refreshAvatarBgs()
     }
     document.addEventListener('visibilitychange', onVisible)
     const t = window.setInterval(onVisible, 60_000)
