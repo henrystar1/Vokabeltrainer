@@ -72,9 +72,10 @@ const GroupRow = memo(function GroupRow({ g, live, isStaff, me, onDelete, onTime
   const toMe = whisper && !h.is_me
   const mountain = h.theme_id === 'theme_mountain'
   const football = h.theme_id === 'theme_football'
+  const food = h.theme_id === 'theme_food'
   return (
-    <div className={`flex ${h.is_me ? 'justify-end' : 'justify-start'} ${mountain ? 'mt-row ' : football ? 'fb-row ' : ''}[contain-intrinsic-size:auto_72px] [content-visibility:auto]`}>
-      <div className={`max-w-[88%] rounded-2xl px-3 py-2 ${h.theme_id === 'theme_blackhole' ? 'bh-bubble ' : mountain ? 'mt-bubble ' : football ? 'fb-bubble ' : ''}${whisper ? 'border border-violet-400/30 bg-violet-500/10' : h.is_me ? 'bg-accent-cyan/15' : 'bg-white/5'}`}>
+    <div className={`flex ${h.is_me ? 'justify-end' : 'justify-start'} ${mountain ? 'mt-row ' : football ? 'fb-row ' : food ? 'fd-row ' : ''}[contain-intrinsic-size:auto_72px] [content-visibility:auto]`}>
+      <div className={`max-w-[88%] rounded-2xl px-3 py-2 ${h.theme_id === 'theme_blackhole' ? 'bh-bubble ' : mountain ? 'mt-bubble ' : football ? 'fb-bubble ' : food ? 'fd-bubble ' : ''}${whisper ? 'border border-violet-400/30 bg-violet-500/10' : h.is_me ? 'bg-accent-cyan/15' : 'bg-white/5'}`}>
         <div className={`flex items-center gap-2 text-xs text-slate-400 ${live ? '' : 'av-still'}`}>
           <PlayerTag name={h.display_name} cosmetics={h} size={22} />
           {whisper && (

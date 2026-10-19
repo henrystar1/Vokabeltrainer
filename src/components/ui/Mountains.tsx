@@ -16,11 +16,11 @@ function ridge(x: number, seed: number): number {
 interface Layer { base: number; amp: number; speed: number; top: string; bottom: string; snow: number; seed: number; mist: number }
 
 const LAYERS: Layer[] = [
-  { base: 0.60, amp: 0.30, speed: 3, top: '#6d5a9e', bottom: '#3f3a7a', snow: 0.72, seed: 1.3, mist: 0.18 },
-  { base: 0.68, amp: 0.30, speed: 6, top: '#4b4688', bottom: '#2c2a62', snow: 0.74, seed: 4.1, mist: 0.2 },
-  { base: 0.77, amp: 0.27, speed: 11, top: '#303a74', bottom: '#1b2350', snow: 0.8, seed: 2.2, mist: 0.16 },
-  { base: 0.87, amp: 0.2, speed: 18, top: '#1c2754', bottom: '#0e1433', snow: 0, seed: 6.4, mist: 0.14 },
-  { base: 1.0, amp: 0.2, speed: 28, top: '#0d1331', bottom: '#050818', snow: 0, seed: 8.8, mist: 0 },
+  { base: 0.60, amp: 0.30, speed: 3, top: '#4f7fc4', bottom: '#2a4f94', snow: 0.72, seed: 1.3, mist: 0.18 },
+  { base: 0.68, amp: 0.30, speed: 6, top: '#34609f', bottom: '#1e3d78', snow: 0.74, seed: 4.1, mist: 0.2 },
+  { base: 0.77, amp: 0.27, speed: 11, top: '#234a85', bottom: '#122a59', snow: 0.8, seed: 2.2, mist: 0.16 },
+  { base: 0.87, amp: 0.2, speed: 18, top: '#14316a', bottom: '#0a1b3f', snow: 0, seed: 6.4, mist: 0.14 },
+  { base: 1.0, amp: 0.2, speed: 28, top: '#0a1c42', bottom: '#030b21', snow: 0, seed: 8.8, mist: 0 },
 ]
 
 export function MountainBackdrop() {
@@ -49,10 +49,10 @@ export function MountainBackdrop() {
       const sy = H * 0.5
       // Himmel (Dämmerung)
       const sky = ctx.createLinearGradient(0, 0, 0, H * 0.75)
-      sky.addColorStop(0, '#070b24')
-      sky.addColorStop(0.45, '#2c2466')
-      sky.addColorStop(0.75, '#a8467c')
-      sky.addColorStop(1, '#f59e0b')
+      sky.addColorStop(0, '#04122e')
+      sky.addColorStop(0.45, '#0f3b8a')
+      sky.addColorStop(0.75, '#2f7fd6')
+      sky.addColorStop(1, '#8fd0ff')
       ctx.globalCompositeOperation = 'source-over'
       ctx.fillStyle = sky
       ctx.fillRect(0, 0, W, H)
@@ -66,9 +66,9 @@ export function MountainBackdrop() {
       // Sonne mit Strahlen
       ctx.globalCompositeOperation = 'lighter'
       const glow = ctx.createRadialGradient(sx, sy, 0, sx, sy, Math.max(W, H) * 0.7)
-      glow.addColorStop(0, 'rgba(255,214,140,0.65)')
-      glow.addColorStop(0.15, 'rgba(251,146,60,0.35)')
-      glow.addColorStop(0.5, 'rgba(236,72,153,0.12)')
+      glow.addColorStop(0, 'rgba(214,240,255,0.7)')
+      glow.addColorStop(0.15, 'rgba(96,180,255,0.38)')
+      glow.addColorStop(0.5, 'rgba(56,130,246,0.14)')
       glow.addColorStop(1, 'rgba(0,0,0,0)')
       ctx.fillStyle = glow
       ctx.fillRect(0, 0, W, H)
@@ -78,8 +78,8 @@ export function MountainBackdrop() {
         const w = 0.07 + 0.03 * Math.sin(t * 0.5 + i * 2)
         const len = Math.max(W, H) * 1.3
         const g = ctx.createRadialGradient(sx, sy, 0, sx, sy, len)
-        g.addColorStop(0, 'rgba(255,230,170,0.14)')
-        g.addColorStop(1, 'rgba(255,230,170,0)')
+        g.addColorStop(0, 'rgba(200,232,255,0.15)')
+        g.addColorStop(1, 'rgba(200,232,255,0)')
         ctx.fillStyle = g
         ctx.beginPath()
         ctx.moveTo(sx, sy)
@@ -89,7 +89,7 @@ export function MountainBackdrop() {
         ctx.fill()
       }
       ctx.globalCompositeOperation = 'source-over'
-      ctx.fillStyle = '#fff4d6'
+      ctx.fillStyle = '#f2faff'
       ctx.beginPath()
       ctx.arc(sx, sy, Math.max(14, W * 0.022), 0, TAU)
       ctx.fill()
@@ -125,8 +125,8 @@ export function MountainBackdrop() {
           ctx.lineTo(W + step, topY - 4)
           ctx.closePath()
           const sn = ctx.createLinearGradient(0, topY, 0, topY + L.amp * H * 0.4)
-          sn.addColorStop(0, 'rgba(255,247,237,0.95)')
-          sn.addColorStop(1, 'rgba(199,210,254,0.55)')
+          sn.addColorStop(0, 'rgba(248,252,255,0.97)')
+          sn.addColorStop(1, 'rgba(186,216,255,0.55)')
           ctx.fillStyle = sn
           ctx.fill()
           // Glitzern
@@ -144,9 +144,9 @@ export function MountainBackdrop() {
         if (L.mist > 0) {
           const yy = H * (L.base + 0.02)
           const mg = ctx.createLinearGradient(0, yy - H * 0.08, 0, yy + H * 0.06)
-          mg.addColorStop(0, 'rgba(226,232,255,0)')
-          mg.addColorStop(0.5, `rgba(226,232,255,${L.mist * (0.7 + 0.3 * Math.sin(t * 0.25 + li))})`)
-          mg.addColorStop(1, 'rgba(226,232,255,0)')
+          mg.addColorStop(0, 'rgba(214,232,255,0)')
+          mg.addColorStop(0.5, `rgba(214,232,255,${L.mist * (0.7 + 0.3 * Math.sin(t * 0.25 + li))})`)
+          mg.addColorStop(1, 'rgba(214,232,255,0)')
           ctx.fillStyle = mg
           ctx.fillRect(0, yy - H * 0.08, W, H * 0.14)
         }

@@ -373,3 +373,7 @@ Tabelle `book_library_hidden`; `in_library` blendet ein veröffentlichtes Buch d
 
 ## 0035 – Lernpool nur aus eigener Bibliothek
 - `get_learning_pool` filtert wieder auf `in_library(book)` (wenn kein Buch gewählt ist) und `is_active_vocab`. Die Version aus 0011 hatte beides verloren, dadurch kamen in Multiple Choice, Lernen, Test, Sprint und Fehler-Training auch Vokabeln aus öffentlichen Büchern, die man nicht verwendet.
+
+## 0036 – Design „Gasthaus“ und blaue Berge
+- `theme_food` (Shop 250 000 Coins, in 0036 eingetragen; `fx: 'tavern'`, `decor: 'food'`): `components/ui/Food.tsx` – Canvas mit Karo-Tischdecke und fallenden, selbst gezeichneten Speisen (Schnitzel, Pommes in Tüte, Spätzle in Schüssel, Brezel, Bratwurst, Zitrone; keine Emojis). CSS `[data-fx='tavern']` (goldene Krusten-Verläufe), `.fd-bubble` (Karo-Rand, oben ragen Pommes heraus; Zeile `.fd-row`), `.fd-ring` (Karo-Ring). Die Karomuster sind exakt periodisch, die Animation läuft nahtlos.
+- `theme_mountain` ist jetzt komplett blau (Himmel, Strahlen, Berge, Akzente in `[data-fx='alps']`).
