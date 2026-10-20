@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { CircleDot, Dice5, Disc3, Cherry, Sparkles, TrendingDown, Trophy } from 'lucide-react'
+import { CircleDot, Dice5, Disc3, Cherry, Spade, Sparkles, TrendingDown, Trophy } from 'lucide-react'
 import Card from '../components/ui/Card'
 import PageHeader from '../components/ui/PageHeader'
 import { Notice } from '../components/ui/States'
@@ -13,16 +13,18 @@ import Slots from '../features/gambling/Slots'
 import Roulette from '../features/gambling/Roulette'
 import Dice from '../features/gambling/Dice'
 import Wheel from '../features/gambling/Wheel'
+import Blackjack from '../features/gambling/Blackjack'
 
 const TABS = [
   { id: 'slots', label: 'Automat', icon: Cherry },
   { id: 'roulette', label: 'Roulette', icon: CircleDot },
   { id: 'dice', label: 'Würfeln', icon: Dice5 },
   { id: 'wheel', label: 'Glücksrad', icon: Disc3 },
+  { id: 'blackjack', label: 'Black Jack', icon: Spade },
 ] as const
 type Tab = (typeof TABS)[number]['id']
 
-/** Gambling: Automat, Roulette, Würfeln und Glücksrad. Alle Ausgänge werden auf dem Server gewürfelt; der Admin legt Höchsteinsätze und Chancen fest. */
+/** Gambling: Automat, Roulette, Würfeln, Glücksrad und Black Jack. Alle Ausgänge werden auf dem Server gewürfelt; der Admin legt Höchsteinsätze und Chancen fest. */
 export default function Gambling() {
   const settings = useAsync(getAppSettings, [])
   const maxBet = settings.data?.gambling_max_bet ?? 200
@@ -46,7 +48,7 @@ export default function Gambling() {
   return (
     <div className="mx-auto max-w-xl">
       <PageHeader eyebrow="Glück gehabt?" title="Gambling" />
-      <div className="mb-4 grid grid-cols-4 gap-1.5" role="tablist" aria-label="Spiel wählen">
+      <div className="mb-4 grid grid-cols-5 gap-1.5" role="tablist" aria-label="Spiel wählen">
         {TABS.map((t) => (
           <button
             key={t.id}
@@ -54,7 +56,7 @@ export default function Gambling() {
             role="tab"
             aria-selected={tab === t.id}
             onClick={() => setTab(t.id)}
-            className={`flex min-h-[52px] flex-col items-center justify-center gap-0.5 rounded-xl border text-xs font-semibold transition ${tab === t.id ? 'border-amber-300/60 bg-amber-400/15 text-amber-200' : 'border-white/10 bg-white/5 text-slate-300 hover:bg-white/10'}`}
+            className={`flex min-h-[52px] flex-col items-center justify-center gap-0.5 rounded-xl border text-[11px] font-semibold transition ${tab === t.id ? 'border-amber-300/60 bg-amber-400/15 text-amber-200' : 'border-white/10 bg-white/5 text-slate-300 hover:bg-white/10'}`}
           >
             <t.icon size={18} />
             {t.label}
@@ -66,6 +68,7 @@ export default function Gambling() {
         {tab === 'roulette' && <Roulette maxBet={maxBet} />}
         {tab === 'dice' && <Dice maxBet={maxBet} rtp={rtp} />}
         {tab === 'wheel' && <Wheel maxBet={maxBet} />}
+        {tab === 'blackjack' && <Blackjack maxBet={maxBet} />}
       </Card>
       <p className="mt-3 text-center text-xs text-slate-500">Glücksspiel kostet im Schnitt Coins. Spiel nur, was du verschmerzen kannst.</p>
 

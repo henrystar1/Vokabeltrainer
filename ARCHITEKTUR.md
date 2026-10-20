@@ -383,3 +383,7 @@ Tabelle `book_library_hidden`; `in_library` blendet ein veröffentlichtes Buch d
 
 - Schwarzes Loch: Die Lichtstrahlen (`BlackHoleBeams`) liegen jetzt hinter dem Seiteninhalt (`-z-[9]` statt `z-[35]`) und pausieren, solange ein Eingabefeld den Fokus hat – vorher flogen sie quer über Chat-Eingabe und Texte.
 - Einblend-Animation `animate-rise` nutzt `backwards` statt `both`: Vorher blieb am Seiteninhalt dauerhaft `transform: translateY(0)` hängen; auf Apple-Geräten kann das den blinkenden Textcursor („Strich hinter dem letzten Buchstaben“) in Eingabefeldern springen lassen. Jetzt gibt es nach der Animation keinen Transform mehr.
+
+### 0038/0039 – Gambling verschärft, Black Jack
+- 0038: Würfeln höchstens 50 % Chance, Standard-Gewinnquote 85 %. Glücksrad zahlt exakt den Faktor des Felds (Layout bringt ~87,5 % zurück).
+- 0039: Black Jack. Tabelle `blackjack_hands` (eine offene Runde pro Nutzer, für Clients gesperrt) hält Deck und Karten. RPCs `blackjack_start`, `blackjack_action('hit'|'stand'|'double')`, `blackjack_current`. Einsatz wird beim Start abgebucht, Auszahlung (inkl. Einsatz) am Ende; die verdeckte Geberkarte wird erst bei Rundenende gesendet. Regeln: 1 Deck pro Runde, Geber zieht bis 17 inkl. weichem 17, Black Jack 6:5, Verdoppeln nur mit 2 Karten, kein Teilen. Neustart mit offener Runde = Verlust der alten Runde. Frontend: `features/gambling/Blackjack.tsx`, `cards.ts`.

@@ -52,6 +52,21 @@ export const gamblingDice = (bet: number, over: boolean, target: number) =>
   rpc<{ roll: number; chance: number; win: boolean; bet: number; payout: number; balance: number }>('gambling_dice', { p_bet: bet, p_over: over, p_target: target })
 export const gamblingWheel = (bet: number) =>
   rpc<{ index: number; tenths: number; segments: number[]; bet: number; payout: number; balance: number }>('gambling_wheel', { p_bet: bet })
+export interface BlackjackState {
+  done: boolean
+  result: 'blackjack' | 'win' | 'push' | 'lose' | 'bust' | null
+  bet: number
+  payout: number
+  balance: number
+  player: number[]
+  player_total: number
+  dealer: number[]
+  dealer_total: number
+  can_double: boolean
+}
+export const blackjackStart = (bet: number) => rpc<BlackjackState>('blackjack_start', { p_bet: bet })
+export const blackjackAction = (action: 'hit' | 'stand' | 'double') => rpc<BlackjackState>('blackjack_action', { p_action: action })
+export const blackjackCurrent = () => rpc<BlackjackState | null>('blackjack_current', {})
 export const gamblingPlay = (bet: number) =>
   rpc<{ reels: number[]; mult: number; payout: number; bet: number; balance: number }>('gambling_play', { p_bet: bet })
 export const submitChoice = (correct: number, total: number) =>
