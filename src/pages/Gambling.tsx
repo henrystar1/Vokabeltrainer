@@ -4,6 +4,7 @@ import Card from '../components/ui/Card'
 import PageHeader from '../components/ui/PageHeader'
 import { Notice } from '../components/ui/States'
 import { useAsync } from '../lib/useAsync'
+import { useWallet } from '../features/koins/WalletProvider'
 import { getAppSettings } from '../services/koins'
 import { getGamblingFeed } from '../services/social'
 import { lastSeenText } from './Presence'
@@ -28,7 +29,10 @@ type Tab = (typeof TABS)[number]['id']
 /** Gambling: Automat, Roulette, Würfeln, Glücksrad und Black Jack. Alle Ausgänge werden auf dem Server gewürfelt; der Admin legt Höchsteinsätze und Chancen fest. */
 export default function Gambling() {
   const settings = useAsync(getAppSettings, [])
-  const maxBet = settings.data?.gambling_max_bet ?? 200
+  const wallet = useWallet()
+  const baseMax = settings.data?.gambling_max_bet ?? 200
+  const allIn = (settings.data?.gambling_all_in ?? 1) !== 0
+  const maxBet = allIn ? Math.max(baseMax, wallet.balance) : baseMax
   const rtp = Math.min(Math.max((settings.data?.gambling_rtp_dice ?? 850) / 10, 30), 99)
   const maxChance = Math.min(Math.max(settings.data?.gambling_dice_max_chance ?? 50, 5), 95)
   const skip = useSkipAnim()
@@ -54,7 +58,7 @@ export default function Gambling() {
   const info = win !== null && jack !== null && (
     <Notice tone="info">
       <span className="block">
-        Chancen: drei gleiche Symbole <b>{win} %</b> (Einsatz ×{settings.data?.gambling_mult_win}), dreimal die 7 <b>{jack} %</b> (×{settings.data?.gambling_mult_jackpot}). Höchsteinsatz {maxBet} Coins.
+        Chancen: drei gleiche Symbole <b>{win} %</b> (Einsatz ×{settings.data?.gambling_mult_win}), dreimal die 7 <b>{jack} %</b> (×{settings.data?.gambling_mult_jackpot}). {allIn ? 'Du kannst bis zu deinem ganzen Guthaben setzen.' : `Höchsteinsatz ${maxBet.toLocaleString('de-DE')} Coins.`}
       </span>
     </Notice>
   )

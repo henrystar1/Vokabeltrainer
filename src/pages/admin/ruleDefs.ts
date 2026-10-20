@@ -61,7 +61,8 @@ export const SECTIONS: Array<{ title: string; text?: string; rules: Rule[] }> = 
       { key: 'gambling_jackpot_permille', label: 'Jackpot-Chance (‰)', hint: 'Dreimal die 7' },
       { key: 'gambling_mult_win', label: 'Gewinn-Faktor', hint: 'Einsatz × Faktor' },
       { key: 'gambling_mult_jackpot', label: 'Jackpot-Faktor' },
-      { key: 'gambling_max_bet', label: 'Höchster Einsatz (Coins)', hint: 'Roulette: insgesamt das Fünffache pro Runde' },
+      { key: 'gambling_max_bet', label: 'Höchster Einsatz (Coins)', hint: 'Gilt nur, wenn „Ganzes Guthaben setzen“ aus ist. Roulette: insgesamt das Fünffache pro Runde' },
+      { key: 'gambling_all_in', label: 'Ganzes Guthaben setzen erlaubt', hint: '1 = jeder darf bis zu seinem ganzen Guthaben setzen (Gewinne können riesig werden), 0 = nur bis zum Höchsteinsatz' },
     ],
   },
   {

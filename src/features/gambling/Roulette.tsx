@@ -7,9 +7,10 @@ import { useWallet } from '../koins/WalletProvider'
 import { errorMessage } from '../../lib/errors'
 import { gamblingRoulette, type RouletteBet, type RouletteResult } from '../../services/play'
 import { useSkipAnim } from './skipAnim'
+import { fmtCompact } from '../../lib/compact'
 import { TABLE_ROWS, WHEEL_ORDER, addChip, betKey, colorOf, totalOf } from './roulette'
 
-const CHIPS = [1, 5, 10, 25, 50, 100, 500, 1000, 5000]
+const CHIPS = [1, 5, 10, 25, 50, 100, 500, 1000, 5000, 1e4, 1e5, 1e6, 1e7, 1e9, 1e12, 1e15]
 const SEG = 360 / 37
 const COLORS = { red: '#dc2626', black: '#111827', green: '#16a34a' }
 
@@ -192,9 +193,9 @@ export default function Roulette({ maxBet }: { maxBet: number }) {
               role="radio"
               aria-checked={chip === c}
               onClick={() => setChip(c)}
-              className={`flex h-11 w-11 items-center justify-center rounded-full border-4 border-dashed font-mono text-sm font-bold transition ${chip === c ? 'scale-110 border-amber-200 bg-amber-500 text-amber-950 shadow-[0_0_14px_rgb(251_191_36/0.7)]' : 'border-white/40 bg-slate-700 text-white'}`}
+              className={`flex h-11 min-w-11 items-center px-1 justify-center rounded-full border-4 border-dashed font-mono text-sm font-bold transition ${chip === c ? 'scale-110 border-amber-200 bg-amber-500 text-amber-950 shadow-[0_0_14px_rgb(251_191_36/0.7)]' : 'border-white/40 bg-slate-700 text-white'}`}
             >
-              {c}
+              {c >= 1000 ? fmtCompact(c) : c}
             </button>
           ))}
         </div>
@@ -202,7 +203,7 @@ export default function Roulette({ maxBet }: { maxBet: number }) {
           <RotateCcw size={14} /> Löschen
         </button>
       </div>
-      <p className="text-center text-xs text-slate-500">Tippe auf Felder, um Chips zu setzen (mehrfach = mehr Einsatz). Höchstens {maxBet} Coins pro Feld, {limit} Coins insgesamt, 10 Felder.</p>
+      <p className="text-center text-xs text-slate-500">Tippe auf Felder, um Chips zu setzen (mehrfach = mehr Einsatz). Höchstens {maxBet.toLocaleString('de-DE')} Coins pro Feld, {limit.toLocaleString('de-DE')} Coins insgesamt, 10 Felder.</p>
       <Button onClick={() => void spin()} busy={spinning} disabled={bets.length === 0 || wallet.balance < total || spinning} className="w-full">
         <CoinIcon size={16} /> Drehen · {total}
       </Button>

@@ -394,3 +394,8 @@ Tabelle `book_library_hidden`; `in_library` blendet ein veröffentlichtes Buch d
 - Hausschutz `_house_squeeze()`: summiert Einsatz/Auszahlung der letzten 3 Tage aus `gambling_feed`. Liegt der Hausgewinn unter `gambling_guard_target_permille` (Standard 50 ‰) und wurden mindestens `gambling_guard_min_wagered` Coins eingesetzt, wird ein Gewinn mit Wahrscheinlichkeit min(`gambling_guard_max_permille`, Abstand zum Ziel) durch eine Niete ersetzt (Würfeln: Wurf, Rad: Feld, Roulette: neue Zahl, Automat: Walzen, Black Jack: Deck wird neu gemischt). Für Spieler unsichtbar. `gambling_guard_max_permille` = 0 schaltet ihn aus.
 - Frontend: `WalletProvider.hold()/release(n)` hält Guthaben-Änderungen und die „+N Coins“-Meldung zurück, bis die Animation fertig ist (vorher sprang die Meldung per Realtime schon beim Drehen auf). Haken „Animationen überspringen“ (`features/gambling/skipAnim.ts`, im Browser gemerkt) gilt für alle Spiele.
 - Black Jack neu gestaltet (Sechseck-Tisch, Kartenrücken, Austeilen/Aufdecken animiert).
+
+### 0041 – Riesige Einsätze und Gewinne
+- Einsätze/Auszahlungen/Feed/Bilanz rechnen mit bigint (vorher integer, ~2,1 Mrd. Grenze). Zwischenrechnungen mit numeric. Regel `gambling_all_in` (Standard 1): jeder darf bis zum ganzen Guthaben setzen, sonst gilt `gambling_max_bet`.
+- Das Höchstguthaben bleibt 9 Billiarden (9·10^15), weil JavaScript darüber Zahlen nicht mehr exakt darstellt; Gewinne über dem Limit werden gekürzt gutgeschrieben (`_grant_koins`).
+- Frontend: `lib/compact.ts` (Kurzschreibweise für Chips/Schnellwahl bis 1 Brd.), Einsatz-Obergrenze = max(Höchsteinsatz, Guthaben).
