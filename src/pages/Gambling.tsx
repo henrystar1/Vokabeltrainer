@@ -14,6 +14,7 @@ import Roulette from '../features/gambling/Roulette'
 import Dice from '../features/gambling/Dice'
 import Wheel from '../features/gambling/Wheel'
 import Blackjack from '../features/gambling/Blackjack'
+import { setSkipAnim, useSkipAnim } from '../features/gambling/skipAnim'
 
 const TABS = [
   { id: 'slots', label: 'Automat', icon: Cherry },
@@ -28,7 +29,19 @@ type Tab = (typeof TABS)[number]['id']
 export default function Gambling() {
   const settings = useAsync(getAppSettings, [])
   const maxBet = settings.data?.gambling_max_bet ?? 200
-  const rtp = Math.min(Math.max((settings.data?.gambling_rtp_permille ?? 850) / 10, 50), 95)
+  const rtp = Math.min(Math.max((settings.data?.gambling_rtp_dice ?? 850) / 10, 30), 99)
+  const maxChance = Math.min(Math.max(settings.data?.gambling_dice_max_chance ?? 50, 5), 95)
+  const skip = useSkipAnim()
+  const wheelChances = (() => {
+    const s = settings.data
+    if (!s) return undefined
+    const w: Array<[number, number]> = [[0, s.gambling_wheel_w0 ?? 500], [5, s.gambling_wheel_w05 ?? 150], [10, s.gambling_wheel_w1 ?? 50], [20, s.gambling_wheel_w2 ?? 200], [30, s.gambling_wheel_w3 ?? 50], [40, s.gambling_wheel_w4 ?? 50]]
+    const sum = w.reduce((a, [, v]) => a + Math.max(v, 0), 0)
+    if (sum <= 0) return undefined
+    return w.map(([f, v]) => ({ f, pct: (Math.max(v, 0) / sum) * 100 }))
+  })()
+  const bjX = (settings.data?.gambling_bj_blackjack_x10 ?? 12) / 10
+  const bjHit17 = (settings.data?.gambling_bj_dealer_hits_soft17 ?? 1) !== 0
   const feed = useAsync(getGamblingFeed, [])
   const [tab, setTab] = useState<Tab>('slots')
   useEffect(() => {
@@ -63,12 +76,16 @@ export default function Gambling() {
           </button>
         ))}
       </div>
+      <label className="mb-3 flex cursor-pointer items-center justify-end gap-2 text-sm text-slate-300">
+        <input type="checkbox" checked={skip} onChange={(e) => setSkipAnim(e.target.checked)} className="h-5 w-5 accent-amber-400" />
+        Animationen überspringen
+      </label>
       <Card className="space-y-5">
         {tab === 'slots' && <Slots maxBet={maxBet} onPlayed={feed.reload} info={info} />}
         {tab === 'roulette' && <Roulette maxBet={maxBet} />}
-        {tab === 'dice' && <Dice maxBet={maxBet} rtp={rtp} />}
-        {tab === 'wheel' && <Wheel maxBet={maxBet} />}
-        {tab === 'blackjack' && <Blackjack maxBet={maxBet} />}
+        {tab === 'dice' && <Dice maxBet={maxBet} rtp={rtp} maxChance={maxChance} />}
+        {tab === 'wheel' && <Wheel maxBet={maxBet} chances={wheelChances} />}
+        {tab === 'blackjack' && <Blackjack maxBet={maxBet} blackjackPays={bjX} dealerHitsSoft17={bjHit17} />}
       </Card>
       <p className="mt-3 text-center text-xs text-slate-500">Glücksspiel kostet im Schnitt Coins. Spiel nur, was du verschmerzen kannst.</p>
 

@@ -10,6 +10,10 @@ interface WalletState {
   /** Lädt das Guthaben neu (nach Kauf, Lernen, Code …). */
   refresh: () => Promise<void>
   setBalance: (n: number) => void
+  /** Hält Guthaben-Änderungen (und die "+N Coins"-Meldung) zurück, z. B. solange ein Glücksspiel noch dreht. */
+  hold: () => void
+  /** Hebt die Sperre auf und zeigt den Endstand (n) bzw. den zuletzt zurückgehaltenen Wert. */
+  release: (n?: number) => void
 }
 
 const WalletContext = createContext<WalletState | null>(null)
@@ -23,14 +27,36 @@ export function WalletProvider({ children }: { children: ReactNode }) {
   const [balance, setBalanceState] = useState(0)
   const [toast, setToast] = useState<{ amount: number; key: number } | null>(null)
   const last = useRef<number | null>(null)
+  const holding = useRef(false)
+  const pending = useRef<number | null>(null)
+  const holdTimer = useRef(0)
 
   // Einzige Stelle, an der das Guthaben gesetzt wird: zeigt bei einem Plus kurz "+N Coins".
   const setBalance = useCallback((n: number) => {
+    if (holding.current) {
+      pending.current = n
+      return
+    }
     const prev = last.current
     last.current = n
     setBalanceState(n)
     if (prev !== null && n > prev) setToast({ amount: n - prev, key: Date.now() })
   }, [])
+
+  const release = useCallback((n?: number) => {
+    window.clearTimeout(holdTimer.current)
+    holding.current = false
+    const v = n ?? pending.current
+    pending.current = null
+    if (v !== null && v !== undefined) setBalance(v)
+  }, [setBalance])
+  const hold = useCallback(() => {
+    holding.current = true
+    pending.current = null
+    // Sicherheitsnetz: nach 20 s wird die Sperre in jedem Fall aufgehoben.
+    window.clearTimeout(holdTimer.current)
+    holdTimer.current = window.setTimeout(() => release(), 20_000)
+  }, [release])
 
   useEffect(() => {
     if (!toast) return
@@ -86,7 +112,7 @@ export function WalletProvider({ children }: { children: ReactNode }) {
     }
   }, [userId, profileReady, isStaff, blocked, setBalance])
 
-  const value = useMemo(() => ({ balance, refresh, setBalance }), [balance, refresh, setBalance])
+  const value = useMemo(() => ({ balance, refresh, setBalance, hold, release }), [balance, refresh, setBalance, hold, release])
   return (
     <WalletContext.Provider value={value}>
       {children}

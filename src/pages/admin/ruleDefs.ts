@@ -61,8 +61,45 @@ export const SECTIONS: Array<{ title: string; text?: string; rules: Rule[] }> = 
       { key: 'gambling_jackpot_permille', label: 'Jackpot-Chance (‰)', hint: 'Dreimal die 7' },
       { key: 'gambling_mult_win', label: 'Gewinn-Faktor', hint: 'Einsatz × Faktor' },
       { key: 'gambling_mult_jackpot', label: 'Jackpot-Faktor' },
-      { key: 'gambling_max_bet', label: 'Höchster Einsatz (Coins)' },
-      { key: 'gambling_rtp_permille', label: 'Gewinnquote Würfeln/Roulette/Glücksrad (‰)', hint: '850 = im Schnitt 85 % zurück (Würfeln, Roulette); höchstens 950. Das Glücksrad hat feste Felder.' },
+      { key: 'gambling_max_bet', label: 'Höchster Einsatz (Coins)', hint: 'Roulette: insgesamt das Fünffache pro Runde' },
+    ],
+  },
+  {
+    title: 'Gambling: Würfeln & Roulette',
+    text: 'Gewinnquote in Promille: 850 = im Schnitt 85 % des Einsatzes kommen zurück (über 1000 wäre ein Gewinn für die Spieler).',
+    rules: [
+      { key: 'gambling_rtp_dice', label: 'Würfeln: Gewinnquote (‰)', hint: 'Die Auszahlung richtet sich nach der Chance, die der Spieler wählt' },
+      { key: 'gambling_dice_max_chance', label: 'Würfeln: höchste wählbare Gewinnchance (%)', hint: '5 bis 95' },
+      { key: 'gambling_rtp_roulette', label: 'Roulette: Gewinnquote (‰)' },
+    ],
+  },
+  {
+    title: 'Gambling: Glücksrad',
+    text: 'Gewichte: Wie oft kommt welcher Faktor im Verhältnis zu den anderen? Die Summe muss nicht 1000 sein, es zählt das Verhältnis. Es wird genau der Faktor ausgezahlt, der auf dem Feld steht.',
+    rules: [
+      { key: 'gambling_wheel_w0', label: 'Gewicht ×0 (Verlust)' },
+      { key: 'gambling_wheel_w05', label: 'Gewicht ×0,5' },
+      { key: 'gambling_wheel_w1', label: 'Gewicht ×1' },
+      { key: 'gambling_wheel_w2', label: 'Gewicht ×2' },
+      { key: 'gambling_wheel_w3', label: 'Gewicht ×3' },
+      { key: 'gambling_wheel_w4', label: 'Gewicht ×4' },
+    ],
+  },
+  {
+    title: 'Gambling: Black Jack',
+    text: 'Der Geber zieht bis 17. Verdoppeln nur mit den ersten zwei Karten, kein Teilen.',
+    rules: [
+      { key: 'gambling_bj_blackjack_x10', label: 'Black Jack zahlt (Zehntel des Einsatzes zusätzlich)', hint: '12 = 6:5, 15 = 3:2, 10 = 1:1' },
+      { key: 'gambling_bj_dealer_hits_soft17', label: 'Geber zieht bei weichem 17', hint: '1 = ja (besser fürs Haus), 0 = nein' },
+    ],
+  },
+  {
+    title: 'Gambling: Hausschutz',
+    text: 'Schaut auf Einsätze und Auszahlungen der letzten 3 Tage über alle Spiele. Liegt der Gewinn des Hauses unter dem Ziel, wird ein Gewinn mit einer gewissen Wahrscheinlichkeit nicht ausgespielt, ohne dass die Spieler es sehen. Je weiter unter dem Ziel, desto öfter, höchstens mit der unten gesetzten Chance. 0 bei der höchsten Chance schaltet den Schutz aus.',
+    rules: [
+      { key: 'gambling_guard_target_permille', label: 'Ziel: Hausgewinn (‰ der Einsätze)', hint: '50 = das Haus soll mindestens 5 % behalten' },
+      { key: 'gambling_guard_max_permille', label: 'Höchste Chance, einen Gewinn zu streichen (‰)', hint: '0 = Schutz aus, 600 = höchstens 60 %' },
+      { key: 'gambling_guard_min_wagered', label: 'Schutz greift erst ab so vielen eingesetzten Coins (3 Tage)' },
     ],
   },
   {

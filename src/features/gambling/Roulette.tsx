@@ -6,9 +6,10 @@ import { ErrorBox } from '../../components/ui/States'
 import { useWallet } from '../koins/WalletProvider'
 import { errorMessage } from '../../lib/errors'
 import { gamblingRoulette, type RouletteBet, type RouletteResult } from '../../services/play'
+import { useSkipAnim } from './skipAnim'
 import { TABLE_ROWS, WHEEL_ORDER, addChip, betKey, colorOf, totalOf } from './roulette'
 
-const CHIPS = [1, 5, 10, 25, 50]
+const CHIPS = [1, 5, 10, 25, 50, 100, 500, 1000, 5000]
 const SEG = 360 / 37
 const COLORS = { red: '#dc2626', black: '#111827', green: '#16a34a' }
 
@@ -61,6 +62,7 @@ function Wheel({ angle, spinning }: { angle: number; spinning: boolean }) {
 /** Roulette (europäisch): Chips auf Felder legen, drehen. Alles wird auf dem Server gewürfelt. */
 export default function Roulette({ maxBet }: { maxBet: number }) {
   const wallet = useWallet()
+  const skip = useSkipAnim()
   const [chip, setChip] = useState(5)
   const [bets, setBets] = useState<RouletteBet[]>([])
   const [result, setResult] = useState<RouletteResult | null>(null)
@@ -85,6 +87,7 @@ export default function Roulette({ maxBet }: { maxBet: number }) {
     setSpinning(true)
     setError(null)
     setResult(null)
+    wallet.hold()
     try {
       const res = await gamblingRoulette(bets)
       const idx = WHEEL_ORDER.indexOf(res.number)
@@ -94,13 +97,16 @@ export default function Roulette({ maxBet }: { maxBet: number }) {
         const base = Math.ceil(a / 360) * 360
         return base + 360 * 5 - idx * SEG
       })
-      window.setTimeout(() => {
+      const done = () => {
         setResult(res)
-        wallet.setBalance(res.balance)
+        wallet.release(res.balance)
         setLast((l) => [res.number, ...l].slice(0, 12))
         setSpinning(false)
-      }, 4400)
+      }
+      if (skip) done()
+      else window.setTimeout(done, 4400)
     } catch (e) {
+      wallet.release()
       setError(errorMessage(e))
       setSpinning(false)
     }
@@ -125,7 +131,7 @@ export default function Roulette({ maxBet }: { maxBet: number }) {
 
   return (
     <div className="space-y-4">
-      <Wheel angle={angle} spinning={spinning} />
+      <Wheel angle={angle} spinning={spinning && !skip} />
       <div className="min-h-[52px] text-center" aria-live="polite">
         {result && (
           <>
@@ -178,7 +184,7 @@ export default function Roulette({ maxBet }: { maxBet: number }) {
       </div>
 
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <div className="flex items-center gap-1.5" role="radiogroup" aria-label="Chip-Wert">
+        <div className="flex flex-wrap items-center gap-1.5" role="radiogroup" aria-label="Chip-Wert">
           {CHIPS.filter((c) => c <= maxBet).map((c) => (
             <button
               key={c}

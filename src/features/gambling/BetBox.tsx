@@ -1,6 +1,6 @@
 import CoinIcon from '../../components/ui/CoinIcon'
 
-const QUICK = [1, 5, 10, 25, 50, 100]
+const QUICK = [1, 5, 10, 25, 50, 100, 250, 500, 1000, 2500, 5000, 10000, 25000, 50000, 100000]
 
 /** Einsatzfeld mit Schnellwahl (für Würfeln, Rad, Automat). */
 export default function BetBox({ bet, setBet, maxBet, balance, id = 'bet' }: { bet: number; setBet: (n: number) => void; maxBet: number; balance: number; id?: string }) {
@@ -20,7 +20,7 @@ export default function BetBox({ bet, setBet, maxBet, balance, id = 'bet' }: { b
       <div className="mt-2 flex flex-wrap gap-2">
         {QUICK.filter((q) => q <= maxBet).map((q) => (
           <button key={q} type="button" onClick={() => setBet(q)} className={`min-h-[40px] rounded-lg px-3 font-mono text-sm ${bet === q ? 'bg-accent-cyan/20 text-accent-cyan' : 'bg-white/5 text-slate-300 hover:bg-white/10'}`}>
-            {q}
+            {q.toLocaleString('de-DE')}
           </button>
         ))}
         <button type="button" onClick={() => setBet(Math.min(maxBet, Math.max(1, balance)))} className="min-h-[40px] rounded-lg bg-white/5 px-3 text-sm text-slate-300 hover:bg-white/10">Max</button>

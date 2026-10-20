@@ -510,3 +510,25 @@ body {
 .flip-face { position: absolute; inset: 0; backface-visibility: hidden; -webkit-backface-visibility: hidden; }
 .flip-back { transform: rotateY(180deg); }
 @media (prefers-reduced-motion: reduce) { .flip-card { transition: none; } }
+
+/* ---- Black Jack ---- */
+@keyframes bj-deal { from { opacity: 0; transform: translate(-90px, -70px) rotate(-18deg) scale(0.85); } to { opacity: 1; transform: none; } }
+@keyframes bj-flip { from { transform: perspective(500px) rotateY(90deg); } to { transform: perspective(500px) rotateY(0); } }
+@keyframes bj-pop { 0% { opacity: 0; transform: scale(0.6); } 60% { transform: scale(1.12); } 100% { opacity: 1; transform: scale(1); } }
+.bj-deal { animation: bj-deal 0.38s cubic-bezier(0.2, 0.8, 0.3, 1) backwards; }
+.bj-flip { animation: bj-flip 0.4s ease-out backwards; }
+.bj-pop { animation: bj-pop 0.45s ease-out both; }
+.bj-hex { clip-path: polygon(22% 0, 78% 0, 100% 50%, 78% 100%, 22% 100%, 0 50%); }
+.bj-felt {
+  background:
+    radial-gradient(circle at 50% 42%, rgb(34 197 94 / 0.55), transparent 62%),
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='64' height='64'%3E%3Cg fill='%23065f2c' fill-opacity='.35' font-family='sans-serif' font-size='20' text-anchor='middle'%3E%3Ctext x='16' y='24'%3E%E2%99%A0%3C/text%3E%3Ctext x='48' y='24'%3E%E2%99%A5%3C/text%3E%3Ctext x='16' y='56'%3E%E2%99%A6%3C/text%3E%3Ctext x='48' y='56'%3E%E2%99%A3%3C/text%3E%3C/g%3E%3C/svg%3E"),
+    #16a34a;
+}
+.bj-back {
+  background:
+    repeating-conic-gradient(#fecaca 0 25%, transparent 0 50%) 0 0 / 10px 10px,
+    #dc2626;
+  box-shadow: inset 0 0 0 3px #fff;
+}
+@media (prefers-reduced-motion: reduce) { .bj-deal, .bj-flip, .bj-pop { animation: none; } }

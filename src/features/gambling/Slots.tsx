@@ -7,6 +7,7 @@ import { useWallet } from '../koins/WalletProvider'
 import { errorMessage } from '../../lib/errors'
 import { gamblingPlay } from '../../services/play'
 import BetBox from './BetBox'
+import { useSkipAnim } from './skipAnim'
 
 interface Sym { icon?: LucideIcon; text?: string; from: string; to: string }
 /** Symbole der Walzen (Index 6 = Sieben = Jackpot). */
@@ -37,6 +38,7 @@ type Outcome = { mult: number; payout: number; bet: number }
 /** Spielautomat. Der Ausgang wird auf dem Server gewürfelt; Chancen und Faktoren stellt der Admin ein. */
 export default function Slots({ maxBet, onPlayed, info }: { maxBet: number; onPlayed: () => void; info: React.ReactNode }) {
   const wallet = useWallet()
+  const skip = useSkipAnim()
   const [bet, setBet] = useState(10)
   const [reels, setReels] = useState<number[]>([0, 1, 2])
   const [spinning, setSpinning] = useState<boolean[]>([false, false, false])
@@ -53,24 +55,31 @@ export default function Slots({ maxBet, onPlayed, info }: { maxBet: number; onPl
     setBusy(true)
     setError(null)
     setOutcome(null)
-    setSpinning([true, true, true])
-    const rolling = [0, 1, 2].map((i) =>
+    wallet.hold()
+    const fast = skip
+    if (!fast) setSpinning([true, true, true])
+    const rolling = fast ? [] : [0, 1, 2].map((i) =>
       window.setInterval(() => setReels((r) => r.map((v, k) => (k === i ? Math.floor(Math.random() * SYMBOLS.length) : v))), 70),
     )
     timers.current.push(...rolling)
     try {
-      const [res] = await Promise.all([gamblingPlay(stake), sleep(900)])
-      for (let i = 0; i < 3; i++) {
-        window.clearInterval(rolling[i])
-        setReels((r) => r.map((v, k) => (k === i ? res.reels[i] : v)))
-        setSpinning((sp) => sp.map((v, k) => (k === i ? false : v)))
-        await sleep(450)
+      const [res] = await Promise.all([gamblingPlay(stake), fast ? Promise.resolve() : sleep(900)])
+      if (fast) {
+        setReels(res.reels)
+      } else {
+        for (let i = 0; i < 3; i++) {
+          window.clearInterval(rolling[i])
+          setReels((r) => r.map((v, k) => (k === i ? res.reels[i] : v)))
+          setSpinning((sp) => sp.map((v, k) => (k === i ? false : v)))
+          await sleep(450)
+        }
       }
-      wallet.setBalance(res.balance)
+      wallet.release(res.balance)
       setOutcome({ mult: res.mult, payout: res.payout, bet: res.bet })
     } catch (e) {
       rolling.forEach((t) => window.clearInterval(t))
       setSpinning([false, false, false])
+      wallet.release()
       setError(errorMessage(e))
     } finally {
       setBusy(false)

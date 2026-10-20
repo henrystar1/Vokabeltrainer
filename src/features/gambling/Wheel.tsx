@@ -6,6 +6,7 @@ import { useWallet } from '../koins/WalletProvider'
 import { errorMessage } from '../../lib/errors'
 import { gamblingWheel } from '../../services/play'
 import BetBox from './BetBox'
+import { useSkipAnim } from './skipAnim'
 
 const DEFAULT_SEGMENTS = [0, 5, 0, 20, 0, 10, 0, 30, 0, 5, 0, 40, 0, 20, 0, 20, 0, 5, 0, 20]
 
@@ -20,8 +21,9 @@ function polar(r: number, deg: number): [number, number] {
 }
 
 /** Glücksrad: 20 Felder mit Faktoren (Rückzahlung je nach Gewinnquote). */
-export default function Wheel({ maxBet }: { maxBet: number }) {
+export default function Wheel({ maxBet, chances }: { maxBet: number; chances?: Array<{ f: number; pct: number }> }) {
   const wallet = useWallet()
+  const skip = useSkipAnim()
   const [bet, setBet] = useState(10)
   const [segments, setSegments] = useState(DEFAULT_SEGMENTS)
   const [angle, setAngle] = useState(0)
@@ -50,16 +52,25 @@ export default function Wheel({ maxBet }: { maxBet: number }) {
     setSpinning(true)
     setError(null)
     setRes(null)
+    wallet.hold()
     try {
       const r = await gamblingWheel(stake)
       setSegments(r.segments)
+      if (skip) {
+        setAngle((a) => Math.ceil(a / 360) * 360 + 360 * 6 - r.index * (360 / r.segments.length))
+        setRes({ tenths: r.tenths, payout: r.payout, bet: r.bet })
+        wallet.release(r.balance)
+        setSpinning(false)
+        return
+      }
       setAngle((a) => Math.ceil(a / 360) * 360 + 360 * 6 - r.index * (360 / r.segments.length))
       window.setTimeout(() => {
         setRes({ tenths: r.tenths, payout: r.payout, bet: r.bet })
-        wallet.setBalance(r.balance)
+        wallet.release(r.balance)
         setSpinning(false)
       }, 4400)
     } catch (e) {
+      wallet.release()
       setError(errorMessage(e))
       setSpinning(false)
     }
@@ -75,7 +86,7 @@ export default function Wheel({ maxBet }: { maxBet: number }) {
             ))}
           </defs>
           <circle cx="100" cy="100" r="99" fill="#1e1b4b" stroke="#e879f9" strokeWidth="2" />
-          <g style={{ transformOrigin: '100px 100px', transform: `rotate(${angle}deg)`, transition: spinning ? 'transform 4.2s cubic-bezier(0.12, 0.6, 0.1, 1)' : 'none' }}>
+          <g style={{ transformOrigin: '100px 100px', transform: `rotate(${angle}deg)`, transition: spinning && !skip ? 'transform 4.2s cubic-bezier(0.12, 0.6, 0.1, 1)' : 'none' }}>
             {paths.map((p) => (
               <g key={p.i}>
                 <path d={p.d} fill={`url(#gw-${FILL[p.t] ? p.t : 0})`} stroke="#0f172a" strokeWidth="0.8" />
@@ -97,7 +108,7 @@ export default function Wheel({ maxBet }: { maxBet: number }) {
         <CoinIcon size={16} /> Drehen · {stake}
       </Button>
       {error && <ErrorBox message={error} />}
-      <p className="text-center text-xs text-slate-500">Felder: ×0 (10×), ×0,5 (3×), ×1 (1×), ×2 (4×), ×3 (1×), ×4 (1×) – du bekommst genau den Faktor auf dem Feld, im Schnitt aber nur etwa 87 % zurück.</p>
+      <p className="text-center text-xs text-slate-500">{chances ? `Chancen: ${chances.map((c) => `×${c.f / 10} ${c.pct.toLocaleString('de-DE', { maximumFractionDigits: 1 })} %`).join(' · ')}` : 'Du bekommst genau den Faktor auf dem Feld.'}</p>
     </div>
   )
 }

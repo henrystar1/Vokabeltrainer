@@ -6,10 +6,12 @@ import { useWallet } from '../koins/WalletProvider'
 import { errorMessage } from '../../lib/errors'
 import { gamblingDice } from '../../services/play'
 import BetBox from './BetBox'
+import { useSkipAnim } from './skipAnim'
 
 /** Würfeln: Zahl von 1 bis 100, du wählst über oder unter einer Grenze. Je kleiner die Chance, desto höher die Auszahlung. */
-export default function Dice({ maxBet, rtp = 85 }: { maxBet: number; rtp?: number }) {
+export default function Dice({ maxBet, rtp = 85, maxChance = 50 }: { maxBet: number; rtp?: number; maxChance?: number }) {
   const wallet = useWallet()
+  const skip = useSkipAnim()
   const [bet, setBet] = useState(10)
   const [over, setOver] = useState(true)
   const [target, setTarget] = useState(50)
@@ -19,8 +21,8 @@ export default function Dice({ maxBet, rtp = 85 }: { maxBet: number; rtp?: numbe
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
-  const lo = over ? 50 : 6 // höchstens 50 % Gewinnchance
-  const hi = over ? 95 : 51
+  const lo = over ? 100 - maxChance : 6 // höchstens maxChance % Gewinnchance
+  const hi = over ? 95 : maxChance + 1
   const t = Math.min(hi, Math.max(lo, target))
   const chance = over ? 100 - t : t - 1
   const mult = Math.floor((rtp / chance) * 100) / 100
@@ -32,16 +34,18 @@ export default function Dice({ maxBet, rtp = 85 }: { maxBet: number; rtp?: numbe
     setError(null)
     setRes(null)
     setRoll(null)
-    const tick = window.setInterval(() => setShown(1 + Math.floor(Math.random() * 100)), 60)
+    wallet.hold()
+    const tick = skip ? 0 : window.setInterval(() => setShown(1 + Math.floor(Math.random() * 100)), 60)
     try {
-      const [r] = await Promise.all([gamblingDice(stake, over, t), new Promise((ok) => window.setTimeout(ok, 900))])
+      const [r] = await Promise.all([gamblingDice(stake, over, t), skip ? Promise.resolve() : new Promise((ok) => window.setTimeout(ok, 900))])
       window.clearInterval(tick)
       setShown(r.roll)
       setRoll(r.roll)
       setRes({ win: r.win, payout: r.payout, bet: r.bet })
-      wallet.setBalance(r.balance)
+      wallet.release(r.balance)
     } catch (e) {
       window.clearInterval(tick)
+      wallet.release()
       setShown(null)
       setError(errorMessage(e))
     } finally {
