@@ -16,7 +16,7 @@ export function installKeepFocusVisible(): () => void {
     const top = vv?.offsetTop ?? 0
     const height = vv?.height ?? window.innerHeight
     if (r.top < top + 8 || r.bottom > top + height - 8) {
-      el.scrollIntoView({ block: 'center', behavior: 'smooth' })
+      el.scrollIntoView({ block: 'nearest', behavior: 'auto' })
     }
   }
   const later = () => {

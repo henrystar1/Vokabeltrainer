@@ -43,7 +43,7 @@ export default {
       },
       animation: {
         twinkle: 'twinkle 4s ease-in-out infinite',
-        rise: 'rise 0.35s ease-out both',
+        rise: 'rise 0.35s ease-out backwards',
       },
     },
   },
