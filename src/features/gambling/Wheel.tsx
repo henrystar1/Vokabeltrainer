@@ -7,7 +7,7 @@ import { errorMessage } from '../../lib/errors'
 import { gamblingWheel } from '../../services/play'
 import BetBox from './BetBox'
 
-const DEFAULT_SEGMENTS = [0, 5, 0, 20, 0, 10, 0, 30, 0, 5, 0, 40, 0, 20, 0, 40, 0, 5, 0, 20]
+const DEFAULT_SEGMENTS = [0, 5, 0, 20, 0, 10, 0, 30, 0, 5, 0, 40, 0, 20, 0, 20, 0, 5, 0, 20]
 
 const FILL: Record<number, [string, string]> = {
   0: ['#334155', '#0f172a'], 5: ['#64748b', '#334155'], 10: ['#14b8a6', '#0f766e'], 20: ['#22c55e', '#15803d'], 30: ['#f59e0b', '#b45309'], 40: ['#e879f9', '#a21caf'],
@@ -97,7 +97,7 @@ export default function Wheel({ maxBet }: { maxBet: number }) {
         <CoinIcon size={16} /> Drehen · {stake}
       </Button>
       {error && <ErrorBox message={error} />}
-      <p className="text-center text-xs text-slate-500">Felder: ×0 (10×), ×0,5 (3×), ×1 (1×), ×2 (3×), ×3 (1×), ×4 (2×) – im Schnitt bekommst du weniger zurück, als du einsetzt.</p>
+      <p className="text-center text-xs text-slate-500">Felder: ×0 (10×), ×0,5 (3×), ×1 (1×), ×2 (4×), ×3 (1×), ×4 (1×) – du bekommst genau den Faktor auf dem Feld, im Schnitt aber nur etwa 87 % zurück.</p>
     </div>
   )
 }

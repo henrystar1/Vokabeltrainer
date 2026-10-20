@@ -166,7 +166,7 @@ export default function QuizRunner({ questions, caseSensitive, onAnswer, onFinis
           autoComplete="off"
           spellCheck={false}
           enterKeyHint="done"
-          className={`mt-8 min-h-[56px] w-full rounded-2xl border bg-space-900/70 px-4 text-center text-xl outline-none transition ${
+          className={`mt-8 min-h-[56px] w-full rounded-2xl border bg-space-900/70 px-4 text-left text-xl outline-none ${
             result === null
               ? 'border-white/10 focus:border-accent-cyan/60 focus:ring-2 focus:ring-accent-cyan/20'
               : result.correct

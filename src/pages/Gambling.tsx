@@ -26,7 +26,7 @@ type Tab = (typeof TABS)[number]['id']
 export default function Gambling() {
   const settings = useAsync(getAppSettings, [])
   const maxBet = settings.data?.gambling_max_bet ?? 200
-  const rtp = Math.min(Math.max((settings.data?.gambling_rtp_permille ?? 900) / 10, 50), 95)
+  const rtp = Math.min(Math.max((settings.data?.gambling_rtp_permille ?? 850) / 10, 50), 95)
   const feed = useAsync(getGamblingFeed, [])
   const [tab, setTab] = useState<Tab>('slots')
   useEffect(() => {

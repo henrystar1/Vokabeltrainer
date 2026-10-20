@@ -62,7 +62,7 @@ export const SECTIONS: Array<{ title: string; text?: string; rules: Rule[] }> = 
       { key: 'gambling_mult_win', label: 'Gewinn-Faktor', hint: 'Einsatz × Faktor' },
       { key: 'gambling_mult_jackpot', label: 'Jackpot-Faktor' },
       { key: 'gambling_max_bet', label: 'Höchster Einsatz (Coins)' },
-      { key: 'gambling_rtp_permille', label: 'Gewinnquote Würfeln/Roulette/Glücksrad (‰)', hint: '900 = im Schnitt 90 % zurück; höchstens 950' },
+      { key: 'gambling_rtp_permille', label: 'Gewinnquote Würfeln/Roulette/Glücksrad (‰)', hint: '850 = im Schnitt 85 % zurück (Würfeln, Roulette); höchstens 950. Das Glücksrad hat feste Felder.' },
     ],
   },
   {
