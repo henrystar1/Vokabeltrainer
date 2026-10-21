@@ -137,7 +137,7 @@ export default function LiveDuel() {
       <Notice tone="info">
         {mode === 'team' ? (
           teamKind === 'parkour'
-            ? <>Ein Jump-and-Run für <b>zwei</b> mit Joystick und Sprungknopf: drei Level, die ihr nur gemeinsam schafft. Steht auf Platten, damit Türen und Brücken offen bleiben, und gebt euch eine Räuberleiter über hohe Mauern. Beide müssen zum Schluss im Ausgang stehen.</>
+            ? <>Ein Jump-and-Run für <b>zwei</b> mit Joystick und Sprungknopf (Doppelsprung: Knopf zweimal tippen): drei Level, die ihr nur gemeinsam schafft. Steht auf Platten, damit Türen und Brücken offen bleiben, und gebt euch eine Räuberleiter über hohe Mauern. Beide müssen zum Schluss im Ausgang stehen.</>
             : <>Ihr zwei lauft gemeinsam einen Vokabel-Parcours. An jedem Hindernis bekommt <b>jeder</b> eine eigene Vokabel, und ihr kommt nur weiter, wenn <b>beide</b> richtig antworten. Jede falsche Antwort kostet ein gemeinsames Leben.</>
         ) : mode === 'class' ? (
           <>Für die ganze Klasse: Du wählst ein Buch, öffnest einen Raum und alle (bis 20) treten mit dem <b>Code</b> bei oder werden eingeladen. Gefragt werden Vokabeln aus dem Buch, egal ob aktiv. Oben siehst du live die Besten auf ihren Strahlen.</>

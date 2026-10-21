@@ -76,4 +76,32 @@ describe('parkour', () => {
     expect(inExit(lv, { x: 3 * TILE, y: 8 * TILE })).toBe(false)
     expect(checkpointAt(lv, { x: lv.checkpoints[0] * TILE, y: 10 * TILE - PH })).toBe(lv.checkpoints[0])
   })
+  it('Doppelsprung: allein auf eine 3 Kacheln hohe Säule, aber nicht über eine 12 Kacheln breite Stachelgrube', () => {
+    const lv = LEVELS[0]
+    const s = spawnAt(lv, true, null)
+    const b = newBody(46 * TILE - 20, s.y)
+    run(b, lv, { move: 0, jump: false }, 0.4)
+    // Sprung, in der Luft noch einmal drücken
+    for (let i = 0; i < 240; i++) {
+      const t = i / 60
+      const jump = (t > 0 && t < 0.15) || (t > 0.45 && t < 0.6)
+      stepBody(b, { move: 1, jump }, lv, {}, null, dt)
+      if (b.y + PH <= 7 * TILE + 1 && b.ground) break
+    }
+    expect(b.ground).toBe(true)
+    expect(b.y + PH).toBeLessThanOrEqual(7 * TILE + 1)
+    // Reichweite: Anlauf, zwei Sprünge, nie weiter als 11 Kacheln
+    const flat = LEVELS[1]
+    const c = newBody(35 * TILE, 10 * TILE - PH - 0.5)
+    run(c, flat, { move: 1, jump: false }, 0.6)
+    const x0 = c.x
+    let maxX = c.x
+    for (let i = 0; i < 200; i++) {
+      const t = i / 60
+      stepBody(c, { move: 1, jump: (t < 0.1) || (t > 0.5 && t < 0.6) }, flat, {}, null, dt)
+      maxX = Math.max(maxX, c.x)
+      if (i > 20 && c.ground) break
+    }
+    expect((maxX - x0) / TILE).toBeLessThan(11)
+  })
 })

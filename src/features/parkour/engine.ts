@@ -23,12 +23,14 @@ export interface Body {
   coyote: number
   buf: number
   jumpHeld: boolean
+  /** Noch verfügbare Luftsprünge (Doppelsprung). */
+  air: number
 }
 export interface Input { move: number; jump: boolean }
 export type Pressed = Record<string, boolean>
 export interface Point { x: number; y: number }
 
-export const newBody = (x: number, y: number): Body => ({ x, y, vx: 0, vy: 0, ground: false, face: 1, coyote: 0, buf: 0, jumpHeld: false })
+export const newBody = (x: number, y: number): Body => ({ x, y, vx: 0, vy: 0, ground: false, face: 1, coyote: 0, buf: 0, jumpHeld: false, air: 1 })
 
 /** Ist die Kachel (Tür/Brücke/Block) gerade fest? Außerhalb links/rechts ist Wand, oben/unten offen. */
 export function solidChar(ch: string, pressed: Pressed): boolean {
@@ -87,10 +89,17 @@ export function stepBody(b: Body, inp: Input, lv: Level, pressed: Pressed, other
   if (inp.move !== 0) b.face = inp.move > 0 ? 1 : -1
 
   // Sprung mit Puffer und Koyote-Zeit
-  if (inp.jump && !b.jumpHeld) b.buf = BUFFER
+  const fresh = inp.jump && !b.jumpHeld
+  if (fresh) b.buf = BUFFER
   else b.buf = Math.max(0, b.buf - dt)
   b.coyote = b.ground ? COYOTE : Math.max(0, b.coyote - dt)
-  if (b.buf > 0 && b.coyote > 0) {
+  if (b.ground) b.air = 1
+  if (fresh && b.coyote <= 0 && b.air > 0) {
+    // Doppelsprung in der Luft
+    b.vy = JUMP_V
+    b.air -= 1
+    b.buf = 0
+  } else if (b.buf > 0 && b.coyote > 0) {
     b.vy = JUMP_V
     b.buf = 0
     b.coyote = 0

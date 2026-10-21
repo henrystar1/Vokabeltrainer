@@ -304,7 +304,7 @@ export default function ParkourGame({ st, startLevel = 0 }: { st: TeamState; sta
         </button>
       </div>
       <p className="text-center text-xs text-slate-500">
-        Joystick links = laufen, Knopf rechts = springen (Tastatur: Pfeile/WASD und Leertaste). Springt auf den Kopf des anderen für eine Räuberleiter, steht auf Platten, damit Türen und Brücken offen bleiben.
+        Joystick links = laufen, Knopf rechts = springen, in der Luft nochmal tippen = Doppelsprung (Tastatur: Pfeile/WASD und Leertaste). Springt auf den Kopf des anderen für eine Räuberleiter, steht auf Platten, damit Türen und Brücken offen bleiben.
         {hud.linked ? '' : ' Verbindung zum Partner wird aufgebaut …'}
       </p>
     </div>
