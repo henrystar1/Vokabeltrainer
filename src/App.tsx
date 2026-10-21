@@ -34,6 +34,8 @@ import Board from './pages/Board'
 import Presence from './pages/Presence'
 import Duels from './pages/Duels'
 import DuelPlay from './pages/DuelPlay'
+import LiveDuel from './pages/LiveDuel'
+import LiveDuelRoom from './pages/LiveDuelRoom'
 import Quests from './pages/Quests'
 import Sprint from './pages/Sprint'
 import Profile from './pages/Profile'
@@ -105,6 +107,8 @@ export default function App() {
           <Route path="sprint" element={<Gate k="sprint"><Sprint /></Gate>} />
           <Route path="duell" element={<Gate k="duels"><Duels /></Gate>} />
           <Route path="duell/:id" element={<Gate k="duels"><DuelPlay /></Gate>} />
+          <Route path="live-duell" element={<Gate k="duels"><LiveDuel /></Gate>} />
+          <Route path="live-duell/:id" element={<Gate k="duels"><LiveDuelRoom /></Gate>} />
           <Route path="statistik" element={<Stats />} />
           <Route path="rangliste" element={<Leaderboard />} />
           <Route path="shop" element={<Gate k="shop"><Shop /></Gate>} />

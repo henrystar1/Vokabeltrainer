@@ -9,6 +9,8 @@ import PanicButton from '../../features/panic/PanicButton'
 import { ChatProvider } from '../../features/chat/ChatProvider'
 import { NotifyProvider } from '../../features/notify/NotifyProvider'
 import { PlusProvider } from '../../features/plus/PlusProvider'
+import PushPrompt from '../../features/push/PushPrompt'
+import LiveInviteWatcher from '../../features/duel/LiveInviteWatcher'
 
 export default function AppShell() {
   const [collapsed, setCollapsed] = useState(false)
@@ -33,6 +35,8 @@ export default function AppShell() {
           </div>
         </main>
         <PanicButton />
+        <PushPrompt />
+        <LiveInviteWatcher />
         {!focus && <MobileNav />}
       </div>
     </FocusProvider>

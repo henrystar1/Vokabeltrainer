@@ -27,6 +27,7 @@ export const adminSetPassword = (userId: string, password: string) => rpc<void>(
 
 // --- Was machen die Leute gerade? ---
 export interface UserStatus { user_id: string; last_seen_at: string | null; online: boolean; activity: string | null; activity_at: string | null }
+export const adminRenameUser = (userId: string, name: string) => rpc<string>('admin_rename_user', { p_user: userId, p_name: name })
 export const adminUserStatus = () => rpc<UserStatus[]>('admin_user_status')
 export interface DirectMessage { id: string; body: string; created_at: string; read_at: string | null }
 export const adminListMessagesTo = (userId: string) => rpc<DirectMessage[]>('admin_list_messages_to', { p_user: userId })

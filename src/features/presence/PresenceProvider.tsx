@@ -10,14 +10,14 @@ import { formatDateTime } from '../../lib/format'
 import { activityFor } from '../../lib/activity'
 import { useSettings } from '../settings/SettingsProvider'
 
-const INTERVAL_MS = 60_000
+const INTERVAL_MS = 30_000
 /** Nachrichten vom Admin werden schneller abgeholt als der Online-Status gemeldet wird. */
 const MESSAGE_MS = 7_000
 /** Während dieser Seiten wird nichts eingeblendet (Sprint, Spiele, Duelle, Lernrunden); danach erscheint die Nachricht. */
-const BUSY_PATHS = [/^\/sprint/, /^\/spiele/, /^\/gambling/, /^\/duell\/.+/, /^\/lernen/, /^\/test/, /^\/ueben/, /^\/konjugieren/, /^\/genus/]
+const BUSY_PATHS = [/^\/sprint/, /^\/spiele/, /^\/gambling/, /^\/duell\/.+/, /^\/live-duell/, /^\/lernen/, /^\/test/, /^\/ueben/, /^\/konjugieren/, /^\/genus/]
 
 /**
- * Meldet jede Minute "ich bin online" (nur Admins sehen das) und holt Nachrichten vom Admin ab.
+ * Meldet alle 30 Sekunden "ich bin online" (nur Admins sehen das) und holt Nachrichten vom Admin ab.
  * Ungelesene Nachrichten erscheinen als Fenster, bis man sie bestätigt.
  */
 export default function PresenceProvider({ children }: { children: ReactNode }) {

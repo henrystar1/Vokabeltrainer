@@ -20,6 +20,7 @@ import {
   adminListMessagesTo,
   adminListPointAdjustments,
   adminListUserBooks,
+  adminRenameUser,
   adminResetProgress,
   adminSetBlocked,
   adminSetRole,
@@ -41,9 +42,9 @@ export function ago(iso: string | null | undefined): string {
   if (!iso) return 'nie'
   const s = Math.max(0, Math.round((Date.now() - new Date(iso).getTime()) / 1000))
   if (s < 60) return 'gerade eben'
-  if (s < 3600) return `vor ${Math.round(s / 60)} Min.`
-  if (s < 86400) return `vor ${Math.round(s / 3600)} Std.`
-  return `vor ${Math.round(s / 86400)} Tagen`
+  if (s < 3600) return `vor ${Math.floor(s / 60)} Min.`
+  if (s < 86400) return `vor ${Math.floor(s / 3600)} Std.`
+  return `vor ${Math.floor(s / 86400)} Tagen`
 }
 
 /** Eine Zeile Status: online + Tätigkeit, oder zuletzt gesehen. */
@@ -79,6 +80,7 @@ export default function PersonSheet({ user: u, status, onClose, onChanged }: { u
   const [text, setText] = useState('')
   const [sending, setSending] = useState(false)
   const [sentNote, setSentNote] = useState<string | null>(null)
+  const [newName, setNewName] = useState(u.display_name)
   const [pts, setPts] = useState('')
   const [ptsReason, setPtsReason] = useState('')
   const [giftItem, setGiftItem] = useState('')
@@ -232,6 +234,18 @@ export default function PersonSheet({ user: u, status, onClose, onChanged }: { u
 
         {message && <Notice tone="ok">{message}</Notice>}
         {error && <ErrorBox message={error} />}
+
+        <section className="space-y-2">
+          <h3 className="label-mono">Anzeigename</h3>
+          <div className="flex flex-wrap items-center gap-2">
+            <TextInput value={newName} maxLength={30} onChange={(e) => setNewName(e.target.value)} aria-label="Neuer Anzeigename" className="max-w-xs" />
+            <Button variant="secondary" className={small} disabled={busy || newName.trim().length < 2 || newName.trim() === u.display_name}
+              onClick={() => void run(async () => { await adminRenameUser(u.user_id, newName) }, `Der Name ist jetzt „${newName.trim()}“.`)}>
+              Name ändern
+            </Button>
+          </div>
+          <p className="text-xs text-slate-500">2 bis 30 Zeichen, jeder Name nur einmal. Die Person sieht den neuen Namen sofort.</p>
+        </section>
 
         <section className="space-y-3">
           <h3 className="label-mono">Nachricht an {u.display_name}</h3>

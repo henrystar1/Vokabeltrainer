@@ -1,4 +1,4 @@
-import type { AdminLeague, Flair, ChatMessage, Duel, DuelDetail, DuelSubmitResult, League, PlayerHit, PoolVocab, Quest, QuestId, SprintRow, Streak } from '../types'
+import type { AdminLeague, Flair, ChatMessage, Duel, DuelDetail, DuelQuestion, DuelSubmitResult, League, PlayerHit, PoolVocab, Quest, QuestId, SprintRow, Streak } from '../types'
 import { rpc } from './rpc'
 
 export const getMistakePool = (bookId: string | null) => rpc<PoolVocab[]>('get_mistake_pool', { p_book_id: bookId })
@@ -30,6 +30,46 @@ export const getDuel = (id: string) => rpc<DuelDetail>('get_duel', { p_id: id })
 export const submitDuel = (id: string, correct: number, total: number, millis: number) =>
   rpc<DuelSubmitResult>('submit_duel', { p_id: id, p_correct: correct, p_total: total, p_millis: millis })
 export const cancelDuel = (id: string) => rpc<void>('cancel_duel', { p_id: id })
+
+// ---- Live-Duell (Migration 0042) ----
+export interface LivePlayer {
+  user_id: string
+  name: string
+  state: 'joined' | 'invited' | 'left' | 'declined'
+  answered: number
+  correct: number
+  finished: boolean
+  millis: number | null
+  place: number | null
+  avatar_id: string | null
+  color_id: string | null
+  effect_id: string | null
+  tag_id: string | null
+  theme_id: string | null
+  role: 'user' | 'mod' | 'alphamod' | 'admin'
+}
+export interface LiveState {
+  id: string
+  status: 'lobby' | 'running' | 'finished' | 'cancelled'
+  is_host: boolean
+  host_id: string
+  me: string
+  q_count: number
+  /** Serverzeit, um den Countdown unabhängig von der Uhr des Geräts zu halten. */
+  now: string
+  starts_at: string | null
+  players: LivePlayer[]
+  questions: DuelQuestion[] | null
+}
+export interface LiveInvite { duel_id: string; host_name: string; host_avatar_id: string | null; host_color_id: string | null; players: number; created_at: string }
+export const liveCreate = (invitees: string[], count = 10) => rpc<string>('live_create', { p_invitees: invitees, p_count: count })
+export const liveMyInvites = () => rpc<LiveInvite[]>('live_my_invites')
+export const liveRespond = (id: string, accept: boolean) => rpc<void>('live_respond', { p_id: id, p_accept: accept })
+export const liveLeave = (id: string) => rpc<void>('live_leave', { p_id: id })
+export const liveStart = (id: string) => rpc<void>('live_start', { p_id: id })
+export const liveGet = (id: string) => rpc<LiveState>('live_get', { p_id: id })
+export const liveProgress = (id: string, answered: number, correct: number) => rpc<void>('live_progress', { p_id: id, p_answered: answered, p_correct: correct })
+export const liveFinish = (id: string, correct: number, millis: number) => rpc<void>('live_finish', { p_id: id, p_correct: correct, p_millis: millis })
 
 export const getChat = (limit = 100) => rpc<ChatMessage[]>('get_chat', { p_limit: limit })
 export const postChat = (body: string) => rpc<number>('post_chat', { p_body: body })

@@ -94,6 +94,11 @@ export default function DuelPlay() {
           {error && <ErrorBox message={error} onRetry={() => void send()} />}
           {outcome?.status === 'open' && <Notice tone="info">Gespeichert. Sobald {d.opponent_name} gespielt hat, siehst du hier das Ergebnis.</Notice>}
           {outcome?.status === 'finished' && (
+            <p className={`vs-banner text-center font-mono text-3xl font-black tracking-widest ${outcome.winner === 'me' ? 'text-amber-300' : outcome.winner === 'opp' ? 'text-rose-300' : 'text-slate-200'}`}>
+              {outcome.winner === 'me' ? 'SIEG!' : outcome.winner === 'opp' ? 'NIEDERLAGE' : 'UNENTSCHIEDEN'}
+            </p>
+          )}
+          {outcome?.status === 'finished' && (
             <Notice tone={outcome.winner === 'opp' ? 'warn' : 'ok'}>
               {outcome.winner === 'me' ? 'Gewonnen! ' : outcome.winner === 'opp' ? 'Verloren. ' : 'Unentschieden. '}
               {d.opponent_name} hatte {outcome.opp_correct} richtig.

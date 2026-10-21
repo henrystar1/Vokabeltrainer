@@ -1,6 +1,8 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Plus, Search, Swords } from 'lucide-react'
+import { Plus, Search, Swords, Zap } from 'lucide-react'
+import { Link } from 'react-router-dom'
+import { useAuth } from '../features/auth/AuthProvider'
 import PlayerTag from '../components/profile/PlayerTag'
 import Button from '../components/ui/Button'
 import Card from '../components/ui/Card'
@@ -25,6 +27,7 @@ function resultText(d: Duel): string {
 /** Zusammenlernen: Duelle mit Freunden. Beide spielen dieselben Fragen, wann sie wollen. */
 export default function Duels() {
   const nav = useNavigate()
+  const { displayName, cosmetics } = useAuth()
   const duels = useAsync(listDuels, [])
   const [creating, setCreating] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -51,11 +54,13 @@ export default function Duels() {
         <Card className="p-2">
           <ul>
             {list.map((d) => (
-              <li key={d.id} className="flex min-h-[56px] flex-wrap items-center gap-3 rounded-xl px-3 py-2">
-                <span className="min-w-0 flex-1">
-                  <PlayerTag name={d.opponent_name} cosmetics={d.opponent} size={34} />
-                  <span className="mt-0.5 block text-xs text-slate-400">{resultText(d)}</span>
+              <li key={d.id} className="vs-card flex min-h-[72px] flex-wrap items-center gap-3 rounded-xl px-3 py-3">
+                <span className="vs-l flex min-w-0 flex-1 basis-32 items-center gap-2"><PlayerTag name={displayName ?? 'Du'} cosmetics={cosmetics} size={38} /></span>
+                <span className="vs-text font-mono text-lg font-black text-fuchsia-300">VS</span>
+                <span className="vs-r flex min-w-0 flex-1 basis-32 flex-col items-end text-right">
+                  <PlayerTag name={d.opponent_name} cosmetics={d.opponent} size={38} />
                 </span>
+                <span className={`basis-full text-center text-xs font-semibold ${d.status === 'finished' ? (d.winner === 'me' ? 'text-emerald-300' : d.winner === 'opp' ? 'text-rose-300' : 'text-slate-300') : 'text-slate-400'}`}>{resultText(d)}</span>
                 {d.status === 'open' && !d.my_done && <Button onClick={() => nav(`/duell/${d.id}`)}><Swords size={16} /> Spielen</Button>}
                 {d.status === 'open' && d.i_am_challenger && (
                   <Button variant="ghost" onClick={() => void cancel(d.id)}>Abbrechen</Button>
@@ -69,7 +74,11 @@ export default function Duels() {
 
   return (
     <div className="space-y-6">
-      <PageHeader eyebrow="Zusammenlernen" title="Duelle" actions={<Button onClick={() => setCreating(true)}><Plus size={18} /> Neues Duell</Button>} />
+      <PageHeader eyebrow="Zusammenlernen" title="Duelle" actions={<div className="flex flex-wrap gap-2"><Button variant="secondary" onClick={() => nav('/live-duell')}><Zap size={18} /> Live-Duell</Button><Button onClick={() => setCreating(true)}><Plus size={18} /> Neues Duell</Button></div>} />
+      <Link to="/live-duell" className="block rounded-2xl border border-fuchsia-400/40 bg-gradient-to-r from-cyan-500/10 via-transparent to-fuchsia-500/15 p-4 transition hover:border-fuchsia-300/70">
+        <p className="flex items-center gap-2 font-semibold text-fuchsia-200"><Zap size={18} /> Neu: Live-Duell mit bis zu 4 Spielern</p>
+        <p className="mt-1 text-sm text-slate-300">Einladen, in der Lobby warten, dann gleichzeitig los. Du siehst auf Strahlen mit Profilbild, wer vorne liegt.</p>
+      </Link>
       <Notice tone="info">
         Du forderst einen Freund heraus: ihr bekommt dieselben 10 Fragen aus Vokabeln, die ihr beide aktiv habt (Online-Bücher). Jeder spielt, wann er will – wer mehr richtig hat, gewinnt Coins. Bei gleich vielen richtigen Antworten ist es unentschieden und jeder bekommt die Hälfte.
       </Notice>

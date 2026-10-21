@@ -40,6 +40,8 @@ describe('Eigene Artikel', () => {
     const now = new Date('2026-10-06T12:00:00Z').getTime()
     expect(lastSeenText('2026-10-06T11:59:30Z', now)).toBe('gerade eben')
     expect(lastSeenText('2026-10-06T11:40:00Z', now)).toBe('vor 20 Min.')
+    expect(lastSeenText('2026-10-06T11:58:30Z', now)).toBe('vor 1 Min.')
+    expect(lastSeenText('2026-10-06T10:30:00Z', now)).toBe('vor 1 Std. 30 Min.')
     expect(lastSeenText('2026-10-06T09:00:00Z', now)).toBe('vor 3 Std.')
     expect(lastSeenText('2026-10-05T09:00:00Z', now)).toBe('gestern')
     expect(lastSeenText('2026-10-02T12:00:00Z', now)).toBe('vor 4 Tagen')
