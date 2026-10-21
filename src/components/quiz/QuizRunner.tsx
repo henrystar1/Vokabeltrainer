@@ -32,12 +32,14 @@ interface QuizRunnerProps {
   maxForgive?: number
   /** „Vokabel melden“-Knopf (Überprüfung anfordern), z. B. beim normalen Lernen. */
   reportable?: boolean
+  /** Zähler „1 / 5“ und Fortschrittsbalken ausblenden (z. B. Team-Parcours mit Einzelfragen). */
+  hideProgress?: boolean
 }
 
 const DIRECTION_LABEL = { forward: 'Deutsch → Fremdsprache', backward: 'Fremdsprache → Deutsch' } as const
 
 /** Abfrageoberfläche: eine Frage nach der anderen, getippte Antwort, sofortige Rückmeldung. */
-export default function QuizRunner({ questions, caseSensitive, onAnswer, onFinish, showFeedback = true, title, accents = false, onCancel, timeLimitSeconds, labelFor, onForgive, maxForgive = 3, reportable = false }: QuizRunnerProps) {
+export default function QuizRunner({ questions, caseSensitive, onAnswer, onFinish, showFeedback = true, title, accents = false, onCancel, timeLimitSeconds, labelFor, onForgive, maxForgive = 3, reportable = false, hideProgress = false }: QuizRunnerProps) {
   const [index, setIndex] = useState(0)
   const [value, setValue] = useState('')
   const [result, setResult] = useState<{ correct: boolean } | null>(null)
@@ -125,7 +127,7 @@ export default function QuizRunner({ questions, caseSensitive, onAnswer, onFinis
               <span className={`font-mono text-lg ${left <= 10 ? 'text-rose-300' : 'text-accent-cyan'}`} aria-label="Verbleibende Zeit">
                 {left}s
               </span>
-            ) : (
+            ) : hideProgress ? null : (
               <span className="font-mono text-sm text-slate-400">
                 {index + 1} / {questions.length}
               </span>
@@ -142,10 +144,12 @@ export default function QuizRunner({ questions, caseSensitive, onAnswer, onFinis
             )}
           </div>
         </div>
-        <ProgressBar
-          value={timeLimitSeconds ? (left / timeLimitSeconds) * 100 : (index / questions.length) * 100}
-          label="Fortschritt der Runde"
-        />
+        {!hideProgress && (
+          <ProgressBar
+            value={timeLimitSeconds ? (left / timeLimitSeconds) * 100 : (index / questions.length) * 100}
+            label="Fortschritt der Runde"
+          />
+        )}
       </div>
 
       <form onSubmit={submit} className="glass rounded-3xl p-6 shadow-glow sm:p-10">

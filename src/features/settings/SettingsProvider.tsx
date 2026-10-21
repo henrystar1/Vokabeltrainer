@@ -3,6 +3,7 @@ import type { UserSettings } from '../../types'
 import { DEFAULT_SETTINGS, loadSettings, saveSettings } from '../../services/settings'
 import { useAuth } from '../auth/AuthProvider'
 import { normalizeSettings } from './rules'
+import { setAnswerLanguage } from '../learning/answer'
 
 interface SettingsState {
   settings: UserSettings
@@ -33,6 +34,10 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
       active = false
     }
   }, [userId])
+
+  useEffect(() => {
+    setAnswerLanguage(settings.learn_language)
+  }, [settings.learn_language])
 
   const update = useCallback(
     async (patch: Partial<UserSettings>) => {

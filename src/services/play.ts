@@ -64,6 +64,8 @@ export interface LiveState {
   starts_at: string | null
   players: LivePlayer[]
   questions: DuelQuestion[] | null
+  /** Siegprämien: Live-Duell [Platz 1], Klassen-Battle [Platz 1, 2, 3]. */
+  rewards: number[]
 }
 export interface LiveInvite { duel_id: string; host_name: string; host_avatar_id: string | null; host_color_id: string | null; players: number; created_at: string }
 export const liveCreate = (invitees: string[], count = 10, bookId: string | null = null) => rpc<string>('live_create', { p_invitees: invitees, p_count: count, p_book: bookId })
@@ -119,3 +121,56 @@ export const submitChoice = (correct: number, total: number) =>
 
 export const startGame = (game: GameId) => rpc<GameStart>('start_game', { p_game: game })
 export const finishGame = (id: string, score: number) => rpc<GameResult>('finish_game', { p_id: id, p_score: score })
+
+// ---- Offene Klassen-Battles und Team-Parcours (Migration 0044) ----
+export interface OpenClass { duel_id: string; host_name: string; host_avatar_id: string | null; host_color_id: string | null; book_name: string | null; players: number; max_players: number; created_at: string }
+export const liveOpenClasses = () => rpc<OpenClass[]>('live_open_classes')
+export const liveJoinOpen = (id: string) => rpc<string>('live_join_open', { p_id: id })
+
+export interface TeamPerson {
+  user_id: string
+  name: string
+  avatar_id: string | null
+  color_id: string | null
+  effect_id: string | null
+  tag_id: string | null
+  theme_id: string | null
+  role: 'user' | 'mod' | 'alphamod' | 'admin'
+  is_host: boolean
+}
+export interface TeamQuestion extends DuelQuestion { idx: number }
+export interface TeamState {
+  id: string
+  kind: 'quiz' | 'parkour'
+  millis: number | null
+  deaths: number | null
+  status: 'lobby' | 'running' | 'won' | 'lost' | 'cancelled'
+  is_host: boolean
+  me: string
+  now: string
+  starts_at: string | null
+  obstacles: number
+  lives: number
+  lives_left: number
+  step: number
+  host_ok: boolean
+  partner_ok: boolean
+  partner_state: 'invited' | 'joined' | 'declined' | 'left'
+  host_right: number
+  host_wrong: number
+  partner_right: number
+  partner_wrong: number
+  reward: number
+  paid: number
+  my_question: TeamQuestion | null
+  people: TeamPerson[]
+}
+export interface TeamInvite { run_id: string; host_name: string; host_avatar_id: string | null; host_color_id: string | null; created_at: string; kind: 'quiz' | 'parkour' }
+export const teamCreate = (partner: string, obstacles = 10, kind: 'quiz' | 'parkour' = 'parkour') => rpc<string>('team_create', { p_partner: partner, p_obstacles: obstacles, p_kind: kind })
+export const teamParkourFinish = (id: string, millis: number, deaths: number) => rpc<void>('team_parkour_finish', { p_id: id, p_millis: millis, p_deaths: deaths })
+export const teamMyInvites = () => rpc<TeamInvite[]>('team_my_invites')
+export const teamRespond = (id: string, accept: boolean) => rpc<void>('team_respond', { p_id: id, p_accept: accept })
+export const teamLeave = (id: string) => rpc<void>('team_leave', { p_id: id })
+export const teamStart = (id: string) => rpc<void>('team_start', { p_id: id })
+export const teamGet = (id: string) => rpc<TeamState>('team_get', { p_id: id })
+export const teamReport = (id: string, step: number, correct: boolean) => rpc<void>('team_report', { p_id: id, p_step: step, p_correct: correct })

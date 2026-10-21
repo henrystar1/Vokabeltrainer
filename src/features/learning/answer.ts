@@ -11,6 +11,7 @@
  *  - Alternativen mit Schrägstrich: „avoir qc/qn“ → auch „avoir qc“ oder „avoir qn“
  *  - Abkürzungen für „jemand/etwas“ (qc, qn, sth, sb, etw., jdn. …) dürfen fehlen
  *  - Klammern sind optional: „(se) lever“ → „se lever“ oder „lever“
+ *  - Spanisch: Akzente, ñ, ü sowie ¿ und ¡ dürfen fehlen („cafe“ = „café“, „manana“ = „mañana“)
  *  - Leerzeichen dürfen ganz fehlen: „icecream“ = „ice cream“, „jetaime“ = „je t'aime“
  */
 export function normalizeAnswer(text: string, caseSensitive: boolean): string {
@@ -68,10 +69,22 @@ function canonical(text: string, caseSensitive: boolean): string {
   return m ? m[1] : t
 }
 
+/** Sprache, in der gerade gelernt wird. Bei Spanisch dürfen Akzente, ñ, ü sowie ¿ ¡ ? ! fehlen. */
+let answerLanguage: string | null = null
+export function setAnswerLanguage(lang: string | null | undefined): void {
+  answerLanguage = lang ?? null
+}
+
+/** Entfernt Akzente und spanische Satzzeichen (á→a, ñ→n, ü→u, ¿¡ weg). */
+export function foldSpanish(text: string): string {
+  return text.normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[¿¡?!]/g, '').normalize('NFC')
+}
+
 const noSpaces = (s: string) => s.replace(/\s+/g, '')
 
-export function isAnswerCorrect(given: string, accepted: readonly string[], caseSensitive: boolean): boolean {
-  const g = noSpaces(canonical(given, caseSensitive))
+export function isAnswerCorrect(given: string, accepted: readonly string[], caseSensitive: boolean, lang: string | null = answerLanguage): boolean {
+  const fold = (t: string) => (lang === 'es' ? foldSpanish(t) : t)
+  const g = noSpaces(fold(canonical(given, caseSensitive)))
   if (g === '') return false
-  return accepted.some((a) => answerVariants(a).some((v) => noSpaces(canonical(v, caseSensitive)) === g))
+  return accepted.some((a) => answerVariants(a).some((v) => noSpaces(fold(canonical(v, caseSensitive))) === g))
 }

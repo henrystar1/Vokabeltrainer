@@ -1,5 +1,5 @@
 /* Animierte Profilbilder. Größe kommt über --s (Pixel). Alles reine CSS-Animation, kein Bild. */
-.av { position: relative; width: var(--s); height: var(--s); border-radius: 50%; flex-shrink: 0; isolation: isolate; }
+.av { position: relative; display: inline-block; vertical-align: middle; width: var(--s); height: var(--s); border-radius: 50%; flex-shrink: 0; isolation: isolate; }
 .av > i { position: absolute; inset: 0; border-radius: 50%; display: block; }
 .av-clip { overflow: hidden; }
 

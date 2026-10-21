@@ -14,7 +14,7 @@ const INTERVAL_MS = 30_000
 /** Nachrichten vom Admin werden schneller abgeholt als der Online-Status gemeldet wird. */
 const MESSAGE_MS = 7_000
 /** Während dieser Seiten wird nichts eingeblendet (Sprint, Spiele, Duelle, Lernrunden); danach erscheint die Nachricht. */
-const BUSY_PATHS = [/^\/sprint/, /^\/spiele/, /^\/gambling/, /^\/duell\/.+/, /^\/live-duell/, /^\/lernen/, /^\/test/, /^\/ueben/, /^\/konjugieren/, /^\/genus/]
+const BUSY_PATHS = [/^\/sprint/, /^\/spiele/, /^\/gambling/, /^\/duell\/.+/, /^\/live-duell/, /^\/team\//, /^\/lernen/, /^\/test/, /^\/ueben/, /^\/konjugieren/, /^\/genus/]
 
 /**
  * Meldet alle 30 Sekunden "ich bin online" (nur Admins sehen das) und holt Nachrichten vom Admin ab.

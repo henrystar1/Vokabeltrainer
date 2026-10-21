@@ -1,14 +1,14 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
-import { School, Search, X, Zap } from 'lucide-react'
-import PlayerTag from '../components/profile/PlayerTag'
+import { Footprints, School, Search, Users, X, Zap } from 'lucide-react'
+import PlayerTag, { Avatar } from '../components/profile/PlayerTag'
 import Button from '../components/ui/Button'
 import Card from '../components/ui/Card'
 import PageHeader from '../components/ui/PageHeader'
 import { Notice, ErrorBox } from '../components/ui/States'
 import { TextInput, Select } from '../components/ui/Field'
 import { errorMessage } from '../lib/errors'
-import { liveCreate, liveJoinCode, searchPlayers } from '../services/play'
+import { liveCreate, liveJoinCode, liveJoinOpen, liveOpenClasses, searchPlayers, teamCreate, type OpenClass } from '../services/play'
 import { listBooks } from '../services/books'
 import { useAsync } from '../lib/useAsync'
 import type { PlayerHit } from '../types'
@@ -16,17 +16,45 @@ import type { PlayerHit } from '../types'
 /** Live-Duell anlegen: bis zu 3 Mitspieler einladen, Lobby öffnen, dann geht es gemeinsam los. */
 export default function LiveDuel() {
   const nav = useNavigate()
-  const [mode, setMode] = useState<'duel' | 'class'>('duel')
+  const [mode, setMode] = useState<'duel' | 'class' | 'team'>('duel')
+  const [open, setOpen] = useState<OpenClass[]>([])
+  const [obstacles, setObstacles] = useState(10)
+  const [teamKind, setTeamKind] = useState<'parkour' | 'quiz'>('parkour')
   const [bookId, setBookId] = useState('')
   const [code, setCode] = useState('')
   const books = useAsync(listBooks, [])
-  const maxInvites = mode === 'class' ? 19 : 3
+  const maxInvites = mode === 'class' ? 19 : mode === 'team' ? 1 : 3
   const [q, setQ] = useState('')
   const [hits, setHits] = useState<PlayerHit[] | null>(null)
   const [picked, setPicked] = useState<PlayerHit[]>([])
   const [count, setCount] = useState(10)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
+
+  // Offene Klassen-Battles alle paar Sekunden neu laden
+  useEffect(() => {
+    if (mode !== 'class') return
+    let alive = true
+    const load = async () => {
+      if (document.visibilityState !== 'visible') return
+      const r = await liveOpenClasses().catch(() => null)
+      if (alive && r) setOpen(r)
+    }
+    void load()
+    const t = window.setInterval(() => void load(), 4000)
+    return () => { alive = false; window.clearInterval(t) }
+  }, [mode])
+
+  async function joinOpen(id: string) {
+    setBusy(true)
+    setError(null)
+    try {
+      nav(`/live-duell/${await liveJoinOpen(id)}`)
+    } catch (e) {
+      setError(errorMessage(e))
+      setBusy(false)
+    }
+  }
 
   async function search() {
     setError(null)
@@ -39,11 +67,12 @@ export default function LiveDuel() {
   const toggle = (p: PlayerHit) =>
     setPicked((cur) => (cur.some((x) => x.user_id === p.user_id) ? cur.filter((x) => x.user_id !== p.user_id) : cur.length >= maxInvites ? cur : [...cur, p]))
 
-  async function open() {
+  async function create() {
     setBusy(true)
     setError(null)
     try {
-      nav(`/live-duell/${await liveCreate(picked.map((p) => p.user_id), count, mode === 'class' ? bookId : null)}`)
+      if (mode === 'team') nav(`/team/${await teamCreate(picked[0].user_id, obstacles, teamKind)}`)
+      else nav(`/live-duell/${await liveCreate(picked.map((p) => p.user_id), count, mode === 'class' ? bookId : null)}`)
     } catch (e) {
       setError(errorMessage(e))
       setBusy(false)
@@ -63,15 +92,40 @@ export default function LiveDuel() {
 
   return (
     <div className="mx-auto max-w-xl space-y-5">
-      <PageHeader eyebrow="Zusammenlernen" title={mode === 'class' ? 'Klassen-Battle' : 'Live-Duell'} />
-      <div className="grid grid-cols-2 gap-2" role="tablist" aria-label="Art">
-        {([['duel', 'Live-Duell · bis 4', Zap], ['class', 'Klassen-Battle · bis 20', School]] as const).map(([k, label, Icon]) => (
-          <button key={k} type="button" role="tab" aria-selected={mode === k} onClick={() => { setMode(k); setPicked((c) => c.slice(0, k === 'class' ? 19 : 3)) }}
-            className={`flex min-h-[48px] items-center justify-center gap-2 rounded-xl border text-sm font-semibold transition ${mode === k ? 'border-fuchsia-300/60 bg-fuchsia-400/15 text-fuchsia-200' : 'border-white/10 bg-white/5 text-slate-300'}`}>
+      <PageHeader eyebrow="Zusammenlernen" title={mode === 'class' ? 'Klassen-Battle' : mode === 'team' ? 'Team-Parkour' : 'Live-Duell'} />
+      <div className="grid grid-cols-3 gap-2" role="tablist" aria-label="Art">
+        {([['duel', 'Live-Duell · bis 4', Zap], ['class', 'Klassen-Battle · bis 20', School], ['team', 'Team-Parkour · 2', Footprints]] as const).map(([k, label, Icon]) => (
+          <button key={k} type="button" role="tab" aria-selected={mode === k} onClick={() => { setMode(k); setPicked((c) => c.slice(0, k === 'class' ? 19 : k === 'team' ? 1 : 3)) }}
+            className={`flex min-h-[56px] flex-col items-center justify-center gap-0.5 rounded-xl border px-1 text-center text-xs font-semibold sm:flex-row sm:gap-2 sm:text-sm transition ${mode === k ? 'border-fuchsia-300/60 bg-fuchsia-400/15 text-fuchsia-200' : 'border-white/10 bg-white/5 text-slate-300'}`}>
             <Icon size={16} /> {label}
           </button>
         ))}
       </div>
+      {mode === 'class' && (
+        <Card className="space-y-3">
+          <p className="label-mono">Offene Klassen-Battles</p>
+          {open.length === 0 ? (
+            <p className="text-sm text-slate-400">Gerade ist kein Raum offen. Öffne unten selbst einen.</p>
+          ) : (
+            <ul className="space-y-2">
+              {open.map((c) => (
+                <li key={c.duel_id}>
+                  <button type="button" disabled={busy} onClick={() => void joinOpen(c.duel_id)}
+                    className="flex min-h-[60px] w-full items-center gap-3 rounded-2xl border border-fuchsia-400/30 bg-fuchsia-500/5 px-3 text-left transition hover:border-fuchsia-300/70 hover:bg-fuchsia-500/10 disabled:opacity-60">
+                    <Avatar name={c.host_name} avatarId={c.host_avatar_id} colorId={c.host_color_id} size={40} />
+                    <span className="min-w-0 flex-1">
+                      <b className="block truncate">{c.book_name ?? 'Klassen-Battle'}</b>
+                      <span className="block truncate text-sm text-slate-400">von {c.host_name}</span>
+                    </span>
+                    <span className="flex shrink-0 items-center gap-1 font-mono text-sm text-fuchsia-200"><Users size={14} /> {c.players}/{c.max_players}</span>
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
+        </Card>
+      )}
+      {mode !== 'team' && (
       <Card className="space-y-3">
         <p className="label-mono">Mit Code beitreten</p>
         <form className="flex gap-2" onSubmit={(e) => { e.preventDefault(); void join() }}>
@@ -79,8 +133,13 @@ export default function LiveDuel() {
           <Button type="submit" busy={busy} disabled={code.trim().length < 4}>Beitreten</Button>
         </form>
       </Card>
+      )}
       <Notice tone="info">
-        {mode === 'class' ? (
+        {mode === 'team' ? (
+          teamKind === 'parkour'
+            ? <>Ein Jump-and-Run für <b>zwei</b> mit Joystick und Sprungknopf: drei Level, die ihr nur gemeinsam schafft. Steht auf Platten, damit Türen und Brücken offen bleiben, und gebt euch eine Räuberleiter über hohe Mauern. Beide müssen zum Schluss im Ausgang stehen.</>
+            : <>Ihr zwei lauft gemeinsam einen Vokabel-Parcours. An jedem Hindernis bekommt <b>jeder</b> eine eigene Vokabel, und ihr kommt nur weiter, wenn <b>beide</b> richtig antworten. Jede falsche Antwort kostet ein gemeinsames Leben.</>
+        ) : mode === 'class' ? (
           <>Für die ganze Klasse: Du wählst ein Buch, öffnest einen Raum und alle (bis 20) treten mit dem <b>Code</b> bei oder werden eingeladen. Gefragt werden Vokabeln aus dem Buch, egal ob aktiv. Oben siehst du live die Besten auf ihren Strahlen.</>
         ) : (<>Du lädst bis zu 3 Mitspieler ein, wartest in der Lobby, bis sie da sind, und dann geht es gleichzeitig los. Dabei siehst du live auf einem Strahl mit Profilbild, wie weit alle sind. Es gelten Vokabeln, die ihr <b>alle</b> aktiv habt. Wer die meisten richtig hat (bei Gleichstand der Schnellste), gewinnt.</>)}
       </Notice>
@@ -123,15 +182,32 @@ export default function LiveDuel() {
             </Select>
           </div>
         )}
-        <div>
-          <label htmlFor="live-count" className="label-mono">Anzahl Fragen</label>
-          <Select id="live-count" value={String(count)} onChange={(e) => setCount(Number(e.target.value))}>
-            {(mode === 'class' ? [10, 15, 20, 30] : [5, 10, 15, 20]).map((n) => <option key={n} value={n}>{n} Fragen</option>)}
-          </Select>
-        </div>
+        {mode === 'team' && (
+          <div className="grid grid-cols-2 gap-2" role="radiogroup" aria-label="Art des Team-Spiels">
+            {([['parkour', 'Parkour mit Joystick'], ['quiz', 'Vokabel-Parcours']] as const).map(([k, label]) => (
+              <button key={k} type="button" role="radio" aria-checked={teamKind === k} onClick={() => setTeamKind(k)}
+                className={`min-h-[48px] rounded-xl border text-sm font-semibold transition ${teamKind === k ? 'border-cyan-300/60 bg-cyan-400/15 text-cyan-200' : 'border-white/10 bg-white/5 text-slate-300'}`}>{label}</button>
+            ))}
+          </div>
+        )}
+        {mode === 'team' ? (teamKind === 'quiz' &&
+          <div>
+            <label htmlFor="team-obst" className="label-mono">Länge des Parcours</label>
+            <Select id="team-obst" value={String(obstacles)} onChange={(e) => setObstacles(Number(e.target.value))}>
+              {[6, 8, 10, 12, 16].map((n) => <option key={n} value={n}>{n} Hindernisse</option>)}
+            </Select>
+          </div>
+        ) : (
+          <div>
+            <label htmlFor="live-count" className="label-mono">Anzahl Fragen</label>
+            <Select id="live-count" value={String(count)} onChange={(e) => setCount(Number(e.target.value))}>
+              {(mode === 'class' ? [10, 15, 20, 30] : [5, 10, 15, 20]).map((n) => <option key={n} value={n}>{n} Fragen</option>)}
+            </Select>
+          </div>
+        )}
         {error && <ErrorBox message={error} />}
-        <Button className="w-full min-h-[52px]" busy={busy} disabled={mode === 'class' ? bookId === '' : picked.length === 0} onClick={() => void open()}>
-          <Zap size={18} /> {mode === 'class' ? 'Raum öffnen' : 'Lobby öffnen'}
+        <Button className="w-full min-h-[52px]" busy={busy} disabled={mode === 'class' ? bookId === '' : picked.length === 0} onClick={() => void create()}>
+          <Zap size={18} /> {mode === 'class' ? 'Raum öffnen' : mode === 'team' ? 'Team-Lobby öffnen' : 'Lobby öffnen'}
         </Button>
       </Card>
       <Link to="/duell" className="inline-block text-sm text-accent-cyan hover:underline">Zurück zu den Duellen</Link>

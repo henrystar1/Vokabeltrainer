@@ -63,4 +63,13 @@ describe('Leerzeichen dürfen fehlen', () => {
     expect(isAnswerCorrect('be', ['to be'], false)).toBe(true)
     expect(isAnswerCorrect('icecrem', ['ice cream'], false)).toBe(false)
   })
+  it('Spanisch: Akzente, ñ und ¿¡ dürfen fehlen, auch umgekehrt', () => {
+    expect(isAnswerCorrect('cafe', ['café'], false, 'es')).toBe(true)
+    expect(isAnswerCorrect('manana', ['mañana'], false, 'es')).toBe(true)
+    expect(isAnswerCorrect('mañana', ['manana'], false, 'es')).toBe(true)
+    expect(isAnswerCorrect('Como estas', ['¿Cómo estás?'], false, 'es')).toBe(true)
+    expect(isAnswerCorrect('pinguino', ['pingüino'], false, 'es')).toBe(true)
+    expect(isAnswerCorrect('cafe', ['café'], false, 'fr')).toBe(false)
+    expect(isAnswerCorrect('caffe', ['café'], false, 'es')).toBe(false)
+  })
 })

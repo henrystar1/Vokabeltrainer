@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Plus, Search, Swords, Zap } from 'lucide-react'
+import { Footprints, Plus, Search, Swords, Zap } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import { useAuth } from '../features/auth/AuthProvider'
 import PlayerTag from '../components/profile/PlayerTag'
@@ -78,6 +78,10 @@ export default function Duels() {
       <Link to="/live-duell" className="block rounded-2xl border border-fuchsia-400/40 bg-gradient-to-r from-cyan-500/10 via-transparent to-fuchsia-500/15 p-4 transition hover:border-fuchsia-300/70">
         <p className="flex items-center gap-2 font-semibold text-fuchsia-200"><Zap size={18} /> Neu: Live-Duell mit bis zu 4 Spielern</p>
         <p className="mt-1 text-sm text-slate-300">Einladen, in der Lobby warten, dann gleichzeitig los. Du siehst auf Strahlen mit Profilbild, wer vorne liegt.</p>
+      </Link>
+      <Link to="/live-duell" className="block rounded-2xl border border-cyan-400/40 bg-gradient-to-r from-emerald-500/10 via-transparent to-cyan-500/15 p-4 transition hover:border-cyan-300/70">
+        <p className="flex items-center gap-2 font-semibold text-cyan-200"><Footprints size={18} /> Neu: Team-Parkour und Klassen-Battles</p>
+        <p className="mt-1 text-sm text-slate-300">Zu zweit mit Joystick durch drei Parkour-Level, die nur gemeinsam gehen. Oder bei einem offenen Klassen-Battle mit bis zu 20 Leuten einfach draufklicken.</p>
       </Link>
       <Notice tone="info">
         Du forderst einen Freund heraus: ihr bekommt dieselben 10 Fragen aus Vokabeln, die ihr beide aktiv habt (Online-Bücher). Jeder spielt, wann er will – wer mehr richtig hat, gewinnt Coins. Bei gleich vielen richtigen Antworten ist es unentschieden und jeder bekommt die Hälfte.

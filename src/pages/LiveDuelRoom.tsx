@@ -154,6 +154,11 @@ export default function LiveDuelRoom() {
             {slots.map((p, i) => <Slot key={p?.user_id ?? `e${i}`} p={p} color={LANE_COLORS[i % 4]} host={p?.user_id === st.host_id} small={small} />)}
           </div>
           <p className="text-center text-sm text-slate-400">{st.q_count} Fragen · {joined.length} von {st.max_players} Plätzen belegt</p>
+          {st.rewards?.some((r) => r > 0) && (
+            <p className="text-center text-sm text-amber-200">
+              {st.rewards.length === 1 ? `Siegprämie: ${st.rewards[0]} Coins` : `Prämien: ${st.rewards.map((r, i) => `${i + 1}. Platz ${r}`).join(' · ')} Coins`}
+            </p>
+          )}
           {error && <ErrorBox message={error} />}
           {st.is_host ? (
             <div className="flex flex-wrap gap-2">
