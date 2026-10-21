@@ -27,20 +27,20 @@ function Confetti() {
   )
 }
 
-function Slot({ p, color, host }: { p?: LivePlayer; color: string; host: boolean }) {
+function Slot({ p, color, host, small }: { p?: LivePlayer; color: string; host: boolean; small: boolean }) {
   if (!p) {
-    return <div className="flex min-h-[150px] flex-col items-center justify-center rounded-2xl border border-dashed border-white/15 text-sm text-slate-500">frei</div>
+    return <div className={`flex flex-col items-center justify-center rounded-2xl border border-dashed border-white/15 text-sm text-slate-500 ${small ? 'min-h-[104px]' : 'min-h-[150px]'}`}>frei</div>
   }
   const ready = p.state === 'joined'
   return (
-    <div className="relative flex min-h-[150px] flex-col items-center justify-center gap-2 rounded-2xl border bg-space-900/60 p-3 text-center" style={{ borderColor: ready ? color : 'rgb(255 255 255 / 0.12)', boxShadow: ready ? `0 0 18px ${color}55` : undefined }}>
+    <div className={`relative flex flex-col items-center justify-center gap-1.5 rounded-2xl border bg-space-900/60 p-2 text-center ${small ? 'min-h-[104px]' : 'min-h-[150px] gap-2 p-3'}`} style={{ borderColor: ready ? color : 'rgb(255 255 255 / 0.12)', boxShadow: ready ? `0 0 18px ${color}55` : undefined }}>
       {host && <Crown size={16} className="absolute left-2 top-2 text-amber-300" aria-label="Host" />}
-      <div className={ready ? '' : 'opacity-50 grayscale'}><Avatar name={p.name} avatarId={p.avatar_id} colorId={p.color_id} size={64} /></div>
-      <p className="max-w-full truncate font-semibold">{p.name}</p>
+      <div className={ready ? '' : 'opacity-50 grayscale'}><Avatar name={p.name} avatarId={p.avatar_id} colorId={p.color_id} size={small ? 40 : 64} /></div>
+      <p className={`max-w-full truncate font-semibold ${small ? 'text-xs' : ''}`}>{p.name}</p>
       {ready ? (
         <span className="inline-flex items-center gap-1 text-xs text-emerald-300"><Check size={13} /> bereit</span>
       ) : p.state === 'invited' ? (
-        <span className="inline-flex animate-pulse items-center gap-1 text-xs text-slate-400"><Clock size={13} /> wartet auf Antwort …</span>
+        <span className="inline-flex animate-pulse items-center gap-1 text-xs text-slate-400"><Clock size={13} /> {small ? 'eingeladen' : 'wartet auf Antwort …'}</span>
       ) : (
         <span className="text-xs text-slate-500">hat verlassen</span>
       )}
@@ -136,16 +136,24 @@ export default function LiveDuelRoom() {
   }
 
   if (st.status === 'lobby') {
-    const slots = Array.from({ length: 4 }, (_, i) => st.players[i])
+    const small = st.max_players > 4
+    const slots = Array.from({ length: st.max_players }, (_, i) => st.players[i])
     const invitedMe = me?.state === 'invited'
     return (
       <div className="mx-auto max-w-xl space-y-5">
         <PageHeader eyebrow="Live-Duell" title="Lobby" />
         <Card className="space-y-4">
-          <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-            {slots.map((p, i) => <Slot key={p?.user_id ?? `e${i}`} p={p} color={LANE_COLORS[i]} host={p?.user_id === st.host_id} />)}
+          {st.code && (
+            <div className="rounded-2xl border border-fuchsia-400/40 bg-fuchsia-500/10 p-3 text-center">
+              <p className="label-mono">{st.book_name ? `Klassen-Battle · ${st.book_name}` : 'Klassen-Battle'}</p>
+              <p className="mt-1 select-all font-mono text-4xl font-black tracking-[0.35em] text-fuchsia-200">{st.code}</p>
+              <p className="mt-1 text-xs text-slate-400">Diesen Code unter „Duell → Live-Duell“ eingeben, dann ist man dabei.</p>
+            </div>
+          )}
+          <div className={`grid gap-3 ${small ? 'grid-cols-4 sm:grid-cols-5' : 'grid-cols-2 sm:grid-cols-4'}`}>
+            {slots.map((p, i) => <Slot key={p?.user_id ?? `e${i}`} p={p} color={LANE_COLORS[i % 4]} host={p?.user_id === st.host_id} small={small} />)}
           </div>
-          <p className="text-center text-sm text-slate-400">{st.q_count} Fragen · {joined.length} von {st.players.length} Spielern sind da</p>
+          <p className="text-center text-sm text-slate-400">{st.q_count} Fragen · {joined.length} von {st.max_players} Plätzen belegt</p>
           {error && <ErrorBox message={error} />}
           {st.is_host ? (
             <div className="flex flex-wrap gap-2">
@@ -220,13 +228,15 @@ export default function LiveDuelRoom() {
   const ranked = [...st.players].filter((p) => p.state === 'joined').sort((a, b) => (a.place ?? 99) - (b.place ?? 99))
   const iWon = ranked[0]?.user_id === st.me
   const heights = ['h-40', 'h-32', 'h-24', 'h-16']
+  const podium = ranked.slice(0, 4)
+  const rest = ranked.slice(4)
   return (
     <div className="mx-auto max-w-xl space-y-5">
       <PageHeader eyebrow="Live-Duell" title={iWon ? 'Gewonnen!' : 'Ergebnis'} />
       <Card className="relative space-y-5 overflow-hidden">
         {iWon && <Confetti />}
         <div className="flex items-end justify-center gap-3">
-          {ranked.map((p, i) => (
+          {podium.map((p, i) => (
             <div key={p.user_id} className="flex w-1/4 min-w-0 flex-col items-center gap-1 text-center">
               {i === 0 && <Crown size={22} className="text-amber-300" aria-label="Sieger" />}
               <Avatar name={p.name} avatarId={p.avatar_id} colorId={p.color_id} size={i === 0 ? 60 : 48} />
@@ -238,6 +248,18 @@ export default function LiveDuelRoom() {
             </div>
           ))}
         </div>
+        {rest.length > 0 && (
+          <ol className="max-h-72 space-y-1 overflow-y-auto" start={5}>
+            {rest.map((p, i) => (
+              <li key={p.user_id} className={`flex items-center gap-3 rounded-xl px-3 py-2 text-sm ${p.user_id === st.me ? 'bg-accent-cyan/10 ring-1 ring-accent-cyan/40' : 'bg-white/5'}`}>
+                <span className="w-7 font-mono text-slate-400">{i + 5}.</span>
+                <Avatar name={p.name} avatarId={p.avatar_id} colorId={p.color_id} size={28} />
+                <span className="min-w-0 flex-1 truncate">{p.name}{p.user_id === st.me ? ' (du)' : ''}</span>
+                <span className="font-mono text-xs text-slate-300">{p.correct}/{st.q_count}{p.millis ? ` · ${(p.millis / 1000).toFixed(1)} s` : ''}</span>
+              </li>
+            ))}
+          </ol>
+        )}
         {iWon && <Notice tone="ok">Du hast gewonnen! Die Siegprämie (falls das Tageslimit nicht erreicht ist) ist schon gutgeschrieben.</Notice>}
         {me?.state === 'left' && <Notice tone="info">Du hast die Runde verlassen.</Notice>}
       </Card>

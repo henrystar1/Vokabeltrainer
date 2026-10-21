@@ -55,6 +55,10 @@ export interface LiveState {
   host_id: string
   me: string
   q_count: number
+  max_players: number
+  code: string | null
+  is_class: boolean
+  book_name: string | null
   /** Serverzeit, um den Countdown unabhängig von der Uhr des Geräts zu halten. */
   now: string
   starts_at: string | null
@@ -62,7 +66,8 @@ export interface LiveState {
   questions: DuelQuestion[] | null
 }
 export interface LiveInvite { duel_id: string; host_name: string; host_avatar_id: string | null; host_color_id: string | null; players: number; created_at: string }
-export const liveCreate = (invitees: string[], count = 10) => rpc<string>('live_create', { p_invitees: invitees, p_count: count })
+export const liveCreate = (invitees: string[], count = 10, bookId: string | null = null) => rpc<string>('live_create', { p_invitees: invitees, p_count: count, p_book: bookId })
+export const liveJoinCode = (code: string) => rpc<string>('live_join_code', { p_code: code })
 export const liveMyInvites = () => rpc<LiveInvite[]>('live_my_invites')
 export const liveRespond = (id: string, accept: boolean) => rpc<void>('live_respond', { p_id: id, p_accept: accept })
 export const liveLeave = (id: string) => rpc<void>('live_leave', { p_id: id })

@@ -406,3 +406,7 @@ Tabelle `book_library_hidden`; `in_library` blendet ein veröffentlichtes Buch d
 - Online-Fenster 75 s statt 3 min (SQL ersetzt `interval '3 minutes'` in allen Funktionen mit `last_seen_at` automatisch); die App meldet sich alle 30 s. „Zuletzt gesehen“ zählt minutengenau. Admins sehen in „Wer ist da?“ zusätzlich die Tätigkeit (`admin_user_status`).
 - `admin_rename_user` (Admin ändert Anzeigenamen, Name eindeutig); UI im Personen-Fenster.
 - Mitteilungen: `features/push/PushPrompt.tsx` meldet das Gerät still an, wenn die Erlaubnis schon vorliegt, sonst kommt alle 3 Tage ein Hinweis zum Einschalten (iPad: Hinweis zum Home-Bildschirm). Die Schalter für @, Team-Nachrichten und Hinweise sind schon standardmäßig an.
+
+### 0043 – Klassen-Battle (bis 20 Spieler)
+- Erweitert das Live-Duell: `live_duels.book_id/max_players/code`. `live_create(p_invitees, p_count, p_book)` mit Buch = Klassen-Battle (bis 20 Spieler, 4-stelliger Code, Fragen aus allen Vokabeln des Buchs, egal ob aktiv); `live_join_code(code)` zum Beitreten, `live_respond` prüft die Platzzahl. Frontend: Reiter „Live-Duell · bis 4“ / „Klassen-Battle · bis 20“ in `pages/LiveDuel.tsx`, Code-Karte und kleinere Plätze in `LiveDuelRoom`.
+- `RaceTrack`: ab 5 Spielern kompakt (die Besten + du, mit Platz). Das Profilbild-Element hat bewusst keinen `key`: sonst startet animierte Profilbilder (Schwarzes Loch) bei jeder Antwort ihre 16-s-Animation neu und wirken leer.
