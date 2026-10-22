@@ -31,11 +31,11 @@ describe('Level-Zufallsgenerator', () => {
           if (uses) expect(lv.plates.filter((p) => p.ch === ch).length).toBeGreaterThanOrEqual(2)
         }
         // Stachelfelder sind höchstens 6 Kacheln breit, Gruben unter Brücken genau 12
-        for (const row of lv.rows) for (const m of row.matchAll(/\^+/g)) expect(m[0].length).toBeLessThanOrEqual(12)
+        for (const row of lv.rows.slice(0, 11)) for (const m of row.matchAll(/\^+/g)) expect(m[0].length).toBeLessThanOrEqual(12)
         for (const host of [true, false]) {
           const sp = spawnAt(lv, host, null)
           const b = newBody(sp.x, sp.y)
-          let r: 'ok' | 'dead' = 'ok'
+          let r: 'ok' | 'dead' | 'lost' = 'ok'
           for (let i = 0; i < 60 && r === 'ok'; i++) r = stepBody(b, { move: 0, jump: false }, lv, pressedMap(lv, [b]), null, 1 / 60)
           expect(r).toBe('ok')
         }

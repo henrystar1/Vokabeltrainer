@@ -74,6 +74,12 @@ export class Builder {
 export function parse(name: string, hint: string, rows: string[]): Level {
   const cols = Math.max(...rows.map((r) => r.length))
   const padded = rows.map((r) => r.padEnd(cols, '.'))
+  // Schluchten (kein Boden in Zeile 10 und 11) bekommen unten Stacheln: Absturz = Stacheln, sonst nichts kostet ein Herz.
+  if (padded.length === ROWS) {
+    const bottom = padded[ROWS - 1].split('')
+    for (let x = 0; x < cols; x++) if (padded[ROWS - 2][x] === '.' && bottom[x] === '.') bottom[x] = '^'
+    padded[ROWS - 1] = bottom.join('')
+  }
   const plates: Level['plates'] = []
   const checkpoints: number[] = []
   let x0 = 1e9, y0 = 1e9, x1 = -1, y1 = -1
@@ -139,7 +145,7 @@ const level4 = new Builder(112)
   .cp(48)
   .spikes(52, 55).chain('a', 58)
   .cp(68)
-  .spikes(72, 74).spikes(77, 79)
+  .spikes(72, 74).spikes(77, 79).cp(80)
   .pillar(82, 83, 7).plate('b', 82, 6).door('b', 88).plate('b', 91)
   .cp(93)
   .chain('c', 96).spikes(106, 107)

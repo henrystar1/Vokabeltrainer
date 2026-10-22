@@ -26,7 +26,7 @@ export interface Body {
   /** Noch verfügbare Luftsprünge (Doppelsprung). */
   air: number
 }
-export interface Input { move: number; jump: boolean }
+export interface Input { move: number; jump: boolean; /** Luftsprünge nach dem Bodensprung (Standard 1 = Doppelsprung; Admin 3 = Vierfachsprung). */ airJumps?: number }
 export type Pressed = Record<string, boolean>
 export interface Point { x: number; y: number }
 
@@ -80,9 +80,17 @@ function touchesSpike(lv: Level, b: Body): boolean {
   return false
 }
 
-/** Ein Schritt (dt Sekunden). Gibt 'dead' zurück bei Stacheln, Absturz oder Einklemmen. */
-export function stepBody(b: Body, inp: Input, lv: Level, pressed: Pressed, other: Point | null, dt: number): 'ok' | 'dead' {
-  if (hitsSolid(lv, pressed, b.x, b.y)) return 'dead' // von einer Tür eingeklemmt
+/** Steht der Körper an dieser Stelle frei (weder in einem festen Block noch in Stacheln)? */
+export function spotIsSafe(lv: Level, pressed: Pressed, x: number, y: number): boolean {
+  return !hitsSolid(lv, pressed, x, y) && !touchesSpike(lv, { x, y } as Body)
+}
+
+/**
+ * Ein Schritt (dt Sekunden). 'dead' = Stacheln berührt (das einzige, was ein Herz kostet).
+ * 'lost' = eingeklemmt oder aus der Welt gefallen: Neustart ohne Herzverlust.
+ */
+export function stepBody(b: Body, inp: Input, lv: Level, pressed: Pressed, other: Point | null, dt: number): 'ok' | 'dead' | 'lost' {
+  if (hitsSolid(lv, pressed, b.x, b.y)) return 'lost' // von einer Tür eingeklemmt
   const target = Math.max(-1, Math.min(1, inp.move)) * RUN
   const acc = (b.ground ? ACC_GROUND : ACC_AIR) * dt
   b.vx = b.vx < target ? Math.min(target, b.vx + acc) : Math.max(target, b.vx - acc)
@@ -93,7 +101,7 @@ export function stepBody(b: Body, inp: Input, lv: Level, pressed: Pressed, other
   if (fresh) b.buf = BUFFER
   else b.buf = Math.max(0, b.buf - dt)
   b.coyote = b.ground ? COYOTE : Math.max(0, b.coyote - dt)
-  if (b.ground) b.air = 1
+  if (b.ground) b.air = inp.airJumps ?? 1
   if (fresh && b.coyote <= 0 && b.air > 0) {
     // Doppelsprung in der Luft
     b.vy = JUMP_V
@@ -140,7 +148,8 @@ export function stepBody(b: Body, inp: Input, lv: Level, pressed: Pressed, other
     b.vy = 0
     b.ground = true
   }
-  if (touchesSpike(lv, b) || b.y > ROWS * TILE + 60) return 'dead'
+  if (touchesSpike(lv, b)) return 'dead'
+  if (b.y > ROWS * TILE + 60) return 'lost'
   return 'ok'
 }
 

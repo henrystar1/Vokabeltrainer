@@ -4,7 +4,7 @@ import { LEVELS, ROWS, TILE } from './levels'
 
 const dt = 1 / 60
 function run(b: ReturnType<typeof newBody>, lv = LEVELS[0], inp: { move: number; jump: boolean }, secs: number, other: { x: number; y: number } | null = null) {
-  let r: 'ok' | 'dead' = 'ok'
+  let r: 'ok' | 'dead' | 'lost' = 'ok'
   for (let i = 0; i < secs * 60 && r === 'ok'; i++) r = stepBody(b, inp, lv, pressedMap(lv, [b, other]), other, dt)
   return r
 }
@@ -47,7 +47,21 @@ describe('parkour', () => {
     const b = newBody(20 * TILE + 4, 10 * TILE - PH - 0.5)
     expect(run(b, lv, { move: 0, jump: false }, 1)).toBe('dead')
     const c = newBody(12 * TILE + 2, 10 * TILE - PH - 0.5)
-    expect(run(c, lv, { move: 1, jump: false }, 3)).toBe('dead') // Lücke bei Spalte 12–14
+    expect(run(c, lv, { move: 1, jump: false }, 3)).toBe('dead') // Lücke bei Spalte 12–14: unten sind Stacheln
+  })
+  it('jede Schlucht hat unten Stacheln, nur Stacheln kosten ein Herz', () => {
+    for (const lv of LEVELS) {
+      for (let x = 0; x < lv.cols; x++) {
+        if (lv.rows[ROWS - 2][x] === '.') expect(lv.rows[ROWS - 1][x]).toBe('^')
+      }
+    }
+  })
+  it('Einklemmen und Herausfallen kosten kein Herz', () => {
+    const lv = LEVELS[0]
+    const stuck = newBody(38 * TILE + 4, 5 * TILE) // mitten in der geschlossenen Tür
+    expect(stepBody(stuck, { move: 0, jump: false }, lv, {}, null, dt)).toBe('lost')
+    const out = newBody(5 * TILE, ROWS * TILE + 100)
+    expect(stepBody(out, { move: 0, jump: false }, lv, {}, null, dt)).toBe('lost')
   })
   it('Platte öffnet Tür, Partner geht durch', () => {
     const lv = LEVELS[0]

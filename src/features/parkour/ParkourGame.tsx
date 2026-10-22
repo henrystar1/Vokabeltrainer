@@ -2,11 +2,12 @@ import { useEffect, useRef, useState } from 'react'
 import { ArrowUp, Skull } from 'lucide-react'
 import { Joystick } from '../games/joystick'
 import { useFocusMode } from '../koins/focusMode'
+import { useAuth } from '../auth/AuthProvider'
 import { supabase } from '../../lib/supabaseClient'
 import { teamParkourFinish, type TeamState } from '../../services/play'
 import { levelFor } from './generator'
 import { ROWS, TILE, VIEW_H, VIEW_W, type Level } from './levels'
-import { PH, PW, checkpointAt, inExit, newBody, pressedMap, spawnAt, stepBody, type Body, type Pressed } from './engine'
+import { PH, PW, checkpointAt, inExit, newBody, pressedMap, spawnAt, spotIsSafe, stepBody, type Body, type Pressed } from './engine'
 
 const COLORS = ['#22d3ee', '#e879f9']
 const SEND_MS = 50
@@ -23,6 +24,9 @@ const hash = (n: number) => {
 export default function ParkourGame({ st, startLevel = 0 }: { st: TeamState; startLevel?: number }) {
   const canvas = useRef<HTMLCanvasElement>(null)
   useFocusMode(true)
+  const { isAdmin } = useAuth()
+  const adminRef = useRef(isAdmin)
+  adminRef.current = isAdmin // Admins springen vierfach (3 Luftsprünge)
   const input = useRef({ stick: 0, left: false, right: false, jump: false, kill: false })
   const [hud, setHud] = useState({ level: 0, deaths: 0, ms: 0, linked: false, done: false })
   const hostIdx = st.is_host ? 0 : 1
@@ -113,11 +117,13 @@ export default function ParkourGame({ st, startLevel = 0 }: { st: TeamState; sta
       if (visible.length > 0) {
         const near = visible.reduce((a, b) => (Math.abs(b * TILE - me.x) < Math.abs(a * TILE - me.x) ? b : a))
         pos = spawnAt(level, st.is_host, near)
-      } else if (remote && now - remote.seen < STALE_MS && !remote.dead && remote.g) {
+      } else if (remote && remote.lv === lv && now - remote.seen < STALE_MS && !remote.dead && remote.g) {
         pos = { x: remote.x, y: remote.y }
       } else {
         pos = spawnAt(level, st.is_host, cp)
       }
+      // Nie an einer Stelle starten, an der man sofort stirbt oder feststeckt
+      if (!spotIsSafe(level, pressedMap(level, [remote && remote.lv === lv && !remote.dead ? { x: remote.x, y: remote.y } : null]), pos.x, pos.y)) pos = spawnAt(level, st.is_host, cp)
       Object.assign(me, newBody(pos.x, pos.y))
     }
 
@@ -129,7 +135,7 @@ export default function ParkourGame({ st, startLevel = 0 }: { st: TeamState; sta
 
     function step(dt: number, now: number) {
       const level = levelOf(lv)
-      const fresh = remote !== null && now - remote.seen < STALE_MS
+      const fresh = remote !== null && remote.lv === lv && now - remote.seen < STALE_MS
       const other = fresh && remote && !remote.dead ? { x: remote.x, y: remote.y } : null
       const pressed: Pressed = pressedMap(level, [deadT > 0 ? null : me, other])
       if (finished) return
@@ -145,8 +151,9 @@ export default function ParkourGame({ st, startLevel = 0 }: { st: TeamState; sta
       }
       const i = input.current
       const move = i.stick !== 0 ? i.stick : (i.right ? 1 : 0) - (i.left ? 1 : 0)
-      const r = stepBody(me, { move, jump: i.jump }, level, pressed, other, dt)
+      const r = stepBody(me, { move, jump: i.jump, airJumps: adminRef.current ? 3 : 1 }, level, pressed, other, dt)
       if (r === 'dead') { deaths += 1; hearts -= 1; deadT = 0.7; checkOver(); return }
+      if (r === 'lost') { deadT = 0.5; return } // eingeklemmt / aus der Welt: neu starten, aber kein Herz verlieren
       const c = checkpointAt(level, me)
       if (c !== null && (cp === null || c > cp)) { cp = c; cpTotal += 1 }
       // Ausgang: beide gleichzeitig drin
@@ -160,7 +167,7 @@ export default function ParkourGame({ st, startLevel = 0 }: { st: TeamState; sta
 
     function render(now: number) {
       const level = levelOf(lv)
-      const fresh = remote !== null && now - remote.seen < STALE_MS
+      const fresh = remote !== null && remote.lv === lv && now - remote.seen < STALE_MS
       const other = fresh && remote && !remote.dead ? { x: remote.x, y: remote.y } : null
       const pressed = pressedMap(level, [deadT > 0 ? null : me, other])
       // Kamera
