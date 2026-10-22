@@ -86,8 +86,9 @@ export function generateLevel(seed: string, n: number): Level {
         break
       }
       case 'tower':
-        g.tower(c, x).door(c, x + 20).tower(c, x + 24)
-        x += 40
+        // Platte oben auf dem Turm, Tür 4 Kacheln dahinter, niedrige Säule mit Platte (Leine: Platten höchstens 16 Kacheln auseinander)
+        g.tower(c, x).door(c, x + 16).pillar(x + 20, x + 21, 7).plate(c, x + 20, 6)
+        x += 26
         break
       case 'double': {
         const c2 = CHANNELS[ch++ % 3]
