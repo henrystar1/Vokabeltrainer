@@ -21,7 +21,7 @@ export interface Level {
   exit: { x: number; y: number; w: number; h: number }
 }
 
-class Builder {
+export class Builder {
   readonly g: string[][]
   constructor(readonly cols: number) {
     this.g = Array.from({ length: ROWS }, () => Array<string>(cols).fill('.'))
@@ -34,6 +34,8 @@ class Builder {
     for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) this.set(x, y, ch)
     return this
   }
+  /** Löscht Boden (Abgrund) von Spalte x0 bis x1. */
+  clear(x0: number, x1: number): this { return this.rect(x0, 10, x1, 11, '.') }
   /** Boden (Zeilen 10 und 11) von Spalte x0 bis x1. */
   ground(x0: number, x1: number): this { return this.rect(x0, 10, x1, 11, '#') }
   spikes(x0: number, x1: number, y = 9): this { return this.rect(x0, y, x1, y, '^') }
@@ -59,6 +61,10 @@ class Builder {
     return this.plate(ch, top, 1)
   }
   exit(x: number): this { return this.rect(x, 7, x + 1, 9, 'X') }
+  /** Wie build, aber auf die ersten `cols` Spalten beschnitten. */
+  buildCropped(cols: number, name: string, hint: string): Level {
+    return parse(name, hint, this.g.map((r) => r.slice(0, cols).join('')))
+  }
   build(name: string, hint: string): Level {
     const rows = this.g.map((r) => r.join(''))
     return parse(name, hint, rows)

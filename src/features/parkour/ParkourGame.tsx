@@ -4,7 +4,8 @@ import { Joystick } from '../games/joystick'
 import { useFocusMode } from '../koins/focusMode'
 import { supabase } from '../../lib/supabaseClient'
 import { teamParkourFinish, type TeamState } from '../../services/play'
-import { LEVELS, ROWS, TILE, VIEW_H, VIEW_W } from './levels'
+import { levelFor } from './generator'
+import { ROWS, TILE, VIEW_H, VIEW_W, type Level } from './levels'
 import { PH, PW, checkpointAt, inExit, newBody, pressedMap, spawnAt, stepBody, type Body, type Pressed } from './engine'
 
 const COLORS = ['#22d3ee', '#e879f9']
@@ -38,6 +39,13 @@ export default function ParkourGame({ st, startLevel = 0 }: { st: TeamState; sta
 
     let lv = startLevel
     let cp: number | null = null
+    // Level 1–8 sind handgebaut, danach zufällig (für beide gleich, aus der Lauf-ID) und immer schwerer.
+    const cache = new Map<number, Level>()
+    const levelOf = (n: number): Level => {
+      let l = cache.get(n)
+      if (!l) { l = levelFor(st.id, n); cache.set(n, l) }
+      return l
+    }
     const maxHearts = Math.max(1, st.lives || 3)
     let hearts = maxHearts
     let cpTotal = 0
@@ -51,7 +59,7 @@ export default function ParkourGame({ st, startLevel = 0 }: { st: TeamState; sta
     let t = 0
     let titleT = 3
     const startPerf = performance.now()
-    const me: Body = (() => { const s = spawnAt(LEVELS[startLevel], st.is_host, null); return newBody(s.x, s.y) })()
+    const me: Body = (() => { const s = spawnAt(levelOf(startLevel), st.is_host, null); return newBody(s.x, s.y) })()
     let remote: Remote | null = null
     const draw: { x: number; y: number } = { x: 0, y: 0 }
     let ready = false
@@ -67,7 +75,7 @@ export default function ParkourGame({ st, startLevel = 0 }: { st: TeamState; sta
       const first = remote === null
       remote = { x: p.x, y: p.y, face: p.face === -1 ? -1 : 1, lv: p.lv ?? 0, cp: p.cp ?? null, dead: !!p.dead, ex: !!p.ex, dc: p.dc ?? 0, g: !!p.g, seen: performance.now() }
       if (first) { draw.x = remote.x; draw.y = remote.y }
-      if (remote.lv > lv && remote.lv < LEVELS.length) goLevel(remote.lv)
+      if (remote.lv > lv && remote.lv < lv + 3) goLevel(remote.lv)
       if (remote.lv === lv && remote.cp !== null && (cp === null || remote.cp > cp)) { cp = remote.cp; cpTotal += 1 }
       // Tode des Partners kosten auch dir ein gemeinsames Herz
       if (remote.dc > partnerDc) { hearts -= remote.dc - partnerDc; partnerDc = remote.dc; checkOver() }
@@ -90,7 +98,7 @@ export default function ParkourGame({ st, startLevel = 0 }: { st: TeamState; sta
       cp = null
       exitHold = 0
       titleT = 3
-      const s = spawnAt(LEVELS[lv], st.is_host, null)
+      const s = spawnAt(levelOf(lv), st.is_host, null)
       Object.assign(me, newBody(s.x, s.y))
       remote = remote ? { ...remote, ex: false } : null
       cam = 0
@@ -98,7 +106,7 @@ export default function ParkourGame({ st, startLevel = 0 }: { st: TeamState; sta
 
     /** Zurück ins Spiel: zu einem erreichten Checkpoint, der im Bild ist, sonst zum Mitspieler, sonst zum letzten Checkpoint. */
     function respawn(now: number) {
-      const level = LEVELS[lv]
+      const level = levelOf(lv)
       const reached = [2, ...level.checkpoints.filter((c) => cp !== null && c <= cp)]
       const visible = reached.filter((c) => c * TILE + TILE > cam && c * TILE < cam + VIEW_W)
       let pos: { x: number; y: number }
@@ -116,11 +124,11 @@ export default function ParkourGame({ st, startLevel = 0 }: { st: TeamState; sta
     function send(now: number) {
       if (!ready || now - lastSend < SEND_MS) return
       lastSend = now
-      void ch.send({ type: 'broadcast', event: 's', payload: { u: st.me, x: me.x, y: me.y, face: me.face, lv, cp, dead: deadT > 0, ex: inExit(LEVELS[lv], me), dc: deaths, g: me.ground } })
+      void ch.send({ type: 'broadcast', event: 's', payload: { u: st.me, x: me.x, y: me.y, face: me.face, lv, cp, dead: deadT > 0, ex: inExit(levelOf(lv), me), dc: deaths, g: me.ground } })
     }
 
     function step(dt: number, now: number) {
-      const level = LEVELS[lv]
+      const level = levelOf(lv)
       const fresh = remote !== null && now - remote.seen < STALE_MS
       const other = fresh && remote && !remote.dead ? { x: remote.x, y: remote.y } : null
       const pressed: Pressed = pressedMap(level, [deadT > 0 ? null : me, other])
@@ -145,14 +153,13 @@ export default function ParkourGame({ st, startLevel = 0 }: { st: TeamState; sta
       if (inExit(level, me) && fresh && remote && remote.lv === lv && remote.ex) {
         exitHold += dt
         if (exitHold > 0.7 && !finished) {
-          if (lv + 1 < LEVELS.length) goLevel(lv + 1)
-          else report(LEVELS.length)
+          goLevel(lv + 1)
         }
       } else exitHold = 0
     }
 
     function render(now: number) {
-      const level = LEVELS[lv]
+      const level = levelOf(lv)
       const fresh = remote !== null && now - remote.seen < STALE_MS
       const other = fresh && remote && !remote.dead ? { x: remote.x, y: remote.y } : null
       const pressed = pressedMap(level, [deadT > 0 ? null : me, other])
@@ -260,7 +267,7 @@ export default function ParkourGame({ st, startLevel = 0 }: { st: TeamState; sta
       for (let h = 0; h < maxHearts; h++) { ctx!.fillStyle = h < hearts ? '#fb7185' : '#475569'; ctx!.fillText('♥', VIEW_W / 2 + (h - (maxHearts - 1) / 2) * 22, 19) }
       ctx!.font = '600 12px system-ui, sans-serif'; ctx!.fillStyle = '#e2e8f0'; ctx!.textAlign = 'left'
       ctx!.textAlign = 'right'
-      ctx!.fillText(`${Math.floor(secs / 60)}:${String(secs % 60).padStart(2, '0')}  ·  Level ${lv + 1}/${LEVELS.length}`, VIEW_W - 10, 17)
+      ctx!.fillText(`${Math.floor(secs / 60)}:${String(secs % 60).padStart(2, '0')}  ·  Level ${lv + 1}`, VIEW_W - 10, 17)
       ctx!.textAlign = 'center'
       if (!fresh) {
         ctx!.fillStyle = 'rgba(2,6,23,0.7)'; ctx!.fillRect(VIEW_W / 2 - 150, 40, 300, 28)
@@ -352,7 +359,7 @@ export default function ParkourGame({ st, startLevel = 0 }: { st: TeamState; sta
         </button>
       </div>
       <p className="text-center text-xs text-slate-500">
-        Joystick links = laufen, Knopf rechts = springen, in der Luft nochmal tippen = Doppelsprung (Tastatur: Pfeile/WASD und Leertaste). Gemeinsam habt ihr 3 Herzen (jedes geschaffte Level bringt eins zurück), jeder Sturz kostet eins. Steckt ihr fest, hilft „Neustart“ (Taste R): ihr landet am Checkpoint im Bild oder bei eurem Partner. Je weiter ihr kommt, desto mehr Coins.
+        Joystick links = laufen, Knopf rechts = springen, in der Luft nochmal tippen = Doppelsprung (Tastatur: Pfeile/WASD und Leertaste). Gemeinsam habt ihr 3 Herzen (jedes geschaffte Level bringt eins zurück), jeder Sturz kostet eins. Steckt ihr fest, hilft „Neustart“ (Taste R): ihr landet am Checkpoint im Bild oder bei eurem Partner. Die Level hören nie auf und werden immer schwerer. Je weiter ihr kommt, desto mehr Coins.
         {hud.linked ? '' : ' Verbindung zum Partner wird aufgebaut …'}
       </p>
     </div>

@@ -137,9 +137,9 @@ export default function TeamRunRoom() {
             <Slot p={host} color={COLORS[0]} joined waitingText="" />
             <Slot p={partner} color={COLORS[1]} joined={joined} waitingText="wartet auf Antwort …" />
           </div>
-          <p className="text-center text-sm text-slate-400">{st.kind === 'parkour' ? `8 Level · Joystick, Sprung und Doppelsprung · ${st.lives} gemeinsame Herzen · nur zu zweit zu schaffen` : `${st.obstacles} Hindernisse · ${st.lives} gemeinsame Leben`}</p>
+          <p className="text-center text-sm text-slate-400">{st.kind === 'parkour' ? `Endlos viele Level, immer schwerer · Joystick, Sprung und Doppelsprung · ${st.lives} gemeinsame Herzen` : `${st.obstacles} Hindernisse · ${st.lives} gemeinsame Leben`}</p>
           {st.kind === 'parkour'
-            ? <p className="text-center text-sm text-amber-200">Coins je nach Fortschritt: {st.coins[0]} pro Level, {st.coins[1]} pro Checkpoint, {st.coins[2]} Bonus fürs Ziel (für jeden)</p>
+            ? <p className="text-center text-sm text-amber-200">Coins je nach Fortschritt: {st.coins[0]} pro Level (ab Level 9 mehr), {st.coins[1]} pro Checkpoint, {st.coins[2]} Bonus für Level 8 (für jeden)</p>
             : st.reward > 0 && <p className="text-center text-sm text-amber-200">Bei Erfolg: {st.reward} Coins für jeden</p>}
           {error && <ErrorBox message={error} />}
           {st.is_host ? (
@@ -238,13 +238,13 @@ export default function TeamRunRoom() {
   const wrong = st.host_wrong + st.partner_wrong
   return (
     <div className="mx-auto max-w-xl space-y-5">
-      <PageHeader eyebrow={st.kind === 'parkour' ? 'Team-Parkour' : 'Vokabel-Parcours'} title={won ? 'Geschafft – ihr seid im Ziel!' : st.kind === 'parkour' ? 'Keine Herzen mehr' : 'Leider nicht geschafft'} />
+      <PageHeader eyebrow={st.kind === 'parkour' ? 'Team-Parkour' : 'Vokabel-Parcours'} title={st.kind === 'parkour' ? 'Keine Herzen mehr' : won ? 'Geschafft – ihr seid im Ziel!' : 'Leider nicht geschafft'} />
       {st.kind === 'quiz' && <TeamTrack st={st} />}
       <Card className="space-y-4 text-center">
         <div className="flex justify-center">{won ? <Trophy size={44} className="text-amber-300" /> : <Hearts left={0} total={st.lives} />}</div>
         {st.kind === 'parkour' ? (
           <p className="text-slate-300">
-            {won ? 'Alle 8 Level gemeinsam geschafft' : `${st.levels ?? 0} von 8 Level geschafft, ${st.cps ?? 0} Checkpoints erreicht`} · {Math.floor((st.millis ?? 0) / 60000)}:{String(Math.floor(((st.millis ?? 0) % 60000) / 1000)).padStart(2, '0')} Min. · {st.deaths ?? 0} Stürze
+            {`${st.levels ?? 0} Level geschafft, ${st.cps ?? 0} Checkpoints erreicht`} · {Math.floor((st.millis ?? 0) / 60000)}:{String(Math.floor(((st.millis ?? 0) % 60000) / 1000)).padStart(2, '0')} Min. · {st.deaths ?? 0} Stürze
           </p>
         ) : (
         <p className="text-slate-300">{won ? `Alle ${st.obstacles} Hindernisse gemeinsam überwunden.` : `Bei Hindernis ${Math.min(st.step + 1, st.obstacles)} von ${st.obstacles} waren die Leben aufgebraucht.`}</p>

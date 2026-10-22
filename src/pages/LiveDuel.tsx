@@ -143,7 +143,7 @@ export default function LiveDuel() {
                   <span className="w-6 text-center font-mono text-sm text-slate-400">{i + 1}.</span>
                   <span className="flex -space-x-2"><Avatar name={r.host_name} avatarId={r.host_avatar_id} colorId={r.host_color_id} size={28} /><Avatar name={r.partner_name} avatarId={r.partner_avatar_id} colorId={r.partner_color_id} size={28} /></span>
                   <span className="min-w-0 flex-1 truncate text-sm">{r.host_name} &amp; {r.partner_name}</span>
-                  <span className="shrink-0 text-right font-mono text-xs text-amber-200">Level {r.levels}/8<br /><span className="text-slate-400">{Math.floor(r.millis / 60000)}:{String(Math.floor((r.millis % 60000) / 1000)).padStart(2, '0')}</span></span>
+                  <span className="shrink-0 text-right font-mono text-xs text-amber-200">Level {r.levels}<br /><span className="text-slate-400">{Math.floor(r.millis / 60000)}:{String(Math.floor((r.millis % 60000) / 1000)).padStart(2, '0')}</span></span>
                 </li>
               ))}
             </ol>
@@ -162,7 +162,7 @@ export default function LiveDuel() {
       <Notice tone="info">
         {mode === 'team' ? (
           teamKind === 'parkour'
-            ? <>Ein Jump-and-Run für <b>zwei</b> mit Joystick und Sprungknopf (Doppelsprung: Knopf zweimal tippen): acht Level, die immer schwerer werden und nur gemeinsam gehen. Steht auf Platten, damit Türen und Brücken offen bleiben. Ihr habt 3 gemeinsame Herzen, ein Sturz kostet eins, ein geschafftes Level bringt eins zurück. Je weiter ihr kommt, desto mehr Coins.</>
+            ? <>Ein Jump-and-Run für <b>zwei</b> mit Joystick und Sprungknopf (Doppelsprung: Knopf zweimal tippen): Level ohne Ende (die ersten 8 sind handgebaut, danach kommen zufällige), die immer schwerer werden und nur gemeinsam gehen. Steht auf Platten, damit Türen und Brücken offen bleiben. Ihr habt 3 gemeinsame Herzen, ein Sturz kostet eins, ein geschafftes Level bringt eins zurück. Je weiter ihr kommt, desto mehr Coins.</>
             : <>Ihr zwei lauft gemeinsam einen Vokabel-Parcours. An jedem Hindernis bekommt <b>jeder</b> eine eigene Vokabel, und ihr kommt nur weiter, wenn <b>beide</b> richtig antworten. Jede falsche Antwort kostet ein gemeinsames Leben.</>
         ) : mode === 'class' ? (
           <>Für die ganze Klasse: Du wählst ein Buch, öffnest einen Raum und alle (bis 20) treten mit dem <b>Code</b> bei oder werden eingeladen. Gefragt werden Vokabeln aus dem Buch, egal ob aktiv. Oben siehst du live die Besten auf ihren Strahlen.</>

@@ -427,3 +427,8 @@ Tabelle `book_library_hidden`; `in_library` blendet ein veröffentlichtes Buch d
 - Neustart-Knopf (Taste R, ohne Herzverlust, 1,5 s Pause): Respawn an einem erreichten Checkpoint, der im Bild ist (der nächste); sonst beim Partner (wenn dieser am Boden steht), sonst beim letzten Checkpoint. Gilt auch nach einem Sturz.
 - Coins: `parkour_coins_level` je Level, `parkour_coins_cp` je erreichtem Checkpoint, `parkour_coins_bonus` für alle 8 Level, jeweils für beide; Mindestdauer 12 s je gemeldetem Level; Tageslimit `team_daily_cap`.
 - `team_parkour_board()`: bester Lauf je Duo (Level, Checkpoints, Zeit), Top 20; Anzeige im Reiter „Team-Parkour“ in `pages/LiveDuel.tsx`.
+
+### 0046 – Team-Parkour endlos
+- `features/parkour/generator.ts`: nach den 8 handgebauten Leveln erzeugt `generateLevel(seed, n)` zufällige Level. Seed = Lauf-ID + Levelnummer (`rng` = mulberry32), daher haben beide Spieler dasselbe Level, ohne dass etwas übertragen wird. `levelFor(seed, n)` wählt handgebaut oder zufällig.
+- Schwierigkeit d = n − 7: mehr Abschnitte (5 + d, höchstens 18), breitere Stachelfelder (bis 6), mehr und schmalere Plattformen mit größeren Lücken, ab d 2 Türme, ab d 3 Doppelbrücken. Alles bleibt in Sprungreichweite (Doppelsprung ≈ 7 Kacheln weit, 5 hoch); Tests in `generator.test.ts` prüfen Gültigkeit (Ausgang, Platten-Paare, Spawn frei) für viele Seeds.
+- Der Lauf endet nur durch aufgebrauchte Herzen. `team_parkour_finish` erlaubt bis zu 500 Level; ab Level 9 gibt es `parkour_coins_endless` Extra-Coins je Level. Status `won` ab Level 8.
