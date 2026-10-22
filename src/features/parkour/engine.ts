@@ -7,6 +7,7 @@ const ACC_GROUND = 1700
 const ACC_AIR = 1200
 const GRAV = 1800
 const MAX_FALL = 900
+const FLY = 260
 export const JUMP_V = -570
 const COYOTE = 0.1
 const BUFFER = 0.12
@@ -26,7 +27,10 @@ export interface Body {
   /** Noch verfügbare Luftsprünge (Doppelsprung). */
   air: number
 }
-export interface Input { move: number; jump: boolean; /** Luftsprünge nach dem Bodensprung (Standard 1 = Doppelsprung; Admin 3 = Vierfachsprung). */ airJumps?: number }
+export interface Input { move: number; jump: boolean; /** Luftsprünge nach dem Bodensprung (Standard 1 = Doppelsprung; Admin 3 = Vierfachsprung). */ airJumps?: number
+  /** Flugmodus (Admin): schweben, W/S = hoch/runter, keine Stacheln. `vert` −1 = hoch, 1 = runter. */
+  fly?: boolean
+  vert?: number }
 export type Pressed = Record<string, boolean>
 export interface Point { x: number; y: number }
 
@@ -53,14 +57,17 @@ function hitsSolid(lv: Level, pressed: Pressed, x: number, y: number): boolean {
   return false
 }
 
-/** Welche Kanäle sind gedrückt? Eine Platte zählt, wenn jemand mit den Füßen darauf steht. */
+/**
+ * Welche Kanäle sind gedrückt? Eine Platte zählt, wenn jemand mit den Füßen darauf steht. Die Zone ist großzügig
+ * (ganze Kachel plus 3 px Rand, Füße dürfen ein paar Pixel darüber schweben), damit man den Knopf nie knapp verfehlt.
+ */
 export function pressedMap(lv: Level, bodies: ReadonlyArray<Point | null>): Pressed {
   const out: Pressed = {}
   for (const p of lv.plates) {
-    const px = p.x * TILE + 2, py = p.y * TILE + 26, pw = TILE - 4, ph = 6
+    const px = p.x * TILE - 3, py = p.y * TILE + 20, pw = TILE + 6, ph = 14
     for (const b of bodies) {
       if (!b) continue
-      const fx = b.x + 2, fy = b.y + PH - 3, fw = PW - 4, fh = 4
+      const fx = b.x + 1, fy = b.y + PH - 6, fw = PW - 2, fh = 8
       if (fx < px + pw && fx + fw > px && fy < py + ph && fy + fh > py) out[p.ch] = true
     }
   }
@@ -91,6 +98,23 @@ export function spotIsSafe(lv: Level, pressed: Pressed, x: number, y: number): b
  */
 export function stepBody(b: Body, inp: Input, lv: Level, pressed: Pressed, other: Point | null, dt: number): 'ok' | 'dead' | 'lost' {
   if (hitsSolid(lv, pressed, b.x, b.y)) return 'lost' // von einer Tür eingeklemmt
+  if (inp.fly) {
+    // Flugmodus: kein Fallen, keine Stacheln; Wände und feste Türen bleiben fest
+    b.ground = false
+    b.air = inp.airJumps ?? 1
+    b.vx = Math.max(-1, Math.min(1, inp.move)) * FLY
+    b.vy = Math.max(-1, Math.min(1, inp.vert ?? 0)) * FLY
+    if (inp.move !== 0) b.face = inp.move > 0 ? 1 : -1
+    let fx = b.x + b.vx * dt
+    if (hitsSolid(lv, pressed, fx, b.y)) { fx = b.x; b.vx = 0 }
+    b.x = fx
+    if (other) b.x = Math.max(other.x - LEASH, Math.min(other.x + LEASH, b.x))
+    let fy = b.y + b.vy * dt
+    if (hitsSolid(lv, pressed, b.x, fy)) { fy = b.y; b.vy = 0 }
+    b.y = Math.max(-6 * TILE, Math.min(ROWS * TILE - PH - 1, fy))
+    b.jumpHeld = inp.jump
+    return 'ok'
+  }
   const target = Math.max(-1, Math.min(1, inp.move)) * RUN
   const acc = (b.ground ? ACC_GROUND : ACC_AIR) * dt
   b.vx = b.vx < target ? Math.min(target, b.vx + acc) : Math.max(target, b.vx - acc)

@@ -6,6 +6,7 @@ import { useAuth } from '../auth/AuthProvider'
 import { supabase } from '../../lib/supabaseClient'
 import { teamParkourFinish, type TeamState } from '../../services/play'
 import { levelFor } from './generator'
+import { PK_HATS, pkFill } from './cosmetics'
 import { ROWS, TILE, VIEW_H, VIEW_W, type Level } from './levels'
 import { PH, PW, checkpointAt, inExit, newBody, pressedMap, spawnAt, spotIsSafe, stepBody, type Body, type Pressed } from './engine'
 
@@ -13,7 +14,7 @@ const COLORS = ['#22d3ee', '#e879f9']
 const SEND_MS = 50
 const STALE_MS = 2500
 
-interface Remote { x: number; y: number; face: 1 | -1; lv: number; cp: number | null; dead: boolean; ex: boolean; dc: number; g: boolean; seen: number }
+interface Remote { x: number; y: number; face: 1 | -1; lv: number; cp: number | null; dead: boolean; ex: boolean; dc: number; g: boolean; seen: number; lh: number }
 
 const hash = (n: number) => {
   const x = Math.sin(n * 127.1 + 311.7) * 43758.5453
@@ -27,7 +28,9 @@ export default function ParkourGame({ st, startLevel = 0 }: { st: TeamState; sta
   const { isAdmin } = useAuth()
   const adminRef = useRef(isAdmin)
   adminRef.current = isAdmin // Admins springen vierfach (3 Luftsprünge)
-  const input = useRef({ stick: 0, left: false, right: false, jump: false, kill: false })
+  const input = useRef({ stick: 0, left: false, right: false, jump: false, down: false, fly: false, kill: false })
+  const [flyUi, setFlyUi] = useState(false)
+  const toggleFly = () => { if (!adminRef.current) return; input.current.fly = !input.current.fly; setFlyUi(input.current.fly) }
   const [hud, setHud] = useState({ level: 0, deaths: 0, ms: 0, linked: false, done: false })
   const hostIdx = st.is_host ? 0 : 1
   const names = [st.people.find((p) => p.is_host)?.name ?? 'Host', st.people.find((p) => !p.is_host)?.name ?? 'Partner']
@@ -50,7 +53,8 @@ export default function ParkourGame({ st, startLevel = 0 }: { st: TeamState; sta
       if (!l) { l = levelFor(st.id, n); cache.set(n, l) }
       return l
     }
-    const maxHearts = Math.max(1, st.lives || 3)
+    // Gemeinsamer Herzvorrat: Grundwert plus die im Shop gekauften Extra-Herzen beider Personen
+    const maxHearts = Math.min(15, Math.max(1, st.lives || 3) + st.people.reduce((a, p) => a + Math.max(0, Math.min(10, p.pk_hearts ?? 0)), 0))
     let hearts = maxHearts
     let cpTotal = 0
     let partnerDc = 0
@@ -62,6 +66,8 @@ export default function ParkourGame({ st, startLevel = 0 }: { st: TeamState; sta
     let cam = 0
     let t = 0
     let titleT = 3
+    let graceT = 1.5 // kurz nach Start/Neustart kosten Stacheln und Absturz kein Herz
+    const hashLevel = (l: Level) => { let h = 5381; for (const r of l.rows) for (let i = 0; i < r.length; i++) h = ((h << 5) + h + r.charCodeAt(i)) | 0; return h }
     const startPerf = performance.now()
     const me: Body = (() => { const s = spawnAt(levelOf(startLevel), st.is_host, null); return newBody(s.x, s.y) })()
     let remote: Remote | null = null
@@ -77,7 +83,7 @@ export default function ParkourGame({ st, startLevel = 0 }: { st: TeamState; sta
       const p = payload as Partial<Remote> & { u?: string }
       if (p.u === st.me || typeof p.x !== 'number' || typeof p.y !== 'number') return
       const first = remote === null
-      remote = { x: p.x, y: p.y, face: p.face === -1 ? -1 : 1, lv: p.lv ?? 0, cp: p.cp ?? null, dead: !!p.dead, ex: !!p.ex, dc: p.dc ?? 0, g: !!p.g, seen: performance.now() }
+      remote = { x: p.x, y: p.y, face: p.face === -1 ? -1 : 1, lv: p.lv ?? 0, cp: p.cp ?? null, dead: !!p.dead, ex: !!p.ex, dc: p.dc ?? 0, g: !!p.g, seen: performance.now(), lh: p.lh ?? 0 }
       if (first) { draw.x = remote.x; draw.y = remote.y }
       if (remote.lv > lv && remote.lv < lv + 3) goLevel(remote.lv)
       if (remote.lv === lv && remote.cp !== null && (cp === null || remote.cp > cp)) { cp = remote.cp; cpTotal += 1 }
@@ -102,6 +108,7 @@ export default function ParkourGame({ st, startLevel = 0 }: { st: TeamState; sta
       cp = null
       exitHold = 0
       titleT = 3
+      graceT = 1.5
       const s = spawnAt(levelOf(lv), st.is_host, null)
       Object.assign(me, newBody(s.x, s.y))
       remote = remote ? { ...remote, ex: false } : null
@@ -125,12 +132,13 @@ export default function ParkourGame({ st, startLevel = 0 }: { st: TeamState; sta
       // Nie an einer Stelle starten, an der man sofort stirbt oder feststeckt
       if (!spotIsSafe(level, pressedMap(level, [remote && remote.lv === lv && !remote.dead ? { x: remote.x, y: remote.y } : null]), pos.x, pos.y)) pos = spawnAt(level, st.is_host, cp)
       Object.assign(me, newBody(pos.x, pos.y))
+      graceT = 1.5
     }
 
     function send(now: number) {
       if (!ready || now - lastSend < SEND_MS) return
       lastSend = now
-      void ch.send({ type: 'broadcast', event: 's', payload: { u: st.me, x: me.x, y: me.y, face: me.face, lv, cp, dead: deadT > 0, ex: inExit(levelOf(lv), me), dc: deaths, g: me.ground } })
+      void ch.send({ type: 'broadcast', event: 's', payload: { u: st.me, x: me.x, y: me.y, face: me.face, lv, cp, dead: deadT > 0, ex: inExit(levelOf(lv), me), dc: deaths, g: me.ground, lh: hashLevel(levelOf(lv)) } })
     }
 
     function step(dt: number, now: number) {
@@ -140,6 +148,7 @@ export default function ParkourGame({ st, startLevel = 0 }: { st: TeamState; sta
       const pressed: Pressed = pressedMap(level, [deadT > 0 ? null : me, other])
       if (finished) return
       if (killCool > 0) killCool -= dt
+      if (graceT > 0) graceT -= dt
       if (deadT > 0) {
         deadT -= dt
         if (deadT <= 0) respawn(now)
@@ -151,7 +160,8 @@ export default function ParkourGame({ st, startLevel = 0 }: { st: TeamState; sta
       }
       const i = input.current
       const move = i.stick !== 0 ? i.stick : (i.right ? 1 : 0) - (i.left ? 1 : 0)
-      const r = stepBody(me, { move, jump: i.jump, airJumps: adminRef.current ? 3 : 1 }, level, pressed, other, dt)
+      const r = stepBody(me, { move, jump: i.jump, airJumps: adminRef.current ? 3 : 1, fly: adminRef.current && i.fly, vert: (i.down ? 1 : 0) - (i.jump ? 1 : 0) }, level, pressed, other, dt)
+      if (r === 'dead' && graceT > 0) { deadT = 0.3; return } // Schonfrist: neu starten ohne Herz zu verlieren
       if (r === 'dead') { deaths += 1; hearts -= 1; deadT = 0.7; checkOver(); return }
       if (r === 'lost') { deadT = 0.5; return } // eingeklemmt / aus der Welt: neu starten, aber kein Herz verlieren
       const c = checkpointAt(level, me)
@@ -245,7 +255,10 @@ export default function ParkourGame({ st, startLevel = 0 }: { st: TeamState; sta
       ctx!.strokeStyle = `rgba(253,224,71,${0.6 + 0.4 * Math.sin(t * 4)})`; ctx!.lineWidth = 3
       ctx!.strokeRect(ex + 2, ey + 2, ew - 4, eh - 4)
       // Spieler
-      const drawP = (x: number, y: number, face: 1 | -1, color: string, name: string, dead: boolean, self: boolean) => {
+      const look = [st.people.find((p) => p.is_host), st.people.find((p) => !p.is_host)]
+      const drawP = (x: number, y: number, face: 1 | -1, idx: number, name: string, dead: boolean, self: boolean) => {
+        const color = pkFill(look[idx]?.pk_color, COLORS[idx], t)
+        const hat = look[idx]?.pk_hat ? PK_HATS[look[idx]?.pk_hat ?? ''] : undefined
         ctx!.save()
         ctx!.globalAlpha = dead ? 0.25 : 1
         ctx!.fillStyle = color
@@ -258,11 +271,13 @@ export default function ParkourGame({ st, startLevel = 0 }: { st: TeamState; sta
         ctx!.fillRect(x + (face > 0 ? 15 : 4), y + 9, 3, 4)
         ctx!.font = '600 11px system-ui, sans-serif'; ctx!.textAlign = 'center'
         ctx!.fillStyle = 'rgba(255,255,255,0.9)'
-        ctx!.fillText(self ? 'Du' : name.slice(0, 10), x + PW / 2, y - 6)
+        if (hat) { ctx!.font = '20px system-ui, "Apple Color Emoji", "Segoe UI Emoji", sans-serif'; ctx!.textAlign = 'center'; ctx!.fillStyle = '#fff'; ctx!.fillText(hat.emoji, x + PW / 2, y + 4) }
+        ctx!.font = '600 11px system-ui, sans-serif'; ctx!.textAlign = 'center'; ctx!.fillStyle = 'rgba(255,255,255,0.9)'
+        ctx!.fillText(self ? 'Du' : name.slice(0, 10), x + PW / 2, y - (hat ? 20 : 6))
         ctx!.restore()
       }
-      if (fresh && remote) drawP(draw.x, draw.y, remote.face, COLORS[1 - hostIdx], names[1 - hostIdx], remote.dead, false)
-      drawP(me.x, me.y, me.face, COLORS[hostIdx], names[hostIdx], deadT > 0, true)
+      if (fresh && remote) drawP(draw.x, draw.y, remote.face, 1 - hostIdx, names[1 - hostIdx], remote.dead, false)
+      drawP(me.x, me.y, me.face, hostIdx, names[hostIdx], deadT > 0, true)
       ctx!.restore()
       // Anzeige
       ctx!.fillStyle = 'rgba(2,6,23,0.55)'
@@ -292,6 +307,13 @@ export default function ParkourGame({ st, startLevel = 0 }: { st: TeamState; sta
         for (const w of words) { if ((line + w).length > 78) { ctx!.fillText(line, VIEW_W / 2, yy); line = ''; yy += 18 } line += w + ' ' }
         ctx!.fillText(line, VIEW_W / 2, yy)
         ctx!.globalAlpha = 1
+      }
+      if (remote && remote.lv === lv && remote.lh !== 0 && remote.lh !== hashLevel(level)) {
+        ctx!.fillStyle = 'rgba(127,29,29,0.92)'; ctx!.fillRect(0, 150, VIEW_W, 84)
+        ctx!.fillStyle = '#fff'; ctx!.textAlign = 'center'; ctx!.font = '700 15px system-ui, sans-serif'
+        ctx!.fillText('Ihr habt unterschiedliche Spiel-Versionen.', VIEW_W / 2, 182)
+        ctx!.font = '500 13px system-ui, sans-serif'
+        ctx!.fillText('Beide: Seite neu laden (Strg+F5, am Handy Tab schließen und neu öffnen).', VIEW_W / 2, 206)
       }
       if (finished) {
         ctx!.fillStyle = 'rgba(2,6,23,0.75)'; ctx!.fillRect(0, 0, VIEW_W, VIEW_H)
@@ -324,9 +346,11 @@ export default function ParkourGame({ st, startLevel = 0 }: { st: TeamState; sta
 
     const key = (e: KeyboardEvent, down: boolean) => {
       const k = e.key
-      if (k === 'ArrowLeft' || k === 'a') { input.current.left = down; e.preventDefault() }
-      if (k === 'ArrowRight' || k === 'd') { input.current.right = down; e.preventDefault() }
-      if (k === ' ' || k === 'ArrowUp' || k === 'w') { input.current.jump = down; e.preventDefault() }
+      if (k === 'ArrowLeft' || k === 'a' || k === 'A') { input.current.left = down; e.preventDefault() }
+      if (k === 'ArrowRight' || k === 'd' || k === 'D') { input.current.right = down; e.preventDefault() }
+      if (k === ' ' || k === 'ArrowUp' || k === 'w' || k === 'W') { input.current.jump = down; e.preventDefault() }
+      if (k === 's' || k === 'S' || k === 'ArrowDown') { input.current.down = down; e.preventDefault() }
+      if ((k === 'f' || k === 'F') && down && adminRef.current) { input.current.fly = !input.current.fly; setFlyUi(input.current.fly) }
       if ((k === 'r' || k === 'R') && down) input.current.kill = true
     }
     const kd = (e: KeyboardEvent) => key(e, true)
@@ -353,6 +377,21 @@ export default function ParkourGame({ st, startLevel = 0 }: { st: TeamState; sta
         >
           <Skull size={16} /> Neustart am Checkpoint
         </button>
+        {isAdmin && (
+          <div className="flex flex-col gap-2">
+            <button type="button" onClick={toggleFly} aria-pressed={flyUi}
+              className={`min-h-[44px] rounded-2xl border px-3 text-xs font-semibold ${flyUi ? 'border-cyan-300/70 bg-cyan-400/25 text-cyan-100' : 'border-white/20 bg-white/10 text-slate-200'}`}>
+              {flyUi ? 'Flug an (F)' : 'Flug (F)'}
+            </button>
+            {flyUi && (
+              <button type="button" aria-label="Runter"
+                onPointerDown={(e) => { e.preventDefault(); e.currentTarget.setPointerCapture(e.pointerId); input.current.down = true }}
+                onPointerUp={() => { input.current.down = false }} onPointerCancel={() => { input.current.down = false }}
+                onContextMenu={(e) => e.preventDefault()}
+                className="min-h-[44px] touch-none select-none rounded-2xl border border-white/20 bg-white/10 px-3 text-xs font-semibold text-slate-200 active:bg-white/25">Runter (S)</button>
+            )}
+          </div>
+        )}
         <button
           type="button"
           aria-label="Springen"

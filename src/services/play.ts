@@ -137,6 +137,10 @@ export interface TeamPerson {
   theme_id: string | null
   role: 'user' | 'mod' | 'alphamod' | 'admin'
   is_host: boolean
+  /** Parkour-Shop: gekaufte Extra-Herzen, ausgerüstete Farbe und Hut (nur Parkour). */
+  pk_hearts?: number
+  pk_color?: string | null
+  pk_hat?: string | null
 }
 export interface TeamQuestion extends DuelQuestion { idx: number }
 export interface TeamState {
@@ -179,6 +183,21 @@ export interface ParkourScore {
   levels: number; cps: number; millis: number; deaths: number; finished_at: string
 }
 export const teamParkourBoard = () => rpc<ParkourScore[]>('team_parkour_board')
+
+export interface ParkourShop {
+  hearts: number
+  heart_max: number
+  /** Preis des nächsten Herzens, null = Maximum erreicht. */
+  heart_price: number | null
+  color: string | null
+  hat: string | null
+  owned: string[]
+  color_price: number
+  hat_price: number
+}
+export const parkourShopGet = () => rpc<ParkourShop>('parkour_shop_get')
+export const parkourShopBuy = (item: string) => rpc<ParkourShop>('parkour_shop_buy', { p_item: item })
+export const parkourEquip = (color: string | null, hat: string | null) => rpc<ParkourShop>('parkour_equip', { p_color: color ?? '', p_hat: hat ?? '' })
 export const teamMyInvites = () => rpc<TeamInvite[]>('team_my_invites')
 export const teamRespond = (id: string, accept: boolean) => rpc<void>('team_respond', { p_id: id, p_accept: accept })
 export const teamLeave = (id: string) => rpc<void>('team_leave', { p_id: id })

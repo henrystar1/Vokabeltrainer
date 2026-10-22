@@ -118,4 +118,24 @@ describe('parkour', () => {
     }
     expect((maxX - x0) / TILE).toBeLessThan(11)
   })
+  it('Platte zählt auch, wenn man sie nur am Rand oder knapp darüber trifft', () => {
+    const lv = LEVELS[0]
+    const pl = lv.plates[0]
+    const edge = { x: pl.x * TILE - PW + 4, y: (pl.y + 1) * TILE - PH }
+    expect(pressedMap(lv, [edge])[pl.ch]).toBe(true)
+    const hover = { x: pl.x * TILE + 5, y: (pl.y + 1) * TILE - PH - 4 }
+    expect(pressedMap(lv, [hover])[pl.ch]).toBe(true)
+    const high = { x: pl.x * TILE + 5, y: (pl.y + 1) * TILE - PH - 40 }
+    expect(pressedMap(lv, [high])[pl.ch]).toBeFalsy()
+  })
+  it('Flugmodus: schweben, hoch/runter, Stacheln und Abgrund töten nicht', () => {
+    const lv = LEVELS[0]
+    const b = newBody(20 * TILE + 4, 5 * TILE) // über den Stacheln von Level 1
+    for (let i = 0; i < 120; i++) expect(stepBody(b, { move: 0, jump: false, fly: true, vert: 0 }, lv, {}, null, dt)).toBe('ok')
+    expect(Math.round(b.y)).toBe(5 * TILE)
+    for (let i = 0; i < 60; i++) stepBody(b, { move: 0, jump: false, fly: true, vert: -1 }, lv, {}, null, dt)
+    expect(b.y).toBeLessThan(5 * TILE - 200)
+    for (let i = 0; i < 60; i++) stepBody(b, { move: 1, jump: false, fly: true, vert: 1 }, lv, {}, null, dt)
+    expect(b.x).toBeGreaterThan(20 * TILE + 100)
+  })
 })

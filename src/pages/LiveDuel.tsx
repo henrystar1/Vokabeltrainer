@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { useNavigate, Link } from 'react-router-dom'
+import { useNavigate, useSearchParams, Link } from 'react-router-dom'
 import { Footprints, School, Search, Users, X, Zap } from 'lucide-react'
 import PlayerTag, { Avatar } from '../components/profile/PlayerTag'
 import Button from '../components/ui/Button'
@@ -16,7 +16,8 @@ import type { PlayerHit } from '../types'
 /** Live-Duell anlegen: bis zu 3 Mitspieler einladen, Lobby öffnen, dann geht es gemeinsam los. */
 export default function LiveDuel() {
   const nav = useNavigate()
-  const [mode, setMode] = useState<'duel' | 'class' | 'team'>('duel')
+  const [params] = useSearchParams()
+  const [mode, setMode] = useState<'duel' | 'class' | 'team'>(params.get('modus') === 'team' ? 'team' : 'duel')
   const [open, setOpen] = useState<OpenClass[]>([])
   const [obstacles, setObstacles] = useState(10)
   const [board, setBoard] = useState<ParkourScore[]>([])
@@ -235,6 +236,7 @@ export default function LiveDuel() {
           <Zap size={18} /> {mode === 'class' ? 'Raum öffnen' : mode === 'team' ? 'Team-Lobby öffnen' : 'Lobby öffnen'}
         </Button>
       </Card>
+      {mode === 'team' && <Link to="/parkour" className="block text-sm text-accent-cyan hover:underline">Parkour-Shop: Herzen, Farben und Hüte kaufen</Link>}
       <Link to="/duell" className="inline-block text-sm text-accent-cyan hover:underline">Zurück zu den Duellen</Link>
     </div>
   )
