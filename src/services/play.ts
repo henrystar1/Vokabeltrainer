@@ -144,6 +144,10 @@ export interface TeamState {
   kind: 'quiz' | 'parkour'
   millis: number | null
   deaths: number | null
+  /** Parkour: geschaffte Level und erreichte Checkpoints; Coins je Level / Checkpoint / Bonus für alle Level. */
+  levels: number | null
+  cps: number | null
+  coins: [number, number, number]
   status: 'lobby' | 'running' | 'won' | 'lost' | 'cancelled'
   is_host: boolean
   me: string
@@ -167,7 +171,14 @@ export interface TeamState {
 }
 export interface TeamInvite { run_id: string; host_name: string; host_avatar_id: string | null; host_color_id: string | null; created_at: string; kind: 'quiz' | 'parkour' }
 export const teamCreate = (partner: string, obstacles = 10, kind: 'quiz' | 'parkour' = 'parkour') => rpc<string>('team_create', { p_partner: partner, p_obstacles: obstacles, p_kind: kind })
-export const teamParkourFinish = (id: string, millis: number, deaths: number) => rpc<void>('team_parkour_finish', { p_id: id, p_millis: millis, p_deaths: deaths })
+export const teamParkourFinish = (id: string, millis: number, deaths: number, levels: number, cps: number) =>
+  rpc<void>('team_parkour_finish', { p_id: id, p_millis: millis, p_deaths: deaths, p_levels: levels, p_cps: cps })
+export interface ParkourScore {
+  host_name: string; host_avatar_id: string | null; host_color_id: string | null
+  partner_name: string; partner_avatar_id: string | null; partner_color_id: string | null
+  levels: number; cps: number; millis: number; deaths: number; finished_at: string
+}
+export const teamParkourBoard = () => rpc<ParkourScore[]>('team_parkour_board')
 export const teamMyInvites = () => rpc<TeamInvite[]>('team_my_invites')
 export const teamRespond = (id: string, accept: boolean) => rpc<void>('team_respond', { p_id: id, p_accept: accept })
 export const teamLeave = (id: string) => rpc<void>('team_leave', { p_id: id })

@@ -8,7 +8,7 @@ import PageHeader from '../components/ui/PageHeader'
 import { Notice, ErrorBox } from '../components/ui/States'
 import { TextInput, Select } from '../components/ui/Field'
 import { errorMessage } from '../lib/errors'
-import { liveCreate, liveJoinCode, liveJoinOpen, liveOpenClasses, searchPlayers, teamCreate, type OpenClass } from '../services/play'
+import { liveCreate, liveJoinCode, liveJoinOpen, liveOpenClasses, searchPlayers, teamCreate, teamParkourBoard, type OpenClass, type ParkourScore } from '../services/play'
 import { listBooks } from '../services/books'
 import { useAsync } from '../lib/useAsync'
 import type { PlayerHit } from '../types'
@@ -19,6 +19,7 @@ export default function LiveDuel() {
   const [mode, setMode] = useState<'duel' | 'class' | 'team'>('duel')
   const [open, setOpen] = useState<OpenClass[]>([])
   const [obstacles, setObstacles] = useState(10)
+  const [board, setBoard] = useState<ParkourScore[]>([])
   const [teamKind, setTeamKind] = useState<'parkour' | 'quiz'>('parkour')
   const [bookId, setBookId] = useState('')
   const [code, setCode] = useState('')
@@ -43,6 +44,11 @@ export default function LiveDuel() {
     void load()
     const t = window.setInterval(() => void load(), 4000)
     return () => { alive = false; window.clearInterval(t) }
+  }, [mode])
+
+  useEffect(() => {
+    if (mode !== 'team') return
+    void teamParkourBoard().then(setBoard).catch(() => undefined)
   }, [mode])
 
   async function joinOpen(id: string) {
@@ -125,6 +131,25 @@ export default function LiveDuel() {
           )}
         </Card>
       )}
+      {mode === 'team' && teamKind === 'parkour' && (
+        <Card className="space-y-3">
+          <p className="label-mono">Duo-Bestenliste Parkour</p>
+          {board.length === 0 ? (
+            <p className="text-sm text-slate-400">Noch kein Lauf. Schafft den ersten Eintrag!</p>
+          ) : (
+            <ol className="space-y-1.5">
+              {board.slice(0, 10).map((r, i) => (
+                <li key={`${r.host_name}-${r.partner_name}-${r.finished_at}`} className="flex min-h-[44px] items-center gap-2 rounded-xl bg-white/5 px-2">
+                  <span className="w-6 text-center font-mono text-sm text-slate-400">{i + 1}.</span>
+                  <span className="flex -space-x-2"><Avatar name={r.host_name} avatarId={r.host_avatar_id} colorId={r.host_color_id} size={28} /><Avatar name={r.partner_name} avatarId={r.partner_avatar_id} colorId={r.partner_color_id} size={28} /></span>
+                  <span className="min-w-0 flex-1 truncate text-sm">{r.host_name} &amp; {r.partner_name}</span>
+                  <span className="shrink-0 text-right font-mono text-xs text-amber-200">Level {r.levels}/8<br /><span className="text-slate-400">{Math.floor(r.millis / 60000)}:{String(Math.floor((r.millis % 60000) / 1000)).padStart(2, '0')}</span></span>
+                </li>
+              ))}
+            </ol>
+          )}
+        </Card>
+      )}
       {mode !== 'team' && (
       <Card className="space-y-3">
         <p className="label-mono">Mit Code beitreten</p>
@@ -137,7 +162,7 @@ export default function LiveDuel() {
       <Notice tone="info">
         {mode === 'team' ? (
           teamKind === 'parkour'
-            ? <>Ein Jump-and-Run für <b>zwei</b> mit Joystick und Sprungknopf (Doppelsprung: Knopf zweimal tippen): drei Level, die ihr nur gemeinsam schafft. Steht auf Platten, damit Türen und Brücken offen bleiben, und gebt euch eine Räuberleiter über hohe Mauern. Beide müssen zum Schluss im Ausgang stehen.</>
+            ? <>Ein Jump-and-Run für <b>zwei</b> mit Joystick und Sprungknopf (Doppelsprung: Knopf zweimal tippen): acht Level, die immer schwerer werden und nur gemeinsam gehen. Steht auf Platten, damit Türen und Brücken offen bleiben. Ihr habt 3 gemeinsame Herzen, ein Sturz kostet eins, ein geschafftes Level bringt eins zurück. Je weiter ihr kommt, desto mehr Coins.</>
             : <>Ihr zwei lauft gemeinsam einen Vokabel-Parcours. An jedem Hindernis bekommt <b>jeder</b> eine eigene Vokabel, und ihr kommt nur weiter, wenn <b>beide</b> richtig antworten. Jede falsche Antwort kostet ein gemeinsames Leben.</>
         ) : mode === 'class' ? (
           <>Für die ganze Klasse: Du wählst ein Buch, öffnest einen Raum und alle (bis 20) treten mit dem <b>Code</b> bei oder werden eingeladen. Gefragt werden Vokabeln aus dem Buch, egal ob aktiv. Oben siehst du live die Besten auf ihren Strahlen.</>

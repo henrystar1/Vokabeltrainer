@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { ArrowUp } from 'lucide-react'
+import { ArrowUp, Skull } from 'lucide-react'
 import { Joystick } from '../games/joystick'
 import { useFocusMode } from '../koins/focusMode'
 import { supabase } from '../../lib/supabaseClient'
@@ -11,7 +11,7 @@ const COLORS = ['#22d3ee', '#e879f9']
 const SEND_MS = 50
 const STALE_MS = 2500
 
-interface Remote { x: number; y: number; face: 1 | -1; lv: number; cp: number | null; dead: boolean; ex: boolean; dc: number; seen: number }
+interface Remote { x: number; y: number; face: 1 | -1; lv: number; cp: number | null; dead: boolean; ex: boolean; dc: number; g: boolean; seen: number }
 
 const hash = (n: number) => {
   const x = Math.sin(n * 127.1 + 311.7) * 43758.5453
@@ -22,7 +22,7 @@ const hash = (n: number) => {
 export default function ParkourGame({ st, startLevel = 0 }: { st: TeamState; startLevel?: number }) {
   const canvas = useRef<HTMLCanvasElement>(null)
   useFocusMode(true)
-  const input = useRef({ stick: 0, left: false, right: false, jump: false })
+  const input = useRef({ stick: 0, left: false, right: false, jump: false, kill: false })
   const [hud, setHud] = useState({ level: 0, deaths: 0, ms: 0, linked: false, done: false })
   const hostIdx = st.is_host ? 0 : 1
   const names = [st.people.find((p) => p.is_host)?.name ?? 'Host', st.people.find((p) => !p.is_host)?.name ?? 'Partner']
@@ -38,6 +38,11 @@ export default function ParkourGame({ st, startLevel = 0 }: { st: TeamState; sta
 
     let lv = startLevel
     let cp: number | null = null
+    const maxHearts = Math.max(1, st.lives || 3)
+    let hearts = maxHearts
+    let cpTotal = 0
+    let partnerDc = 0
+    let killCool = 0
     let deaths = 0
     let deadT = 0
     let exitHold = 0
@@ -52,19 +57,35 @@ export default function ParkourGame({ st, startLevel = 0 }: { st: TeamState; sta
     let ready = false
     let lastSend = 0
     let lastHud = 0
+    let over = false
+    let reported = false
 
     const ch = supabase.channel(`parkour-${st.id}`, { config: { broadcast: { self: false } } })
     ch.on('broadcast', { event: 's' }, ({ payload }) => {
       const p = payload as Partial<Remote> & { u?: string }
       if (p.u === st.me || typeof p.x !== 'number' || typeof p.y !== 'number') return
       const first = remote === null
-      remote = { x: p.x, y: p.y, face: p.face === -1 ? -1 : 1, lv: p.lv ?? 0, cp: p.cp ?? null, dead: !!p.dead, ex: !!p.ex, dc: p.dc ?? 0, seen: performance.now() }
+      remote = { x: p.x, y: p.y, face: p.face === -1 ? -1 : 1, lv: p.lv ?? 0, cp: p.cp ?? null, dead: !!p.dead, ex: !!p.ex, dc: p.dc ?? 0, g: !!p.g, seen: performance.now() }
       if (first) { draw.x = remote.x; draw.y = remote.y }
       if (remote.lv > lv && remote.lv < LEVELS.length) goLevel(remote.lv)
-      if (remote.lv === lv && remote.cp !== null && (cp === null || remote.cp > cp)) cp = remote.cp
+      if (remote.lv === lv && remote.cp !== null && (cp === null || remote.cp > cp)) { cp = remote.cp; cpTotal += 1 }
+      // Tode des Partners kosten auch dir ein gemeinsames Herz
+      if (remote.dc > partnerDc) { hearts -= remote.dc - partnerDc; partnerDc = remote.dc; checkOver() }
     }).subscribe((s) => { ready = s === 'SUBSCRIBED' })
 
+    function report(levels: number) {
+      if (finished && reported) return
+      finished = true
+      reported = true
+      void teamParkourFinish(st.id, Math.round(performance.now() - startPerf), deaths + partnerDc, levels, cpTotal).catch(() => undefined)
+    }
+
+    function checkOver() {
+      if (hearts <= 0 && !finished) { over = true; hearts = 0; window.setTimeout(() => report(lv), 1800); finished = true }
+    }
+
     function goLevel(n: number) {
+      if (n > lv) hearts = Math.min(maxHearts, hearts + 1) // geschafftes Level: ein Herz zurück
       lv = n
       cp = null
       exitHold = 0
@@ -75,15 +96,27 @@ export default function ParkourGame({ st, startLevel = 0 }: { st: TeamState; sta
       cam = 0
     }
 
-    function respawn() {
-      const s = spawnAt(LEVELS[lv], st.is_host, cp)
-      Object.assign(me, newBody(s.x, s.y))
+    /** Zurück ins Spiel: zu einem erreichten Checkpoint, der im Bild ist, sonst zum Mitspieler, sonst zum letzten Checkpoint. */
+    function respawn(now: number) {
+      const level = LEVELS[lv]
+      const reached = [2, ...level.checkpoints.filter((c) => cp !== null && c <= cp)]
+      const visible = reached.filter((c) => c * TILE + TILE > cam && c * TILE < cam + VIEW_W)
+      let pos: { x: number; y: number }
+      if (visible.length > 0) {
+        const near = visible.reduce((a, b) => (Math.abs(b * TILE - me.x) < Math.abs(a * TILE - me.x) ? b : a))
+        pos = spawnAt(level, st.is_host, near)
+      } else if (remote && now - remote.seen < STALE_MS && !remote.dead && remote.g) {
+        pos = { x: remote.x, y: remote.y }
+      } else {
+        pos = spawnAt(level, st.is_host, cp)
+      }
+      Object.assign(me, newBody(pos.x, pos.y))
     }
 
     function send(now: number) {
       if (!ready || now - lastSend < SEND_MS) return
       lastSend = now
-      void ch.send({ type: 'broadcast', event: 's', payload: { u: st.me, x: me.x, y: me.y, face: me.face, lv, cp, dead: deadT > 0, ex: inExit(LEVELS[lv], me), dc: deaths } })
+      void ch.send({ type: 'broadcast', event: 's', payload: { u: st.me, x: me.x, y: me.y, face: me.face, lv, cp, dead: deadT > 0, ex: inExit(LEVELS[lv], me), dc: deaths, g: me.ground } })
     }
 
     function step(dt: number, now: number) {
@@ -91,26 +124,29 @@ export default function ParkourGame({ st, startLevel = 0 }: { st: TeamState; sta
       const fresh = remote !== null && now - remote.seen < STALE_MS
       const other = fresh && remote && !remote.dead ? { x: remote.x, y: remote.y } : null
       const pressed: Pressed = pressedMap(level, [deadT > 0 ? null : me, other])
+      if (finished) return
+      if (killCool > 0) killCool -= dt
       if (deadT > 0) {
         deadT -= dt
-        if (deadT <= 0) respawn()
+        if (deadT <= 0) respawn(now)
         return
+      }
+      if (input.current.kill) {
+        input.current.kill = false
+        if (killCool <= 0) { killCool = 1.5; deadT = 0.35; return } // Neustart ohne Herz-Verlust
       }
       const i = input.current
       const move = i.stick !== 0 ? i.stick : (i.right ? 1 : 0) - (i.left ? 1 : 0)
       const r = stepBody(me, { move, jump: i.jump }, level, pressed, other, dt)
-      if (r === 'dead') { deaths += 1; deadT = 0.7; return }
+      if (r === 'dead') { deaths += 1; hearts -= 1; deadT = 0.7; checkOver(); return }
       const c = checkpointAt(level, me)
-      if (c !== null && (cp === null || c > cp)) cp = c
+      if (c !== null && (cp === null || c > cp)) { cp = c; cpTotal += 1 }
       // Ausgang: beide gleichzeitig drin
       if (inExit(level, me) && fresh && remote && remote.lv === lv && remote.ex) {
         exitHold += dt
         if (exitHold > 0.7 && !finished) {
           if (lv + 1 < LEVELS.length) goLevel(lv + 1)
-          else {
-            finished = true
-            void teamParkourFinish(st.id, Math.round(now - startPerf), deaths + (remote?.dc ?? 0)).catch(() => undefined)
-          }
+          else report(LEVELS.length)
         }
       } else exitHold = 0
     }
@@ -220,8 +256,11 @@ export default function ParkourGame({ st, startLevel = 0 }: { st: TeamState; sta
       ctx!.font = '600 12px system-ui, sans-serif'; ctx!.textAlign = 'left'; ctx!.fillStyle = '#e2e8f0'
       const secs = Math.floor((now - startPerf) / 1000)
       ctx!.fillText(`Level ${level.name}`, 10, 17)
+      ctx!.textAlign = 'center'; ctx!.font = '700 17px system-ui, sans-serif'
+      for (let h = 0; h < maxHearts; h++) { ctx!.fillStyle = h < hearts ? '#fb7185' : '#475569'; ctx!.fillText('♥', VIEW_W / 2 + (h - (maxHearts - 1) / 2) * 22, 19) }
+      ctx!.font = '600 12px system-ui, sans-serif'; ctx!.fillStyle = '#e2e8f0'; ctx!.textAlign = 'left'
       ctx!.textAlign = 'right'
-      ctx!.fillText(`${Math.floor(secs / 60)}:${String(secs % 60).padStart(2, '0')}  ·  Stürze ${deaths + (remote?.dc ?? 0)}`, VIEW_W - 10, 17)
+      ctx!.fillText(`${Math.floor(secs / 60)}:${String(secs % 60).padStart(2, '0')}  ·  Level ${lv + 1}/${LEVELS.length}`, VIEW_W - 10, 17)
       ctx!.textAlign = 'center'
       if (!fresh) {
         ctx!.fillStyle = 'rgba(2,6,23,0.7)'; ctx!.fillRect(VIEW_W / 2 - 150, 40, 300, 28)
@@ -242,7 +281,8 @@ export default function ParkourGame({ st, startLevel = 0 }: { st: TeamState; sta
       }
       if (finished) {
         ctx!.fillStyle = 'rgba(2,6,23,0.75)'; ctx!.fillRect(0, 0, VIEW_W, VIEW_H)
-        ctx!.fillStyle = '#fde047'; ctx!.font = '700 28px system-ui, sans-serif'; ctx!.fillText('Alle Level geschafft!', VIEW_W / 2, VIEW_H / 2)
+        ctx!.fillStyle = over ? '#fb7185' : '#fde047'; ctx!.font = '700 28px system-ui, sans-serif'
+        ctx!.fillText(over ? 'Keine Herzen mehr' : 'Alle Level geschafft!', VIEW_W / 2, VIEW_H / 2)
       }
     }
 
@@ -273,6 +313,7 @@ export default function ParkourGame({ st, startLevel = 0 }: { st: TeamState; sta
       if (k === 'ArrowLeft' || k === 'a') { input.current.left = down; e.preventDefault() }
       if (k === 'ArrowRight' || k === 'd') { input.current.right = down; e.preventDefault() }
       if (k === ' ' || k === 'ArrowUp' || k === 'w') { input.current.jump = down; e.preventDefault() }
+      if ((k === 'r' || k === 'R') && down) input.current.kill = true
     }
     const kd = (e: KeyboardEvent) => key(e, true)
     const ku = (e: KeyboardEvent) => key(e, false)
@@ -293,6 +334,13 @@ export default function ParkourGame({ st, startLevel = 0 }: { st: TeamState; sta
         <Joystick onChange={(x) => { input.current.stick = x }} />
         <button
           type="button"
+          onClick={() => { input.current.kill = true }}
+          className="flex min-h-[48px] max-w-[130px] items-center justify-center gap-1.5 rounded-2xl border border-rose-400/40 bg-rose-500/10 px-3 text-center text-xs font-semibold text-rose-200 active:bg-rose-500/25"
+        >
+          <Skull size={16} /> Neustart am Checkpoint
+        </button>
+        <button
+          type="button"
           aria-label="Springen"
           onPointerDown={(e) => { e.preventDefault(); e.currentTarget.setPointerCapture(e.pointerId); input.current.jump = true }}
           onPointerUp={() => { input.current.jump = false }}
@@ -304,7 +352,7 @@ export default function ParkourGame({ st, startLevel = 0 }: { st: TeamState; sta
         </button>
       </div>
       <p className="text-center text-xs text-slate-500">
-        Joystick links = laufen, Knopf rechts = springen, in der Luft nochmal tippen = Doppelsprung (Tastatur: Pfeile/WASD und Leertaste). Springt auf den Kopf des anderen für eine Räuberleiter, steht auf Platten, damit Türen und Brücken offen bleiben.
+        Joystick links = laufen, Knopf rechts = springen, in der Luft nochmal tippen = Doppelsprung (Tastatur: Pfeile/WASD und Leertaste). Gemeinsam habt ihr 3 Herzen (jedes geschaffte Level bringt eins zurück), jeder Sturz kostet eins. Steckt ihr fest, hilft „Neustart“ (Taste R): ihr landet am Checkpoint im Bild oder bei eurem Partner. Je weiter ihr kommt, desto mehr Coins.
         {hud.linked ? '' : ' Verbindung zum Partner wird aufgebaut …'}
       </p>
     </div>

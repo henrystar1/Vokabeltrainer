@@ -46,6 +46,18 @@ class Builder {
   door(ch: string, x: number): this { return this.rect(x, 0, x, 9, ch.toUpperCase()) }
   bridge(ch: string, x0: number, x1: number, y = 8): this { return this.rect(x0, y, x1, y, String.fromCharCode(ch.charCodeAt(0) + 23)) }
   cp(x: number): this { return this.set(x, 9, 'k') }
+  /** Platte – Tür – Platte (jeweils 4 Kacheln Abstand): einer hält, einer geht, dann hält der andere von drüben. */
+  chain(ch: string, x: number): this { return this.plate(ch, x).door(ch, x + 4).plate(ch, x + 8) }
+  /** Platte – 12 Kacheln Brücke über Stacheln – Platte. Die Brücke steht nur, solange jemand auf einer Platte steht. */
+  bridgeGap(ch: string, x: number): this { return this.plate(ch, x).bridge(ch, x + 3, x + 14).spikes(x + 3, x + 14).plate(ch, x + 17) }
+  /** Vier Stufen (je 2 Kacheln höher) hoch auf einen Turm mit Platte oben. */
+  tower(ch: string, x: number, up = true): this {
+    const xs = [x, x + 4, x + 8, x + 12]
+    const tops = [8, 6, 4, 2]
+    xs.forEach((px, i) => this.pillar(px, px + 1, tops[up ? i : 3 - i]))
+    const top = up ? x + 12 : x
+    return this.plate(ch, top, 1)
+  }
   exit(x: number): this { return this.rect(x, 7, x + 1, 9, 'X') }
   build(name: string, hint: string): Level {
     const rows = this.g.map((r) => r.join(''))
@@ -113,4 +125,69 @@ const level3 = new Builder(110)
   .exit(108)
   .build('3 · Gipfel', 'Alles zusammen: Treppen, lange Brücke und viele Türen. Stacheln und Abgründe bringen euch zum Checkpoint zurück.')
 
-export const LEVELS: Level[] = [level1, level2, level3]
+
+const level4 = new Builder(112)
+  .ground(0, 8)
+  .plat(11, 12, 8).plat(16, 17, 7).plat(21, 22, 6).plat(26, 27, 7).plat(31, 32, 8).plat(36, 37, 7).plat(41, 42, 8)
+  .ground(46, 111)
+  .cp(48)
+  .spikes(52, 55).chain('a', 58)
+  .cp(68)
+  .spikes(72, 74).spikes(77, 79)
+  .pillar(82, 83, 7).plate('b', 82, 6).door('b', 88).plate('b', 91)
+  .cp(93)
+  .chain('c', 96).spikes(106, 107)
+  .exit(109)
+  .build('4 · Zacken', 'Schmale Plattformen über dem Abgrund und breitere Stachelfelder. Zwei Sprünge hintereinander sind hier Pflicht.')
+
+const level5 = new Builder(112)
+  .ground(0, 111)
+  .cp(8)
+  .tower('a', 10).door('a', 40)
+  .tower('a', 44).cp(60)
+  .chain('b', 64).spikes(75, 78)
+  .cp(80)
+  .bridgeGap('c', 82)
+  .exit(106)
+  .build('5 · Turm', 'Zwei Türme mit Platten oben, dazwischen eine Tür. Wer oben steht, hält sie für den anderen offen.')
+
+const level6 = new Builder(118)
+  .ground(0, 117)
+  .cp(12)
+  .plate('a', 16).bridge('a', 19, 30).spikes(19, 30).plate('a', 33).cp(34).plate('b', 36)
+  .bridge('b', 39, 50).spikes(39, 50).plate('b', 53).cp(55)
+  .chain('c', 58).spikes(69, 72).chain('a', 75)
+  .cp(85)
+  .pillar(88, 89, 8).pillar(92, 93, 6).plate('b', 92, 5).door('b', 99).plate('b', 102)
+  .cp(104).spikes(107, 109)
+  .exit(112)
+  .build('6 · Doppelbrücke', 'Auf der Mittelinsel gibt es zwei Platten: erst hält einer die erste Brücke, dann der andere die zweite.')
+
+const level7 = new Builder(124)
+  .ground(0, 123)
+  .cp(10)
+  .spikes(14, 17).spikes(20, 23).spikes(25, 29).spikes(32, 34)
+  .cp(37)
+  .chain('a', 40).bridgeGap('b', 51)
+  .cp(70)
+  .chain('c', 73).spikes(84, 88)
+  .pillar(91, 92, 7).plate('b', 91, 6).door('b', 97).plate('b', 100)
+  .spikes(103, 104).cp(106)
+  .spikes(109, 113).spikes(116, 118)
+  .exit(121)
+  .build('7 · Stachelfeld', 'Viele Stacheln hintereinander. Zwischen den Feldern bleiben nur kleine sichere Inseln, plant eure Sprünge.')
+
+const level8 = new Builder(150)
+  .ground(0, 149)
+  .cp(10)
+  .spikes(14, 17).spikes(20, 23)
+  .cp(26)
+  .tower('a', 30).door('a', 50).tower('a', 54).cp(70)
+  .bridgeGap('c', 74).plate('b', 94).cp(92)
+  .bridge('b', 97, 108).spikes(97, 108).plate('b', 111).cp(113)
+  .chain('a', 116).spikes(127, 131)
+  .chain('c', 134)
+  .exit(146)
+  .build('8 · Finale', 'Türme, Doppelbrücke, Türketten und Stachelfelder in einem Lauf. Wer hier ankommt, ist ein echtes Team.')
+
+export const LEVELS: Level[] = [level1, level2, level3, level4, level5, level6, level7, level8]

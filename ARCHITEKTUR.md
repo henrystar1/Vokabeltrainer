@@ -420,3 +420,10 @@ Tabelle `book_library_hidden`; `in_library` blendet ein veröffentlichtes Buch d
 - Lobby/Countdown/Ergebnis für beide Arten in `pages/TeamRunRoom.tsx`, Route `/team/:id`, Einladungen über `LiveInviteWatcher`.
 - Animierte Profilbilder (`.av`) sind jetzt `inline-block`: in Block-Containern (Lobby, Rennstrecke) hatten sie sonst keine Größe (unsichtbar oder riesig).
 - Spanisch: `isAnswerCorrect` ignoriert Akzente, ñ, ü sowie ¿ ¡ ? !, wenn die Lernsprache Spanisch ist (`setAnswerLanguage` aus `SettingsProvider`).
+
+### 0045 – Team-Parkour: 8 Level, Herzen, Coins nach Fortschritt, Duo-Bestenliste
+- 8 Level in `features/parkour/levels.ts` (Builder-Makros `chain`, `bridgeGap`, `tower`): 1–3 Einstieg, 4 schmale Plattformen, 5 Türme mit Platten oben, 6 Doppelbrücke, 7 Stachelfelder, 8 Finale mit allem.
+- Gemeinsame Herzen (`team_lives`, Standard 3): jeder Sturz eines der beiden kostet eins (jeder zählt die Tode des Partners aus dem Broadcast mit), ein geschafftes Level bringt eins zurück, bei 0 ist der Lauf verloren. Das Frontend meldet dann `team_parkour_finish(p_id, p_millis, p_deaths, p_levels, p_cps)`.
+- Neustart-Knopf (Taste R, ohne Herzverlust, 1,5 s Pause): Respawn an einem erreichten Checkpoint, der im Bild ist (der nächste); sonst beim Partner (wenn dieser am Boden steht), sonst beim letzten Checkpoint. Gilt auch nach einem Sturz.
+- Coins: `parkour_coins_level` je Level, `parkour_coins_cp` je erreichtem Checkpoint, `parkour_coins_bonus` für alle 8 Level, jeweils für beide; Mindestdauer 12 s je gemeldetem Level; Tageslimit `team_daily_cap`.
+- `team_parkour_board()`: bester Lauf je Duo (Level, Checkpoints, Zeit), Top 20; Anzeige im Reiter „Team-Parkour“ in `pages/LiveDuel.tsx`.
