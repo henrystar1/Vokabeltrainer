@@ -29,7 +29,7 @@ export default function LiveInviteWatcher() {
       if (!alive || (!lv && !tm)) return
       setInvites([
         ...(lv ?? []).map((i): Invite => ({ kind: 'live', id: i.duel_id, host_name: i.host_name, host_avatar_id: i.host_avatar_id, host_color_id: i.host_color_id, text: `lädt dich zu einem Live-Duell ein (${i.players} Spieler)` })),
-        ...(tm ?? []).map((i): Invite => ({ kind: 'team', id: i.run_id, host_name: i.host_name, host_avatar_id: i.host_avatar_id, host_color_id: i.host_color_id, text: i.kind === 'parkour' ? 'lädt dich zum Team-Parkour ein (Joystick-Spiel mit bis zu 5 Personen)' : 'lädt dich zum Vokabel-Parcours ein' })),
+        ...(tm ?? []).map((i): Invite => ({ kind: 'team', id: i.run_id, host_name: i.host_name, host_avatar_id: i.host_avatar_id, host_color_id: i.host_color_id, text: i.kind === 'deathrun' ? 'lädt dich zum Deathrun ein (Parkour, jeder für sich, mit Teamarbeit an den Toren)' : i.kind === 'parkour' ? 'lädt dich zum Team-Parkour ein (Joystick-Spiel mit bis zu 5 Personen)' : 'lädt dich zum Vokabel-Parcours ein' })),
       ])
     }
     void load()

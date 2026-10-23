@@ -4,7 +4,7 @@ import { Joystick } from '../games/joystick'
 import { useFocusMode } from '../koins/focusMode'
 import { useAuth } from '../auth/AuthProvider'
 import { supabase } from '../../lib/supabaseClient'
-import { teamParkourFinish, type TeamState } from '../../services/play'
+import { teamDeathrunFinish, teamParkourFinish, type TeamState } from '../../services/play'
 import { levelFor } from './generator'
 import { PK_HATS, pkFill } from './cosmetics'
 import { ROWS, TILE, VIEW_H, VIEW_W, type Level } from './levels'
@@ -13,7 +13,7 @@ import { PH, PW, checkpointAt, inExit, newBody, pressedMap, spawnAt, spotIsSafe,
 const COLORS = ['#22d3ee', '#e879f9', '#facc15', '#4ade80', '#fb923c']
 const STALE_MS = 2500
 
-interface Remote { x: number; y: number; face: 1 | -1; lv: number; cp: number | null; dead: boolean; ex: boolean; dc: number; g: boolean; seen: number; lh: number; gh: boolean; dx: number; dy: number }
+interface Remote { x: number; y: number; face: 1 | -1; lv: number; cp: number | null; dead: boolean; ex: boolean; dc: number; g: boolean; seen: number; lh: number; gh: boolean; dx: number; dy: number; hp: number; el: boolean }
 
 const hash = (n: number) => {
   const x = Math.sin(n * 127.1 + 311.7) * 43758.5453
@@ -53,11 +53,14 @@ export default function ParkourGame({ st, startLevel = 0 }: { st: TeamState; sta
       return l
     }
     // Mitspielende (Host zuerst); wer nur eingeladen ist oder ausgestiegen ist, zählt nicht
+    const dr = st.kind === 'deathrun' // Deathrun: jeder für sich (eigene Herzen und Level), Tore nur mit Teamarbeit
     const players = st.people.filter((p) => p.is_host || p.state === undefined || p.state === 'joined')
     const slot = Math.max(0, players.findIndex((p) => p.user_id === st.me))
     const idxOf = (uid: string) => Math.max(0, players.findIndex((p) => p.user_id === uid))
     // Gemeinsamer Herzvorrat: Grundwert, +1 je Person ab der dritten, plus die im Shop gekauften Extra-Herzen aller
-    const maxHearts = Math.min(20, Math.max(1, st.lives || 3) + Math.max(0, players.length - 2) + players.reduce((a, p) => a + Math.max(0, Math.min(10, p.pk_hearts ?? 0)), 0))
+    const maxHearts = dr
+      ? Math.min(12, Math.max(1, st.lives || 3) + Math.max(0, Math.min(10, st.people.find((p) => p.user_id === st.me)?.pk_hearts ?? 0)))
+      : Math.min(20, Math.max(1, st.lives || 3) + Math.max(0, players.length - 2) + players.reduce((a, p) => a + Math.max(0, Math.min(10, p.pk_hearts ?? 0)), 0))
     const SEND_MS = players.length <= 2 ? 50 : players.length === 3 ? 70 : 90
     let hearts = maxHearts
     let cpTotal = 0
@@ -77,7 +80,7 @@ export default function ParkourGame({ st, startLevel = 0 }: { st: TeamState; sta
     const startPerf = performance.now()
     const me: Body = (() => { const s = spawnAt(levelOf(startLevel), slot, null); return newBody(s.x, s.y) })()
     const remotes = new Map<string, Remote>()
-    const mates = (now: number) => { const out: Remote[] = []; for (const r of remotes.values()) if (r.lv === lv && now - r.seen < STALE_MS) out.push(r); return out }
+    const mates = (now: number) => { const out: Remote[] = []; for (const r of remotes.values()) if (r.lv === lv && !r.el && now - r.seen < STALE_MS) out.push(r); return out }
     let ready = false
     let lastSend = 0
     let lastHud = 0
@@ -90,8 +93,9 @@ export default function ParkourGame({ st, startLevel = 0 }: { st: TeamState; sta
       const uid = p.u
       if (!uid || uid === st.me || typeof p.x !== 'number' || typeof p.y !== 'number') return
       const prev = remotes.get(uid)
-      const r: Remote = { x: p.x, y: p.y, face: p.face === -1 ? -1 : 1, lv: p.lv ?? 0, cp: p.cp ?? null, dead: !!p.dead, ex: !!p.ex, dc: p.dc ?? 0, g: !!p.g, seen: performance.now(), lh: p.lh ?? 0, gh: !!p.gh, dx: prev?.dx ?? p.x, dy: prev?.dy ?? p.y }
+      const r: Remote = { x: p.x, y: p.y, face: p.face === -1 ? -1 : 1, lv: p.lv ?? 0, cp: p.cp ?? null, dead: !!p.dead, ex: !!p.ex, dc: p.dc ?? 0, g: !!p.g, seen: performance.now(), lh: p.lh ?? 0, gh: !!p.gh, dx: prev?.dx ?? p.x, dy: prev?.dy ?? p.y, hp: p.hp ?? 0, el: !!p.el }
       remotes.set(uid, r)
+      if (dr) return // Deathrun: jede Person hat ihr eigenes Level, ihre Herzen und ihre Checkpoints
       if (r.lv > lv && r.lv < lv + 3) goLevel(r.lv)
       if (r.lv === lv && r.cp !== null && (cp === null || r.cp > cp)) { cp = r.cp; cpTotal += 1 }
       // Tode der anderen kosten auch dir ein gemeinsames Herz
@@ -103,7 +107,9 @@ export default function ParkourGame({ st, startLevel = 0 }: { st: TeamState; sta
       if (finished && reported) return
       finished = true
       reported = true
-      void teamParkourFinish(st.id, Math.round(performance.now() - startPerf), deaths + [...dcSeen.values()].reduce((x, y) => x + y, 0), levels, cpTotal).catch(() => undefined)
+      const ms = Math.round(performance.now() - startPerf)
+      if (dr) void teamDeathrunFinish(st.id, ms, deaths, levels, cpTotal).catch(() => undefined)
+      else void teamParkourFinish(st.id, ms, deaths + [...dcSeen.values()].reduce((x, y) => x + y, 0), levels, cpTotal).catch(() => undefined)
     }
 
     function checkOver() {
@@ -149,14 +155,15 @@ export default function ParkourGame({ st, startLevel = 0 }: { st: TeamState; sta
     function send(now: number) {
       if (!ready || now - lastSend < SEND_MS) return
       lastSend = now
-      void ch.send({ type: 'broadcast', event: 's', payload: { u: st.me, x: me.x, y: me.y, face: me.face, lv, cp, dead: deadT > 0, ex: inExit(levelOf(lv), me), dc: deaths, g: me.ground, lh: hashLevel(levelOf(lv)), gh: ghostOn } })
+      void ch.send({ type: 'broadcast', event: 's', payload: { u: st.me, x: me.x, y: me.y, face: me.face, lv, cp, dead: deadT > 0, ex: inExit(levelOf(lv), me), dc: deaths, g: me.ground, lh: hashLevel(levelOf(lv)), gh: ghostOn, hp: hearts, el: finished && dr } })
     }
 
     function step(dt: number, now: number) {
       const level = levelOf(lv)
       const mt = mates(now)
       const others = mt.filter((r) => !r.dead).map((r) => ({ x: r.x, y: r.y }))
-      const pressed: Pressed = pressedMap(level, [deadT > 0 ? null : me, ...others])
+      // Deathrun: wer allein im Level ist, für den sind alle Tore offen (sonst käme der Letzte nie weiter)
+      const pressed: Pressed = dr && mt.length === 0 ? { a: true, b: true, c: true } : pressedMap(level, [deadT > 0 ? null : me, ...others])
       if (finished) return
       if (killCool > 0) killCool -= dt
       if (graceT > 0) graceT -= dt
@@ -179,10 +186,10 @@ export default function ParkourGame({ st, startLevel = 0 }: { st: TeamState; sta
       const c = checkpointAt(level, me)
       if (c !== null && (myCp === null || c > myCp)) myCp = c
       if (c !== null && (cp === null || c > cp)) { cp = c; cpTotal += 1 }
-      // Ausgang: beide gleichzeitig drin
-      if (inExit(level, me) && mt.length > 0 && mt.every((r) => r.ex)) {
+      // Ausgang: im Deathrun sofort ins nächste Level, sonst müssen alle gleichzeitig drin sein
+      if (dr ? inExit(level, me) : inExit(level, me) && mt.length > 0 && mt.every((r) => r.ex)) {
         exitHold += dt
-        if (exitHold > 0.7 && !finished) {
+        if (exitHold > (dr ? 0.2 : 0.7) && !finished) {
           goLevel(lv + 1)
         }
       } else exitHold = 0
@@ -192,7 +199,7 @@ export default function ParkourGame({ st, startLevel = 0 }: { st: TeamState; sta
       const level = levelOf(lv)
       const mt = mates(now)
       const fresh = mt.length > 0
-      const pressed = pressedMap(level, [deadT > 0 ? null : me, ...mt.filter((r) => !r.dead)])
+      const pressed = dr && mt.length === 0 ? { a: true, b: true, c: true } : pressedMap(level, [deadT > 0 ? null : me, ...mt.filter((r) => !r.dead)])
       // Kamera
       const mid = me.x // die Kamera folgt nur dir: wer weit weg ist, verschwindet aus dem Bild
       const want = Math.max(0, Math.min(level.cols * TILE - VIEW_W, mid + PW / 2 - VIEW_W / 2))
@@ -326,7 +333,24 @@ export default function ParkourGame({ st, startLevel = 0 }: { st: TeamState; sta
       ctx!.textAlign = 'right'
       ctx!.fillText(`${Math.floor(secs / 60)}:${String(secs % 60).padStart(2, '0')}  ·  Level ${lv + 1}`, VIEW_W - 10, 17)
       ctx!.textAlign = 'center'
-      if (!fresh) {
+      if (dr) {
+        // Stand aller: Level und Herzen, ausgeschiedene Personen durchgestrichen
+        ctx!.fillStyle = 'rgba(2,6,23,0.45)'; ctx!.fillRect(0, 26, VIEW_W, 18)
+        ctx!.font = '600 11px system-ui, sans-serif'; ctx!.textAlign = 'center'
+        players.forEach((pl, i) => {
+          const isMe = pl.user_id === st.me
+          const r = remotes.get(pl.user_id)
+          const out = isMe ? finished : !!r?.el
+          const text = `${isMe ? 'Du' : pl.name.slice(0, 8)}: ${out ? 'raus bei ' : ''}Lv ${(isMe ? lv : r?.lv ?? 0) + 1}${out ? '' : ' ♥' + (isMe ? hearts : r?.hp ?? '?')}`
+          ctx!.fillStyle = out ? '#64748b' : COLORS[i % COLORS.length]
+          ctx!.fillText(text, ((i + 0.5) / players.length) * VIEW_W, 39)
+        })
+        ctx!.font = '600 12px system-ui, sans-serif'
+        if (!finished && mt.length === 0 && players.length > 1) {
+          ctx!.fillStyle = 'rgba(2,6,23,0.7)'; ctx!.fillRect(VIEW_W / 2 - 170, 52, 340, 26)
+          ctx!.fillStyle = '#86efac'; ctx!.fillText('Allein im Level: alle Tore sind für dich offen', VIEW_W / 2, 69)
+        }
+      } else if (!fresh) {
         ctx!.fillStyle = 'rgba(2,6,23,0.7)'; ctx!.fillRect(VIEW_W / 2 - 150, 40, 300, 28)
         ctx!.fillStyle = '#fbbf24'; ctx!.fillText('Warte auf die Verbindung zu deinem Team …', VIEW_W / 2, 58)
       } else if (exitHold > 0 || (inExit(level, me) && !mt.every((r) => r.ex))) {
@@ -353,7 +377,7 @@ export default function ParkourGame({ st, startLevel = 0 }: { st: TeamState; sta
       if (finished) {
         ctx!.fillStyle = 'rgba(2,6,23,0.75)'; ctx!.fillRect(0, 0, VIEW_W, VIEW_H)
         ctx!.fillStyle = over ? '#fb7185' : '#fde047'; ctx!.font = '700 28px system-ui, sans-serif'
-        ctx!.fillText(over ? 'Keine Herzen mehr' : 'Alle Level geschafft!', VIEW_W / 2, VIEW_H / 2)
+        ctx!.fillText(over ? (dr ? `Ausgeschieden bei Level ${lv + 1}` : 'Keine Herzen mehr') : 'Alle Level geschafft!', VIEW_W / 2, VIEW_H / 2)
       }
     }
 
@@ -394,6 +418,8 @@ export default function ParkourGame({ st, startLevel = 0 }: { st: TeamState; sta
     window.addEventListener('keydown', kd)
     window.addEventListener('keyup', ku)
     return () => {
+      // Deathrun: Wer die Seite verlässt, meldet seinen Stand (Coins und Bestenliste)
+      if (dr && !reported && performance.now() - startPerf > 3000) report(lv)
       cancelAnimationFrame(raf)
       window.removeEventListener('keydown', kd)
       window.removeEventListener('keyup', ku)
@@ -445,7 +471,7 @@ export default function ParkourGame({ st, startLevel = 0 }: { st: TeamState; sta
         </button>
       </div>
       <p className="text-center text-xs text-slate-500">
-        Joystick links = laufen, Knopf rechts = springen, in der Luft nochmal tippen = Doppelsprung (Tastatur: Pfeile/WASD und Leertaste). Ihr teilt euch die Herzen (jedes geschaffte Level bringt eins zurück), jeder Sturz in Stacheln oder Schluchten kostet eins. Die Kamera folgt nur dir: Pfeile am Rand zeigen, wo die anderen sind. Ins nächste Level kommt ihr, wenn alle im Ausgang stehen. Steckt ihr fest, hilft „Neustart“ (Taste R): ihr landet am Checkpoint im Bild oder bei einem Mitspieler. Die Level hören nie auf und werden immer schwerer. Je weiter ihr kommt, desto mehr Coins.
+        Joystick links = laufen, Knopf rechts = springen, in der Luft nochmal tippen = Doppelsprung (Tastatur: Pfeile/WASD und Leertaste). {st.kind === 'deathrun' ? 'DEATHRUN: Jeder läuft für sich mit eigenen Herzen. Wer im Ziel ist, ist sofort im nächsten Level. Tore öffnen sich nur, wenn jemand im selben Level auf der Platte steht; wer allein im Level ist, für den sind sie offen. ' : 'Ihr teilt euch die Herzen (jedes geschaffte Level bringt eins zurück), jeder Sturz in Stacheln oder Schluchten kostet eins. '} Die Kamera folgt nur dir: Pfeile am Rand zeigen, wo die anderen sind.{st.kind === 'deathrun' ? '' : ' Ins nächste Level kommt ihr, wenn alle im Ausgang stehen.'} Steckt ihr fest, hilft „Neustart“ (Taste R): ihr landet am Checkpoint im Bild oder bei einem Mitspieler. Die Level hören nie auf und werden immer schwerer. Je weiter ihr kommt, desto mehr Coins.
         {hud.linked ? '' : ' Verbindung zum Partner wird aufgebaut …'}
       </p>
     </div>

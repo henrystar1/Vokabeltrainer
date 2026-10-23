@@ -147,7 +147,7 @@ export interface TeamPerson {
 export interface TeamQuestion extends DuelQuestion { idx: number }
 export interface TeamState {
   id: string
-  kind: 'quiz' | 'parkour'
+  kind: 'quiz' | 'parkour' | 'deathrun'
   millis: number | null
   deaths: number | null
   /** Parkour: geschaffte Level und erreichte Checkpoints; Coins je Level / Checkpoint / Bonus für alle Level. */
@@ -172,14 +172,21 @@ export interface TeamState {
   partner_wrong: number
   reward: number
   paid: number
+  /** Deathrun: Ergebnis jeder Person, die fertig ist. */
+  results?: DeathrunResult[] | null
   my_question: TeamQuestion | null
   people: TeamPerson[]
 }
-export interface TeamInvite { run_id: string; host_name: string; host_avatar_id: string | null; host_color_id: string | null; created_at: string; kind: 'quiz' | 'parkour' }
-export const teamCreate = (partner: string, obstacles = 10, kind: 'quiz' | 'parkour' = 'parkour', extra: string[] = []) =>
+export interface DeathrunResult { user_id: string; name: string; levels: number; cps: number; millis: number; deaths: number; paid: number }
+export interface TeamInvite { run_id: string; host_name: string; host_avatar_id: string | null; host_color_id: string | null; created_at: string; kind: 'quiz' | 'parkour' | 'deathrun' }
+export const teamCreate = (partner: string, obstacles = 10, kind: 'quiz' | 'parkour' | 'deathrun' = 'parkour', extra: string[] = []) =>
   rpc<string>('team_create', { p_partner: partner, p_obstacles: obstacles, p_kind: kind, p_extra: extra })
 export const teamParkourFinish = (id: string, millis: number, deaths: number, levels: number, cps: number) =>
   rpc<void>('team_parkour_finish', { p_id: id, p_millis: millis, p_deaths: deaths, p_levels: levels, p_cps: cps })
+export const teamDeathrunFinish = (id: string, millis: number, deaths: number, levels: number, cps: number) =>
+  rpc<void>('team_deathrun_finish', { p_id: id, p_millis: millis, p_deaths: deaths, p_levels: levels, p_cps: cps })
+export interface DeathrunScore { name: string; avatar_id: string | null; color_id: string | null; levels: number; cps: number; millis: number; deaths: number; group_size: number; finished_at: string }
+export const deathrunBoard = () => rpc<DeathrunScore[]>('deathrun_board')
 export interface ParkourScore {
   host_name: string; host_avatar_id: string | null; host_color_id: string | null
   partner_name: string; partner_avatar_id: string | null; partner_color_id: string | null

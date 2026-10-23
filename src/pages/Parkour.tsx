@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
-import { Check, Footprints, Heart, Users } from 'lucide-react'
+import { Check, Footprints, Heart, Skull, Users } from 'lucide-react'
 import Button from '../components/ui/Button'
 import Card from '../components/ui/Card'
 import CoinIcon from '../components/ui/CoinIcon'
@@ -50,9 +50,17 @@ export default function Parkour() {
             Mit bis zu 5 Leuten per Joystick durch Level voller Stacheln, Türen und Brücken. Gemeinsame Herzen, Checkpoints, Coins je nach Fortschritt und eine Bestenliste für Teams. Nach Level 8 gibt es endlos neue Zufallslevel.
           </p>
         </div>
-        <Link to="/live-duell?modus=team" className="btn-primary inline-flex min-h-[48px] w-full items-center justify-center gap-2 rounded-xl px-4 font-semibold">
-          <Users size={18} /> Mit Team spielen
-        </Link>
+        <div className="grid gap-2 sm:grid-cols-2">
+          <Link to="/live-duell?modus=team" className="btn-primary inline-flex min-h-[48px] items-center justify-center gap-2 rounded-xl px-4 font-semibold">
+            <Users size={18} /> Team-Parkour
+          </Link>
+          <Link to="/live-duell?modus=team&art=deathrun" className="inline-flex min-h-[48px] items-center justify-center gap-2 rounded-xl border border-rose-400/40 bg-rose-500/10 px-4 font-semibold text-rose-200 hover:bg-rose-500/20">
+            <Skull size={18} /> Deathrun
+          </Link>
+        </div>
+        <p className="text-xs text-slate-400">
+          <b>Deathrun:</b> bis zu 5 Personen, jeder läuft für sich mit eigenen Herzen und kommt allein ins nächste Level, sobald er im Ziel ist. Tore und Brücken gehen nur mit Teamarbeit auf. Wer keine Herzen mehr hat, scheidet aus. Bestenlisten findest du unter <Link to="/rangliste" className="text-accent-cyan hover:underline">Rangliste</Link>.
+        </p>
       </Card>
 
       <Card className="space-y-4">

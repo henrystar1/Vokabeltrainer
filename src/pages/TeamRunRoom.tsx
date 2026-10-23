@@ -15,7 +15,7 @@ import TeamTrack, { Hearts } from '../features/team/TeamTrack'
 import ParkourGame from '../features/parkour/ParkourGame'
 import { errorMessage } from '../lib/errors'
 import { getWallet } from '../services/koins'
-import { teamGet, teamLeave, teamReport, teamRespond, teamStart, type TeamPerson, type TeamState } from '../services/play'
+import { teamGet, teamLeave, teamReport, teamRespond, teamStart, type DeathrunResult, type TeamPerson, type TeamState } from '../services/play'
 
 const POLL_MS = 900
 const COLORS = ['#22d3ee', '#e879f9', '#facc15', '#4ade80', '#fb923c']
@@ -36,7 +36,22 @@ function Slot({ p, color, joined, waitingText }: { p?: TeamPerson; color: string
   )
 }
 
-/** Lobby, Countdown, Parcours und Ergebnis des Team-Parcours (2 Personen, gemeinsam). */
+function Results({ list, me }: { list: DeathrunResult[]; me: string }) {
+  if (list.length === 0) return <p className="text-center text-sm text-slate-400">Noch niemand ist fertig.</p>
+  return (
+    <ol className="space-y-1.5 text-left">
+      {list.map((r, i) => (
+        <li key={r.user_id} className={`flex min-h-[44px] items-center gap-2 rounded-xl px-3 ${r.user_id === me ? 'bg-accent-cyan/10 ring-1 ring-accent-cyan/30' : 'bg-white/5'}`}>
+          <span className="w-6 text-center font-mono text-sm text-slate-400">{i + 1}.</span>
+          <span className="min-w-0 flex-1 truncate text-sm font-semibold">{r.name}{r.user_id === me ? ' (du)' : ''}</span>
+          <span className="shrink-0 text-right font-mono text-xs text-amber-200">Level {r.levels}<br /><span className="text-slate-400">{Math.floor(r.millis / 60000)}:{String(Math.floor((r.millis % 60000) / 1000)).padStart(2, '0')} · +{r.paid}</span></span>
+        </li>
+      ))}
+    </ol>
+  )
+}
+
+/** Lobby, Countdown, Parcours, Parkour, Deathrun und Ergebnis (Team-Parcours: 2 Personen, Parkour und Deathrun: bis 5). */
 export default function TeamRunRoom() {
   const { id = '' } = useParams()
   const nav = useNavigate()
@@ -96,6 +111,9 @@ export default function TeamRunRoom() {
 
   if (error && !st) return <div className="mx-auto max-w-xl space-y-3"><ErrorBox message={error} /><Link to="/duell" className="text-accent-cyan hover:underline">Zurück zu den Duellen</Link></div>
   if (!st) return <Spinner />
+  const run = st.kind !== 'quiz'
+  const dr = st.kind === 'deathrun'
+  const label = dr ? 'Deathrun' : st.kind === 'parkour' ? 'Team-Parkour' : 'Vokabel-Parcours'
 
   const people = [...st.people].sort((a, b) => Number(b.is_host) - Number(a.is_host))
   const host = people.find((p) => p.is_host)
@@ -134,13 +152,13 @@ export default function TeamRunRoom() {
     const invitedMe = !st.is_host && !(me && isJoined(me))
     return (
       <div className="mx-auto max-w-xl space-y-5">
-        <PageHeader eyebrow={st.kind === 'parkour' ? 'Team-Parkour' : 'Vokabel-Parcours'} title="Lobby" />
+        <PageHeader eyebrow={label} title="Lobby" />
         <Card className="space-y-4">
           <div className={`grid gap-3 ${people.length > 2 ? 'grid-cols-2 sm:grid-cols-3' : 'grid-cols-2'}`}>
             {people.map((p, i) => <Slot key={p.user_id} p={p} color={COLORS[i % COLORS.length]} joined={isJoined(p)} waitingText="wartet auf Antwort …" />)}
           </div>
-          <p className="text-center text-sm text-slate-400">{st.kind === 'parkour' ? `Endlos viele Level, immer schwerer · Joystick, Sprung und Doppelsprung · ${st.lives} gemeinsame Herzen (+1 ab der dritten Person und Extra-Herzen aus dem Parkour-Shop)` : `${st.obstacles} Hindernisse · ${st.lives} gemeinsame Leben`}</p>
-          {st.kind === 'parkour'
+          <p className="text-center text-sm text-slate-400">{dr ? `Endlos viele Level, immer schwerer · jeder läuft für sich mit eigenen Herzen (${st.lives} plus Extra-Herzen aus dem Parkour-Shop) · Tore nur mit Teamarbeit` : run ? `Endlos viele Level, immer schwerer · Joystick, Sprung und Doppelsprung · ${st.lives} gemeinsame Herzen (+1 ab der dritten Person und Extra-Herzen aus dem Parkour-Shop)` : `${st.obstacles} Hindernisse · ${st.lives} gemeinsame Leben`}</p>
+          {run
             ? <p className="text-center text-sm text-amber-200">Coins je nach Fortschritt: {st.coins[0]} pro Level (ab Level 9 mehr), {st.coins[1]} pro Checkpoint, {st.coins[2]} Bonus für Level 8 (für jeden)</p>
             : st.reward > 0 && <p className="text-center text-sm text-amber-200">Bei Erfolg: {st.reward} Coins für jeden</p>}
           {error && <ErrorBox message={error} />}
@@ -167,7 +185,7 @@ export default function TeamRunRoom() {
 
   if (st.status === 'running') {
     const meP = people.find((p) => p.user_id === st.me)
-    if (st.kind === 'parkour' && meP && !(meP.is_host || (meP.state ?? 'joined') === 'joined')) {
+    if (run && meP && !(meP.is_host || (meP.state ?? 'joined') === 'joined')) {
       return (
         <div className="mx-auto max-w-xl space-y-3">
           <PageHeader eyebrow="Team-Parkour" title="Schon gestartet" />
@@ -180,17 +198,18 @@ export default function TeamRunRoom() {
       const n = Math.ceil(remaining / 1000)
       return (
         <div className="mx-auto max-w-xl space-y-5">
-          <PageHeader eyebrow={st.kind === 'parkour' ? 'Team-Parkour' : 'Vokabel-Parcours'} title="Gleich geht’s los" />
+          <PageHeader eyebrow={label} title="Gleich geht’s los" />
           {st.kind === 'quiz' && <TeamTrack st={st} />}
           <p key={n} className="race-count text-center font-mono text-8xl font-black text-fuchsia-300 drop-shadow-[0_0_24px_rgb(232_121_249/0.7)]">{n}</p>
-          <p className="text-center text-sm text-slate-400">{st.kind === 'parkour' ? 'Nur gemeinsam kommt ihr durch: Platten halten, Räuberleiter, zusammen in den Ausgang.' : 'Nur gemeinsam kommt ihr durch: Beide müssen jedes Hindernis richtig beantworten.'}</p>
+          <p className="text-center text-sm text-slate-400">{dr ? 'Jeder läuft für sich: Wer im Ziel ist, ist sofort im nächsten Level. Tore öffnen sich nur, wenn jemand im selben Level auf der Platte steht.' : run ? 'Nur gemeinsam kommt ihr durch: Platten halten, Räuberleiter, zusammen in den Ausgang.' : 'Nur gemeinsam kommt ihr durch: Beide müssen jedes Hindernis richtig beantworten.'}</p>
         </div>
       )
     }
-    if (st.kind === 'parkour') {
+    if (run) {
       return (
         <div className="space-y-3">
           <ParkourGame st={st} />
+          {dr && <Card className="space-y-2"><p className="label-mono">Schon fertig</p><Results list={st.results ?? []} me={st.me} /></Card>}
           <div className="flex justify-center"><Button variant="ghost" onClick={() => { void teamLeave(id).catch(() => undefined); nav('/duell') }}>Spiel beenden</Button></div>
         </div>
       )
@@ -250,11 +269,11 @@ export default function TeamRunRoom() {
   const wrong = st.host_wrong + st.partner_wrong
   return (
     <div className="mx-auto max-w-xl space-y-5">
-      <PageHeader eyebrow={st.kind === 'parkour' ? 'Team-Parkour' : 'Vokabel-Parcours'} title={st.kind === 'parkour' ? 'Keine Herzen mehr' : won ? 'Geschafft – ihr seid im Ziel!' : 'Leider nicht geschafft'} />
+      <PageHeader eyebrow={label} title={dr ? 'Deathrun beendet' : run ? 'Keine Herzen mehr' : won ? 'Geschafft – ihr seid im Ziel!' : 'Leider nicht geschafft'} />
       {st.kind === 'quiz' && <TeamTrack st={st} />}
       <Card className="space-y-4 text-center">
         <div className="flex justify-center">{won ? <Trophy size={44} className="text-amber-300" /> : <Hearts left={0} total={st.lives} />}</div>
-        {st.kind === 'parkour' ? (
+        {dr ? <Results list={st.results ?? []} me={st.me} /> : run ? (
           <p className="text-slate-300">
             {`${st.levels ?? 0} Level geschafft, ${st.cps ?? 0} Checkpoints erreicht`} · {Math.floor((st.millis ?? 0) / 60000)}:{String(Math.floor(((st.millis ?? 0) % 60000) / 1000)).padStart(2, '0')} Min. · {st.deaths ?? 0} Stürze
           </p>
@@ -270,12 +289,12 @@ export default function TeamRunRoom() {
           ))}
         </div>}
         {st.kind === 'quiz' && <p className="text-xs text-slate-500">{right} richtige und {wrong} falsche Antworten zusammen</p>}
-        {(won || st.kind === 'parkour') && (st.paid > 0
+        {(won || run) && (st.paid > 0
           ? <p className="text-lg font-semibold text-amber-200">+{st.paid} Coins</p>
-          : (st.reward > 0 || st.kind === 'parkour') && (st.levels ?? 1) > 0 && <p className="text-sm text-slate-400">Für heute gibt es keine Coins mehr (Tageslimit).</p>)}
+          : (st.reward > 0 || run) && (st.levels ?? 1) > 0 && <p className="text-sm text-slate-400">Für heute gibt es keine Coins mehr (Tageslimit).</p>)}
         {error && <ErrorBox message={error} />}
         <div className="flex flex-wrap justify-center gap-2">
-          <Button onClick={() => nav(st.kind === 'parkour' ? '/live-duell?modus=team' : '/live-duell')}>Neuer Lauf</Button>
+          <Button onClick={() => nav(dr ? '/live-duell?modus=team&art=deathrun' : run ? '/live-duell?modus=team' : '/live-duell')}>Neuer Lauf</Button>
           <Button variant="ghost" onClick={() => nav('/duell')}>Zurück zu den Duellen</Button>
         </div>
       </Card>
