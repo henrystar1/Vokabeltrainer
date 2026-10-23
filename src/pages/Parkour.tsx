@@ -47,11 +47,11 @@ export default function Parkour() {
         <div className="flex items-start gap-3">
           <Footprints className="mt-1 shrink-0 text-accent-cyan" size={22} />
           <p className="text-sm text-slate-300">
-            Zu zweit mit Joystick durch Level voller Stacheln, Türen und Brücken. Gemeinsame Herzen, Checkpoints, Coins je nach Fortschritt und eine Bestenliste für Teams. Nach Level 8 gibt es endlos neue Zufallslevel.
+            Mit bis zu 5 Leuten per Joystick durch Level voller Stacheln, Türen und Brücken. Gemeinsame Herzen, Checkpoints, Coins je nach Fortschritt und eine Bestenliste für Teams. Nach Level 8 gibt es endlos neue Zufallslevel.
           </p>
         </div>
         <Link to="/live-duell?modus=team" className="btn-primary inline-flex min-h-[48px] w-full items-center justify-center gap-2 rounded-xl px-4 font-semibold">
-          <Users size={18} /> Mit Partner spielen
+          <Users size={18} /> Mit Team spielen
         </Link>
       </Card>
 

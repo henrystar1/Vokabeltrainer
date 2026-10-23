@@ -18,7 +18,7 @@ import { getWallet } from '../services/koins'
 import { teamGet, teamLeave, teamReport, teamRespond, teamStart, type TeamPerson, type TeamState } from '../services/play'
 
 const POLL_MS = 900
-const COLORS = ['#22d3ee', '#e879f9']
+const COLORS = ['#22d3ee', '#e879f9', '#facc15', '#4ade80', '#fb923c']
 
 function Slot({ p, color, joined, waitingText }: { p?: TeamPerson; color: string; joined: boolean; waitingText: string }) {
   if (!p) return null
@@ -60,7 +60,7 @@ export default function TeamRunRoom() {
         const r = await teamGet(id)
         if (!alive) return
         offset.current = Date.parse(r.now) - Date.now()
-        const key = JSON.stringify([r.status, r.kind, r.starts_at, r.step, r.lives_left, r.host_ok, r.partner_ok, r.partner_state, r.my_question?.idx, r.paid])
+        const key = JSON.stringify([r.status, r.kind, r.starts_at, r.step, r.lives_left, r.host_ok, r.partner_ok, r.partner_state, r.my_question?.idx, r.paid, r.people.map((p) => `${p.user_id}:${p.state ?? ''}`)])
         if (key !== lastJson.current) { lastJson.current = key; setSt(r) }
       } catch (e) {
         if (alive) setError(errorMessage(e))
@@ -127,24 +127,26 @@ export default function TeamRunRoom() {
   }
 
   if (st.status === 'lobby') {
-    const joined = st.partner_state === 'joined'
-    const invitedMe = !st.is_host && st.partner_state !== 'joined'
+    const me = people.find((p) => p.user_id === st.me)
+    const rest = people.filter((p) => !p.is_host)
+    const isJoined = (p: TeamPerson) => p.is_host || (p.state ?? 'joined') === 'joined'
+    const joined = rest.some(isJoined)
+    const invitedMe = !st.is_host && !(me && isJoined(me))
     return (
       <div className="mx-auto max-w-xl space-y-5">
         <PageHeader eyebrow={st.kind === 'parkour' ? 'Team-Parkour' : 'Vokabel-Parcours'} title="Lobby" />
         <Card className="space-y-4">
-          <div className="grid grid-cols-2 gap-3">
-            <Slot p={host} color={COLORS[0]} joined waitingText="" />
-            <Slot p={partner} color={COLORS[1]} joined={joined} waitingText="wartet auf Antwort …" />
+          <div className={`grid gap-3 ${people.length > 2 ? 'grid-cols-2 sm:grid-cols-3' : 'grid-cols-2'}`}>
+            {people.map((p, i) => <Slot key={p.user_id} p={p} color={COLORS[i % COLORS.length]} joined={isJoined(p)} waitingText="wartet auf Antwort …" />)}
           </div>
-          <p className="text-center text-sm text-slate-400">{st.kind === 'parkour' ? `Endlos viele Level, immer schwerer · Joystick, Sprung und Doppelsprung · ${st.lives} gemeinsame Herzen` : `${st.obstacles} Hindernisse · ${st.lives} gemeinsame Leben`}</p>
+          <p className="text-center text-sm text-slate-400">{st.kind === 'parkour' ? `Endlos viele Level, immer schwerer · Joystick, Sprung und Doppelsprung · ${st.lives} gemeinsame Herzen (+1 ab der dritten Person und Extra-Herzen aus dem Parkour-Shop)` : `${st.obstacles} Hindernisse · ${st.lives} gemeinsame Leben`}</p>
           {st.kind === 'parkour'
             ? <p className="text-center text-sm text-amber-200">Coins je nach Fortschritt: {st.coins[0]} pro Level (ab Level 9 mehr), {st.coins[1]} pro Checkpoint, {st.coins[2]} Bonus für Level 8 (für jeden)</p>
             : st.reward > 0 && <p className="text-center text-sm text-amber-200">Bei Erfolg: {st.reward} Coins für jeden</p>}
           {error && <ErrorBox message={error} />}
           {st.is_host ? (
             <div className="flex flex-wrap gap-2">
-              <Button className="min-h-[52px] flex-1" busy={busy} disabled={!joined} onClick={() => void act(() => teamStart(id))}><Footprints size={18} /> {joined ? 'Los geht’s' : 'Warte auf deinen Partner …'}</Button>
+              <Button className="min-h-[52px] flex-1" busy={busy} disabled={!joined} onClick={() => void act(() => teamStart(id))}><Footprints size={18} /> {joined ? (people.length > 2 && !people.every(isJoined) ? 'Jetzt starten (ohne Wartende)' : 'Los geht’s') : 'Warte auf deine Mitspieler …'}</Button>
               <Button variant="ghost" disabled={busy} onClick={() => void act(() => teamLeave(id), () => nav('/duell'))}>Lobby schließen</Button>
             </div>
           ) : invitedMe ? (
@@ -164,6 +166,16 @@ export default function TeamRunRoom() {
   }
 
   if (st.status === 'running') {
+    const meP = people.find((p) => p.user_id === st.me)
+    if (st.kind === 'parkour' && meP && !(meP.is_host || (meP.state ?? 'joined') === 'joined')) {
+      return (
+        <div className="mx-auto max-w-xl space-y-3">
+          <PageHeader eyebrow="Team-Parkour" title="Schon gestartet" />
+          <Notice tone="warn">Der Lauf hat begonnen, bevor du beigetreten bist. Beim nächsten Mal klappt es.</Notice>
+          <Button variant="ghost" onClick={() => { void teamRespond(id, false).catch(() => undefined); nav('/duell') }}>Zurück</Button>
+        </div>
+      )
+    }
     if (remaining > 0) {
       const n = Math.ceil(remaining / 1000)
       return (
@@ -263,7 +275,7 @@ export default function TeamRunRoom() {
           : (st.reward > 0 || st.kind === 'parkour') && (st.levels ?? 1) > 0 && <p className="text-sm text-slate-400">Für heute gibt es keine Coins mehr (Tageslimit).</p>)}
         {error && <ErrorBox message={error} />}
         <div className="flex flex-wrap justify-center gap-2">
-          <Button onClick={() => nav('/live-duell')}>Neuer Lauf</Button>
+          <Button onClick={() => nav(st.kind === 'parkour' ? '/live-duell?modus=team' : '/live-duell')}>Neuer Lauf</Button>
           <Button variant="ghost" onClick={() => nav('/duell')}>Zurück zu den Duellen</Button>
         </div>
       </Card>

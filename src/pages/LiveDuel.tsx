@@ -25,7 +25,7 @@ export default function LiveDuel() {
   const [bookId, setBookId] = useState('')
   const [code, setCode] = useState('')
   const books = useAsync(listBooks, [])
-  const maxInvites = mode === 'class' ? 19 : mode === 'team' ? 1 : 3
+  const maxInvites = mode === 'class' ? 19 : mode === 'team' ? (teamKind === 'parkour' ? 4 : 1) : 3
   const [q, setQ] = useState('')
   const [hits, setHits] = useState<PlayerHit[] | null>(null)
   const [picked, setPicked] = useState<PlayerHit[]>([])
@@ -78,7 +78,7 @@ export default function LiveDuel() {
     setBusy(true)
     setError(null)
     try {
-      if (mode === 'team') nav(`/team/${await teamCreate(picked[0].user_id, obstacles, teamKind)}`)
+      if (mode === 'team') nav(`/team/${await teamCreate(picked[0].user_id, obstacles, teamKind, picked.slice(1, 4).map((p) => p.user_id))}`)
       else nav(`/live-duell/${await liveCreate(picked.map((p) => p.user_id), count, mode === 'class' ? bookId : null)}`)
     } catch (e) {
       setError(errorMessage(e))
@@ -101,8 +101,8 @@ export default function LiveDuel() {
     <div className="mx-auto max-w-xl space-y-5">
       <PageHeader eyebrow="Zusammenlernen" title={mode === 'class' ? 'Klassen-Battle' : mode === 'team' ? 'Team-Parkour' : 'Live-Duell'} />
       <div className="grid grid-cols-3 gap-2" role="tablist" aria-label="Art">
-        {([['duel', 'Live-Duell · bis 4', Zap], ['class', 'Klassen-Battle · bis 20', School], ['team', 'Team-Parkour · 2', Footprints]] as const).map(([k, label, Icon]) => (
-          <button key={k} type="button" role="tab" aria-selected={mode === k} onClick={() => { setMode(k); setPicked((c) => c.slice(0, k === 'class' ? 19 : k === 'team' ? 1 : 3)) }}
+        {([['duel', 'Live-Duell · bis 4', Zap], ['class', 'Klassen-Battle · bis 20', School], ['team', 'Team-Parkour · bis 5', Footprints]] as const).map(([k, label, Icon]) => (
+          <button key={k} type="button" role="tab" aria-selected={mode === k} onClick={() => { setMode(k); setPicked((c) => c.slice(0, k === 'class' ? 19 : k === 'team' ? (teamKind === 'parkour' ? 4 : 1) : 3)) }}
             className={`flex min-h-[56px] flex-col items-center justify-center gap-0.5 rounded-xl border px-1 text-center text-xs font-semibold sm:flex-row sm:gap-2 sm:text-sm transition ${mode === k ? 'border-fuchsia-300/60 bg-fuchsia-400/15 text-fuchsia-200' : 'border-white/10 bg-white/5 text-slate-300'}`}>
             <Icon size={16} /> {label}
           </button>
@@ -134,7 +134,7 @@ export default function LiveDuel() {
       )}
       {mode === 'team' && teamKind === 'parkour' && (
         <Card className="space-y-3">
-          <p className="label-mono">Duo-Bestenliste Parkour</p>
+          <p className="label-mono">Team-Bestenliste Parkour</p>
           {board.length === 0 ? (
             <p className="text-sm text-slate-400">Noch kein Lauf. Schafft den ersten Eintrag!</p>
           ) : (
@@ -143,7 +143,7 @@ export default function LiveDuel() {
                 <li key={`${r.host_name}-${r.partner_name}-${r.finished_at}`} className="flex min-h-[44px] items-center gap-2 rounded-xl bg-white/5 px-2">
                   <span className="w-6 text-center font-mono text-sm text-slate-400">{i + 1}.</span>
                   <span className="flex -space-x-2"><Avatar name={r.host_name} avatarId={r.host_avatar_id} colorId={r.host_color_id} size={28} /><Avatar name={r.partner_name} avatarId={r.partner_avatar_id} colorId={r.partner_color_id} size={28} /></span>
-                  <span className="min-w-0 flex-1 truncate text-sm">{r.host_name} &amp; {r.partner_name}</span>
+                  <span className="min-w-0 flex-1 truncate text-sm">{r.host_name} &amp; {r.partner_name}{(r.group_size ?? 2) > 2 ? ` +${(r.group_size ?? 2) - 2}` : ''}</span>
                   <span className="shrink-0 text-right font-mono text-xs text-amber-200">Level {r.levels}<br /><span className="text-slate-400">{Math.floor(r.millis / 60000)}:{String(Math.floor((r.millis % 60000) / 1000)).padStart(2, '0')}</span></span>
                 </li>
               ))}
@@ -163,7 +163,7 @@ export default function LiveDuel() {
       <Notice tone="info">
         {mode === 'team' ? (
           teamKind === 'parkour'
-            ? <>Ein Jump-and-Run für <b>zwei</b> mit Joystick und Sprungknopf (Doppelsprung: Knopf zweimal tippen): Level ohne Ende (die ersten 8 sind handgebaut, danach kommen zufällige), die immer schwerer werden und nur gemeinsam gehen. Steht auf Platten, damit Türen und Brücken offen bleiben. Ihr habt 3 gemeinsame Herzen, ein Sturz kostet eins, ein geschafftes Level bringt eins zurück. Je weiter ihr kommt, desto mehr Coins.</>
+            ? <>Ein Jump-and-Run für <b>2 bis 5 Personen</b> mit Joystick und Sprungknopf (Doppelsprung: Knopf zweimal tippen): Level ohne Ende (die ersten 8 sind handgebaut, danach kommen zufällige), die immer schwerer werden und nur gemeinsam gehen. Steht auf Platten, damit Türen und Brücken offen bleiben. Ihr habt 3 gemeinsame Herzen (ab der dritten Person eins mehr, dazu Extra-Herzen aus dem Parkour-Shop), ein Sturz kostet eins, ein geschafftes Level bringt eins zurück. Je weiter ihr kommt, desto mehr Coins.</>
             : <>Ihr zwei lauft gemeinsam einen Vokabel-Parcours. An jedem Hindernis bekommt <b>jeder</b> eine eigene Vokabel, und ihr kommt nur weiter, wenn <b>beide</b> richtig antworten. Jede falsche Antwort kostet ein gemeinsames Leben.</>
         ) : mode === 'class' ? (
           <>Für die ganze Klasse: Du wählst ein Buch, öffnest einen Raum und alle (bis 20) treten mit dem <b>Code</b> bei oder werden eingeladen. Gefragt werden Vokabeln aus dem Buch, egal ob aktiv. Oben siehst du live die Besten auf ihren Strahlen.</>
@@ -211,7 +211,7 @@ export default function LiveDuel() {
         {mode === 'team' && (
           <div className="grid grid-cols-2 gap-2" role="radiogroup" aria-label="Art des Team-Spiels">
             {([['parkour', 'Parkour mit Joystick'], ['quiz', 'Vokabel-Parcours']] as const).map(([k, label]) => (
-              <button key={k} type="button" role="radio" aria-checked={teamKind === k} onClick={() => setTeamKind(k)}
+              <button key={k} type="button" role="radio" aria-checked={teamKind === k} onClick={() => { setTeamKind(k); if (k === 'quiz') setPicked((c) => c.slice(0, 1)) }}
                 className={`min-h-[48px] rounded-xl border text-sm font-semibold transition ${teamKind === k ? 'border-cyan-300/60 bg-cyan-400/15 text-cyan-200' : 'border-white/10 bg-white/5 text-slate-300'}`}>{label}</button>
             ))}
           </div>

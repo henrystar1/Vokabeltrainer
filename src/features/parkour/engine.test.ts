@@ -138,4 +138,25 @@ describe('parkour', () => {
     for (let i = 0; i < 60; i++) stepBody(b, { move: 1, jump: false, fly: true, vert: 1 }, lv, {}, null, dt)
     expect(b.x).toBeGreaterThan(20 * TILE + 100)
   })
+  it('Geistmodus fliegt durch Wände und Türen, normaler Flug nicht', () => {
+    const lv = LEVELS[0]
+    const door = 38 // Tür bei Spalte 38 (Level 1), ohne gedrückte Platte fest
+    const run2 = (ghost: boolean) => {
+      const b = newBody((door - 3) * TILE, 5 * TILE)
+      for (let i = 0; i < 180; i++) stepBody(b, { move: 1, jump: false, fly: true, ghost, vert: 0 }, lv, {}, null, dt)
+      return b.x
+    }
+    expect(run2(false)).toBeLessThan(door * TILE)
+    expect(run2(true)).toBeGreaterThan((door + 1) * TILE)
+  })
+  it('mehrere Mitspieler: man landet auf dem Kopf von jedem, und die Leine gibt es nicht mehr', () => {
+    const lv = LEVELS[0]
+    const mates = [{ x: 10 * TILE, y: 10 * TILE - PH }, { x: 60 * TILE, y: 10 * TILE - PH }]
+    const b = newBody(60 * TILE + 3, 10 * TILE - 2 * PH - 20)
+    for (let i = 0; i < 90; i++) stepBody(b, { move: 0, jump: false }, lv, {}, mates, dt)
+    expect(Math.round(b.y)).toBe(10 * TILE - 2 * PH)
+    const far = newBody(40 * TILE, 10 * TILE - PH - 0.5)
+    for (let i = 0; i < 120; i++) stepBody(far, { move: -1, jump: false }, lv, {}, [mates[1]], dt)
+    expect(Math.abs(far.x - mates[1].x)).toBeGreaterThan(17 * TILE) // weiter als die frühere Leine
+  })
 })

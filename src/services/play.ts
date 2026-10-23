@@ -141,6 +141,8 @@ export interface TeamPerson {
   pk_hearts?: number
   pk_color?: string | null
   pk_hat?: string | null
+  /** Parkour mit mehreren: host | invited | joined (declined/left werden nicht geliefert). */
+  state?: 'host' | 'invited' | 'joined' | 'declined' | 'left'
 }
 export interface TeamQuestion extends DuelQuestion { idx: number }
 export interface TeamState {
@@ -174,13 +176,15 @@ export interface TeamState {
   people: TeamPerson[]
 }
 export interface TeamInvite { run_id: string; host_name: string; host_avatar_id: string | null; host_color_id: string | null; created_at: string; kind: 'quiz' | 'parkour' }
-export const teamCreate = (partner: string, obstacles = 10, kind: 'quiz' | 'parkour' = 'parkour') => rpc<string>('team_create', { p_partner: partner, p_obstacles: obstacles, p_kind: kind })
+export const teamCreate = (partner: string, obstacles = 10, kind: 'quiz' | 'parkour' = 'parkour', extra: string[] = []) =>
+  rpc<string>('team_create', { p_partner: partner, p_obstacles: obstacles, p_kind: kind, p_extra: extra })
 export const teamParkourFinish = (id: string, millis: number, deaths: number, levels: number, cps: number) =>
   rpc<void>('team_parkour_finish', { p_id: id, p_millis: millis, p_deaths: deaths, p_levels: levels, p_cps: cps })
 export interface ParkourScore {
   host_name: string; host_avatar_id: string | null; host_color_id: string | null
   partner_name: string; partner_avatar_id: string | null; partner_color_id: string | null
   levels: number; cps: number; millis: number; deaths: number; finished_at: string
+  group_size?: number
 }
 export const teamParkourBoard = () => rpc<ParkourScore[]>('team_parkour_board')
 

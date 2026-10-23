@@ -11,8 +11,6 @@ const FLY = 260
 export const JUMP_V = -570
 const COYOTE = 0.1
 const BUFFER = 0.12
-/** Wie weit sich die beiden höchstens voneinander entfernen dürfen (Kamera zeigt beide). */
-export const LEASH = 17 * TILE
 
 export interface Body {
   x: number
@@ -30,6 +28,8 @@ export interface Body {
 export interface Input { move: number; jump: boolean; /** Luftsprünge nach dem Bodensprung (Standard 1 = Doppelsprung; Admin 3 = Vierfachsprung). */ airJumps?: number
   /** Flugmodus (Admin): schweben, W/S = hoch/runter, keine Stacheln. `vert` −1 = hoch, 1 = runter. */
   fly?: boolean
+  /** Geistmodus (Admin, nur mit fly): fliegt durch Wände und Türen. */
+  ghost?: boolean
   vert?: number }
 export type Pressed = Record<string, boolean>
 export interface Point { x: number; y: number }
@@ -96,8 +96,9 @@ export function spotIsSafe(lv: Level, pressed: Pressed, x: number, y: number): b
  * Ein Schritt (dt Sekunden). 'dead' = Stacheln berührt (das einzige, was ein Herz kostet).
  * 'lost' = eingeklemmt oder aus der Welt gefallen: Neustart ohne Herzverlust.
  */
-export function stepBody(b: Body, inp: Input, lv: Level, pressed: Pressed, other: Point | null, dt: number): 'ok' | 'dead' | 'lost' {
-  if (hitsSolid(lv, pressed, b.x, b.y)) return 'lost' // von einer Tür eingeklemmt
+export function stepBody(b: Body, inp: Input, lv: Level, pressed: Pressed, other: Point | ReadonlyArray<Point> | null, dt: number): 'ok' | 'dead' | 'lost' {
+  const others: ReadonlyArray<Point> = other === null ? [] : Array.isArray(other) ? other : [other as Point]
+  if (!inp.ghost && hitsSolid(lv, pressed, b.x, b.y)) return 'lost' // von einer Tür eingeklemmt
   if (inp.fly) {
     // Flugmodus: kein Fallen, keine Stacheln; Wände und feste Türen bleiben fest
     b.ground = false
@@ -106,11 +107,11 @@ export function stepBody(b: Body, inp: Input, lv: Level, pressed: Pressed, other
     b.vy = Math.max(-1, Math.min(1, inp.vert ?? 0)) * FLY
     if (inp.move !== 0) b.face = inp.move > 0 ? 1 : -1
     let fx = b.x + b.vx * dt
-    if (hitsSolid(lv, pressed, fx, b.y)) { fx = b.x; b.vx = 0 }
+    if (inp.ghost) fx = Math.max(0, Math.min(lv.cols * TILE - PW, fx))
+    else if (hitsSolid(lv, pressed, fx, b.y)) { fx = b.x; b.vx = 0 }
     b.x = fx
-    if (other) b.x = Math.max(other.x - LEASH, Math.min(other.x + LEASH, b.x))
     let fy = b.y + b.vy * dt
-    if (hitsSolid(lv, pressed, b.x, fy)) { fy = b.y; b.vy = 0 }
+    if (!inp.ghost && hitsSolid(lv, pressed, b.x, fy)) { fy = b.y; b.vy = 0 }
     b.y = Math.max(-6 * TILE, Math.min(ROWS * TILE - PH - 1, fy))
     b.jumpHeld = inp.jump
     return 'ok'
@@ -150,7 +151,6 @@ export function stepBody(b: Body, inp: Input, lv: Level, pressed: Pressed, other
   }
   b.x = nx
   // Leine: nicht zu weit vom Partner weg
-  if (other) b.x = Math.max(other.x - LEASH, Math.min(other.x + LEASH, b.x))
 
   // senkrecht
   const prevBottom = b.y + PH
@@ -167,10 +167,13 @@ export function stepBody(b: Body, inp: Input, lv: Level, pressed: Pressed, other
   }
   b.y = ny
   // Räuberleiter: auf dem Kopf des Partners landen
-  if (other && b.vy >= 0 && prevBottom <= other.y + 3 && b.y + PH >= other.y && b.x < other.x + PW - 3 && b.x + PW > other.x + 3) {
-    b.y = other.y - PH
-    b.vy = 0
-    b.ground = true
+  for (const o of others) {
+    if (b.vy >= 0 && prevBottom <= o.y + 3 && b.y + PH >= o.y && b.x < o.x + PW - 3 && b.x + PW > o.x + 3) {
+      b.y = o.y - PH
+      b.vy = 0
+      b.ground = true
+      break
+    }
   }
   if (touchesSpike(lv, b)) return 'dead'
   if (b.y > ROWS * TILE + 60) return 'lost'
@@ -189,8 +192,9 @@ export function checkpointAt(lv: Level, b: Point): number | null {
   return lv.checkpoints.includes(cx) && b.y + PH > 8 * TILE && b.y < 10 * TILE ? cx : null
 }
 
-/** Startpunkt: Host links, Partner rechts daneben; nach Checkpoint an dessen Spalte. */
-export function spawnAt(_lv: Level, host: boolean, cp: number | null): Point {
+/** Startpunkt: nebeneinander (Platz 0 = Host, dann Partner usw.); nach Checkpoint an dessen Spalte. */
+export function spawnAt(_lv: Level, slot: boolean | number, cp: number | null): Point {
   const col = cp ?? 2
-  return { x: col * TILE + (host ? 2 : 26), y: 10 * TILE - PH - 0.5 }
+  const off = typeof slot === 'boolean' ? (slot ? 2 : 26) : 2 + Math.max(0, Math.min(4, slot)) * 10
+  return { x: col * TILE + off, y: 10 * TILE - PH - 0.5 }
 }

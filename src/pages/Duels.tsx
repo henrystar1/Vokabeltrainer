@@ -81,7 +81,7 @@ export default function Duels() {
       </Link>
       <Link to="/live-duell" className="block rounded-2xl border border-cyan-400/40 bg-gradient-to-r from-emerald-500/10 via-transparent to-cyan-500/15 p-4 transition hover:border-cyan-300/70">
         <p className="flex items-center gap-2 font-semibold text-cyan-200"><Footprints size={18} /> Neu: Team-Parkour und Klassen-Battles</p>
-        <p className="mt-1 text-sm text-slate-300">Zu zweit mit Joystick durch drei Parkour-Level, die nur gemeinsam gehen. Oder bei einem offenen Klassen-Battle mit bis zu 20 Leuten einfach draufklicken.</p>
+        <p className="mt-1 text-sm text-slate-300">Mit bis zu 5 Leuten per Joystick durch Parkour-Level ohne Ende, die nur gemeinsam gehen. Oder bei einem offenen Klassen-Battle mit bis zu 20 Leuten einfach draufklicken.</p>
       </Link>
       <Notice tone="info">
         Du forderst einen Freund heraus: ihr bekommt dieselben 10 Fragen aus Vokabeln, die ihr beide aktiv habt (Online-Bücher). Jeder spielt, wann er will – wer mehr richtig hat, gewinnt Coins. Bei gleich vielen richtigen Antworten ist es unentschieden und jeder bekommt die Hälfte.
