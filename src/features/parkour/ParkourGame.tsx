@@ -9,6 +9,7 @@ import { teamDeathrunFinish, teamParkourFinish, type TeamState } from '../../ser
 import { levelFor } from './generator'
 import { PK_HATS, pkFill } from './cosmetics'
 import { FxField } from './fx'
+import { skillList } from './botmix'
 import { BOT_NAMES, botStep, newBot, type BotCtx, type BotState } from './bots'
 import { PICKUP_INFO, pickupX, pickupY, pickupsFor, type Pickup, type PickupKind } from './pickups'
 import { ROWS, TILE, VIEW_H, VIEW_W, type Level } from './levels'
@@ -81,7 +82,7 @@ export default function ParkourGame({ st, startLevel = 0 }: { st: TeamState; sta
     const lookOf = (uid: string) => peopleRef.current.find((p) => p.user_id === uid)
     const myFx = lookOf(st.me)?.pk_fx ?? null
     const botsN = dr && !spec ? Math.max(0, Math.min(8, st.bots ?? 0)) : 0
-    const botSkill = Math.max(1, Math.min(3, st.bot_skill ?? 2))
+    const botSkills = skillList(st.bot_skill, st.bots ?? 0)
     // Gemeinsamer Herzvorrat: Grundwert, +1 je Person ab der dritten, plus die im Shop gekauften Extra-Herzen aller
     const maxHearts = dr
       ? Math.min(12, Math.max(1, st.lives || 3) + Math.max(0, Math.min(10, st.people.find((p) => p.user_id === st.me)?.pk_hearts ?? 0)))
@@ -160,7 +161,7 @@ export default function ParkourGame({ st, startLevel = 0 }: { st: TeamState; sta
       for (let i = 0; i < botsN; i++) {
         const sn = botSnap.get(i)
         const l = sn?.lv ?? 0
-        const b = newBot(i, levelOf(l), Math.max(1, st.lives || 3), botSkill, l)
+        const b = newBot(i, levelOf(l), Math.max(1, st.lives || 3), botSkills[i] ?? 2, l)
         if (sn) { b.body.x = sn.x; b.body.y = sn.y; b.hearts = sn.hp; b.out = sn.out }
         bots.push(b)
       }
@@ -379,7 +380,9 @@ export default function ParkourGame({ st, startLevel = 0 }: { st: TeamState; sta
             for (const r of remotes.values()) if (r.lv === b.lv && !r.el && !r.dead && now - r.seen < STALE_MS) humans.push({ x: r.x, y: r.y })
             const others = [...humans]
             for (const o of bots) if (o !== b && o.lv === b.lv && !o.out && o.deadT <= 0) others.push({ x: o.body.x, y: o.body.y })
-            const ctx: BotCtx = { humans, others }
+            // Die Bots sagen sich gegenseitig, wer eine Platte hält und wo sie stehen (dann hält nur einer, die anderen gehen weiter)
+            const infos = bots.filter((o) => o !== b && o.lv === b.lv && !o.out && o.deadT <= 0).map((o) => ({ i: o.i, x: o.body.x, y: o.body.y, mode: o.mode, ch: o.holdCh }))
+            const ctx: BotCtx = { humans, others, bots: infos }
             const r = botStep(levelOf(b.lv), b, dt, ctx)
             if (r === 'exit') {
               b.lv += 1

@@ -42,6 +42,15 @@ describe('Deathrun-Bots mit Menschen im Level', () => {
     runFor(s, 30, () => ({ x: 60 * 32, y: gy }))
     expect(s.body.x / 32).toBeGreaterThan(39)
   })
+  it('kommt zurück, wenn der Mensch noch hinter dem Tor steht', () => {
+    const s = newBot(0, lv, 5, 3, 0)
+    Object.assign(s.body, { x: 41 * 32, y: gy })
+    s.grace = 0; s.deadT = 0
+    runFor(s, 25, () => ({ x: 36 * 32, y: gy }))
+    expect(s.mode).toBe('hold')
+    expect(s.body.x / 32).toBeGreaterThan(41)
+    expect(s.body.x / 32).toBeLessThan(44)
+  })
 })
 
 describe('Deathrun-Bots', () => {
@@ -52,4 +61,28 @@ describe('Deathrun-Bots', () => {
     console.log(rows.join(' '))
     expect(ok).toBeGreaterThanOrEqual(9)
   }, 120000)
+  it('Meister-Bots (Können 4) schaffen fast alles', () => {
+    const rows: string[] = []
+    let ok = 0
+    for (let n = 0; n < 14; n++) { const r = run(n, 4); rows.push(`L${n + 1}:${r.exit ? 'ok' : 'x'}${r.hearts}/${Math.round(r.t)}s`); if (r.exit) ok++ }
+    console.log('MEISTER ' + rows.join(' '))
+    expect(ok).toBeGreaterThanOrEqual(12)
+  }, 240000)
+})
+
+describe('Bots untereinander', () => {
+  const gy = 10 * 32 - 28 - 0.5
+  const lv = levelFor('seed', 0)
+  it('nur einer hält die Platte, die anderen gehen weiter', () => {
+    const bots = [0, 1, 2].map((i) => { const b = newBot(i, lv, 5, 3, 0); Object.assign(b.body, { x: 33 * 32 + 4 + i * 3, y: gy }); b.deadT = 0; b.grace = 0; return b })
+    const h = { x: 10 * 32, y: gy }
+    for (let t = 0; t < 60 * 12; t++) {
+      for (const b of bots) {
+        const infos = bots.filter((o) => o !== b).map((o) => ({ i: o.i, x: o.body.x, y: o.body.y, mode: o.mode, ch: o.holdCh }))
+        botStep(lv, b, 1 / 60, { humans: [h], others: [h, ...infos.map((o) => ({ x: o.x, y: o.y }))], bots: infos })
+      }
+    }
+    expect(bots.filter((b) => b.mode === 'hold').length).toBe(1)
+    expect(bots.filter((b) => b.body.x / 32 > 39).length).toBeGreaterThanOrEqual(1)
+  })
 })

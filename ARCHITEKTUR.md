@@ -467,3 +467,13 @@ Tabelle `book_library_hidden`; `in_library` blendet ein veröffentlichtes Buch d
 - In `ParkourGame.tsx` zählen Bots im selben Level für Platten (`pressedMap`) und als Kopf-Landefläche. Notausgang: steht ein Mensch 12 s vor einem Tor, das nur Bots hätten öffnen können, sind alle Tore 40 s offen.
 - Jetpack = Flugmodus wie beim Admin für 20 s (Sprung = hoch, „Runter“-Knopf/S = runter, keine Stacheln, Wände bleiben fest). Kein Treibstoff mehr (`JET_FUEL` entfernt).
 - `fx.ts`: Schwarzes Loch liegt flach unter den Füßen (Anker `cx`/`foot`).
+
+## Update 58/59: Bots kommen zurück, Meister-Bot, gemischte Bots, weniger Upgrades
+- Bots bleiben auf der Platte, bis jeder Mensch ganz hinter dem Tor ist (nicht nur an der Tür). Steht ein Mensch noch 0,8 s vor einem Tor, das der Bot schon passiert hat, läuft der Bot zur nächsten Platte dieses Kanals zurück (`forgottenGate`, danach 30 s Pause gegen Hin-und-Her).
+- Bots sprechen sich ab (`BotCtx.bots`, vom Steuerrechner in `ParkourGame` gefüllt): Hält schon ein Bot die Platte eines Tors oder ist unterwegs dorthin, stellt sich kein zweiter dazu, sondern geht weiter. Zusätzlich halten Bots Abstand: steht ein laufender Bot mit kleinerer Nummer auf derselben Stelle, wartet der andere kurz (mit Pause danach).
+- Pläne enden bei der Landung (der Bot plant danach neu, statt blind weiterzuspringen). Checkpoints merkt sich ein Bot auch im Sprung.
+- Können 4 = Meister: Bremsen in der Luft für schmale Inseln (`candidates` Modus 2/3). Können 3 und 4 benutzen außerdem **einprogrammierte Wege** (`routes.generated.ts`): bildgenau per Strahlsuche berechnet für alle Stachelabschnitte der handgebauten Level 7 und 8 (je Checkpoint und Startplatz 0–4). Am Checkpoint wird der Bot auf die Startstelle des Wegs gesetzt (wenige Pixel) und spielt den Weg ab. Wege durch Abschnitte mit Türen/Brücken gelten nur, wenn kein Mensch im Level ist (alle Tore offen).
+- Gemischte Bots (`botmix.ts`): `team_runs.bot_skill` = 1–4 (alle gleich, alte Lobbys) oder ab 10 `10 + n1 + 9·n2 + 81·n3 + 729·n4`. Lobby: je Stärke ein Plus/Minus, zusammen höchstens 8.
+- `0051_master_bot.sql`: Prüfregel `bot_skill` 1–7000 und `team_set_bots` ohne die alte Obergrenze 3.
+- Boden-Upgrades deutlich seltener (erstes ab Spalte ~36, danach etwa alle 70–100 Spalten).
+- Testlauf (`bots.test.ts`, Level 1–14): Profi und Meister schaffen 13–14 von 14, in Level 7 und 8 mit allen Herzen.

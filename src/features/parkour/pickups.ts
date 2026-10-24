@@ -31,14 +31,14 @@ export function pickupsFor(level: Level, key: string): Pickup[] {
     }
     return false
   }
-  let col = 16 + Math.floor(r() * 10)
+  let col = 36 + Math.floor(r() * 30)
   let id = 0
   while (col < level.cols - 10) {
     let c = col
     while (c < col + 14 && !(free(level, c) && !near(c))) c++
     if (c < col + 14) {
       out.push({ id: id++, kind: r() < 0.5 ? 'jump3' : 'jet', col: c })
-      col = c + 26 + Math.floor(r() * 14)
+      col = c + 70 + Math.floor(r() * 30)
     } else col += 14
   }
   return out
