@@ -477,3 +477,7 @@ Tabelle `book_library_hidden`; `in_library` blendet ein veröffentlichtes Buch d
 - `0051_master_bot.sql`: Prüfregel `bot_skill` 1–7000 und `team_set_bots` ohne die alte Obergrenze 3.
 - Boden-Upgrades deutlich seltener (erstes ab Spalte ~36, danach etwa alle 70–100 Spalten).
 - Testlauf (`bots.test.ts`, Level 1–14): Profi und Meister schaffen 13–14 von 14, in Level 7 und 8 mit allen Herzen.
+
+## Update 60: Bots achten aufeinander, Meister klettert wieder
+- Der haltende Bot wartet auf der Platte auch auf andere Bots, die noch vor dem Tor sind (bis 30 Kacheln dahinter, höchstens 40 s). Sind Menschen oder andere Bots im Level, gelten die Tore für die Bots; alle Tore offen nur, wenn der Bot allein ist (`allOpen`). Der letzte Haltende kommt nach der Wartezeit hinter das Tor.
+- Meister: Bremsplanung nur noch, wenn gar kein normaler Sprung geht (vorher wartete er an der Säule von Level 7 auf einen „besseren“ Plan, lief gegen die Wand, ging zurück und sprang in die Stacheln).

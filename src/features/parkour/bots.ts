@@ -82,7 +82,9 @@ const lastEnd = (wins: Wins): number => wins.reduce((m, w) => Math.max(m, w[1]),
 
 interface Sim { ok: boolean; dx: number; b?: Body }
 
-const worldPressed = (lv: Level, b: Point, ctx: BotCtx): Pressed => (ctx.humans.length === 0 ? ALL_OPEN : pressedMap(lv, [b, ...ctx.others]))
+/** Alle Tore offen? Nur wenn weder Menschen noch andere Bots im Level sind. */
+const allOpen = (ctx: BotCtx): boolean => ctx.humans.length === 0 && (ctx.bots?.length ?? 0) === 0
+const worldPressed = (lv: Level, b: Point, ctx: BotCtx): Pressed => (allOpen(ctx) ? ALL_OPEN : pressedMap(lv, [b, ...ctx.others]))
 
 /** Läuft (mit Sprungfolge) bis zur Landung oder zum Ende des Zeitfensters. dx zählt in Laufrichtung. */
 function simulate(lv: Level, b0: Body, wins: Wins, frames: number, untilLand: boolean, ctx: BotCtx, dir: number): Sim {
@@ -176,6 +178,8 @@ function holdWanted(lv: Level, b: Body, own: Pressed, ctx: BotCtx, me: BotState,
       if (g.ch !== ch || Math.abs(g.x0 * TILE - b.x) > 24 * TILE) continue
       // bis der Mensch ganz hinter dem Tor ist (nicht nur an der Tür), sonst schließt es sich über ihm
       if (ctx.humans.some((h) => h.x < (g.x1 + 1) * TILE + 8)) return ch
+      // und auch, bis die anderen Bots durch sind
+      if (ctx.bots?.some((o) => o.mode === 'run' && o.x < (g.x1 + 1) * TILE + 8 && o.x > g.x0 * TILE - 30 * TILE)) return ch
     }
   }
   return null
@@ -249,7 +253,7 @@ export function botInput(lv: Level, s: BotState, ctx: BotCtx, dir = 1): Input {
   let fallback: Wins | null = null
   // Meister: erst normale Sprungfolgen, wenn keine sicher ist, zusätzlich mit Bremsen in der Luft
   for (const mode of master ? [0, 2, 3] : [0]) {
-    if (first) break
+    if (first || (fallback && mode >= 2)) break // Bremsen nur, wenn gar kein Sprung geht (sonst wie Profi)
     if (mode === 3 && (s.fineT = (s.fineT + 1) % 3) !== 0) continue // die feine Suche ist teuer: nur jedes 3. Bild
     for (const w of candidates(b.ground, b.air, mode)) {
       const now = simulate(lv, b, w, 110, true, ctx, dir)
@@ -294,7 +298,7 @@ export function botStep(lv: Level, s: BotState, dt: number, ctx: BotCtx = { huma
   if (s.mistakeT > 0) s.mistakeT -= dt
   if (s.retCd > 0) s.retCd -= dt
   const b = s.body
-  const open = ctx.humans.length === 0
+  const open = allOpen(ctx)
   s.open = open
   const pNow = open ? ALL_OPEN : pressedMap(lv, [b, ...ctx.others])
   const own = open ? {} : pressedMap(lv, [b])

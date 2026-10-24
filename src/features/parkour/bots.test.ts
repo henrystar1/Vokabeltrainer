@@ -86,3 +86,33 @@ describe('Bots untereinander', () => {
     expect(bots.filter((b) => b.body.x / 32 > 39).length).toBeGreaterThanOrEqual(1)
   })
 })
+
+describe('Bots achten aufeinander', () => {
+  const gy = 10 * 32 - 28 - 0.5
+  const lv = levelFor('seed', 0) // Platte a bei 33, Tür a bei 38
+  const mk = (i: number, x: number) => { const b = newBot(i, lv, 5, 3, 0); Object.assign(b.body, { x, y: gy }); b.deadT = 0; b.grace = 0; return b }
+  const stepAll = (bots: BotState[], frames: number, fixed: Set<number> = new Set()) => {
+    for (let t = 0; t < frames; t++) {
+      for (const b of bots) {
+        if (fixed.has(b.i)) continue
+        const infos = bots.filter((o) => o !== b).map((o) => ({ i: o.i, x: o.body.x, y: o.body.y, mode: o.mode, ch: o.holdCh }))
+        botStep(lv, b, 1 / 60, { humans: [], others: infos.map((o) => ({ x: o.x, y: o.y })), bots: infos })
+      }
+    }
+  }
+  it('der Bot auf der Platte wartet, bis der andere Bot durch das Tor ist', () => {
+    const a = mk(0, 33 * 32 + 4)
+    const c = mk(1, 20 * 32)
+    stepAll([a, c], 60 * 2, new Set([1])) // c steht still weit vor dem Tor
+    expect(a.mode).toBe('hold')
+    expect(a.body.x / 32).toBeLessThan(35)
+  })
+  it('wenn der andere Bot durch ist, geht der Haltende weiter', () => {
+    const a = mk(0, 33 * 32 + 4)
+    const c = mk(1, 20 * 32)
+    stepAll([a, c], 60 * 2, new Set([1]))
+    Object.assign(c.body, { x: 41 * 32, y: gy })
+    stepAll([a, c], 60 * 22, new Set([1])) // das Tor schließt sich hinter dem letzten Bot: nach der Wartezeit wird er hinter das Tor gesetzt
+    expect(a.body.x / 32).toBeGreaterThan(36)
+  })
+})
