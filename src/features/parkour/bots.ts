@@ -138,7 +138,8 @@ function holdWanted(lv: Level, b: Body, own: Pressed, ctx: BotCtx): string | nul
     if (!own[ch]) continue
     for (const g of gatesOf(lv)) {
       if (g.ch !== ch || Math.abs(g.x0 * TILE - b.x) > 24 * TILE) continue
-      if (ctx.humans.some((h) => h.x < g.x0 * TILE - 20)) return ch
+      // bis der Mensch ganz hinter dem Tor ist (nicht nur an der Tür), sonst schließt es sich über ihm
+      if (ctx.humans.some((h) => h.x < (g.x1 + 1) * TILE + 8)) return ch
     }
   }
   return null
