@@ -7,10 +7,8 @@ export interface Pickup { id: number; kind: PickupKind; col: number }
 
 export const PICKUP_INFO: Record<PickupKind, { name: string; color: string; glyph: string; seconds: number }> = {
   jump3: { name: '3er-Sprung', color: '#a78bfa', glyph: '3', seconds: 20 },
-  jet: { name: 'Jetpack', color: '#fb923c', glyph: '🚀', seconds: 25 },
+  jet: { name: 'Jetpack', color: '#fb923c', glyph: '🚀', seconds: 20 },
 }
-/** Jetpack-Treibstoff in Sekunden Schub (Halten des Sprungknopfs in der Luft). */
-export const JET_FUEL = 5
 
 const free = (lv: Level, col: number): boolean => {
   if (col < 1 || col >= lv.cols - 1) return false

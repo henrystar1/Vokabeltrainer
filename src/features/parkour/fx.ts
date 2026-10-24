@@ -27,13 +27,13 @@ const RAINBOW = ['#f87171', '#fb923c', '#facc15', '#4ade80', '#60a5fa', '#c084fc
 export class FxField {
   private parts: Particle[] = []
   private trail = new Map<string, TrailPoint[]>()
-  private anchor = new Map<string, { x: number; y: number; face: number }>()
+  private anchor = new Map<string, { x: number; y: number; face: number; cx: number; foot: number }>()
   private acc = new Map<string, number>()
 
   /** Pro Bild für jede sichtbare Figur aufrufen (x, y = linke obere Ecke der Figur). */
   update(uid: string, fx: string | null | undefined, x: number, y: number, face: 1 | -1, t: number, dt: number, rate = 1): void {
     const cx = x + PW / 2, cy = y + PH / 2
-    this.anchor.set(uid, { x: cx - face * 26, y: cy, face })
+    this.anchor.set(uid, { x: cx - face * 26, y: cy, face, cx, foot: y + PH + 3 })
     if (!fx) { this.trail.delete(uid); return }
     // Spur: Positionen in festen Zeitabständen merken (für Notenband und Regenbogenstrahl)
     let tr = this.trail.get(uid)
@@ -120,8 +120,8 @@ export class FxField {
         const k = 1 - p.life / p.max
         const rad = Math.max(2, (p.rad ?? 40) * k * k)
         p.ang = (p.ang ?? 0) + (p.spin ?? 3) * dt * (1 + (1 - k) * 2)
-        p.x = an.x + Math.cos(p.ang) * rad
-        p.y = an.y + Math.sin(p.ang) * rad * 0.9
+        p.x = an.cx + Math.cos(p.ang) * rad
+        p.y = an.foot + Math.sin(p.ang) * rad * 0.28 // flach: Loch liegt unter den Füßen
       } else if (p.kind !== 'bolt') {
         p.x += p.vx * dt
         p.y += p.vy * dt
@@ -171,17 +171,20 @@ export class FxField {
       const an = this.anchor.get(uid)
       if (!an) return
       ctx.save()
-      const g = ctx.createRadialGradient(an.x, an.y, 2, an.x, an.y, 26)
+      // Loch unter dem Spieler: flache Scheibe am Boden, Figur steht darüber
+      ctx.translate(an.cx, an.foot)
+      ctx.scale(1, 0.32)
+      const g = ctx.createRadialGradient(0, 0, 2, 0, 0, 40)
       g.addColorStop(0, 'rgba(0,0,0,1)'); g.addColorStop(0.55, 'rgba(0,0,0,0.95)'); g.addColorStop(0.75, 'rgba(124,58,237,0.55)'); g.addColorStop(1, 'rgba(124,58,237,0)')
       ctx.fillStyle = g
-      ctx.beginPath(); ctx.arc(an.x, an.y, 26, 0, Math.PI * 2); ctx.fill()
+      ctx.beginPath(); ctx.arc(0, 0, 40, 0, Math.PI * 2); ctx.fill()
       ctx.strokeStyle = 'rgba(232,121,249,0.8)'
-      ctx.lineWidth = 2
-      ctx.beginPath(); ctx.ellipse(an.x, an.y, 17, 7, t * 2.2, 0, Math.PI * 2); ctx.stroke()
+      ctx.lineWidth = 3
+      ctx.beginPath(); ctx.ellipse(0, 0, 28, 20, t * 2.2, 0, Math.PI * 2); ctx.stroke()
       ctx.strokeStyle = 'rgba(167,139,250,0.7)'
-      ctx.beginPath(); ctx.ellipse(an.x, an.y, 13, 5, -t * 3, 0, Math.PI * 2); ctx.stroke()
+      ctx.beginPath(); ctx.ellipse(0, 0, 20, 14, -t * 3, 0, Math.PI * 2); ctx.stroke()
       ctx.fillStyle = '#000'
-      ctx.beginPath(); ctx.arc(an.x, an.y, 9, 0, Math.PI * 2); ctx.fill()
+      ctx.beginPath(); ctx.arc(0, 0, 14, 0, Math.PI * 2); ctx.fill()
       ctx.restore()
     }
   }

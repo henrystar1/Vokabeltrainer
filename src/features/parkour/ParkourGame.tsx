@@ -9,8 +9,8 @@ import { teamDeathrunFinish, teamParkourFinish, type TeamState } from '../../ser
 import { levelFor } from './generator'
 import { PK_HATS, pkFill } from './cosmetics'
 import { FxField } from './fx'
-import { BOT_NAMES, botStep, newBot, type BotState } from './bots'
-import { JET_FUEL, PICKUP_INFO, pickupX, pickupY, pickupsFor, type Pickup, type PickupKind } from './pickups'
+import { BOT_NAMES, botStep, newBot, type BotCtx, type BotState } from './bots'
+import { PICKUP_INFO, pickupX, pickupY, pickupsFor, type Pickup, type PickupKind } from './pickups'
 import { ROWS, TILE, VIEW_H, VIEW_W, type Level } from './levels'
 import { PH, PW, checkpointAt, inExit, newBody, pressedMap, spawnAt, spotIsSafe, stepBody, type Body, type Pressed } from './engine'
 
@@ -46,7 +46,7 @@ export default function ParkourGame({ st, startLevel = 0 }: { st: TeamState; sta
   const toggleFly = () => { if (!adminRef.current || spec) return; input.current.fly = !input.current.fly; if (!input.current.fly) input.current.ghost = false; setFlyUi(input.current.fly); setGhostUi(input.current.ghost) }
   const toggleGhost = () => { if (!adminRef.current || spec) return; input.current.ghost = !input.current.ghost; if (input.current.ghost) input.current.fly = true; setGhostUi(input.current.ghost); setFlyUi(input.current.fly) }
   const watch = (uid: string | null) => { follow.current = { uid, to: uid }; setFollowUi(uid) }
-  const [hud, setHud] = useState({ level: 0, deaths: 0, ms: 0, linked: false, done: false })
+  const [hud, setHud] = useState({ level: 0, deaths: 0, ms: 0, linked: false, done: false, jet: false })
 
   useEffect(() => {
     const cv = canvas.current
@@ -116,8 +116,8 @@ export default function ParkourGame({ st, startLevel = 0 }: { st: TeamState; sta
 
     // ---- Boden-Upgrades ----
     const taken = new Map<string, number>() // "Level:Nr" → Zeit, ab der das Upgrade wieder da ist
-    const buff = { jump3: 0, jet: 0, fuel: 0 }
-    const buffCode = () => (buff.jet > 0 && buff.fuel > 0 ? 2 : buff.jump3 > 0 ? 1 : 0)
+    const buff = { jump3: 0, jet: 0 }
+    const buffCode = () => (buff.jet > 0 ? 2 : buff.jump3 > 0 ? 1 : 0)
 
     // ---- Wiedereinstieg: Stand nach einem Neuladen oder Verbindungsabbruch wiederherstellen ----
     const saveKey = `pkr:${st.id}:${st.me}`
@@ -339,19 +339,33 @@ export default function ParkourGame({ st, startLevel = 0 }: { st: TeamState; sta
           taken.set(key, t + 35)
           const info = PICKUP_INFO[pk.kind]
           if (pk.kind === 'jump3') buff.jump3 = info.seconds
-          else { buff.jet = info.seconds; buff.fuel = JET_FUEL }
+          else buff.jet = info.seconds
           toast = { text: `${info.name}! ${info.seconds} s`, t: 2 }
         }
       }
     }
     let toast: { text: string; t: number } | null = null
 
+    // Bots im selben Level wie ich (zählen wie Mitspielende: sie halten Platten und tragen auf dem Kopf)
+    const botPts = (now: number): Array<{ x: number; y: number }> => {
+      const out: Array<{ x: number; y: number }> = []
+      for (const b of botViews(now)) if (b.lv === lv && !b.out && !b.dead) out.push({ x: b.x, y: b.y })
+      return out
+    }
+    let openUntil = 0 // Notausgang: Bots konnten nicht helfen, Tore bleiben kurz offen
+    let gateStuck = 0
+    const gatePressed = (level: Level, mt: Remote[], bp: Array<{ x: number; y: number }>, others: Array<{ x: number; y: number }>): Pressed => {
+      if (dr && ((mt.length === 0 && bp.length === 0) || t < openUntil)) return { a: true, b: true, c: true }
+      return pressedMap(level, [deadT > 0 || spec ? null : me, ...others, ...bp])
+    }
+
     function step(dt: number, now: number) {
       const level = levelOf(lv)
       const mt = mates(now)
-      const others = mt.filter((r) => !r.dead).map((r) => ({ x: r.x, y: r.y }))
-      // Deathrun: wer allein im Level ist, für den sind alle Tore offen (sonst käme der Letzte nie weiter)
-      const pressed: Pressed = dr && mt.length === 0 ? { a: true, b: true, c: true } : pressedMap(level, [deadT > 0 || spec ? null : me, ...others])
+      const bp = botPts(now)
+      const others = [...mt.filter((r) => !r.dead).map((r) => ({ x: r.x, y: r.y })), ...bp]
+      // Deathrun: wer allein im Level ist (auch ohne Bots), für den sind alle Tore offen (sonst käme der Letzte nie weiter)
+      const pressed: Pressed = gatePressed(level, mt, bp, others.slice(0, others.length - bp.length))
       // Bots (nur auf dem Rechner, der sie steuert)
       if (botsN > 0) {
         const master = isMaster(now)
@@ -359,7 +373,14 @@ export default function ParkourGame({ st, startLevel = 0 }: { st: TeamState; sta
         else if (!master && bots) { for (const b of bots) botSnap.set(b.i, { i: b.i, x: b.body.x, y: b.body.y, face: b.body.face, lv: b.lv, hp: b.hearts, out: b.out, dead: b.deadT > 0, dx: b.body.x, dy: b.body.y, seen: now }); bots = null }
         if (bots) {
           for (const b of bots) {
-            const r = botStep(levelOf(b.lv), b, dt)
+            // Menschen und andere Bots im Level des Bots: er hält Platten für Menschen und hat selbst feste Türen
+            const humans: Array<{ x: number; y: number }> = []
+            if (!spec && !finished && deadT <= 0 && lv === b.lv) humans.push({ x: me.x, y: me.y })
+            for (const r of remotes.values()) if (r.lv === b.lv && !r.el && !r.dead && now - r.seen < STALE_MS) humans.push({ x: r.x, y: r.y })
+            const others = [...humans]
+            for (const o of bots) if (o !== b && o.lv === b.lv && !o.out && o.deadT <= 0) others.push({ x: o.body.x, y: o.body.y })
+            const ctx: BotCtx = { humans, others }
+            const r = botStep(levelOf(b.lv), b, dt, ctx)
             if (r === 'exit') {
               b.lv += 1
               b.hearts = Math.min(Math.max(1, st.lives || 3), b.hearts + 1)
@@ -406,10 +427,17 @@ export default function ParkourGame({ st, startLevel = 0 }: { st: TeamState; sta
       const i = input.current
       const move = i.stick !== 0 ? i.stick : (i.right ? 1 : 0) - (i.left ? 1 : 0)
       const adm = adminRef.current
-      const jetting = !adm && buff.jet > 0 && buff.fuel > 0 && i.jump && !me.ground
-      if (jetting) buff.fuel -= dt
+      const jetFly = !adm && buff.jet > 0 // Jetpack: Flugmodus wie beim Admin (Sprungknopf hoch, Runter-Knopf oder S runter), keine Stacheln, Wände bleiben fest
       const airJumps = adm ? 3 : buff.jump3 > 0 ? 2 : 1
-      const r = stepBody(me, { move, jump: i.jump, airJumps, jet: jetting, fly: adm && i.fly, ghost: adm && i.fly && i.ghost, vert: (i.down ? 1 : 0) - (i.jump ? 1 : 0) }, level, pressed, others, dt)
+      const r = stepBody(me, { move, jump: i.jump, airJumps, fly: (adm && i.fly) || jetFly, ghost: adm && i.fly && i.ghost, vert: (i.down ? 1 : 0) - (i.jump ? 1 : 0) }, level, pressed, others, dt)
+      // Notausgang: steht ein Mensch lange allein vor einer Tür, die nur Bots hätten öffnen können, gehen die Tore auf
+      if (dr && bp.length > 0 && mt.length === 0 && move !== 0 && Math.abs(me.vx) < 5 && me.ground) {
+        const tx = Math.floor((me.x + PW + 3) / TILE), ty = Math.floor((me.y + PH - 2) / TILE)
+        const ch = level.rows[ty]?.[tx]
+        if (ch && ch >= 'A' && ch <= 'C' && !pressed[ch.toLowerCase()]) gateStuck += dt
+        else gateStuck = 0
+        if (gateStuck > 12) { openUntil = t + 40; gateStuck = 0; toast = { text: 'Tore offen: die Bots helfen nicht', t: 3 } }
+      } else gateStuck = 0
       ghostOn = adm && i.fly && i.ghost
       if (r === 'dead' && graceT > 0) { deadT = 0.3; return } // Schonfrist: neu starten ohne Herz zu verlieren
       if (r === 'dead') { deaths += 1; hearts -= 1; deadT = 0.7; checkOver(); return }
@@ -431,7 +459,7 @@ export default function ParkourGame({ st, startLevel = 0 }: { st: TeamState; sta
       const level = levelOf(lv)
       const mt = mates(now)
       const fresh = mt.length > 0
-      const pressed = dr && mt.length === 0 ? { a: true, b: true, c: true } : pressedMap(level, [deadT > 0 || spec ? null : me, ...mt.filter((r) => !r.dead)])
+      const pressed = gatePressed(level, mt, botPts(now), mt.filter((r) => !r.dead))
       // Kamera
       const mid = me.x // die Kamera folgt nur dir: wer weit weg ist, verschwindet aus dem Bild
       const want = Math.max(0, Math.min(level.cols * TILE - VIEW_W, mid + PW / 2 - VIEW_W / 2))
@@ -597,16 +625,11 @@ export default function ParkourGame({ st, startLevel = 0 }: { st: TeamState; sta
       ctx!.fillText(spec ? `Level ${lv + 1}` : `${Math.floor(secs / 60)}:${String(secs % 60).padStart(2, '0')}  ·  Level ${lv + 1}`, VIEW_W - 10, 17)
       ctx!.textAlign = 'center'
       // Aktive Upgrades
-      if (!spec && (buff.jump3 > 0 || (buff.jet > 0 && buff.fuel > 0))) {
+      if (!spec && (buff.jump3 > 0 || buff.jet > 0)) {
         let by = (dr ? 48 : 32)
         ctx!.font = '600 11px system-ui, sans-serif'; ctx!.textAlign = 'left'
         if (buff.jump3 > 0) { ctx!.fillStyle = 'rgba(2,6,23,0.65)'; ctx!.fillRect(8, by - 11, 128, 16); ctx!.fillStyle = '#c4b5fd'; ctx!.fillText(`3er-Sprung ${Math.ceil(buff.jump3)} s`, 12, by); by += 18 }
-        if (buff.jet > 0 && buff.fuel > 0) {
-          ctx!.fillStyle = 'rgba(2,6,23,0.65)'; ctx!.fillRect(8, by - 11, 128, 16)
-          ctx!.fillStyle = '#334155'; ctx!.fillRect(12, by - 6, 78, 7)
-          ctx!.fillStyle = '#fb923c'; ctx!.fillRect(12, by - 6, 78 * Math.max(0, Math.min(1, buff.fuel / JET_FUEL)), 7)
-          ctx!.fillStyle = '#fed7aa'; ctx!.fillText(`🚀 ${Math.ceil(buff.jet)} s`, 96, by)
-        }
+        if (buff.jet > 0) { ctx!.fillStyle = 'rgba(2,6,23,0.65)'; ctx!.fillRect(8, by - 11, 150, 16); ctx!.fillStyle = '#fed7aa'; ctx!.fillText(`🚀 Flugmodus ${Math.ceil(buff.jet)} s`, 12, by) }
         ctx!.textAlign = 'center'
       }
       if (dr) {
@@ -701,7 +724,7 @@ export default function ParkourGame({ st, startLevel = 0 }: { st: TeamState; sta
       render(now)
       if (now - lastHud > 400) {
         lastHud = now
-        setHud({ level: lv, deaths, ms: now - startPerf, linked: mates(now).length > 0, done: finished })
+        setHud({ level: lv, deaths, ms: now - startPerf, linked: mates(now).length > 0, done: finished, jet: buff.jet > 0 })
       }
       raf = requestAnimationFrame(loop)
     }
@@ -805,6 +828,10 @@ export default function ParkourGame({ st, startLevel = 0 }: { st: TeamState; sta
             )}
           </div>
         )}
+        {hud.jet && !isAdmin && !spec && (
+          <button type="button" aria-label="Runter" {...holdProps('down')}
+            className="min-h-[48px] touch-none select-none rounded-2xl border border-orange-300/50 bg-orange-400/15 px-3 text-xs font-semibold text-orange-100 active:bg-orange-400/30">Runter (S)</button>
+        )}
         {spec && (
           <div className="flex flex-col gap-2">
             <button type="button" aria-label="Runter" {...holdProps('down')}
@@ -835,7 +862,7 @@ export default function ParkourGame({ st, startLevel = 0 }: { st: TeamState; sta
         </div>
       )}
       <p className="text-center text-xs text-slate-500">
-        Joystick links = laufen, Knopf rechts = springen, in der Luft nochmal tippen = Doppelsprung (Tastatur: Pfeile/WASD und Leertaste). Leuchtende Kugeln am Boden geben kurz einen 3er-Sprung oder ein Jetpack (Sprungknopf in der Luft halten). {st.kind === 'deathrun' ? 'DEATHRUN: Jeder läuft für sich mit eigenen Herzen. Wer im Ziel ist, ist sofort im nächsten Level. Tore öffnen sich nur, wenn jemand im selben Level auf der Platte steht; wer allein im Level ist, für den sind sie offen. ' : 'Ihr teilt euch die Herzen (jedes geschaffte Level bringt eins zurück), jeder Sturz in Stacheln oder Schluchten kostet eins. '} Die Kamera folgt nur dir: Pfeile am Rand zeigen, wo die anderen sind.{st.kind === 'deathrun' ? '' : ' Ins nächste Level kommt ihr, wenn alle im Ausgang stehen.'} Steckt ihr fest, hilft „Neustart“ (Taste R): ihr landet am Checkpoint im Bild oder bei einem Mitspieler. Die Level hören nie auf und werden immer schwerer. Je weiter ihr kommt, desto mehr Coins.
+        Joystick links = laufen, Knopf rechts = springen, in der Luft nochmal tippen = Doppelsprung (Tastatur: Pfeile/WASD und Leertaste). Leuchtende Kugeln am Boden geben kurz einen 3er-Sprung oder ein Jetpack (Flugmodus: Sprungknopf = hoch, Runter-Knopf = runter, Stacheln tun nichts). {st.kind === 'deathrun' ? 'DEATHRUN: Jeder läuft für sich mit eigenen Herzen. Wer im Ziel ist, ist sofort im nächsten Level. Tore öffnen sich nur, wenn jemand im selben Level auf der Platte steht; wer allein im Level ist, für den sind sie offen. ' : 'Ihr teilt euch die Herzen (jedes geschaffte Level bringt eins zurück), jeder Sturz in Stacheln oder Schluchten kostet eins. '} Die Kamera folgt nur dir: Pfeile am Rand zeigen, wo die anderen sind.{st.kind === 'deathrun' ? '' : ' Ins nächste Level kommt ihr, wenn alle im Ausgang stehen.'} Steckt ihr fest, hilft „Neustart“ (Taste R): ihr landet am Checkpoint im Bild oder bei einem Mitspieler. Die Level hören nie auf und werden immer schwerer. Je weiter ihr kommt, desto mehr Coins.
         {hud.linked ? '' : ' Verbindung zum Partner wird aufgebaut …'}
       </p>
     </div>

@@ -461,3 +461,9 @@ Tabelle `book_library_hidden`; `in_library` blendet ein veröffentlichtes Buch d
 - Boden-Upgrades (`pickups.ts`, nur im Client, aus Lauf-ID und Level deterministisch): 3er-Sprung (20 s) und Jetpack (25 s, 5 s Schub, Sprungknopf in der Luft halten); Aura/Flamme sehen auch die anderen (`bf`).
 - Kosmetik: Effekte (`fx.ts`: Notenstrahl, Schwarzes Loch, Blitze …), weitere Farben und Hüte; `parkour_profiles.fx`, `parkour_equip(color, hat, fx)`, `_pk_price` (Preise: `parkour_fx_price`, Premium ×3), `team_get.people[].pk_fx`.
 - Joystick: setzt sich bei pointerup/cancel, verlorenem Pointer, Fensterfokus-Verlust, Tab-Wechsel und wenn kein Finger mehr auf dem Bildschirm ist zurück; Textmarkieren (`selectstart`), Kontextmenü und Lupe sind im Spiel gesperrt.
+
+## Update 57: Bots als echte Mitspieler, Jetpack-Flugmodus, Loch unter dem Spieler
+- Bots (`bots.ts`) bekommen einen `BotCtx` (Menschen/andere im Level): sie stehen auf Platten, bis Menschen durch sind, haben selbst feste Türen/Brücken und warten auf Menschen. Nach 14 s ohne Hilfe werden sie hinter das Tor gesetzt.
+- In `ParkourGame.tsx` zählen Bots im selben Level für Platten (`pressedMap`) und als Kopf-Landefläche. Notausgang: steht ein Mensch 12 s vor einem Tor, das nur Bots hätten öffnen können, sind alle Tore 40 s offen.
+- Jetpack = Flugmodus wie beim Admin für 20 s (Sprung = hoch, „Runter“-Knopf/S = runter, keine Stacheln, Wände bleiben fest). Kein Treibstoff mehr (`JET_FUEL` entfernt).
+- `fx.ts`: Schwarzes Loch liegt flach unter den Füßen (Anker `cx`/`foot`).
