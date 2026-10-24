@@ -38,6 +38,8 @@ import LiveDuel from './pages/LiveDuel'
 import LiveDuelRoom from './pages/LiveDuelRoom'
 import Parkour from './pages/Parkour'
 import TeamRunRoom from './pages/TeamRunRoom'
+import OpenDeathrun from './pages/OpenDeathrun'
+import AdminRuns from './pages/AdminRuns'
 import Quests from './pages/Quests'
 import Sprint from './pages/Sprint'
 import Profile from './pages/Profile'
@@ -112,6 +114,8 @@ export default function App() {
           <Route path="live-duell" element={<Gate k="duels"><LiveDuel /></Gate>} />
           <Route path="live-duell/:id" element={<Gate k="duels"><LiveDuelRoom /></Gate>} />
           <Route path="parkour" element={<Gate k="duels"><Parkour /></Gate>} />
+          <Route path="deathrun" element={<Gate k="duels"><OpenDeathrun /></Gate>} />
+          <Route path="laeufe" element={<Gate k="duels"><AdminRuns /></Gate>} />
           <Route path="team/:id" element={<Gate k="duels"><TeamRunRoom /></Gate>} />
           <Route path="statistik" element={<Stats />} />
           <Route path="rangliste" element={<Leaderboard />} />

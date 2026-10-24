@@ -1,13 +1,14 @@
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
-import { Check, Footprints, Heart, Skull, Users } from 'lucide-react'
+import { Check, Eye, Footprints, Heart, Skull, Users } from 'lucide-react'
+import { useAuth } from '../features/auth/AuthProvider'
 import Button from '../components/ui/Button'
 import Card from '../components/ui/Card'
 import CoinIcon from '../components/ui/CoinIcon'
 import PageHeader from '../components/ui/PageHeader'
 import { ErrorBox, Spinner } from '../components/ui/States'
 import { useWallet } from '../features/koins/WalletProvider'
-import { PK_COLORS, PK_HATS, PK_PREMIUM_FACTOR } from '../features/parkour/cosmetics'
+import { PK_COLORS, PK_FX, PK_HATS, PK_PREMIUM_FACTOR } from '../features/parkour/cosmetics'
 import { errorMessage } from '../lib/errors'
 import { useAsync } from '../lib/useAsync'
 import { parkourEquip, parkourShopBuy, parkourShopGet, type ParkourShop } from '../services/play'
@@ -25,6 +26,7 @@ function Figure({ color, hat }: { color: string; hat?: string }) {
 
 export default function Parkour() {
   const wallet = useWallet()
+  const { isAdmin } = useAuth()
   const shop = useAsync(parkourShopGet, [])
   const [armed, setArmed] = useState<string | null>(null)
   const [busy, setBusy] = useState<string | null>(null)
@@ -58,6 +60,14 @@ export default function Parkour() {
             <Skull size={18} /> Deathrun
           </Link>
         </div>
+        <Link to="/deathrun" className="inline-flex min-h-[48px] w-full items-center justify-center gap-2 rounded-xl border border-amber-300/40 bg-amber-400/10 px-4 font-semibold text-amber-100 hover:bg-amber-400/20">
+          <Skull size={18} /> Offene Deathrun-Lobby: sofort mitspielen
+        </Link>
+        {isAdmin && (
+          <Link to="/laeufe" className="inline-flex min-h-[44px] w-full items-center justify-center gap-2 rounded-xl border border-violet-300/40 bg-violet-400/10 px-4 text-sm font-semibold text-violet-100 hover:bg-violet-400/20">
+            <Eye size={16} /> Admin: alle offenen Läufe ansehen
+          </Link>
+        )}
         <p className="text-xs text-slate-400">
           <b>Deathrun:</b> bis zu 5 Personen, jeder läuft für sich mit eigenen Herzen und kommt allein ins nächste Level, sobald er im Ziel ist. Tore und Brücken gehen nur mit Teamarbeit auf. Wer keine Herzen mehr hat, scheidet aus. Bestenlisten findest du unter <Link to="/rangliste" className="text-accent-cyan hover:underline">Rangliste</Link>.
         </p>
@@ -106,7 +116,7 @@ export default function Parkour() {
                     <button key={id} type="button" disabled={busy === key || (!owned && wallet.balance < price)}
                       onClick={() => (owned ? void run(key, () => parkourEquip(id, s.hat)) : buy(key))} aria-pressed={on}
                       className={`flex min-h-[84px] flex-col items-center justify-center gap-1 rounded-xl border p-2 text-xs disabled:opacity-50 ${on ? 'border-cyan-300/60 bg-cyan-400/10 text-cyan-100' : armed === key ? 'border-amber-300/60 bg-amber-400/10 text-amber-100' : 'border-white/10 bg-white/5 text-slate-300'}`}>
-                      <Figure color={c.rainbow ? 'linear-gradient(135deg,#f87171,#facc15,#4ade80,#60a5fa,#c084fc)' : c.fill} />
+                      <Figure color={c.rainbow ? 'linear-gradient(135deg,#f87171,#facc15,#4ade80,#60a5fa,#c084fc)' : c.anim === 'galaxy' ? 'linear-gradient(135deg,#312e81,#6366f1,#c084fc)' : c.anim === 'lava' ? 'linear-gradient(135deg,#7f1d1d,#ef4444,#fb923c)' : c.fill} />
                       <span>{c.name}</span>
                       <span className="flex items-center gap-1 text-[11px]">{on ? <><Check size={12} /> an</> : owned ? 'ausrüsten' : armed === key ? 'Wirklich?' : <>{price} <CoinIcon size={11} /></>}</span>
                     </button>
@@ -137,7 +147,32 @@ export default function Parkour() {
                 })}
               </div>
             </section>
-            <p className="text-xs text-slate-500">Zum Kaufen zweimal tippen. Gekaufte Sachen gehören dir dauerhaft. Farbe und Hut siehst du und dein Partner im Spiel.</p>
+
+            <section className="space-y-2">
+              <h3 className="label-mono">Effekte</h3>
+              <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+                <button type="button" onClick={() => void run('f-none', () => parkourEquip(s.color, s.hat, null))} aria-pressed={!s.fx}
+                  className={`flex min-h-[84px] flex-col items-center justify-center gap-1 rounded-xl border p-2 text-xs ${!s.fx ? 'border-cyan-300/60 bg-cyan-400/10 text-cyan-100' : 'border-white/10 bg-white/5 text-slate-300'}`}>
+                  <span className="text-2xl leading-none">∅</span> Kein Effekt
+                </button>
+                {Object.entries(PK_FX).map(([id, f]) => {
+                  const key = `fx:${id}`, owned = s.owned.includes(key), on = s.fx === id
+                  const base = s.fx_price ?? 150
+                  const price = base * (f.premium ? PK_PREMIUM_FACTOR : 1)
+                  return (
+                    <button key={id} type="button" disabled={busy === key || (!owned && wallet.balance < price)}
+                      onClick={() => (owned ? void run(key, () => parkourEquip(s.color, s.hat, id)) : buy(key))} aria-pressed={on}
+                      className={`flex min-h-[96px] flex-col items-center justify-center gap-1 rounded-xl border p-2 text-center text-xs disabled:opacity-50 ${on ? 'border-cyan-300/60 bg-cyan-400/10 text-cyan-100' : armed === key ? 'border-amber-300/60 bg-amber-400/10 text-amber-100' : 'border-white/10 bg-white/5 text-slate-300'}`}>
+                      <span className="text-2xl leading-none">{f.icon}</span>
+                      <span className="font-semibold">{f.name}</span>
+                      <span className="text-[10px] text-slate-400">{f.blurb}</span>
+                      <span className="flex items-center gap-1 text-[11px]">{on ? <><Check size={12} /> an</> : owned ? 'ausrüsten' : armed === key ? 'Wirklich?' : <>{price} <CoinIcon size={11} /></>}</span>
+                    </button>
+                  )
+                })}
+              </div>
+            </section>
+            <p className="text-xs text-slate-500">Zum Kaufen zweimal tippen. Gekaufte Sachen gehören dir dauerhaft. Farbe, Hut und Effekt sehen alle im Spiel.</p>
           </>
         )}
       </Card>

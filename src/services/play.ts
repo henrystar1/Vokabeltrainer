@@ -141,6 +141,7 @@ export interface TeamPerson {
   pk_hearts?: number
   pk_color?: string | null
   pk_hat?: string | null
+  pk_fx?: string | null
   /** Parkour mit mehreren: host | invited | joined (declined/left werden nicht geliefert). */
   state?: 'host' | 'invited' | 'joined' | 'declined' | 'left'
 }
@@ -176,6 +177,16 @@ export interface TeamState {
   results?: DeathrunResult[] | null
   my_question: TeamQuestion | null
   people: TeamPerson[]
+  /** Offene Deathrun-Lobby, Bots, Zuschauer-Modus (Admin), Wiedereinstieg (Migration 0050). */
+  is_open?: boolean
+  bots?: number
+  bot_skill?: number
+  spectator?: boolean
+  can_rejoin?: boolean
+  member?: boolean
+  staff_present?: boolean
+  can_manage?: boolean
+  can_start?: boolean
 }
 export interface DeathrunResult { user_id: string; name: string; levels: number; cps: number; millis: number; deaths: number; paid: number }
 export interface TeamInvite { run_id: string; host_name: string; host_avatar_id: string | null; host_color_id: string | null; created_at: string; kind: 'quiz' | 'parkour' | 'deathrun' }
@@ -203,15 +214,26 @@ export interface ParkourShop {
   color: string | null
   hat: string | null
   owned: string[]
+  fx?: string | null
   color_price: number
   hat_price: number
+  fx_price?: number
 }
 export const parkourShopGet = () => rpc<ParkourShop>('parkour_shop_get')
 export const parkourShopBuy = (item: string) => rpc<ParkourShop>('parkour_shop_buy', { p_item: item })
-export const parkourEquip = (color: string | null, hat: string | null) => rpc<ParkourShop>('parkour_equip', { p_color: color ?? '', p_hat: hat ?? '' })
+export const parkourEquip = (color: string | null, hat: string | null, fx?: string | null) =>
+  rpc<ParkourShop>('parkour_equip', fx === undefined ? { p_color: color ?? '', p_hat: hat ?? '' } : { p_color: color ?? '', p_hat: hat ?? '', p_fx: fx ?? '' })
 export const teamMyInvites = () => rpc<TeamInvite[]>('team_my_invites')
 export const teamRespond = (id: string, accept: boolean) => rpc<void>('team_respond', { p_id: id, p_accept: accept })
 export const teamLeave = (id: string) => rpc<void>('team_leave', { p_id: id })
 export const teamStart = (id: string) => rpc<void>('team_start', { p_id: id })
 export const teamGet = (id: string) => rpc<TeamState>('team_get', { p_id: id })
 export const teamReport = (id: string, step: number, correct: boolean) => rpc<void>('team_report', { p_id: id, p_step: step, p_correct: correct })
+
+// ---- Offene Deathrun-Lobby, Bots, Wiedereinstieg, Admin-Zuschauer (Migration 0050) ----
+export const deathrunOpenJoin = () => rpc<string>('deathrun_open_join')
+export const teamSetBots = (id: string, bots: number, skill: number) => rpc<void>('team_set_bots', { p_id: id, p_bots: bots, p_skill: skill })
+export const teamRejoin = (id: string) => rpc<void>('team_rejoin', { p_id: id })
+export const teamSpectate = (id: string) => rpc<TeamState>('team_spectate', { p_id: id })
+export interface AdminRun { id: string; kind: 'parkour' | 'deathrun'; status: 'lobby' | 'running'; is_open: boolean; bots: number; created_at: string; starts_at: string | null; players: string[] }
+export const adminOpenRuns = () => rpc<AdminRun[]>('admin_open_runs')

@@ -8,6 +8,8 @@ const ACC_AIR = 1200
 const GRAV = 1800
 const MAX_FALL = 900
 const FLY = 260
+const JET_UP = 330
+const JET_ACC = 3600
 export const JUMP_V = -570
 const COYOTE = 0.1
 const BUFFER = 0.12
@@ -30,7 +32,9 @@ export interface Input { move: number; jump: boolean; /** Luftsprünge nach dem 
   fly?: boolean
   /** Geistmodus (Admin, nur mit fly): fliegt durch Wände und Türen. */
   ghost?: boolean
-  vert?: number }
+  vert?: number
+  /** Jetpack (Boden-Upgrade): solange gesetzt und in der Luft, schiebt es nach oben. */
+  jet?: boolean }
 export type Pressed = Record<string, boolean>
 export interface Point { x: number; y: number }
 
@@ -142,6 +146,7 @@ export function stepBody(b: Body, inp: Input, lv: Level, pressed: Pressed, other
   b.jumpHeld = inp.jump
 
   b.vy = Math.min(MAX_FALL, b.vy + GRAV * dt)
+  if (inp.jet && !b.ground) b.vy = Math.max(-JET_UP, b.vy - JET_ACC * dt)
 
   // waagerecht
   let nx = b.x + b.vx * dt

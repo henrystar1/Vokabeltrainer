@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
-import { ArrowUp, Skull } from 'lucide-react'
+import type { RealtimeChannel } from '@supabase/supabase-js'
+import { ArrowUp, Eye, Skull } from 'lucide-react'
 import { Joystick } from '../games/joystick'
 import { useFocusMode } from '../koins/focusMode'
 import { useAuth } from '../auth/AuthProvider'
@@ -7,31 +8,44 @@ import { supabase } from '../../lib/supabaseClient'
 import { teamDeathrunFinish, teamParkourFinish, type TeamState } from '../../services/play'
 import { levelFor } from './generator'
 import { PK_HATS, pkFill } from './cosmetics'
+import { FxField } from './fx'
+import { BOT_NAMES, botStep, newBot, type BotState } from './bots'
+import { JET_FUEL, PICKUP_INFO, pickupX, pickupY, pickupsFor, type Pickup, type PickupKind } from './pickups'
 import { ROWS, TILE, VIEW_H, VIEW_W, type Level } from './levels'
 import { PH, PW, checkpointAt, inExit, newBody, pressedMap, spawnAt, spotIsSafe, stepBody, type Body, type Pressed } from './engine'
 
 const COLORS = ['#22d3ee', '#e879f9', '#facc15', '#4ade80', '#fb923c']
+const BOT_COLOR = '#94a3b8'
 const STALE_MS = 2500
+const SNAP_PX = 140 // größere Sprünge der Position werden nicht weich nachgezogen (Neustart, Levelwechsel)
 
-interface Remote { x: number; y: number; face: 1 | -1; lv: number; cp: number | null; dead: boolean; ex: boolean; dc: number; g: boolean; seen: number; lh: number; gh: boolean; dx: number; dy: number; hp: number; el: boolean }
+interface Remote { x: number; y: number; face: 1 | -1; lv: number; cp: number | null; dead: boolean; ex: boolean; dc: number; g: boolean; seen: number; lh: number; gh: boolean; dx: number; dy: number; hp: number; el: boolean; sid: string; n: number; bf: number }
+interface BotView { i: number; x: number; y: number; face: 1 | -1; lv: number; hp: number; out: boolean; dead: boolean; dx: number; dy: number; seen: number }
 
 const hash = (n: number) => {
   const x = Math.sin(n * 127.1 + 311.7) * 43758.5453
   return x - Math.floor(x)
 }
+const finite = (v: unknown, lo: number, hi: number): number | null => (typeof v === 'number' && Number.isFinite(v) ? Math.max(lo, Math.min(hi, v)) : null)
 
-/** Joystick-Parkour für zwei: beide laufen durch dieselben Level, Positionen laufen über Supabase Realtime. */
+/** Joystick-Parkour für bis zu 5: alle laufen durch dieselben Level, Positionen laufen über Supabase Realtime. */
 export default function ParkourGame({ st, startLevel = 0 }: { st: TeamState; startLevel?: number }) {
   const canvas = useRef<HTMLCanvasElement>(null)
   useFocusMode(true)
   const { isAdmin } = useAuth()
   const adminRef = useRef(isAdmin)
   adminRef.current = isAdmin // Admins springen vierfach (3 Luftsprünge)
-  const input = useRef({ stick: 0, left: false, right: false, jump: false, down: false, fly: false, ghost: false, kill: false })
-  const [flyUi, setFlyUi] = useState(false)
-  const [ghostUi, setGhostUi] = useState(false)
-  const toggleFly = () => { if (!adminRef.current) return; input.current.fly = !input.current.fly; if (!input.current.fly) input.current.ghost = false; setFlyUi(input.current.fly); setGhostUi(input.current.ghost) }
-  const toggleGhost = () => { if (!adminRef.current) return; input.current.ghost = !input.current.ghost; if (input.current.ghost) input.current.fly = true; setGhostUi(input.current.ghost); setFlyUi(input.current.fly) }
+  const peopleRef = useRef(st.people)
+  peopleRef.current = st.people
+  const spec = !!st.spectator
+  const input = useRef({ stick: 0, left: false, right: false, jump: false, down: false, fly: spec, ghost: spec, kill: false })
+  const follow = useRef<{ uid: string | null; to: string | null }>({ uid: null, to: null })
+  const [flyUi, setFlyUi] = useState(spec)
+  const [ghostUi, setGhostUi] = useState(spec)
+  const [followUi, setFollowUi] = useState<string | null>(null)
+  const toggleFly = () => { if (!adminRef.current || spec) return; input.current.fly = !input.current.fly; if (!input.current.fly) input.current.ghost = false; setFlyUi(input.current.fly); setGhostUi(input.current.ghost) }
+  const toggleGhost = () => { if (!adminRef.current || spec) return; input.current.ghost = !input.current.ghost; if (input.current.ghost) input.current.fly = true; setGhostUi(input.current.ghost); setFlyUi(input.current.fly) }
+  const watch = (uid: string | null) => { follow.current = { uid, to: uid }; setFollowUi(uid) }
   const [hud, setHud] = useState({ level: 0, deaths: 0, ms: 0, linked: false, done: false })
 
   useEffect(() => {
@@ -45,23 +59,36 @@ export default function ParkourGame({ st, startLevel = 0 }: { st: TeamState; sta
 
     let lv = startLevel
     let cp: number | null = null
-    // Level 1–8 sind handgebaut, danach zufällig (für beide gleich, aus der Lauf-ID) und immer schwerer.
+    // Level 1–8 sind handgebaut, danach zufällig (für alle gleich, aus der Lauf-ID) und immer schwerer.
     const cache = new Map<number, Level>()
     const levelOf = (n: number): Level => {
       let l = cache.get(n)
       if (!l) { l = levelFor(st.id, n); cache.set(n, l) }
       return l
     }
+    const pickCache = new Map<number, Pickup[]>()
+    const pickupsOf = (n: number): Pickup[] => {
+      let p = pickCache.get(n)
+      if (!p) { p = pickupsFor(levelOf(n), st.id); pickCache.set(n, p) }
+      return p
+    }
     // Mitspielende (Host zuerst); wer nur eingeladen ist oder ausgestiegen ist, zählt nicht
     const dr = st.kind === 'deathrun' // Deathrun: jeder für sich (eigene Herzen und Level), Tore nur mit Teamarbeit
-    const players = st.people.filter((p) => p.is_host || p.state === undefined || p.state === 'joined')
-    const slot = Math.max(0, players.findIndex((p) => p.user_id === st.me))
-    const idxOf = (uid: string) => Math.max(0, players.findIndex((p) => p.user_id === uid))
+    const members = () => peopleRef.current.filter((p) => p.is_host || p.state === undefined || p.state === 'joined')
+    const players = members()
+    const slot = spec ? 0 : Math.max(0, players.findIndex((p) => p.user_id === st.me))
+    const idxOf = (uid: string) => Math.max(0, members().findIndex((p) => p.user_id === uid))
+    const lookOf = (uid: string) => peopleRef.current.find((p) => p.user_id === uid)
+    const myFx = lookOf(st.me)?.pk_fx ?? null
+    const botsN = dr && !spec ? Math.max(0, Math.min(8, st.bots ?? 0)) : 0
+    const botSkill = Math.max(1, Math.min(3, st.bot_skill ?? 2))
     // Gemeinsamer Herzvorrat: Grundwert, +1 je Person ab der dritten, plus die im Shop gekauften Extra-Herzen aller
     const maxHearts = dr
       ? Math.min(12, Math.max(1, st.lives || 3) + Math.max(0, Math.min(10, st.people.find((p) => p.user_id === st.me)?.pk_hearts ?? 0)))
       : Math.min(20, Math.max(1, st.lives || 3) + Math.max(0, players.length - 2) + players.reduce((a, p) => a + Math.max(0, Math.min(10, p.pk_hearts ?? 0)), 0))
-    const SEND_MS = players.length <= 2 ? 50 : players.length === 3 ? 70 : 90
+    const SEND_MS = players.length <= 2 ? 50 : players.length === 3 ? 70 : players.length === 4 ? 85 : 100
+    const sid = Math.random().toString(36).slice(2, 8)
+    let seq = 0
     let hearts = maxHearts
     let cpTotal = 0
     const dcSeen = new Map<string, number>() // gezählte Tode je Mitspieler
@@ -77,47 +104,176 @@ export default function ParkourGame({ st, startLevel = 0 }: { st: TeamState; sta
     let titleT = 3
     let graceT = 1.5 // kurz nach Start/Neustart kosten Stacheln und Absturz kein Herz
     const hashLevel = (l: Level) => { let h = 5381; for (const r of l.rows) for (let i = 0; i < r.length; i++) h = ((h << 5) + h + r.charCodeAt(i)) | 0; return h }
-    const startPerf = performance.now()
+    let startPerf = performance.now()
     const me: Body = (() => { const s = spawnAt(levelOf(startLevel), slot, null); return newBody(s.x, s.y) })()
     const remotes = new Map<string, Remote>()
     const mates = (now: number) => { const out: Remote[] = []; for (const r of remotes.values()) if (r.lv === lv && !r.el && now - r.seen < STALE_MS) out.push(r); return out }
-    let ready = false
-    let lastSend = 0
-    let lastHud = 0
+    const fxField = new FxField()
+    let seenAny = false
     let over = false
     let reported = false
+    let disposed = false
 
-    const ch = supabase.channel(`parkour-${st.id}`, { config: { broadcast: { self: false } } })
-    ch.on('broadcast', { event: 's' }, ({ payload }) => {
-      const p = payload as Partial<Remote> & { u?: string }
+    // ---- Boden-Upgrades ----
+    const taken = new Map<string, number>() // "Level:Nr" → Zeit, ab der das Upgrade wieder da ist
+    const buff = { jump3: 0, jet: 0, fuel: 0 }
+    const buffCode = () => (buff.jet > 0 && buff.fuel > 0 ? 2 : buff.jump3 > 0 ? 1 : 0)
+
+    // ---- Wiedereinstieg: Stand nach einem Neuladen oder Verbindungsabbruch wiederherstellen ----
+    const saveKey = `pkr:${st.id}:${st.me}`
+    let restored = false
+    if (!spec) {
+      try {
+        const raw = window.localStorage.getItem(saveKey)
+        const d = raw ? (JSON.parse(raw) as { t: number; lv: number; hearts: number; deaths: number; cp: number; ms: number }) : null
+        if (d && Date.now() - d.t < 15 * 60 * 1000 && Number.isFinite(d.lv) && d.lv >= 0 && d.lv < 500) {
+          lv = d.lv
+          hearts = Math.max(1, Math.min(maxHearts, d.hearts))
+          deaths = d.deaths || 0
+          cpTotal = d.cp || 0
+          startPerf = performance.now() - Math.max(0, d.ms || 0)
+          const s0 = spawnAt(levelOf(lv), slot, null)
+          Object.assign(me, newBody(s0.x, s0.y))
+          restored = true
+          titleT = 0
+        }
+      } catch { /* kein Speicher: egal */ }
+    }
+    let lastSave = 0
+    const saveState = (now: number) => {
+      if (spec || finished || now - lastSave < 1000) return
+      lastSave = now
+      try { window.localStorage.setItem(saveKey, JSON.stringify({ t: Date.now(), lv, hearts, deaths, cp: cpTotal, ms: now - startPerf })) } catch { /* ignorieren */ }
+    }
+
+    // ---- Bots (Deathrun): der Rechner mit der kleinsten Nutzer-ID im Lauf steuert sie, alle anderen sehen sie wie Mitspielende ----
+    let bots: BotState[] | null = null
+    const botSnap = new Map<number, BotView>()
+    const isMaster = (now: number): boolean => {
+      if (botsN <= 0 || finished) return false
+      for (const [uid, r] of remotes) if (uid < st.me && !r.el && now - r.seen < STALE_MS * 2 && members().some((p) => p.user_id === uid)) return false
+      return true
+    }
+    const initBots = (now: number) => {
+      void now
+      bots = []
+      for (let i = 0; i < botsN; i++) {
+        const sn = botSnap.get(i)
+        const l = sn?.lv ?? 0
+        const b = newBot(i, levelOf(l), Math.max(1, st.lives || 3), botSkill, l)
+        if (sn) { b.body.x = sn.x; b.body.y = sn.y; b.hearts = sn.hp; b.out = sn.out }
+        bots.push(b)
+      }
+    }
+    const botViews = (now: number): BotView[] => {
+      if (bots) return bots.map((b) => ({ i: b.i, x: b.body.x, y: b.body.y, face: b.body.face, lv: b.lv, hp: b.hearts, out: b.out, dead: b.deadT > 0, dx: b.body.x, dy: b.body.y, seen: now }))
+      return [...botSnap.values()].filter((b) => now - b.seen < STALE_MS * 2)
+    }
+
+    // ---- Verbindung: bei Fehlern und Funkstille neu aufbauen ----
+    let ch: RealtimeChannel | null = null
+    let ready = false
+    let lastSend = 0
+    let lastSig = ''
+    let lastRx = performance.now()
+    let lastConnect = performance.now()
+    let netNote = ''
+    let retryT: number | undefined
+    let attempt = 0
+    let lastHud = 0
+    let lastBotSend = 0
+
+    function onState(payload: unknown) {
+      const p = payload as Partial<Remote> & { u?: string; n?: number; sid?: string; bf?: number }
       const uid = p.u
-      if (!uid || uid === st.me || typeof p.x !== 'number' || typeof p.y !== 'number') return
+      const x = finite(p.x, -100, 200000)
+      const y = finite(p.y, -800, 1200)
+      if (!uid || uid === st.me || x === null || y === null) return
+      lastRx = performance.now()
       const prev = remotes.get(uid)
-      const r: Remote = { x: p.x, y: p.y, face: p.face === -1 ? -1 : 1, lv: p.lv ?? 0, cp: p.cp ?? null, dead: !!p.dead, ex: !!p.ex, dc: p.dc ?? 0, g: !!p.g, seen: performance.now(), lh: p.lh ?? 0, gh: !!p.gh, dx: prev?.dx ?? p.x, dy: prev?.dy ?? p.y, hp: p.hp ?? 0, el: !!p.el }
+      const psid = typeof p.sid === 'string' ? p.sid : ''
+      const pn = typeof p.n === 'number' ? p.n : 0
+      // Veraltete oder doppelte Nachrichten (Wiederverbindung, Reihenfolge) verwerfen
+      if (prev && prev.sid === psid && pn > 0 && pn <= prev.n) return
+      const lvNew = Math.max(0, Math.min(999, Math.floor(p.lv ?? 0)))
+      const dead = !!p.dead
+      const jump = !prev || prev.lv !== lvNew || prev.dead !== dead || Math.hypot(x - prev.x, y - prev.y) > SNAP_PX
+      const r: Remote = { x, y, face: p.face === -1 ? -1 : 1, lv: lvNew, cp: p.cp ?? null, dead, ex: !!p.ex, dc: p.dc ?? 0, g: !!p.g, seen: performance.now(), lh: p.lh ?? 0, gh: !!p.gh, dx: jump || !prev ? x : prev.dx, dy: jump || !prev ? y : prev.dy, hp: p.hp ?? 0, el: !!p.el, sid: psid, n: pn, bf: p.bf ?? 0 }
       remotes.set(uid, r)
-      if (dr) return // Deathrun: jede Person hat ihr eigenes Level, ihre Herzen und ihre Checkpoints
+      if (spec || dr) { seenAny = true; return } // Deathrun: jede Person hat ihr eigenes Level, ihre Herzen und ihre Checkpoints
+      if (!seenAny) {
+        // Späterer Einstieg: Level und Herzen der anderen übernehmen
+        seenAny = true
+        dcSeen.set(uid, r.dc)
+        if (!restored && r.lv > lv) { goLevel(r.lv, true); if (r.hp > 0) hearts = Math.min(maxHearts, r.hp) } else if (r.hp > 0 && r.hp < hearts) hearts = r.hp
+        if (r.lv === lv && r.cp !== null) { cp = r.cp }
+        return
+      }
       if (r.lv > lv && r.lv < lv + 3) goLevel(r.lv)
       if (r.lv === lv && r.cp !== null && (cp === null || r.cp > cp)) { cp = r.cp; cpTotal += 1 }
       // Tode der anderen kosten auch dir ein gemeinsames Herz
       const seenDc = dcSeen.get(uid) ?? 0
       if (r.dc > seenDc) { hearts -= r.dc - seenDc; dcSeen.set(uid, r.dc); checkOver() }
-    }).subscribe((s) => { ready = s === 'SUBSCRIBED' })
+    }
+
+    function onBots(payload: unknown) {
+      const p = payload as { sid?: string; l?: number[][] }
+      if (!p || !Array.isArray(p.l) || bots) return
+      lastRx = performance.now()
+      const now = performance.now()
+      for (const a of p.l) {
+        if (!Array.isArray(a) || a.length < 8) continue
+        const i = a[0]
+        const x = finite(a[1], -100, 200000), y = finite(a[2], -800, 1200)
+        if (x === null || y === null || !Number.isInteger(i) || i < 0 || i > 8) continue
+        const prev = botSnap.get(i)
+        const lvN = Math.max(0, Math.min(999, Math.floor(a[4])))
+        const jump = !prev || prev.lv !== lvN || Math.hypot(x - prev.x, y - prev.y) > SNAP_PX
+        botSnap.set(i, { i, x, y, face: a[3] === -1 ? -1 : 1, lv: lvN, hp: a[5], out: a[6] === 1, dead: a[7] === 1, dx: jump || !prev ? x : prev.dx, dy: jump || !prev ? y : prev.dy, seen: now })
+      }
+    }
+
+    function connect() {
+      if (disposed) return
+      lastConnect = performance.now()
+      if (ch) void supabase.removeChannel(ch)
+      ready = false
+      const c = supabase.channel(`parkour-${st.id}`, { config: { broadcast: { self: false } } })
+      ch = c
+      c.on('broadcast', { event: 's' }, ({ payload }) => onState(payload))
+        .on('broadcast', { event: 'b' }, ({ payload }) => onBots(payload))
+        .subscribe((s) => {
+          if (c !== ch || disposed) return
+          if (s === 'SUBSCRIBED') { ready = true; attempt = 0; netNote = ''; lastSend = 0; lastSig = ''; lastRx = performance.now() }
+          else if (s === 'CHANNEL_ERROR' || s === 'TIMED_OUT' || s === 'CLOSED') { ready = false; scheduleReconnect() }
+        })
+    }
+    function scheduleReconnect() {
+      if (disposed || retryT !== undefined) return
+      netNote = 'Verbindung wird neu aufgebaut …'
+      const delay = Math.min(8000, 700 * 2 ** Math.min(attempt++, 4))
+      retryT = window.setTimeout(() => { retryT = undefined; connect() }, delay)
+    }
+    connect()
 
     function report(levels: number) {
+      if (spec) return
       if (finished && reported) return
       finished = true
       reported = true
+      try { window.localStorage.removeItem(saveKey) } catch { /* ignorieren */ }
       const ms = Math.round(performance.now() - startPerf)
       if (dr) void teamDeathrunFinish(st.id, ms, deaths, levels, cpTotal).catch(() => undefined)
       else void teamParkourFinish(st.id, ms, deaths + [...dcSeen.values()].reduce((x, y) => x + y, 0), levels, cpTotal).catch(() => undefined)
     }
 
     function checkOver() {
+      if (spec) return
       if (hearts <= 0 && !finished) { over = true; hearts = 0; window.setTimeout(() => report(lv), 1800); finished = true }
     }
 
-    function goLevel(n: number) {
-      if (n > lv) hearts = Math.min(maxHearts, hearts + 1) // geschafftes Level: ein Herz zurück
+    function goLevel(n: number, adopt = false) {
+      if (n > lv && !adopt) hearts = Math.min(maxHearts, hearts + 1) // geschafftes Level: ein Herz zurück
       lv = n
       cp = null
       myCp = null
@@ -127,6 +283,7 @@ export default function ParkourGame({ st, startLevel = 0 }: { st: TeamState; sta
       const s = spawnAt(levelOf(lv), slot, null)
       Object.assign(me, newBody(s.x, s.y))
       for (const r of remotes.values()) r.ex = false
+      fxField.clear()
       cam = 0
     }
 
@@ -150,23 +307,93 @@ export default function ParkourGame({ st, startLevel = 0 }: { st: TeamState; sta
       if (!spotIsSafe(level, pressedMap(level, mates(now).filter((r) => !r.dead)), pos.x, pos.y)) pos = spawnAt(level, slot, myCp)
       Object.assign(me, newBody(pos.x, pos.y))
       graceT = 1.5
+      fxField.clear()
     }
 
     function send(now: number) {
-      if (!ready || now - lastSend < SEND_MS) return
+      if (spec || !ready) return
+      const level = levelOf(lv)
+      const x = Math.round(me.x * 10) / 10, y = Math.round(me.y * 10) / 10
+      const sig = `${x}|${y}|${me.face}|${lv}|${cp}|${deadT > 0 ? 1 : 0}|${me.ground ? 1 : 0}|${ghostOn ? 1 : 0}|${hearts}|${deaths}|${finished && dr ? 1 : 0}|${buffCode()}`
+      // Wer stillsteht, meldet sich nur ein paarmal pro Sekunde (spart Nachrichten bei vielen Spielenden)
+      if (now - lastSend < SEND_MS || (sig === lastSig && now - lastSend < 350)) return
       lastSend = now
-      void ch.send({ type: 'broadcast', event: 's', payload: { u: st.me, x: me.x, y: me.y, face: me.face, lv, cp, dead: deadT > 0, ex: inExit(levelOf(lv), me), dc: deaths, g: me.ground, lh: hashLevel(levelOf(lv)), gh: ghostOn, hp: hearts, el: finished && dr } })
+      lastSig = sig
+      void ch?.send({ type: 'broadcast', event: 's', payload: { u: st.me, sid, n: ++seq, x, y, face: me.face, lv, cp, dead: deadT > 0, ex: inExit(level, me), dc: deaths, g: me.ground, lh: hashLevel(level), gh: ghostOn, hp: hearts, el: finished && dr, bf: buffCode() } })?.catch?.(() => undefined)
     }
+
+    function sendBots(now: number) {
+      if (!bots || !ready || now - lastBotSend < 110) return
+      lastBotSend = now
+      const l = bots.map((b) => [b.i, Math.round(b.body.x * 10) / 10, Math.round(b.body.y * 10) / 10, b.body.face, b.lv, b.hearts, b.out ? 1 : 0, b.deadT > 0 ? 1 : 0])
+      void ch?.send({ type: 'broadcast', event: 'b', payload: { sid, l } })?.catch?.(() => undefined)
+    }
+
+    function collectPickups(level: Level) {
+      void level
+      for (const pk of pickupsOf(lv)) {
+        const key = `${lv}:${pk.id}`
+        if ((taken.get(key) ?? 0) > t) continue
+        const dx = me.x + PW / 2 - pickupX(pk), dy = me.y + PH / 2 - pickupY()
+        if (Math.abs(dx) < 22 && Math.abs(dy) < 30) {
+          taken.set(key, t + 35)
+          const info = PICKUP_INFO[pk.kind]
+          if (pk.kind === 'jump3') buff.jump3 = info.seconds
+          else { buff.jet = info.seconds; buff.fuel = JET_FUEL }
+          toast = { text: `${info.name}! ${info.seconds} s`, t: 2 }
+        }
+      }
+    }
+    let toast: { text: string; t: number } | null = null
 
     function step(dt: number, now: number) {
       const level = levelOf(lv)
       const mt = mates(now)
       const others = mt.filter((r) => !r.dead).map((r) => ({ x: r.x, y: r.y }))
       // Deathrun: wer allein im Level ist, für den sind alle Tore offen (sonst käme der Letzte nie weiter)
-      const pressed: Pressed = dr && mt.length === 0 ? { a: true, b: true, c: true } : pressedMap(level, [deadT > 0 ? null : me, ...others])
+      const pressed: Pressed = dr && mt.length === 0 ? { a: true, b: true, c: true } : pressedMap(level, [deadT > 0 || spec ? null : me, ...others])
+      // Bots (nur auf dem Rechner, der sie steuert)
+      if (botsN > 0) {
+        const master = isMaster(now)
+        if (master && !bots) initBots(now)
+        else if (!master && bots) { for (const b of bots) botSnap.set(b.i, { i: b.i, x: b.body.x, y: b.body.y, face: b.body.face, lv: b.lv, hp: b.hearts, out: b.out, dead: b.deadT > 0, dx: b.body.x, dy: b.body.y, seen: now }); bots = null }
+        if (bots) {
+          for (const b of bots) {
+            const r = botStep(levelOf(b.lv), b, dt)
+            if (r === 'exit') {
+              b.lv += 1
+              b.hearts = Math.min(Math.max(1, st.lives || 3), b.hearts + 1)
+              const sp = spawnAt(levelOf(b.lv), b.i % 5, null)
+              Object.assign(b.body, newBody(sp.x, sp.y))
+              b.cp = null; b.grace = 1.5; b.script = null; b.stuckT = 0; b.lastX = sp.x; b.retries = 0; b.deadT = 0.05 + b.i * 0.45
+            }
+          }
+        }
+      }
+      if (spec) {
+        // Zuschauer: unsichtbarer Geist, fliegt frei oder folgt einer Person
+        const i = input.current
+        const fl = follow.current
+        if (fl.to) {
+          const r = remotes.get(fl.to)
+          if (r && now - r.seen < STALE_MS * 3) {
+            if (r.lv !== lv) { lv = r.lv; cam = 0; fxField.clear() }
+            me.x = r.dx; me.y = r.dy - 8
+            if (fl.uid === null) fl.to = null // einmal hinfliegen, dann frei
+          }
+        }
+        const move = i.stick !== 0 ? i.stick : (i.right ? 1 : 0) - (i.left ? 1 : 0)
+        if (move !== 0 || i.jump || i.down) { if (fl.uid) { follow.current = { uid: null, to: null }; setFollowUi(null) } }
+        if (!fl.uid || move !== 0) stepBody(me, { move, jump: false, fly: true, ghost: true, vert: (i.down ? 1 : 0) - (i.jump ? 1 : 0) }, level, pressed, null, dt)
+        ghostOn = true
+        return
+      }
       if (finished) return
       if (killCool > 0) killCool -= dt
       if (graceT > 0) graceT -= dt
+      if (buff.jump3 > 0) buff.jump3 -= dt
+      if (buff.jet > 0) buff.jet -= dt
+      if (toast) { toast.t -= dt; if (toast.t <= 0) toast = null }
       if (deadT > 0) {
         deadT -= dt
         if (deadT <= 0) respawn(now)
@@ -178,11 +405,16 @@ export default function ParkourGame({ st, startLevel = 0 }: { st: TeamState; sta
       }
       const i = input.current
       const move = i.stick !== 0 ? i.stick : (i.right ? 1 : 0) - (i.left ? 1 : 0)
-      const r = stepBody(me, { move, jump: i.jump, airJumps: adminRef.current ? 3 : 1, fly: adminRef.current && i.fly, ghost: adminRef.current && i.fly && i.ghost, vert: (i.down ? 1 : 0) - (i.jump ? 1 : 0) }, level, pressed, others, dt)
-      ghostOn = adminRef.current && i.fly && i.ghost
+      const adm = adminRef.current
+      const jetting = !adm && buff.jet > 0 && buff.fuel > 0 && i.jump && !me.ground
+      if (jetting) buff.fuel -= dt
+      const airJumps = adm ? 3 : buff.jump3 > 0 ? 2 : 1
+      const r = stepBody(me, { move, jump: i.jump, airJumps, jet: jetting, fly: adm && i.fly, ghost: adm && i.fly && i.ghost, vert: (i.down ? 1 : 0) - (i.jump ? 1 : 0) }, level, pressed, others, dt)
+      ghostOn = adm && i.fly && i.ghost
       if (r === 'dead' && graceT > 0) { deadT = 0.3; return } // Schonfrist: neu starten ohne Herz zu verlieren
       if (r === 'dead') { deaths += 1; hearts -= 1; deadT = 0.7; checkOver(); return }
       if (r === 'lost') { deadT = 0.5; return } // eingeklemmt / aus der Welt: neu starten, aber kein Herz verlieren
+      collectPickups(level)
       const c = checkpointAt(level, me)
       if (c !== null && (myCp === null || c > myCp)) myCp = c
       if (c !== null && (cp === null || c > cp)) { cp = c; cpTotal += 1 }
@@ -199,7 +431,7 @@ export default function ParkourGame({ st, startLevel = 0 }: { st: TeamState; sta
       const level = levelOf(lv)
       const mt = mates(now)
       const fresh = mt.length > 0
-      const pressed = dr && mt.length === 0 ? { a: true, b: true, c: true } : pressedMap(level, [deadT > 0 ? null : me, ...mt.filter((r) => !r.dead)])
+      const pressed = dr && mt.length === 0 ? { a: true, b: true, c: true } : pressedMap(level, [deadT > 0 || spec ? null : me, ...mt.filter((r) => !r.dead)])
       // Kamera
       const mid = me.x // die Kamera folgt nur dir: wer weit weg ist, verschwindet aus dem Bild
       const want = Math.max(0, Math.min(level.cols * TILE - VIEW_W, mid + PW / 2 - VIEW_W / 2))
@@ -274,37 +506,67 @@ export default function ParkourGame({ st, startLevel = 0 }: { st: TeamState; sta
       ctx!.fillRect(ex - 10, ey - 10, ew + 20, eh + 20)
       ctx!.strokeStyle = `rgba(253,224,71,${0.6 + 0.4 * Math.sin(t * 4)})`; ctx!.lineWidth = 3
       ctx!.strokeRect(ex + 2, ey + 2, ew - 4, eh - 4)
+      // Boden-Upgrades
+      {
+        for (const pk of pickupsOf(lv)) {
+          if ((taken.get(`${lv}:${pk.id}`) ?? 0) > t) continue
+          const px = pickupX(pk), py = pickupY() + Math.sin(t * 3 + pk.id) * 3
+          if (px < cx - 30 || px > cx + VIEW_W + 30) continue
+          const info = PICKUP_INFO[pk.kind as PickupKind]
+          const rg = ctx!.createRadialGradient(px, py, 2, px, py, 26)
+          rg.addColorStop(0, info.color + 'cc'); rg.addColorStop(1, info.color + '00')
+          ctx!.fillStyle = rg
+          ctx!.beginPath(); ctx!.arc(px, py, 26, 0, Math.PI * 2); ctx!.fill()
+          ctx!.fillStyle = '#0f172a'; ctx!.strokeStyle = info.color; ctx!.lineWidth = 2.5
+          ctx!.beginPath(); ctx!.arc(px, py, 12, 0, Math.PI * 2); ctx!.fill(); ctx!.stroke()
+          ctx!.fillStyle = '#fff'; ctx!.font = pk.kind === 'jet' ? '14px system-ui, "Apple Color Emoji", sans-serif' : '700 14px system-ui, sans-serif'; ctx!.textAlign = 'center'
+          ctx!.fillText(info.glyph, px, py + 5)
+        }
+      }
       // Spieler
-      const look = players
-      const drawP = (x: number, y: number, face: 1 | -1, idx: number, name: string, dead: boolean, self: boolean, ghost = false) => {
-        const color = pkFill(look[idx]?.pk_color, COLORS[idx], t)
-        const hat = look[idx]?.pk_hat ? PK_HATS[look[idx]?.pk_hat ?? ''] : undefined
+      const drawP = (x: number, y: number, face: 1 | -1, uid: string, name: string, dead: boolean, self: boolean, ghost = false, bf = 0, bot = false) => {
+        const look = lookOf(uid)
+        const idx = bot ? 0 : idxOf(uid)
+        const color = bot ? BOT_COLOR : pkFill(look?.pk_color, COLORS[idx % COLORS.length], t)
+        const hat = bot ? { emoji: '🤖' } : look?.pk_hat ? PK_HATS[look.pk_hat] : undefined
         ctx!.save()
         ctx!.globalAlpha = dead ? 0.25 : ghost ? 0.5 : 1
+        if (bf === 2 && !dead) {
+          // Jetpack: Flamme unter den Füßen
+          ctx!.fillStyle = '#fb923c'
+          ctx!.beginPath(); ctx!.moveTo(x + 4, y + PH); ctx!.lineTo(x + PW / 2, y + PH + 10 + 6 * Math.abs(Math.sin(t * 30))); ctx!.lineTo(x + PW - 4, y + PH); ctx!.fill()
+        }
         ctx!.fillStyle = color
         ctx!.shadowColor = color; ctx!.shadowBlur = self ? 12 : 8
         ctx!.beginPath(); ctx!.roundRect(x, y, PW, PH, 7); ctx!.fill()
         ctx!.shadowBlur = 0
+        if (bf === 1 && !dead) { ctx!.strokeStyle = '#a78bfa'; ctx!.lineWidth = 2; ctx!.beginPath(); ctx!.roundRect(x - 2, y - 2, PW + 4, PH + 4, 9); ctx!.stroke() }
         ctx!.fillStyle = '#fff'
         ctx!.fillRect(x + (face > 0 ? 11 : 3), y + 7, 7, 7)
         ctx!.fillStyle = '#0f172a'
         ctx!.fillRect(x + (face > 0 ? 15 : 4), y + 9, 3, 4)
-        ctx!.font = '600 11px system-ui, sans-serif'; ctx!.textAlign = 'center'
-        ctx!.fillStyle = 'rgba(255,255,255,0.9)'
-        if (hat) { ctx!.font = '20px system-ui, "Apple Color Emoji", "Segoe UI Emoji", sans-serif'; ctx!.textAlign = 'center'; ctx!.fillStyle = '#fff'; ctx!.fillText(hat.emoji, x + PW / 2, y + 4) }
-        ctx!.font = '600 11px system-ui, sans-serif'; ctx!.textAlign = 'center'; ctx!.fillStyle = 'rgba(255,255,255,0.9)'
-        ctx!.fillText(self ? 'Du' : name.slice(0, 10), x + PW / 2, y - (hat ? 20 : 6))
+        ctx!.textAlign = 'center'
+        if (hat) { ctx!.font = '20px system-ui, "Apple Color Emoji", "Segoe UI Emoji", sans-serif'; ctx!.fillStyle = '#fff'; ctx!.fillText(hat.emoji, x + PW / 2, y + 4) }
+        ctx!.font = '600 11px system-ui, sans-serif'; ctx!.fillStyle = 'rgba(255,255,255,0.9)'
+        ctx!.fillText(self ? (spec ? 'Zuschauer' : 'Du') : name.slice(0, 10), x + PW / 2, y - (hat ? 20 : 6))
         ctx!.restore()
       }
+      const nameOf = (uid: string) => members().find((p) => p.user_id === uid)?.name ?? lookOf(uid)?.name ?? '?'
+      const bviews = botViews(now).filter((b) => b.lv === lv && !b.out)
+      // Effekte hinter den Figuren
+      for (const [uid, r] of remotes) { if (r.lv === lv && now - r.seen < STALE_MS && !r.dead) fxField.drawBehind(ctx!, uid, lookOf(uid)?.pk_fx, t) }
+      if (!spec && deadT <= 0) fxField.drawBehind(ctx!, 'me', myFx, t)
+      fxField.drawParticles(ctx!)
       for (const [uid, r] of remotes) {
-        if (r.lv !== lv || now - r.seen >= STALE_MS) continue
-        drawP(r.dx, r.dy, r.face, idxOf(uid), look[idxOf(uid)]?.name ?? '?', r.dead, false, r.gh)
+        if (r.lv !== lv || now - r.seen >= STALE_MS || r.el) continue
+        drawP(r.dx, r.dy, r.face, uid, nameOf(uid), r.dead, false, r.gh, r.bf)
       }
-      drawP(me.x, me.y, me.face, slot, 'Du', deadT > 0, true, ghostOn)
+      for (const b of bviews) drawP(bots ? b.x : b.dx, bots ? b.y : b.dy, b.face, 'bot' + b.i, BOT_NAMES[b.i % BOT_NAMES.length], b.dead, false, false, 0, true)
+      drawP(me.x, me.y, me.face, st.me, 'Du', deadT > 0, true, ghostOn || spec, buffCode())
       ctx!.restore()
       // Pfeile am Bildrand für Mitspielende außerhalb des Bildes
       for (const [uid, r] of remotes) {
-        if (r.lv !== lv || now - r.seen >= STALE_MS) continue
+        if (r.lv !== lv || now - r.seen >= STALE_MS || r.el) continue
         const sx = r.dx + PW / 2 - cx
         if (sx >= -4 && sx <= VIEW_W + 4) continue
         const left = sx < 0
@@ -317,7 +579,7 @@ export default function ParkourGame({ st, startLevel = 0 }: { st: TeamState; sta
         ctx!.moveTo(ax + (left ? -9 : 9), ay); ctx!.lineTo(ax + (left ? 7 : -7), ay - 9); ctx!.lineTo(ax + (left ? 7 : -7), ay + 9)
         ctx!.fill()
         ctx!.font = '600 10px system-ui, sans-serif'; ctx!.textAlign = left ? 'left' : 'right'; ctx!.fillStyle = '#fff'
-        ctx!.fillText((look[idxOf(uid)]?.name ?? '?').slice(0, 8) + ' ' + Math.round(Math.abs(sx) / TILE) + 'm', left ? 26 : VIEW_W - 26, ay + 3)
+        ctx!.fillText(nameOf(uid).slice(0, 8) + ' ' + Math.round(Math.abs(sx) / TILE) + 'm', left ? 26 : VIEW_W - 26, ay + 3)
         ctx!.restore()
       }
       // Anzeige
@@ -328,36 +590,61 @@ export default function ParkourGame({ st, startLevel = 0 }: { st: TeamState; sta
       ctx!.fillText(`Level ${level.name}`, 10, 17)
       ctx!.textAlign = 'center'; ctx!.font = '700 17px system-ui, sans-serif'
       const hs = maxHearts > 12 ? 15 : 22
-      for (let h = 0; h < maxHearts; h++) { ctx!.fillStyle = h < hearts ? '#fb7185' : '#475569'; ctx!.fillText('♥', VIEW_W / 2 + (h - (maxHearts - 1) / 2) * hs, 19) }
+      if (!spec) for (let h = 0; h < maxHearts; h++) { ctx!.fillStyle = h < hearts ? '#fb7185' : '#475569'; ctx!.fillText('♥', VIEW_W / 2 + (h - (maxHearts - 1) / 2) * hs, 19) }
+      if (spec) { ctx!.font = '600 12px system-ui, sans-serif'; ctx!.fillStyle = '#c4b5fd'; ctx!.fillText('👻 Zuschauer: niemand sieht dich', VIEW_W / 2, 17) }
       ctx!.font = '600 12px system-ui, sans-serif'; ctx!.fillStyle = '#e2e8f0'; ctx!.textAlign = 'left'
       ctx!.textAlign = 'right'
-      ctx!.fillText(`${Math.floor(secs / 60)}:${String(secs % 60).padStart(2, '0')}  ·  Level ${lv + 1}`, VIEW_W - 10, 17)
+      ctx!.fillText(spec ? `Level ${lv + 1}` : `${Math.floor(secs / 60)}:${String(secs % 60).padStart(2, '0')}  ·  Level ${lv + 1}`, VIEW_W - 10, 17)
       ctx!.textAlign = 'center'
+      // Aktive Upgrades
+      if (!spec && (buff.jump3 > 0 || (buff.jet > 0 && buff.fuel > 0))) {
+        let by = (dr ? 48 : 32)
+        ctx!.font = '600 11px system-ui, sans-serif'; ctx!.textAlign = 'left'
+        if (buff.jump3 > 0) { ctx!.fillStyle = 'rgba(2,6,23,0.65)'; ctx!.fillRect(8, by - 11, 128, 16); ctx!.fillStyle = '#c4b5fd'; ctx!.fillText(`3er-Sprung ${Math.ceil(buff.jump3)} s`, 12, by); by += 18 }
+        if (buff.jet > 0 && buff.fuel > 0) {
+          ctx!.fillStyle = 'rgba(2,6,23,0.65)'; ctx!.fillRect(8, by - 11, 128, 16)
+          ctx!.fillStyle = '#334155'; ctx!.fillRect(12, by - 6, 78, 7)
+          ctx!.fillStyle = '#fb923c'; ctx!.fillRect(12, by - 6, 78 * Math.max(0, Math.min(1, buff.fuel / JET_FUEL)), 7)
+          ctx!.fillStyle = '#fed7aa'; ctx!.fillText(`🚀 ${Math.ceil(buff.jet)} s`, 96, by)
+        }
+        ctx!.textAlign = 'center'
+      }
       if (dr) {
         // Stand aller: Level und Herzen, ausgeschiedene Personen durchgestrichen
         ctx!.fillStyle = 'rgba(2,6,23,0.45)'; ctx!.fillRect(0, 26, VIEW_W, 18)
         ctx!.font = '600 11px system-ui, sans-serif'; ctx!.textAlign = 'center'
-        players.forEach((pl, i) => {
-          const isMe = pl.user_id === st.me
+        const rows: Array<{ text: string; color: string; out: boolean }> = []
+        members().forEach((pl, i) => {
+          const isMe = pl.user_id === st.me && !spec
           const r = remotes.get(pl.user_id)
           const out = isMe ? finished : !!r?.el
-          const text = `${isMe ? 'Du' : pl.name.slice(0, 8)}: ${out ? 'raus bei ' : ''}Lv ${(isMe ? lv : r?.lv ?? 0) + 1}${out ? '' : ' ♥' + (isMe ? hearts : r?.hp ?? '?')}`
-          ctx!.fillStyle = out ? '#64748b' : COLORS[i % COLORS.length]
-          ctx!.fillText(text, ((i + 0.5) / players.length) * VIEW_W, 39)
+          rows.push({ text: `${isMe ? 'Du' : pl.name.slice(0, 8)}: ${out ? 'raus bei ' : ''}Lv ${(isMe ? lv : r?.lv ?? 0) + 1}${out ? '' : ' ♥' + (isMe ? hearts : r?.hp ?? '?')}`, color: out ? '#64748b' : COLORS[i % COLORS.length], out })
         })
+        for (const b of botViews(now)) rows.push({ text: `${BOT_NAMES[b.i % BOT_NAMES.length]}: ${b.out ? 'raus bei ' : ''}Lv ${b.lv + 1}${b.out ? '' : ' ♥' + b.hp}`, color: b.out ? '#64748b' : BOT_COLOR, out: b.out })
+        rows.forEach((row, i) => { ctx!.fillStyle = row.color; ctx!.fillText(row.text, ((i + 0.5) / rows.length) * VIEW_W, 39) })
         ctx!.font = '600 12px system-ui, sans-serif'
-        if (!finished && mt.length === 0 && players.length > 1) {
+        if (!spec && !finished && mt.length === 0 && members().length > 1) {
           ctx!.fillStyle = 'rgba(2,6,23,0.7)'; ctx!.fillRect(VIEW_W / 2 - 170, 52, 340, 26)
           ctx!.fillStyle = '#86efac'; ctx!.fillText('Allein im Level: alle Tore sind für dich offen', VIEW_W / 2, 69)
         }
-      } else if (!fresh) {
+      } else if (!fresh && !spec) {
         ctx!.fillStyle = 'rgba(2,6,23,0.7)'; ctx!.fillRect(VIEW_W / 2 - 150, 40, 300, 28)
         ctx!.fillStyle = '#fbbf24'; ctx!.fillText('Warte auf die Verbindung zu deinem Team …', VIEW_W / 2, 58)
-      } else if (exitHold > 0 || (inExit(level, me) && !mt.every((r) => r.ex))) {
+      } else if (!spec && (exitHold > 0 || (inExit(level, me) && !mt.every((r) => r.ex)))) {
         ctx!.fillStyle = 'rgba(2,6,23,0.7)'; ctx!.fillRect(VIEW_W / 2 - 150, 40, 300, 28)
         ctx!.fillStyle = '#fde047'; ctx!.fillText(exitHold > 0 ? 'Geschafft!' : 'Warte, bis alle im Ausgang sind', VIEW_W / 2, 58)
       }
-      if (titleT > 0) {
+      if (toast) {
+        ctx!.globalAlpha = Math.min(1, toast.t)
+        ctx!.fillStyle = 'rgba(2,6,23,0.75)'; ctx!.fillRect(VIEW_W / 2 - 110, 92, 220, 26)
+        ctx!.fillStyle = '#fde68a'; ctx!.font = '700 13px system-ui, sans-serif'; ctx!.fillText(toast.text, VIEW_W / 2, 110)
+        ctx!.globalAlpha = 1
+      }
+      if (netNote) {
+        ctx!.fillStyle = 'rgba(2,6,23,0.8)'; ctx!.fillRect(VIEW_W / 2 - 130, VIEW_H - 34, 260, 24)
+        ctx!.fillStyle = '#fbbf24'; ctx!.font = '600 12px system-ui, sans-serif'; ctx!.fillText(netNote, VIEW_W / 2, VIEW_H - 18)
+      }
+      if (titleT > 0 && !spec) {
         ctx!.globalAlpha = Math.min(1, titleT)
         ctx!.fillStyle = 'rgba(2,6,23,0.7)'; ctx!.fillRect(40, 130, VIEW_W - 80, 110)
         ctx!.fillStyle = '#fff'; ctx!.font = '700 22px system-ui, sans-serif'; ctx!.fillText(`Level ${level.name}`, VIEW_W / 2, 168)
@@ -372,7 +659,7 @@ export default function ParkourGame({ st, startLevel = 0 }: { st: TeamState; sta
         ctx!.fillStyle = '#fff'; ctx!.textAlign = 'center'; ctx!.font = '700 15px system-ui, sans-serif'
         ctx!.fillText('Ihr habt unterschiedliche Spiel-Versionen.', VIEW_W / 2, 182)
         ctx!.font = '500 13px system-ui, sans-serif'
-        ctx!.fillText('Beide: Seite neu laden (Strg+F5, am Handy Tab schließen und neu öffnen).', VIEW_W / 2, 206)
+        ctx!.fillText('Alle: Seite neu laden (Strg+F5, am Handy Tab schließen und neu öffnen).', VIEW_W / 2, 206)
       }
       if (finished) {
         ctx!.fillStyle = 'rgba(2,6,23,0.75)'; ctx!.fillRect(0, 0, VIEW_W, VIEW_H)
@@ -393,7 +680,24 @@ export default function ParkourGame({ st, startLevel = 0 }: { st: TeamState; sta
       let guard = 0
       while (acc >= 1 / 60 && guard++ < 6) { step(1 / 60, now); acc -= 1 / 60 }
       { const k = Math.min(1, dt * 14); for (const r of remotes.values()) { r.dx += (r.x - r.dx) * k; r.dy += (r.y - r.dy) * k } }
+      { const k = Math.min(1, dt * 12); for (const b of botSnap.values()) { b.dx += (b.x - b.dx) * k; b.dy += (b.y - b.dy) * k } }
+      // Effekte nachführen
+      if (!spec && deadT <= 0 && !finished) fxField.update('me', myFx, me.x, me.y, me.face, t, dt)
+      for (const [uid, r] of remotes) {
+        const fxId = lookOf(uid)?.pk_fx
+        if (r.lv === lv && now - r.seen < STALE_MS && !r.dead && !r.el && fxId) fxField.update(uid, fxId, r.dx, r.dy, r.face, t, dt, 0.7)
+        else fxField.forget(uid)
+      }
+      fxField.step(dt)
       send(now)
+      sendBots(now)
+      saveState(now)
+      // Funkstille trotz Mitspielenden: Verbindung neu aufbauen
+      {
+        const someone = [...remotes.values()].some((r) => !r.el && now - r.seen < 60000)
+        if (members().length > 1 && someone && now - lastRx > 6000 && now - lastConnect > 6000 && document.visibilityState === 'visible') { netNote = 'Verbindung wird neu aufgebaut …'; connect() }
+        else if (netNote && ready && now - lastRx < 3000) netNote = ''
+      }
       render(now)
       if (now - lastHud > 400) {
         lastHud = now
@@ -403,8 +707,15 @@ export default function ParkourGame({ st, startLevel = 0 }: { st: TeamState; sta
     }
     raf = requestAnimationFrame(loop)
 
+    // ---- Eingaben: Tasten und Berührungen, die nie hängen bleiben dürfen ----
+    const releaseAll = () => {
+      const i = input.current
+      i.stick = 0; i.left = false; i.right = false; i.jump = false; i.down = false
+    }
     const key = (e: KeyboardEvent, down: boolean) => {
       const k = e.key
+      const el = e.target as HTMLElement | null
+      if (el && (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA' || el.isContentEditable)) return
       if (k === 'ArrowLeft' || k === 'a' || k === 'A') { input.current.left = down; e.preventDefault() }
       if (k === 'ArrowRight' || k === 'd' || k === 'D') { input.current.right = down; e.preventDefault() }
       if (k === ' ' || k === 'ArrowUp' || k === 'w' || k === 'W') { input.current.jump = down; e.preventDefault() }
@@ -415,31 +726,70 @@ export default function ParkourGame({ st, startLevel = 0 }: { st: TeamState; sta
     }
     const kd = (e: KeyboardEvent) => key(e, true)
     const ku = (e: KeyboardEvent) => key(e, false)
+    const touchEnd = (e: TouchEvent) => { if (e.touches.length === 0) releaseAll() }
+    const hiddenFn = () => {
+      if (document.hidden) releaseAll()
+      else if (performance.now() - lastRx > 3000 && performance.now() - lastConnect > 2500) connect()
+    }
+    const online = () => { if (performance.now() - lastConnect > 1500) connect() }
+    const offline = () => { netNote = 'Offline – Verbindung wird neu aufgebaut, sobald du wieder online bist.' }
+    const noSelect = (e: Event) => e.preventDefault()
     window.addEventListener('keydown', kd)
     window.addEventListener('keyup', ku)
+    window.addEventListener('blur', releaseAll)
+    window.addEventListener('pagehide', releaseAll)
+    window.addEventListener('touchend', touchEnd)
+    window.addEventListener('touchcancel', touchEnd)
+    window.addEventListener('online', online)
+    window.addEventListener('offline', offline)
+    document.addEventListener('visibilitychange', hiddenFn)
+    document.addEventListener('selectstart', noSelect)
     return () => {
+      disposed = true
       // Deathrun: Wer die Seite verlässt, meldet seinen Stand (Coins und Bestenliste)
-      if (dr && !reported && performance.now() - startPerf > 3000) report(lv)
+      if (dr && !spec && !reported && performance.now() - startPerf > 3000) report(lv)
+      if (retryT !== undefined) window.clearTimeout(retryT)
       cancelAnimationFrame(raf)
       window.removeEventListener('keydown', kd)
       window.removeEventListener('keyup', ku)
-      void supabase.removeChannel(ch)
+      window.removeEventListener('blur', releaseAll)
+      window.removeEventListener('pagehide', releaseAll)
+      window.removeEventListener('touchend', touchEnd)
+      window.removeEventListener('touchcancel', touchEnd)
+      window.removeEventListener('online', online)
+      window.removeEventListener('offline', offline)
+      document.removeEventListener('visibilitychange', hiddenFn)
+      document.removeEventListener('selectstart', noSelect)
+      if (ch) void supabase.removeChannel(ch)
     }
   }, [st.id, st.is_host, st.me]) // eslint-disable-line react-hooks/exhaustive-deps
 
+  const bg = (e: React.PointerEvent<HTMLButtonElement>) => { e.preventDefault(); try { e.currentTarget.setPointerCapture(e.pointerId) } catch { /* Zeiger schon weg */ } }
+  const holdProps = (key: 'jump' | 'down') => ({
+    onPointerDown: (e: React.PointerEvent<HTMLButtonElement>) => { bg(e); input.current[key] = true },
+    onPointerUp: () => { input.current[key] = false },
+    onPointerCancel: () => { input.current[key] = false },
+    onLostPointerCapture: () => { input.current[key] = false },
+    onContextMenu: (e: React.MouseEvent) => e.preventDefault(),
+  })
+  const noSel = { userSelect: 'none', WebkitUserSelect: 'none', WebkitTouchCallout: 'none', WebkitTapHighlightColor: 'transparent' } as const
+  const humans = st.people.filter((p) => p.user_id !== st.me)
+
   return (
-    <div className="mx-auto flex max-w-[720px] flex-col items-center gap-3">
+    <div className="mx-auto flex max-w-[720px] flex-col items-center gap-3" style={noSel} onContextMenu={(e) => e.preventDefault()}>
       <canvas ref={canvas} className="aspect-[704/384] w-full touch-none select-none rounded-2xl border border-white/10" aria-label="Parkour-Spielfeld" />
       <div className="flex w-full items-center justify-between px-2">
         <Joystick onChange={(x) => { input.current.stick = x }} />
-        <button
-          type="button"
-          onClick={() => { input.current.kill = true }}
-          className="flex min-h-[48px] max-w-[130px] items-center justify-center gap-1.5 rounded-2xl border border-rose-400/40 bg-rose-500/10 px-3 text-center text-xs font-semibold text-rose-200 active:bg-rose-500/25"
-        >
-          <Skull size={16} /> Neustart am Checkpoint
-        </button>
-        {isAdmin && (
+        {!spec && (
+          <button
+            type="button"
+            onClick={() => { input.current.kill = true }}
+            className="flex min-h-[48px] max-w-[130px] select-none items-center justify-center gap-1.5 rounded-2xl border border-rose-400/40 bg-rose-500/10 px-3 text-center text-xs font-semibold text-rose-200 active:bg-rose-500/25"
+          >
+            <Skull size={16} /> Neustart am Checkpoint
+          </button>
+        )}
+        {isAdmin && !spec && (
           <div className="flex flex-col gap-2">
             <button type="button" onClick={toggleFly} aria-pressed={flyUi}
               className={`min-h-[44px] rounded-2xl border px-3 text-xs font-semibold ${flyUi ? 'border-cyan-300/70 bg-cyan-400/25 text-cyan-100' : 'border-white/20 bg-white/10 text-slate-200'}`}>
@@ -450,28 +800,42 @@ export default function ParkourGame({ st, startLevel = 0 }: { st: TeamState; sta
               {ghostUi ? 'Geist an (G)' : 'Geist (G)'}
             </button>
             {flyUi && (
-              <button type="button" aria-label="Runter"
-                onPointerDown={(e) => { e.preventDefault(); e.currentTarget.setPointerCapture(e.pointerId); input.current.down = true }}
-                onPointerUp={() => { input.current.down = false }} onPointerCancel={() => { input.current.down = false }}
-                onContextMenu={(e) => e.preventDefault()}
+              <button type="button" aria-label="Runter" {...holdProps('down')}
                 className="min-h-[44px] touch-none select-none rounded-2xl border border-white/20 bg-white/10 px-3 text-xs font-semibold text-slate-200 active:bg-white/25">Runter (S)</button>
             )}
           </div>
         )}
+        {spec && (
+          <div className="flex flex-col gap-2">
+            <button type="button" aria-label="Runter" {...holdProps('down')}
+              className="min-h-[44px] touch-none select-none rounded-2xl border border-white/20 bg-white/10 px-3 text-xs font-semibold text-slate-200 active:bg-white/25">Runter (S)</button>
+          </div>
+        )}
         <button
           type="button"
-          aria-label="Springen"
-          onPointerDown={(e) => { e.preventDefault(); e.currentTarget.setPointerCapture(e.pointerId); input.current.jump = true }}
-          onPointerUp={() => { input.current.jump = false }}
-          onPointerCancel={() => { input.current.jump = false }}
-          onContextMenu={(e) => e.preventDefault()}
+          aria-label={spec ? 'Hoch' : 'Springen'}
+          {...holdProps('jump')}
           className="flex h-28 w-28 touch-none select-none items-center justify-center rounded-full border border-white/25 bg-fuchsia-400/25 text-white shadow-lg active:scale-95 active:bg-fuchsia-400/45"
         >
           <ArrowUp size={40} />
         </button>
       </div>
+      {spec && (
+        <div className="w-full rounded-2xl border border-violet-400/30 bg-violet-500/10 p-3">
+          <p className="mb-2 flex items-center gap-1.5 text-xs font-semibold text-violet-200"><Eye size={14} /> Zuschauer-Geist: dich sieht niemand. Joystick = fliegen, Knopf = hoch. Tippe eine Person an, um ihr zu folgen.</p>
+          <div className="flex flex-wrap gap-2">
+            {humans.map((p) => (
+              <button key={p.user_id} type="button" onClick={() => watch(followUi === p.user_id ? null : p.user_id)}
+                className={`min-h-[40px] rounded-xl border px-3 text-xs font-semibold ${followUi === p.user_id ? 'border-violet-300 bg-violet-400/30 text-white' : 'border-white/20 bg-white/10 text-slate-200'}`}>
+                {followUi === p.user_id ? '👁 ' : ''}{p.name}
+              </button>
+            ))}
+            <button type="button" onClick={() => watch(null)} className="min-h-[40px] rounded-xl border border-white/20 bg-white/5 px-3 text-xs text-slate-300">Frei fliegen</button>
+          </div>
+        </div>
+      )}
       <p className="text-center text-xs text-slate-500">
-        Joystick links = laufen, Knopf rechts = springen, in der Luft nochmal tippen = Doppelsprung (Tastatur: Pfeile/WASD und Leertaste). {st.kind === 'deathrun' ? 'DEATHRUN: Jeder läuft für sich mit eigenen Herzen. Wer im Ziel ist, ist sofort im nächsten Level. Tore öffnen sich nur, wenn jemand im selben Level auf der Platte steht; wer allein im Level ist, für den sind sie offen. ' : 'Ihr teilt euch die Herzen (jedes geschaffte Level bringt eins zurück), jeder Sturz in Stacheln oder Schluchten kostet eins. '} Die Kamera folgt nur dir: Pfeile am Rand zeigen, wo die anderen sind.{st.kind === 'deathrun' ? '' : ' Ins nächste Level kommt ihr, wenn alle im Ausgang stehen.'} Steckt ihr fest, hilft „Neustart“ (Taste R): ihr landet am Checkpoint im Bild oder bei einem Mitspieler. Die Level hören nie auf und werden immer schwerer. Je weiter ihr kommt, desto mehr Coins.
+        Joystick links = laufen, Knopf rechts = springen, in der Luft nochmal tippen = Doppelsprung (Tastatur: Pfeile/WASD und Leertaste). Leuchtende Kugeln am Boden geben kurz einen 3er-Sprung oder ein Jetpack (Sprungknopf in der Luft halten). {st.kind === 'deathrun' ? 'DEATHRUN: Jeder läuft für sich mit eigenen Herzen. Wer im Ziel ist, ist sofort im nächsten Level. Tore öffnen sich nur, wenn jemand im selben Level auf der Platte steht; wer allein im Level ist, für den sind sie offen. ' : 'Ihr teilt euch die Herzen (jedes geschaffte Level bringt eins zurück), jeder Sturz in Stacheln oder Schluchten kostet eins. '} Die Kamera folgt nur dir: Pfeile am Rand zeigen, wo die anderen sind.{st.kind === 'deathrun' ? '' : ' Ins nächste Level kommt ihr, wenn alle im Ausgang stehen.'} Steckt ihr fest, hilft „Neustart“ (Taste R): ihr landet am Checkpoint im Bild oder bei einem Mitspieler. Die Level hören nie auf und werden immer schwerer. Je weiter ihr kommt, desto mehr Coins.
         {hud.linked ? '' : ' Verbindung zum Partner wird aufgebaut …'}
       </p>
     </div>

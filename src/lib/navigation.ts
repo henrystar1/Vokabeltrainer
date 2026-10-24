@@ -1,5 +1,5 @@
 import type { LockKey } from '../services/koins'
-import { BookOpen, MessageSquarePlus, ShoppingBag, UserCircle, Brain, ClipboardCheck, Home, Search, Settings, ShieldCheck, Trophy, BarChart3, Gamepad2, MessagesSquare, Target, Swords, Zap, ListChecks, Languages, ArrowLeftRight, Dices, Users, Pin, PenLine, Printer, Sparkles, Crown, Calculator, Timer, Layers, Shuffle, Mountain, type LucideIcon } from 'lucide-react'
+import { BookOpen, MessageSquarePlus, ShoppingBag, UserCircle, Brain, ClipboardCheck, Home, Search, Settings, ShieldCheck, Trophy, BarChart3, Gamepad2, MessagesSquare, Target, Swords, Zap, ListChecks, Languages, ArrowLeftRight, Dices, Users, Pin, PenLine, Printer, Sparkles, Crown, Calculator, Timer, Layers, Shuffle, Mountain, Skull, type LucideIcon } from 'lucide-react'
 
 export interface NavItem {
   to: string
@@ -55,6 +55,7 @@ export const NAV_GROUPS: NavGroup[] = [
   g('Spaß', [
     { lock: 'games', to: '/spiele', label: 'Spiele', icon: Gamepad2 },
     { lock: 'duels', to: '/parkour', label: 'Parkour', icon: Mountain },
+    { lock: 'duels', to: '/deathrun', label: 'Offene Deathrun-Lobby', icon: Skull },
     { lock: 'gambling', to: '/gambling', label: 'Gambling', icon: Dices },
     { lock: 'chat', to: '/chat', label: 'Chat', icon: MessagesSquare },
     { to: '/online', label: 'Wer ist da?', icon: Users },
