@@ -44,8 +44,12 @@ export default function ParkourGame({ st, startLevel = 0 }: { st: TeamState; sta
   const [flyUi, setFlyUi] = useState(spec)
   const [ghostUi, setGhostUi] = useState(spec)
   const [followUi, setFollowUi] = useState<string | null>(null)
-  const toggleFly = () => { if (!adminRef.current || spec) return; input.current.fly = !input.current.fly; if (!input.current.fly) input.current.ghost = false; setFlyUi(input.current.fly); setGhostUi(input.current.ghost) }
-  const toggleGhost = () => { if (!adminRef.current || spec) return; input.current.ghost = !input.current.ghost; if (input.current.ghost) input.current.fly = true; setGhostUi(input.current.ghost); setFlyUi(input.current.fly) }
+  const [watchUi, setWatchUi] = useState(false)
+  const specUi = spec || watchUi
+  const watchApi = useRef<((on: boolean) => void) | null>(null)
+  const specApi = useRef<((d: number) => void) | null>(null)
+  const toggleFly = () => { if (!adminRef.current || specUi) return; input.current.fly = !input.current.fly; if (!input.current.fly) input.current.ghost = false; setFlyUi(input.current.fly); setGhostUi(input.current.ghost) }
+  const toggleGhost = () => { if (!adminRef.current || specUi) return; input.current.ghost = !input.current.ghost; if (input.current.ghost) input.current.fly = true; setGhostUi(input.current.ghost); setFlyUi(input.current.fly) }
   const watch = (uid: string | null) => { follow.current = { uid, to: uid }; setFollowUi(uid) }
   const [hud, setHud] = useState({ level: 0, deaths: 0, ms: 0, linked: false, done: false, jet: false })
 
@@ -53,6 +57,8 @@ export default function ParkourGame({ st, startLevel = 0 }: { st: TeamState; sta
     const cv = canvas.current
     const ctx = cv?.getContext('2d')
     if (!cv || !ctx) return
+    let isSpec = spec // Zuschauer-Geist: von der Seite aus oder von einem Admin mitten im Spiel eingeschaltet
+    let hideSend = false
     const dpr = Math.min(2, window.devicePixelRatio || 1)
     cv.width = VIEW_W * dpr
     cv.height = VIEW_H * dpr
@@ -77,11 +83,11 @@ export default function ParkourGame({ st, startLevel = 0 }: { st: TeamState; sta
     const dr = st.kind === 'deathrun' // Deathrun: jeder für sich (eigene Herzen und Level), Tore nur mit Teamarbeit
     const members = () => peopleRef.current.filter((p) => p.is_host || p.state === undefined || p.state === 'joined')
     const players = members()
-    const slot = spec ? 0 : Math.max(0, players.findIndex((p) => p.user_id === st.me))
+    const slot = isSpec ? 0 : Math.max(0, players.findIndex((p) => p.user_id === st.me))
     const idxOf = (uid: string) => Math.max(0, members().findIndex((p) => p.user_id === uid))
     const lookOf = (uid: string) => peopleRef.current.find((p) => p.user_id === uid)
     const myFx = lookOf(st.me)?.pk_fx ?? null
-    const botsN = dr && !spec ? Math.max(0, Math.min(8, st.bots ?? 0)) : 0
+    const botsN = dr && !isSpec ? Math.max(0, Math.min(8, st.bots ?? 0)) : 0
     const botSkills = skillList(st.bot_skill, st.bots ?? 0)
     // Gemeinsamer Herzvorrat: Grundwert, +1 je Person ab der dritten, plus die im Shop gekauften Extra-Herzen aller
     const maxHearts = dr
@@ -123,7 +129,7 @@ export default function ParkourGame({ st, startLevel = 0 }: { st: TeamState; sta
     // ---- Wiedereinstieg: Stand nach einem Neuladen oder Verbindungsabbruch wiederherstellen ----
     const saveKey = `pkr:${st.id}:${st.me}`
     let restored = false
-    if (!spec) {
+    if (!isSpec) {
       try {
         const raw = window.localStorage.getItem(saveKey)
         const d = raw ? (JSON.parse(raw) as { t: number; lv: number; hearts: number; deaths: number; cp: number; ms: number }) : null
@@ -142,7 +148,7 @@ export default function ParkourGame({ st, startLevel = 0 }: { st: TeamState; sta
     }
     let lastSave = 0
     const saveState = (now: number) => {
-      if (spec || finished || now - lastSave < 1000) return
+      if (isSpec || finished || now - lastSave < 1000) return
       lastSave = now
       try { window.localStorage.setItem(saveKey, JSON.stringify({ t: Date.now(), lv, hearts, deaths, cp: cpTotal, ms: now - startPerf })) } catch { /* ignorieren */ }
     }
@@ -201,7 +207,7 @@ export default function ParkourGame({ st, startLevel = 0 }: { st: TeamState; sta
       const jump = !prev || prev.lv !== lvNew || prev.dead !== dead || Math.hypot(x - prev.x, y - prev.y) > SNAP_PX
       const r: Remote = { x, y, face: p.face === -1 ? -1 : 1, lv: lvNew, cp: p.cp ?? null, dead, ex: !!p.ex, dc: p.dc ?? 0, g: !!p.g, seen: performance.now(), lh: p.lh ?? 0, gh: !!p.gh, dx: jump || !prev ? x : prev.dx, dy: jump || !prev ? y : prev.dy, hp: p.hp ?? 0, el: !!p.el, sid: psid, n: pn, bf: p.bf ?? 0 }
       remotes.set(uid, r)
-      if (spec || dr) { seenAny = true; return } // Deathrun: jede Person hat ihr eigenes Level, ihre Herzen und ihre Checkpoints
+      if (isSpec || dr) { seenAny = true; return } // Deathrun: jede Person hat ihr eigenes Level, ihre Herzen und ihre Checkpoints
       if (!seenAny) {
         // Späterer Einstieg: Level und Herzen der anderen übernehmen
         seenAny = true
@@ -258,7 +264,7 @@ export default function ParkourGame({ st, startLevel = 0 }: { st: TeamState; sta
     connect()
 
     function report(levels: number) {
-      if (spec) return
+      if (isSpec) return
       if (finished && reported) return
       finished = true
       reported = true
@@ -269,7 +275,7 @@ export default function ParkourGame({ st, startLevel = 0 }: { st: TeamState; sta
     }
 
     function checkOver() {
-      if (spec) return
+      if (isSpec) return
       if (hearts <= 0 && !finished) { over = true; hearts = 0; window.setTimeout(() => report(lv), 1800); finished = true }
     }
 
@@ -311,8 +317,51 @@ export default function ParkourGame({ st, startLevel = 0 }: { st: TeamState; sta
       fxField.clear()
     }
 
+    /** Zuschauer: in ein anderes Level wechseln (Ziel durchfliegen oder Knopf). */
+    function specGo(n: number, atEnd: boolean) {
+      if (n < 0) return
+      lv = n
+      cam = 0
+      fxField.clear()
+      follow.current = { uid: null, to: null }
+      setFollowUi(null)
+      const L = levelOf(n)
+      const sp = spawnAt(L, 0, null)
+      me.x = atEnd ? (L.cols - 4) * TILE : sp.x
+      me.y = sp.y - 40
+      me.vx = 0
+      me.vy = 0
+    }
+    specApi.current = (d) => specGo(Math.max(0, lv + d), d < 0)
+    /** Admin: mitten im Lauf zum unsichtbaren Zuschauer-Geist werden und wieder zurück ins Spiel. */
+    watchApi.current = (on) => {
+      if (!adminRef.current || spec || finished || on === isSpec) return
+      if (on) {
+        isSpec = true
+        hideSend = true
+        input.current.fly = true
+        input.current.ghost = true
+        ghostOn = true
+        deadT = 0
+        follow.current = { uid: null, to: null }
+        setFollowUi(null)
+      } else {
+        isSpec = false
+        input.current.fly = false
+        input.current.ghost = false
+        ghostOn = false
+        follow.current = { uid: null, to: null }
+        setFollowUi(null)
+        goLevel(lv, true)
+      }
+      setWatchUi(on)
+      setFlyUi(input.current.fly)
+      setGhostUi(input.current.ghost)
+    }
+
     function send(now: number) {
-      if (spec || !ready) return
+      if (!ready || (isSpec && !hideSend)) return
+      if (hideSend) { lastSend = 0; lastSig = '' } // einmal "ausgeblendet" melden, dann still
       const level = levelOf(lv)
       const x = Math.round(me.x * 10) / 10, y = Math.round(me.y * 10) / 10
       const sig = `${x}|${y}|${me.face}|${lv}|${cp}|${deadT > 0 ? 1 : 0}|${me.ground ? 1 : 0}|${ghostOn ? 1 : 0}|${hearts}|${deaths}|${finished && dr ? 1 : 0}|${buffCode()}`
@@ -320,7 +369,8 @@ export default function ParkourGame({ st, startLevel = 0 }: { st: TeamState; sta
       if (now - lastSend < SEND_MS || (sig === lastSig && now - lastSend < 350)) return
       lastSend = now
       lastSig = sig
-      void ch?.send({ type: 'broadcast', event: 's', payload: { u: st.me, sid, n: ++seq, x, y, face: me.face, lv, cp, dead: deadT > 0, ex: inExit(level, me), dc: deaths, g: me.ground, lh: hashLevel(level), gh: ghostOn, hp: hearts, el: finished && dr, bf: buffCode() } })?.catch?.(() => undefined)
+      void ch?.send({ type: 'broadcast', event: 's', payload: { u: st.me, sid, n: ++seq, x, y, face: me.face, lv, cp, dead: deadT > 0, ex: inExit(level, me), dc: deaths, g: me.ground, lh: hashLevel(level), gh: ghostOn, hp: hearts, el: (finished && dr) || isSpec, bf: buffCode() } })?.catch?.(() => undefined)
+      hideSend = false
     }
 
     function sendBots(now: number) {
@@ -357,7 +407,7 @@ export default function ParkourGame({ st, startLevel = 0 }: { st: TeamState; sta
     let gateStuck = 0
     const gatePressed = (level: Level, mt: Remote[], bp: Array<{ x: number; y: number }>, others: Array<{ x: number; y: number }>): Pressed => {
       if (dr && ((mt.length === 0 && bp.length === 0) || t < openUntil)) return { a: true, b: true, c: true }
-      return pressedMap(level, [deadT > 0 || spec ? null : me, ...others, ...bp])
+      return pressedMap(level, [deadT > 0 || isSpec ? null : me, ...others, ...bp])
     }
 
     function step(dt: number, now: number) {
@@ -376,7 +426,7 @@ export default function ParkourGame({ st, startLevel = 0 }: { st: TeamState; sta
           for (const b of bots) {
             // Menschen und andere Bots im Level des Bots: er hält Platten für Menschen und hat selbst feste Türen
             const humans: Array<{ x: number; y: number }> = []
-            if (!spec && !finished && deadT <= 0 && lv === b.lv) humans.push({ x: me.x, y: me.y })
+            if (!isSpec && !finished && deadT <= 0 && lv === b.lv) humans.push({ x: me.x, y: me.y })
             for (const r of remotes.values()) if (r.lv === b.lv && !r.el && !r.dead && now - r.seen < STALE_MS) humans.push({ x: r.x, y: r.y })
             const others = [...humans]
             for (const o of bots) if (o !== b && o.lv === b.lv && !o.out && o.deadT <= 0) others.push({ x: o.body.x, y: o.body.y })
@@ -394,7 +444,7 @@ export default function ParkourGame({ st, startLevel = 0 }: { st: TeamState; sta
           }
         }
       }
-      if (spec) {
+      if (isSpec) {
         // Zuschauer: unsichtbarer Geist, fliegt frei oder folgt einer Person
         const i = input.current
         const fl = follow.current
@@ -410,6 +460,11 @@ export default function ParkourGame({ st, startLevel = 0 }: { st: TeamState; sta
         if (move !== 0 || i.jump || i.down) { if (fl.uid) { follow.current = { uid: null, to: null }; setFollowUi(null) } }
         if (!fl.uid || move !== 0) stepBody(me, { move, jump: false, fly: true, ghost: true, vert: (i.down ? 1 : 0) - (i.jump ? 1 : 0) }, level, pressed, null, dt)
         ghostOn = true
+        // Durch das Ziel in das nächste Level, durch den linken Rand zurück in das vorige
+        if (!fl.uid) {
+          if (inExit(level, me)) specGo(lv + 1, false)
+          else if (me.x < 2 && move < 0 && lv > 0) specGo(lv - 1, true)
+        }
         return
       }
       if (finished) return
@@ -579,21 +634,21 @@ export default function ParkourGame({ st, startLevel = 0 }: { st: TeamState; sta
         ctx!.textAlign = 'center'
         if (hat) { ctx!.font = '20px system-ui, "Apple Color Emoji", "Segoe UI Emoji", sans-serif'; ctx!.fillStyle = '#fff'; ctx!.fillText(hat.emoji, x + PW / 2, y + 4) }
         ctx!.font = '600 11px system-ui, sans-serif'; ctx!.fillStyle = 'rgba(255,255,255,0.9)'
-        ctx!.fillText(self ? (spec ? 'Zuschauer' : 'Du') : name.slice(0, 10), x + PW / 2, y - (hat ? 20 : 6))
+        ctx!.fillText(self ? (isSpec ? 'Zuschauer' : 'Du') : name.slice(0, 10), x + PW / 2, y - (hat ? 20 : 6))
         ctx!.restore()
       }
       const nameOf = (uid: string) => members().find((p) => p.user_id === uid)?.name ?? lookOf(uid)?.name ?? '?'
       const bviews = botViews(now).filter((b) => b.lv === lv && !b.out)
       // Effekte hinter den Figuren
       for (const [uid, r] of remotes) { if (r.lv === lv && now - r.seen < STALE_MS && !r.dead) fxField.drawBehind(ctx!, uid, lookOf(uid)?.pk_fx, t) }
-      if (!spec && deadT <= 0) fxField.drawBehind(ctx!, 'me', myFx, t)
+      if (!isSpec && deadT <= 0) fxField.drawBehind(ctx!, 'me', myFx, t)
       fxField.drawParticles(ctx!)
       for (const [uid, r] of remotes) {
         if (r.lv !== lv || now - r.seen >= STALE_MS || r.el) continue
         drawP(r.dx, r.dy, r.face, uid, nameOf(uid), r.dead, false, r.gh, r.bf)
       }
       for (const b of bviews) drawP(bots ? b.x : b.dx, bots ? b.y : b.dy, b.face, 'bot' + b.i, BOT_NAMES[b.i % BOT_NAMES.length], b.dead, false, false, 0, true)
-      drawP(me.x, me.y, me.face, st.me, 'Du', deadT > 0, true, ghostOn || spec, buffCode())
+      drawP(me.x, me.y, me.face, st.me, 'Du', deadT > 0, true, ghostOn || isSpec, buffCode())
       ctx!.restore()
       // Pfeile am Bildrand für Mitspielende außerhalb des Bildes
       for (const [uid, r] of remotes) {
@@ -621,14 +676,14 @@ export default function ParkourGame({ st, startLevel = 0 }: { st: TeamState; sta
       ctx!.fillText(`Level ${level.name}`, 10, 17)
       ctx!.textAlign = 'center'; ctx!.font = '700 17px system-ui, sans-serif'
       const hs = maxHearts > 12 ? 15 : 22
-      if (!spec) for (let h = 0; h < maxHearts; h++) { ctx!.fillStyle = h < hearts ? '#fb7185' : '#475569'; ctx!.fillText('♥', VIEW_W / 2 + (h - (maxHearts - 1) / 2) * hs, 19) }
-      if (spec) { ctx!.font = '600 12px system-ui, sans-serif'; ctx!.fillStyle = '#c4b5fd'; ctx!.fillText('👻 Zuschauer: niemand sieht dich', VIEW_W / 2, 17) }
+      if (!isSpec) for (let h = 0; h < maxHearts; h++) { ctx!.fillStyle = h < hearts ? '#fb7185' : '#475569'; ctx!.fillText('♥', VIEW_W / 2 + (h - (maxHearts - 1) / 2) * hs, 19) }
+      if (isSpec) { ctx!.font = '600 12px system-ui, sans-serif'; ctx!.fillStyle = '#c4b5fd'; ctx!.fillText('👻 Zuschauer: niemand sieht dich', VIEW_W / 2, 17) }
       ctx!.font = '600 12px system-ui, sans-serif'; ctx!.fillStyle = '#e2e8f0'; ctx!.textAlign = 'left'
       ctx!.textAlign = 'right'
-      ctx!.fillText(spec ? `Level ${lv + 1}` : `${Math.floor(secs / 60)}:${String(secs % 60).padStart(2, '0')}  ·  Level ${lv + 1}`, VIEW_W - 10, 17)
+      ctx!.fillText(isSpec ? `Level ${lv + 1}` : `${Math.floor(secs / 60)}:${String(secs % 60).padStart(2, '0')}  ·  Level ${lv + 1}`, VIEW_W - 10, 17)
       ctx!.textAlign = 'center'
       // Aktive Upgrades
-      if (!spec && (buff.jump3 > 0 || buff.jet > 0)) {
+      if (!isSpec && (buff.jump3 > 0 || buff.jet > 0)) {
         let by = (dr ? 48 : 32)
         ctx!.font = '600 11px system-ui, sans-serif'; ctx!.textAlign = 'left'
         if (buff.jump3 > 0) { ctx!.fillStyle = 'rgba(2,6,23,0.65)'; ctx!.fillRect(8, by - 11, 128, 16); ctx!.fillStyle = '#c4b5fd'; ctx!.fillText(`3er-Sprung ${Math.ceil(buff.jump3)} s`, 12, by); by += 18 }
@@ -641,7 +696,7 @@ export default function ParkourGame({ st, startLevel = 0 }: { st: TeamState; sta
         ctx!.font = '600 11px system-ui, sans-serif'; ctx!.textAlign = 'center'
         const rows: Array<{ text: string; color: string; out: boolean }> = []
         members().forEach((pl, i) => {
-          const isMe = pl.user_id === st.me && !spec
+          const isMe = pl.user_id === st.me && !isSpec
           const r = remotes.get(pl.user_id)
           const out = isMe ? finished : !!r?.el
           rows.push({ text: `${isMe ? 'Du' : pl.name.slice(0, 8)}: ${out ? 'raus bei ' : ''}Lv ${(isMe ? lv : r?.lv ?? 0) + 1}${out ? '' : ' ♥' + (isMe ? hearts : r?.hp ?? '?')}`, color: out ? '#64748b' : COLORS[i % COLORS.length], out })
@@ -649,14 +704,14 @@ export default function ParkourGame({ st, startLevel = 0 }: { st: TeamState; sta
         for (const b of botViews(now)) rows.push({ text: `${BOT_NAMES[b.i % BOT_NAMES.length]}: ${b.out ? 'raus bei ' : ''}Lv ${b.lv + 1}${b.out ? '' : ' ♥' + b.hp}`, color: b.out ? '#64748b' : BOT_COLOR, out: b.out })
         rows.forEach((row, i) => { ctx!.fillStyle = row.color; ctx!.fillText(row.text, ((i + 0.5) / rows.length) * VIEW_W, 39) })
         ctx!.font = '600 12px system-ui, sans-serif'
-        if (!spec && !finished && mt.length === 0 && members().length > 1) {
+        if (!isSpec && !finished && mt.length === 0 && members().length > 1) {
           ctx!.fillStyle = 'rgba(2,6,23,0.7)'; ctx!.fillRect(VIEW_W / 2 - 170, 52, 340, 26)
           ctx!.fillStyle = '#86efac'; ctx!.fillText('Allein im Level: alle Tore sind für dich offen', VIEW_W / 2, 69)
         }
-      } else if (!fresh && !spec) {
+      } else if (!fresh && !isSpec) {
         ctx!.fillStyle = 'rgba(2,6,23,0.7)'; ctx!.fillRect(VIEW_W / 2 - 150, 40, 300, 28)
         ctx!.fillStyle = '#fbbf24'; ctx!.fillText('Warte auf die Verbindung zu deinem Team …', VIEW_W / 2, 58)
-      } else if (!spec && (exitHold > 0 || (inExit(level, me) && !mt.every((r) => r.ex)))) {
+      } else if (!isSpec && (exitHold > 0 || (inExit(level, me) && !mt.every((r) => r.ex)))) {
         ctx!.fillStyle = 'rgba(2,6,23,0.7)'; ctx!.fillRect(VIEW_W / 2 - 150, 40, 300, 28)
         ctx!.fillStyle = '#fde047'; ctx!.fillText(exitHold > 0 ? 'Geschafft!' : 'Warte, bis alle im Ausgang sind', VIEW_W / 2, 58)
       }
@@ -670,7 +725,7 @@ export default function ParkourGame({ st, startLevel = 0 }: { st: TeamState; sta
         ctx!.fillStyle = 'rgba(2,6,23,0.8)'; ctx!.fillRect(VIEW_W / 2 - 130, VIEW_H - 34, 260, 24)
         ctx!.fillStyle = '#fbbf24'; ctx!.font = '600 12px system-ui, sans-serif'; ctx!.fillText(netNote, VIEW_W / 2, VIEW_H - 18)
       }
-      if (titleT > 0 && !spec) {
+      if (titleT > 0 && !isSpec) {
         ctx!.globalAlpha = Math.min(1, titleT)
         ctx!.fillStyle = 'rgba(2,6,23,0.7)'; ctx!.fillRect(40, 130, VIEW_W - 80, 110)
         ctx!.fillStyle = '#fff'; ctx!.font = '700 22px system-ui, sans-serif'; ctx!.fillText(`Level ${level.name}`, VIEW_W / 2, 168)
@@ -708,7 +763,7 @@ export default function ParkourGame({ st, startLevel = 0 }: { st: TeamState; sta
       { const k = Math.min(1, dt * 14); for (const r of remotes.values()) { r.dx += (r.x - r.dx) * k; r.dy += (r.y - r.dy) * k } }
       { const k = Math.min(1, dt * 12); for (const b of botSnap.values()) { b.dx += (b.x - b.dx) * k; b.dy += (b.y - b.dy) * k } }
       // Effekte nachführen
-      if (!spec && deadT <= 0 && !finished) fxField.update('me', myFx, me.x, me.y, me.face, t, dt)
+      if (!isSpec && deadT <= 0 && !finished) fxField.update('me', myFx, me.x, me.y, me.face, t, dt)
       for (const [uid, r] of remotes) {
         const fxId = lookOf(uid)?.pk_fx
         if (r.lv === lv && now - r.seen < STALE_MS && !r.dead && !r.el && fxId) fxField.update(uid, fxId, r.dx, r.dy, r.face, t, dt, 0.7)
@@ -773,7 +828,7 @@ export default function ParkourGame({ st, startLevel = 0 }: { st: TeamState; sta
     return () => {
       disposed = true
       // Deathrun: Wer die Seite verlässt, meldet seinen Stand (Coins und Bestenliste)
-      if (dr && !spec && !reported && performance.now() - startPerf > 3000) report(lv)
+      if (dr && !isSpec && !reported && performance.now() - startPerf > 3000) report(lv)
       if (retryT !== undefined) window.clearTimeout(retryT)
       cancelAnimationFrame(raf)
       window.removeEventListener('keydown', kd)
@@ -806,7 +861,7 @@ export default function ParkourGame({ st, startLevel = 0 }: { st: TeamState; sta
       <canvas ref={canvas} className="aspect-[704/384] w-full touch-none select-none rounded-2xl border border-white/10" aria-label="Parkour-Spielfeld" />
       <div className="flex w-full items-center justify-between px-2">
         <Joystick onChange={(x) => { input.current.stick = x }} />
-        {!spec && (
+        {!specUi && (
           <button
             type="button"
             onClick={() => { input.current.kill = true }}
@@ -815,7 +870,7 @@ export default function ParkourGame({ st, startLevel = 0 }: { st: TeamState; sta
             <Skull size={16} /> Neustart am Checkpoint
           </button>
         )}
-        {isAdmin && !spec && (
+        {isAdmin && !specUi && (
           <div className="flex flex-col gap-2">
             <button type="button" onClick={toggleFly} aria-pressed={flyUi}
               className={`min-h-[44px] rounded-2xl border px-3 text-xs font-semibold ${flyUi ? 'border-cyan-300/70 bg-cyan-400/25 text-cyan-100' : 'border-white/20 bg-white/10 text-slate-200'}`}>
@@ -825,17 +880,19 @@ export default function ParkourGame({ st, startLevel = 0 }: { st: TeamState; sta
               className={`min-h-[44px] rounded-2xl border px-3 text-xs font-semibold ${ghostUi ? 'border-violet-300/70 bg-violet-400/25 text-violet-100' : 'border-white/20 bg-white/10 text-slate-200'}`}>
               {ghostUi ? 'Geist an (G)' : 'Geist (G)'}
             </button>
+            <button type="button" onClick={() => watchApi.current?.(true)}
+              className="min-h-[44px] rounded-2xl border border-violet-300/50 bg-violet-400/10 px-3 text-xs font-semibold text-violet-100 active:bg-violet-400/25">👻 Zuschauen</button>
             {flyUi && (
               <button type="button" aria-label="Runter" {...holdProps('down')}
                 className="min-h-[44px] touch-none select-none rounded-2xl border border-white/20 bg-white/10 px-3 text-xs font-semibold text-slate-200 active:bg-white/25">Runter (S)</button>
             )}
           </div>
         )}
-        {hud.jet && !isAdmin && !spec && (
+        {hud.jet && !isAdmin && !specUi && (
           <button type="button" aria-label="Runter" {...holdProps('down')}
             className="min-h-[48px] touch-none select-none rounded-2xl border border-orange-300/50 bg-orange-400/15 px-3 text-xs font-semibold text-orange-100 active:bg-orange-400/30">Runter (S)</button>
         )}
-        {spec && (
+        {specUi && (
           <div className="flex flex-col gap-2">
             <button type="button" aria-label="Runter" {...holdProps('down')}
               className="min-h-[44px] touch-none select-none rounded-2xl border border-white/20 bg-white/10 px-3 text-xs font-semibold text-slate-200 active:bg-white/25">Runter (S)</button>
@@ -843,16 +900,16 @@ export default function ParkourGame({ st, startLevel = 0 }: { st: TeamState; sta
         )}
         <button
           type="button"
-          aria-label={spec ? 'Hoch' : 'Springen'}
+          aria-label={specUi ? 'Hoch' : 'Springen'}
           {...holdProps('jump')}
           className="flex h-28 w-28 touch-none select-none items-center justify-center rounded-full border border-white/25 bg-fuchsia-400/25 text-white shadow-lg active:scale-95 active:bg-fuchsia-400/45"
         >
           <ArrowUp size={40} />
         </button>
       </div>
-      {spec && (
+      {specUi && (
         <div className="w-full rounded-2xl border border-violet-400/30 bg-violet-500/10 p-3">
-          <p className="mb-2 flex items-center gap-1.5 text-xs font-semibold text-violet-200"><Eye size={14} /> Zuschauer-Geist: dich sieht niemand. Joystick = fliegen, Knopf = hoch. Tippe eine Person an, um ihr zu folgen.</p>
+          <p className="mb-2 flex items-center gap-1.5 text-xs font-semibold text-violet-200"><Eye size={14} /> Zuschauer-Geist: dich sieht niemand, Wände und Tore sind für dich offen. Joystick = fliegen, Knopf = hoch. Durch das Ziel (oder den linken Rand) wechselst du das Level. Tippe eine Person an, um ihr zu folgen.</p>
           <div className="flex flex-wrap gap-2">
             {humans.map((p) => (
               <button key={p.user_id} type="button" onClick={() => watch(followUi === p.user_id ? null : p.user_id)}
@@ -861,6 +918,11 @@ export default function ParkourGame({ st, startLevel = 0 }: { st: TeamState; sta
               </button>
             ))}
             <button type="button" onClick={() => watch(null)} className="min-h-[40px] rounded-xl border border-white/20 bg-white/5 px-3 text-xs text-slate-300">Frei fliegen</button>
+            <button type="button" onClick={() => specApi.current?.(-1)} className="min-h-[40px] rounded-xl border border-white/20 bg-white/5 px-3 text-xs text-slate-300">◀ Level</button>
+            <button type="button" onClick={() => specApi.current?.(1)} className="min-h-[40px] rounded-xl border border-white/20 bg-white/5 px-3 text-xs text-slate-300">Level ▶</button>
+            {watchUi && (
+              <button type="button" onClick={() => watchApi.current?.(false)} className="min-h-[40px] rounded-xl border border-emerald-300/50 bg-emerald-400/15 px-3 text-xs font-semibold text-emerald-100">Zurück ins Spiel</button>
+            )}
           </div>
         </div>
       )}

@@ -169,11 +169,13 @@ function gatesOf(lv: Level): Gate[] {
 }
 
 /** Auf welchem Kanal soll der Bot jetzt stehen bleiben? Wenn er auf einer Platte steht und ein Mensch noch vor dem Tor ist. */
-function holdWanted(lv: Level, b: Body, own: Pressed, ctx: BotCtx, me: BotState, entering: boolean): string | null {
+function holdWanted(lv: Level, b: Body, own: Pressed, ctx: BotCtx, me: BotState): string | null {
   for (const ch of ['a', 'b', 'c']) {
     if (!own[ch]) continue
     // Ein anderer Bot hält diese Platte schon (oder ist auf dem Weg): dann geht dieser Bot weiter, statt sich dazuzustellen
-    if (ctx.bots?.some((o) => o.ch === ch && o.mode !== 'run' && Math.abs(o.x - b.x) < 26 * TILE && (entering || o.i < me.i))) continue
+    // Steht ein Bot auf der anderen Seite des Tors auf einer Platte desselben Kanals, bleibt der vordere dort stehen und wartet,
+    // bis der hintere durch ist; der hintere geht dann einfach durch das offene Tor.
+    if (ctx.bots?.some((o) => o.ch === ch && o.mode !== 'run' && Math.abs(o.x - b.x) < 26 * TILE && (o.x > b.x + 40 || (Math.abs(o.x - b.x) <= 40 && o.i < me.i)))) continue
     for (const g of gatesOf(lv)) {
       if (g.ch !== ch || Math.abs(g.x0 * TILE - b.x) > 24 * TILE) continue
       // bis der Mensch ganz hinter dem Tor ist (nicht nur an der Tür), sonst schließt es sich über ihm
@@ -240,7 +242,8 @@ export function botInput(lv: Level, s: BotState, ctx: BotCtx, dir = 1): Input {
     if (k > lastEnd(s.script.wins)) s.script = null
     return inp
   }
-  const master = s.skill >= 4
+  const master = s.skill === 4 // rechnet am meisten (zusätzlich feine Bremssuche)
+  const eff = s.skill === 5 // Effizient: Profi-Planung, einprogrammierte Wege und einfache Bremspläne, aber sparsam gerechnet
   const every = EVERY
   s.tick = (s.tick + 1) % every
   if (s.tick !== 0 && !s.urgent) return RUN_INPUT
@@ -252,9 +255,10 @@ export function botInput(lv: Level, s: BotState, ctx: BotCtx, dir = 1): Input {
   let first: Wins | null = null
   let fallback: Wins | null = null
   // Meister: erst normale Sprungfolgen, wenn keine sicher ist, zusätzlich mit Bremsen in der Luft
-  for (const mode of master ? [0, 2, 3] : [0]) {
+  for (const mode of master ? [0, 2, 3] : eff ? [0, 2] : [0]) {
     if (first || (fallback && mode >= 2)) break // Bremsen nur, wenn gar kein Sprung geht (sonst wie Profi)
     if (mode === 3 && (s.fineT = (s.fineT + 1) % 3) !== 0) continue // die feine Suche ist teuer: nur jedes 3. Bild
+    if (mode === 2 && eff && (s.fineT = (s.fineT + 1) % 2) !== 0) continue // Effizient: Bremspläne nur jedes 2. Bild
     for (const w of candidates(b.ground, b.air, mode)) {
       const now = simulate(lv, b, w, 110, true, ctx, dir)
       if (!now.ok) continue
@@ -315,7 +319,7 @@ export function botStep(lv: Level, s: BotState, dt: number, ctx: BotCtx = { huma
   }
   // Auf einer Platte stehen bleiben, solange jemand hinter dem Bot noch durch das Tor muss
   if (s.mode === 'run' && b.ground && !open) {
-    const ch = holdWanted(lv, b, own, ctx, s, true)
+    const ch = holdWanted(lv, b, own, ctx, s)
     if (ch) { s.mode = 'hold'; s.holdCh = ch; s.holdT = 0; s.holdMin = 0 }
   }
   // Mensch steht noch hinter einem Tor, das der Bot schon hinter sich hat: zurück zur Platte
@@ -341,7 +345,7 @@ export function botStep(lv: Level, s: BotState, dt: number, ctx: BotCtx = { huma
   }
   if (s.mode === 'hold') {
     s.holdT += dt
-    const still = holdWanted(lv, b, own, ctx, s, false) === s.holdCh
+    const still = holdWanted(lv, b, own, ctx, s) === s.holdCh
     const slipped = !own[s.holdCh]
     if (slipped) {
       if (still || s.holdMin > 0) { s.mode = 'goto'; s.gotoT = 0 } else s.mode = 'run'

@@ -1,4 +1,4 @@
-import { SKILL_NAMES, decodeMix, encodeMix, mixTotal, type Mix } from '../features/parkour/botmix'
+import { MAX_BOTS, SKILL_NAMES, SKILL_ORDER, decodeMix, encodeMix, mixTotal, type Mix } from '../features/parkour/botmix'
 import { useEffect, useRef, useState } from 'react'
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { Bot, Check, Clock, Crown, Eye, Footprints, Minus, Plus, Trophy } from 'lucide-react'
@@ -164,7 +164,7 @@ export default function TeamRunRoom() {
     const joined = open ? humans + bots >= 2 : rest.some(isJoined) || (dr && bots > 0)
     const invitedMe = !open && !st.is_host && !(me && isJoined(me))
     const mix = decodeMix(st.bot_skill, bots)
-    const skillName = [1, 2, 3, 4].filter((k) => mix[k - 1] > 0).map((k) => `${mix[k - 1]}× ${SKILL_NAMES[k]}`).join(', ')
+    const skillName = SKILL_ORDER.filter((k) => mix[k - 1] > 0).map((k) => `${mix[k - 1]}× ${SKILL_NAMES[k]}`).join(', ')
     const setMix = (k: number, d: number) => {
       const m: Mix = [...mix]
       m[k - 1] += d
@@ -196,15 +196,15 @@ export default function TeamRunRoom() {
           {st.can_manage && (
             <div className="space-y-2 rounded-xl border border-white/10 bg-white/5 p-3">
               <p className="label-mono">Bots einstellen</p>
-              <p className="text-xs text-slate-400">Bis zu 8 Bots, gern gemischt: jede Stärke einzeln wählbar.</p>
+              <p className="text-xs text-slate-400">Bis zu 8 Bots, gern gemischt: jede Stärke einzeln wählbar. „Effizient“ liegt zwischen Profi und Meister und rechnet viel weniger (schont schwache Geräte).</p>
               <div className="space-y-1.5">
-                {[1, 2, 3, 4].map((k) => (
+                {SKILL_ORDER.map((k) => (
                   <div key={k} className="flex items-center justify-between gap-2">
                     <span className="w-24 text-sm text-slate-200">{SKILL_NAMES[k]}</span>
                     <div className="flex items-center gap-2">
                       <Button variant="ghost" disabled={busy || mix[k - 1] <= 0} aria-label={`Weniger ${SKILL_NAMES[k]}`} onClick={() => setMix(k, -1)}><Minus size={16} /></Button>
                       <span className="w-8 text-center font-mono text-sm">{mix[k - 1]}</span>
-                      <Button variant="ghost" disabled={busy || mixTotal(mix) >= 8} aria-label={`Mehr ${SKILL_NAMES[k]}`} onClick={() => setMix(k, 1)}><Plus size={16} /></Button>
+                      <Button variant="ghost" disabled={busy || mixTotal(mix) >= MAX_BOTS} aria-label={`Mehr ${SKILL_NAMES[k]}`} onClick={() => setMix(k, 1)}><Plus size={16} /></Button>
                     </div>
                   </div>
                 ))}

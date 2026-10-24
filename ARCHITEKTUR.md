@@ -481,3 +481,9 @@ Tabelle `book_library_hidden`; `in_library` blendet ein veröffentlichtes Buch d
 ## Update 60: Bots achten aufeinander, Meister klettert wieder
 - Der haltende Bot wartet auf der Platte auch auf andere Bots, die noch vor dem Tor sind (bis 30 Kacheln dahinter, höchstens 40 s). Sind Menschen oder andere Bots im Level, gelten die Tore für die Bots; alle Tore offen nur, wenn der Bot allein ist (`allOpen`). Der letzte Haltende kommt nach der Wartezeit hinter das Tor.
 - Meister: Bremsplanung nur noch, wenn gar kein normaler Sprung geht (vorher wartete er an der Säule von Level 7 auf einen „besseren“ Plan, lief gegen die Wand, ging zurück und sprang in die Stacheln).
+
+## Update 61: Bots auf beiden Seiten, Effizient-Bot, Zuschauen mitten im Lauf, Tore für Zuschauer
+- Stehen zwei Bots auf Platten desselben Kanals auf verschiedenen Seiten eines Tors, bleibt der vordere stehen und wartet, bis der hintere durch das offene Tor ist (`holdWanted`: ein Halter weiter vorn hat Vorrang).
+- Neues Können 5 „Effizient“ (zwischen Profi und Meister): Profi-Planung, einprogrammierte Wege (`routes.generated.ts`) und einfache Bremspläne, Bremspläne nur jedes 2. Bild, keine feine Suche. Testlauf Level 1–14 in ca. 2 s (Meister rechnet ein Mehrfaches). `botmix.ts`: Mischung als laufende Nummer (`10 + Index` in `MIXES`, alle Aufstellungen mit höchstens 8 Bots), passt in die vorhandene Spalte, **kein neues SQL**. Alte Codes aus Update 59 (Basis-9-Zahl) sind ungültig, Lobbys halten aber nur Minuten.
+- Admins können mitten im Lauf „👻 Zuschauen“ drücken (`watchApi` in `ParkourGame`): Geist ohne Senden (die anderen sehen sie als ausgeschieden und ausgeblendet), Flug durch Wände und Tore; „Zurück ins Spiel“ setzt am Anfang des aktuellen Levels neu an.
+- Zuschauer (auch der Seiten-Zuschauer `?zuschauen=1`) kommen jetzt durch das Ziel in das nächste Level, durch den linken Rand in das vorige und haben Knöpfe „◀ Level“ / „Level ▶“.
