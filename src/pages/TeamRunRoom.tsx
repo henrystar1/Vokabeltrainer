@@ -16,7 +16,7 @@ import TeamTrack, { Hearts } from '../features/team/TeamTrack'
 import ParkourGame from '../features/parkour/ParkourGame'
 import { errorMessage } from '../lib/errors'
 import { getWallet } from '../services/koins'
-import { deathrunOpenJoin, teamGet, teamLeave, teamRejoin, teamReport, teamRespond, teamSetBots, teamSpectate, teamStart, type DeathrunResult, type TeamPerson, type TeamState } from '../services/play'
+import { deathrunOpenJoin, teamGet, teamLeave, teamRejoin, teamReport, teamRespond, teamSetBots, teamSetVersus, teamSpectate, teamStart, type DeathrunResult, type TeamPerson, type TeamState } from '../services/play'
 
 const POLL_MS = 900
 const COLORS = ['#22d3ee', '#e879f9', '#facc15', '#4ade80', '#fb923c']
@@ -164,6 +164,20 @@ export default function TeamRunRoom() {
     const joined = open ? humans + bots >= 2 : rest.some(isJoined) || (dr && bots > 0)
     const invitedMe = !open && !st.is_host && !(me && isJoined(me))
     const mix = decodeMix(st.bot_skill, bots)
+    const vs = dr ? 0 : st.versus ?? 0
+    const joinedPeople = people.filter(isJoined)
+    const teamOf = (uid: string) => ((st.team_map ?? {})[uid] === 1 ? 1 : 0)
+    const setVs = (mode: number) => {
+      // Beim Wechsel auf „Team gegen Team“ gleich abwechselnd verteilen (rot, blau, rot, blau …)
+      const map: Record<string, number> = {}
+      if (mode === 2) joinedPeople.forEach((p, i) => { map[p.user_id] = i % 2 })
+      void act(() => teamSetVersus(id, mode, map))
+    }
+    const setTeam = (uid: string, team: number) => {
+      const map: Record<string, number> = {}
+      for (const p of joinedPeople) map[p.user_id] = p.user_id === uid ? team : teamOf(p.user_id)
+      void act(() => teamSetVersus(id, 2, map))
+    }
     const skillName = SKILL_ORDER.filter((k) => mix[k - 1] > 0).map((k) => `${mix[k - 1]}× ${SKILL_NAMES[k]}`).join(', ')
     const setMix = (k: number, d: number) => {
       const m: Mix = [...mix]
@@ -195,7 +209,36 @@ export default function TeamRunRoom() {
             : st.reward > 0 && <p className="text-center text-sm text-amber-200">Bei Erfolg: {st.reward} Coins für jeden</p>}
           {st.can_manage && (
             <div className="space-y-2 rounded-xl border border-white/10 bg-white/5 p-3">
-              <p className="label-mono">Bots einstellen</p>
+              {!dr && (
+                <>
+                  <p className="label-mono">Gegner</p>
+                  <div className="flex flex-wrap gap-1.5" role="group" aria-label="Gegner im Team-Parkour">
+                    {([[0, 'Keiner'], [1, 'Bots'], [2, 'Anderes Team']] as const).map(([k, l]) => (
+                      <button key={k} type="button" disabled={busy} onClick={() => setVs(k)} aria-pressed={vs === k}
+                        className={`min-h-[40px] rounded-lg border px-3 text-xs font-semibold ${vs === k ? 'border-cyan-300/60 bg-cyan-400/15 text-cyan-100' : 'border-white/15 bg-white/5 text-slate-300'}`}>{l}</button>
+                    ))}
+                  </div>
+                  {vs === 0 && <p className="text-xs text-slate-400">Alle spielen zusammen in einem Team.</p>}
+                  {vs === 1 && <p className="text-xs text-slate-400">Ihr lauft als Team (blau) gegen ein Bot-Team (rot) dieselben Level. Wer keine Herzen mehr hat, scheidet aus; es gewinnt, wer weiter kommt.</p>}
+                  {vs === 2 && (
+                    <div className="space-y-1.5">
+                      <p className="text-xs text-slate-400">Zwei Teams laufen gleichzeitig dieselben Level, jedes mit eigenen Herzen. Wer weiter kommt, gewinnt. Verteilt euch auf Rot und Blau:</p>
+                      {joinedPeople.map((p) => (
+                        <div key={p.user_id} className="flex items-center justify-between gap-2">
+                          <span className="min-w-0 flex-1 truncate text-sm text-slate-200">{p.name}</span>
+                          {([[0, 'Rot', '#f87171'], [1, 'Blau', '#60a5fa']] as const).map(([k, l, c]) => (
+                            <button key={k} type="button" disabled={busy} onClick={() => setTeam(p.user_id, k)} aria-pressed={teamOf(p.user_id) === k}
+                              className="min-h-[36px] rounded-lg border px-3 text-xs font-semibold" style={teamOf(p.user_id) === k ? { borderColor: c, background: `${c}33`, color: '#fff' } : { borderColor: 'rgb(255 255 255 / 0.15)', color: '#cbd5e1' }}>{l}</button>
+                          ))}
+                        </div>
+                      ))}
+                      {new Set(joinedPeople.map((p) => teamOf(p.user_id))).size < 2 && <p className="text-xs text-amber-200">Es braucht in beiden Teams mindestens eine Person.</p>}
+                    </div>
+                  )}
+                </>
+              )}
+              {(dr || vs === 1) && (<>
+              <p className="label-mono">{dr ? 'Bots einstellen' : 'Bot-Team einstellen'}</p>
               <p className="text-xs text-slate-400">Bis zu 8 Bots, gern gemischt: jede Stärke einzeln wählbar. „Effizient“ liegt zwischen Profi und Meister und rechnet viel weniger (schont schwache Geräte).</p>
               <div className="space-y-1.5">
                 {SKILL_ORDER.map((k) => (
@@ -209,6 +252,7 @@ export default function TeamRunRoom() {
                   </div>
                 ))}
               </div>
+              </>)}
             </div>
           )}
           {error && <ErrorBox message={error} />}
@@ -344,13 +388,29 @@ export default function TeamRunRoom() {
   const won = st.status === 'won'
   const right = st.host_right + st.partner_right
   const wrong = st.host_wrong + st.partner_wrong
+  // Wettlauf (Team-Parkour mit Gegnern): Urteil kommt aus dem eigenen Spiel, Stand der Teams vom Server
+  const versus = !dr && st.kind === 'parkour' ? st.versus ?? 0 : 0
+  let vres: { v: 'win' | 'lose' | 'draw'; my: number; rv: number } | null = null
+  if (versus > 0) {
+    try { vres = JSON.parse(window.localStorage.getItem(`pkrvs:${st.id}:${st.me}`) ?? 'null') } catch { vres = null }
+    if (vres && !['win', 'lose', 'draw'].includes(vres.v)) vres = null
+    if (!vres && versus === 2 && st.team_results) {
+      const mine = (st.team_map ?? {})[st.me] === 1 ? 1 : 0
+      const a = st.team_results[String(mine)]?.levels, b = st.team_results[String(1 - mine)]?.levels
+      if (typeof a === 'number' && typeof b === 'number') vres = { v: a > b ? 'win' : a < b ? 'lose' : 'draw', my: a, rv: b }
+    }
+  }
   return (
     <div className="mx-auto max-w-xl space-y-5">
-      <PageHeader eyebrow={label} title={dr ? 'Deathrun beendet' : run ? 'Keine Herzen mehr' : won ? 'Geschafft – ihr seid im Ziel!' : 'Leider nicht geschafft'} />
+      <PageHeader eyebrow={label} title={dr ? 'Deathrun beendet' : vres ? (vres.v === 'win' ? 'Gewonnen!' : vres.v === 'lose' ? 'Verloren' : 'Unentschieden') : versus > 0 ? 'Wettlauf beendet' : run ? 'Keine Herzen mehr' : won ? 'Geschafft – ihr seid im Ziel!' : 'Leider nicht geschafft'} />
       {st.kind === 'quiz' && <TeamTrack st={st} />}
       <Card className="space-y-4 text-center">
         <div className="flex justify-center">{won ? <Trophy size={44} className="text-amber-300" /> : <Hearts left={0} total={st.lives} />}</div>
-        {dr ? <Results list={st.results ?? []} me={st.me} /> : run ? (
+        {dr ? <Results list={st.results ?? []} me={st.me} /> : versus > 0 ? (
+          <p className="text-slate-300">
+            {vres ? `Wir: ${vres.my} Level · ${versus === 1 ? 'Bots' : 'Anderes Team'}: ${vres.rv} Level` : `${st.levels ?? 0} Level geschafft`}
+          </p>
+        ) : run ? (
           <p className="text-slate-300">
             {`${st.levels ?? 0} Level geschafft, ${st.cps ?? 0} Checkpoints erreicht`} · {Math.floor((st.millis ?? 0) / 60000)}:{String(Math.floor(((st.millis ?? 0) % 60000) / 1000)).padStart(2, '0')} Min. · {st.deaths ?? 0} Stürze
           </p>

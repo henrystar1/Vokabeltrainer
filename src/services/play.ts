@@ -187,6 +187,10 @@ export interface TeamState {
   staff_present?: boolean
   can_manage?: boolean
   can_start?: boolean
+  /** Team-Parkour: 0 normal, 1 Team gegen Bots, 2 Team gegen Team (Migration 0052). team_map: Person → Team (0 rot, 1 blau). */
+  versus?: 0 | 1 | 2
+  team_map?: Record<string, number>
+  team_results?: Record<string, { levels: number; cps: number; millis: number; deaths: number }>
 }
 export interface DeathrunResult { user_id: string; name: string; levels: number; cps: number; millis: number; deaths: number; paid: number }
 export interface TeamInvite { run_id: string; host_name: string; host_avatar_id: string | null; host_color_id: string | null; created_at: string; kind: 'quiz' | 'parkour' | 'deathrun' }
@@ -237,3 +241,4 @@ export const teamRejoin = (id: string) => rpc<void>('team_rejoin', { p_id: id })
 export const teamSpectate = (id: string) => rpc<TeamState>('team_spectate', { p_id: id })
 export interface AdminRun { id: string; kind: 'parkour' | 'deathrun'; status: 'lobby' | 'running'; is_open: boolean; bots: number; created_at: string; starts_at: string | null; players: string[] }
 export const adminOpenRuns = () => rpc<AdminRun[]>('admin_open_runs')
+export const teamSetVersus = (id: string, mode: number, map: Record<string, number> = {}) => rpc<void>('team_set_versus', { p_id: id, p_mode: mode, p_map: map })

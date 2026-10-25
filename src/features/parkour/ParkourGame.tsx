@@ -82,12 +82,16 @@ export default function ParkourGame({ st, startLevel = 0 }: { st: TeamState; sta
     // Mitspielende (Host zuerst); wer nur eingeladen ist oder ausgestiegen ist, zählt nicht
     const dr = st.kind === 'deathrun' // Deathrun: jeder für sich (eigene Herzen und Level), Tore nur mit Teamarbeit
     const members = () => peopleRef.current.filter((p) => p.is_host || p.state === undefined || p.state === 'joined')
-    const players = members()
+    // Versus: 0 = ein Team zusammen, 1 = wir (blau) gegen ein Bot-Team (rot), 2 = zwei Teams (rot/blau) auf denselben Leveln
+    const vs = dr ? 0 : Math.max(0, Math.min(2, st.versus ?? 0))
+    const teamOfU = (uid: string) => ((st.team_map ?? {})[uid] === 1 ? 1 : 0)
+    const myTeam = vs === 2 ? teamOfU(st.me) : 1
+    const players = members().filter((p) => vs !== 2 || spec || teamOfU(p.user_id) === myTeam)
     const slot = isSpec ? 0 : Math.max(0, players.findIndex((p) => p.user_id === st.me))
     const idxOf = (uid: string) => Math.max(0, members().findIndex((p) => p.user_id === uid))
     const lookOf = (uid: string) => peopleRef.current.find((p) => p.user_id === uid)
     const myFx = lookOf(st.me)?.pk_fx ?? null
-    const botsN = dr && !isSpec ? Math.max(0, Math.min(8, st.bots ?? 0)) : 0
+    const botsN = (dr || vs === 1) && !isSpec ? Math.max(0, Math.min(8, st.bots ?? 0)) : 0
     const botSkills = skillList(st.bot_skill, st.bots ?? 0)
     // Gemeinsamer Herzvorrat: Grundwert, +1 je Person ab der dritten, plus die im Shop gekauften Extra-Herzen aller
     const maxHearts = dr
@@ -114,6 +118,11 @@ export default function ParkourGame({ st, startLevel = 0 }: { st: TeamState; sta
     let startPerf = performance.now()
     const me: Body = (() => { const s = spawnAt(levelOf(startLevel), slot, null); return newBody(s.x, s.y) })()
     const remotes = new Map<string, Remote>()
+    const rivals = new Map<string, Remote>() // Versus: das andere Team (nur sichtbar, keine Wirkung auf mein Team)
+    let verdict: 'win' | 'lose' | 'draw' | null = null
+    const group = vs === 1 // Bot-Team: alle Bots im selben Level mit gemeinsamen Herzen
+    let bgh = Math.min(20, Math.max(1, st.lives || 3) + Math.max(0, Math.min(8, st.bots ?? 0) - 2))
+    let bgOut = false
     const mates = (now: number) => { const out: Remote[] = []; for (const r of remotes.values()) if (r.lv === lv && !r.el && now - r.seen < STALE_MS) out.push(r); return out }
     const fxField = new FxField()
     let seenAny = false
@@ -157,23 +166,25 @@ export default function ParkourGame({ st, startLevel = 0 }: { st: TeamState; sta
     let bots: BotState[] | null = null
     const botSnap = new Map<number, BotView>()
     const isMaster = (now: number): boolean => {
-      if (botsN <= 0 || finished) return false
-      for (const [uid, r] of remotes) if (uid < st.me && !r.el && now - r.seen < STALE_MS * 2 && members().some((p) => p.user_id === uid)) return false
+      if (botsN <= 0 || (finished && !group)) return false
+      for (const [uid, r] of remotes) if (uid < st.me && (!r.el || group) && now - r.seen < STALE_MS * 2 && members().some((p) => p.user_id === uid)) return false
       return true
     }
     const initBots = (now: number) => {
       void now
       bots = []
+      if (group) { const g0 = botSnap.get(0); if (g0) { bgh = g0.hp; bgOut = g0.out } }
       for (let i = 0; i < botsN; i++) {
-        const sn = botSnap.get(i)
+        const sn = group ? botSnap.get(0) : botSnap.get(i)
         const l = sn?.lv ?? 0
         const b = newBot(i, levelOf(l), Math.max(1, st.lives || 3), botSkills[i] ?? 2, l)
-        if (sn) { b.body.x = sn.x; b.body.y = sn.y; b.hearts = sn.hp; b.out = sn.out }
+        if (group) { b.hearts = 99; b.out = bgOut; b.deadT = 0.05 + i * 0.45 }
+        else if (sn) { b.body.x = sn.x; b.body.y = sn.y; b.hearts = sn.hp; b.out = sn.out }
         bots.push(b)
       }
     }
     const botViews = (now: number): BotView[] => {
-      if (bots) return bots.map((b) => ({ i: b.i, x: b.body.x, y: b.body.y, face: b.body.face, lv: b.lv, hp: b.hearts, out: b.out, dead: b.deadT > 0, dx: b.body.x, dy: b.body.y, seen: now }))
+      if (bots) return bots.map((b) => ({ i: b.i, x: b.body.x, y: b.body.y, face: b.body.face, lv: b.lv, hp: group ? bgh : b.hearts, out: group ? bgOut : b.out, dead: b.deadT > 0, dx: b.body.x, dy: b.body.y, seen: now }))
       return [...botSnap.values()].filter((b) => now - b.seen < STALE_MS * 2)
     }
 
@@ -197,7 +208,9 @@ export default function ParkourGame({ st, startLevel = 0 }: { st: TeamState; sta
       const y = finite(p.y, -800, 1200)
       if (!uid || uid === st.me || x === null || y === null) return
       lastRx = performance.now()
-      const prev = remotes.get(uid)
+      const rival = vs === 2 && !spec && !isSpec && teamOfU(uid) !== myTeam
+      const store = rival ? rivals : remotes
+      const prev = store.get(uid)
       const psid = typeof p.sid === 'string' ? p.sid : ''
       const pn = typeof p.n === 'number' ? p.n : 0
       // Veraltete oder doppelte Nachrichten (Wiederverbindung, Reihenfolge) verwerfen
@@ -206,7 +219,8 @@ export default function ParkourGame({ st, startLevel = 0 }: { st: TeamState; sta
       const dead = !!p.dead
       const jump = !prev || prev.lv !== lvNew || prev.dead !== dead || Math.hypot(x - prev.x, y - prev.y) > SNAP_PX
       const r: Remote = { x, y, face: p.face === -1 ? -1 : 1, lv: lvNew, cp: p.cp ?? null, dead, ex: !!p.ex, dc: p.dc ?? 0, g: !!p.g, seen: performance.now(), lh: p.lh ?? 0, gh: !!p.gh, dx: jump || !prev ? x : prev.dx, dy: jump || !prev ? y : prev.dy, hp: p.hp ?? 0, el: !!p.el, sid: psid, n: pn, bf: p.bf ?? 0 }
-      remotes.set(uid, r)
+      store.set(uid, r)
+      if (rival) return
       if (isSpec || dr) { seenAny = true; return } // Deathrun: jede Person hat ihr eigenes Level, ihre Herzen und ihre Checkpoints
       if (!seenAny) {
         // Späterer Einstieg: Level und Herzen der anderen übernehmen
@@ -276,7 +290,7 @@ export default function ParkourGame({ st, startLevel = 0 }: { st: TeamState; sta
 
     function checkOver() {
       if (isSpec) return
-      if (hearts <= 0 && !finished) { over = true; hearts = 0; window.setTimeout(() => report(lv), 1800); finished = true }
+      if (hearts <= 0 && !finished) { over = true; hearts = 0; if (vs === 0) window.setTimeout(() => report(lv), 1800); finished = true }
     }
 
     function goLevel(n: number, adopt = false) {
@@ -364,19 +378,19 @@ export default function ParkourGame({ st, startLevel = 0 }: { st: TeamState; sta
       if (hideSend) { lastSend = 0; lastSig = '' } // einmal "ausgeblendet" melden, dann still
       const level = levelOf(lv)
       const x = Math.round(me.x * 10) / 10, y = Math.round(me.y * 10) / 10
-      const sig = `${x}|${y}|${me.face}|${lv}|${cp}|${deadT > 0 ? 1 : 0}|${me.ground ? 1 : 0}|${ghostOn ? 1 : 0}|${hearts}|${deaths}|${finished && dr ? 1 : 0}|${buffCode()}`
+      const sig = `${x}|${y}|${me.face}|${lv}|${cp}|${deadT > 0 ? 1 : 0}|${me.ground ? 1 : 0}|${ghostOn ? 1 : 0}|${hearts}|${deaths}|${finished && (dr || vs > 0) ? 1 : 0}|${buffCode()}`
       // Wer stillsteht, meldet sich nur ein paarmal pro Sekunde (spart Nachrichten bei vielen Spielenden)
       if (now - lastSend < SEND_MS || (sig === lastSig && now - lastSend < 350)) return
       lastSend = now
       lastSig = sig
-      void ch?.send({ type: 'broadcast', event: 's', payload: { u: st.me, sid, n: ++seq, x, y, face: me.face, lv, cp, dead: deadT > 0, ex: inExit(level, me), dc: deaths, g: me.ground, lh: hashLevel(level), gh: ghostOn, hp: hearts, el: (finished && dr) || isSpec, bf: buffCode() } })?.catch?.(() => undefined)
+      void ch?.send({ type: 'broadcast', event: 's', payload: { u: st.me, sid, n: ++seq, x, y, face: me.face, lv, cp, dead: deadT > 0, ex: inExit(level, me), dc: deaths, g: me.ground, lh: hashLevel(level), gh: ghostOn, hp: hearts, el: (finished && (dr || vs > 0)) || isSpec, bf: buffCode() } })?.catch?.(() => undefined)
       hideSend = false
     }
 
     function sendBots(now: number) {
       if (!bots || !ready || now - lastBotSend < 110) return
       lastBotSend = now
-      const l = bots.map((b) => [b.i, Math.round(b.body.x * 10) / 10, Math.round(b.body.y * 10) / 10, b.body.face, b.lv, b.hearts, b.out ? 1 : 0, b.deadT > 0 ? 1 : 0])
+      const l = bots.map((b) => [b.i, Math.round(b.body.x * 10) / 10, Math.round(b.body.y * 10) / 10, b.body.face, b.lv, group ? bgh : b.hearts, (group ? bgOut : b.out) ? 1 : 0, b.deadT > 0 ? 1 : 0])
       void ch?.send({ type: 'broadcast', event: 'b', payload: { sid, l } })?.catch?.(() => undefined)
     }
 
@@ -400,14 +414,38 @@ export default function ParkourGame({ st, startLevel = 0 }: { st: TeamState; sta
     // Bots im selben Level wie ich (zählen wie Mitspielende: sie halten Platten und tragen auf dem Kopf)
     const botPts = (now: number): Array<{ x: number; y: number }> => {
       const out: Array<{ x: number; y: number }> = []
+      if (vs === 1) return out // Gegner-Bots stehen auf keiner Platte von uns
       for (const b of botViews(now)) if (b.lv === lv && !b.out && !b.dead) out.push({ x: b.x, y: b.y })
       return out
     }
     let openUntil = 0 // Notausgang: Bots konnten nicht helfen, Tore bleiben kurz offen
     let gateStuck = 0
     const gatePressed = (level: Level, mt: Remote[], bp: Array<{ x: number; y: number }>, others: Array<{ x: number; y: number }>): Pressed => {
-      if (dr && ((mt.length === 0 && bp.length === 0) || t < openUntil)) return { a: true, b: true, c: true }
+      if ((dr || vs > 0) && ((mt.length === 0 && bp.length === 0) || t < openUntil)) return { a: true, b: true, c: true }
       return pressedMap(level, [deadT > 0 || isSpec ? null : me, ...others, ...bp])
+    }
+
+    const soloTeam = vs > 0 && players.length <= 1 // Wer im Wettlauf allein im Team ist, geht allein durchs Ziel
+    /** Wettlauf: wer ist weiter gekommen? Ein Team scheidet aus, wenn es keine Herzen mehr hat. */
+    function checkVerdict(now: number) {
+      let rLv = -1
+      let rOut = false
+      if (vs === 1) {
+        const v = botViews(now)
+        if (v.length > 0) { rLv = Math.max(...v.map((b) => b.lv)); rOut = v.every((b) => b.out) }
+      } else {
+        const rs = [...rivals.values()]
+        if (rs.length > 0) { rLv = Math.max(...rs.map((r) => r.lv)); rOut = rs.every((r) => r.el || now - r.seen > 15000) }
+      }
+      if (rLv < 0) return
+      let v: 'win' | 'lose' | 'draw' | null = null
+      if (over && rOut) v = lv > rLv ? 'win' : lv < rLv ? 'lose' : 'draw'
+      else if (over && rLv > lv) v = 'lose'
+      else if (!over && rOut && lv > rLv) v = 'win'
+      if (!v) return
+      verdict = v
+      try { window.localStorage.setItem(`pkrvs:${st.id}:${st.me}`, JSON.stringify({ v, my: lv, rv: rLv, bots: vs === 1 })) } catch { /* ignorieren */ }
+      report(lv)
     }
 
     function step(dt: number, now: number) {
@@ -421,20 +459,31 @@ export default function ParkourGame({ st, startLevel = 0 }: { st: TeamState; sta
       if (botsN > 0) {
         const master = isMaster(now)
         if (master && !bots) initBots(now)
-        else if (!master && bots) { for (const b of bots) botSnap.set(b.i, { i: b.i, x: b.body.x, y: b.body.y, face: b.body.face, lv: b.lv, hp: b.hearts, out: b.out, dead: b.deadT > 0, dx: b.body.x, dy: b.body.y, seen: now }); bots = null }
+        else if (!master && bots) { for (const b of bots) botSnap.set(b.i, { i: b.i, x: b.body.x, y: b.body.y, face: b.body.face, lv: b.lv, hp: group ? bgh : b.hearts, out: group ? bgOut : b.out, dead: b.deadT > 0, dx: b.body.x, dy: b.body.y, seen: now }); bots = null }
         if (bots) {
           for (const b of bots) {
+            if (group && (b.parked || bgOut)) continue
             // Menschen und andere Bots im Level des Bots: er hält Platten für Menschen und hat selbst feste Türen
             const humans: Array<{ x: number; y: number }> = []
-            if (!isSpec && !finished && deadT <= 0 && lv === b.lv) humans.push({ x: me.x, y: me.y })
-            for (const r of remotes.values()) if (r.lv === b.lv && !r.el && !r.dead && now - r.seen < STALE_MS) humans.push({ x: r.x, y: r.y })
+            // Auch wer gerade tot ist und gleich wieder einsteigt, zählt weiter (die Bots vergessen niemanden)
+            if (!group) {
+              if (!isSpec && !finished && lv === b.lv) humans.push({ x: me.x, y: me.y })
+              for (const r of remotes.values()) if (r.lv === b.lv && !r.el && now - r.seen < STALE_MS) humans.push({ x: r.x, y: r.y })
+            }
             const others = [...humans]
-            for (const o of bots) if (o !== b && o.lv === b.lv && !o.out && o.deadT <= 0) others.push({ x: o.body.x, y: o.body.y })
+            for (const o of bots) if (o !== b && o.lv === b.lv && !o.out && !o.parked && o.deadT <= 0) others.push({ x: o.body.x, y: o.body.y })
             // Die Bots sagen sich gegenseitig, wer eine Platte hält und wo sie stehen (dann hält nur einer, die anderen gehen weiter)
-            const infos = bots.filter((o) => o !== b && o.lv === b.lv && !o.out && o.deadT <= 0).map((o) => ({ i: o.i, x: o.body.x, y: o.body.y, mode: o.mode, ch: o.holdCh }))
+            const bl = levelOf(b.lv)
+            const infos = bots.filter((o) => o !== b && o.lv === b.lv && !o.out && !o.parked).map((o) => {
+              if (o.deadT > 0) { const sp = spawnAt(bl, o.i % 5, o.cp); return { i: o.i, x: sp.x, y: sp.y, mode: 'run' as const, ch: o.holdCh } } // wartet auf den Neustart: steht gleich wieder am Checkpoint
+              return { i: o.i, x: o.body.x, y: o.body.y, mode: o.mode, ch: o.holdCh }
+            })
             const ctx: BotCtx = { humans, others, bots: infos }
             const r = botStep(levelOf(b.lv), b, dt, ctx)
-            if (r === 'exit') {
+            if (group) {
+              if (r === 'exit') b.parked = true
+              else if (r === 'dead') { bgh -= 1; if (bgh <= 0) { bgOut = true; for (const o of bots) o.out = true } }
+            } else if (r === 'exit') {
               b.lv += 1
               b.hearts = Math.min(Math.max(1, st.lives || 3), b.hearts + 1)
               const sp = spawnAt(levelOf(b.lv), b.i % 5, null)
@@ -442,8 +491,20 @@ export default function ParkourGame({ st, startLevel = 0 }: { st: TeamState; sta
               b.cp = null; b.grace = 1.5; b.script = null; b.stuckT = 0; b.lastX = sp.x; b.retries = 0; b.deadT = 0.05 + b.i * 0.45
             }
           }
+          // Bot-Team: sind alle im Ausgang, geht es gemeinsam ins nächste Level (ein Herz zurück)
+          if (group && !bgOut && bots.length > 0 && bots.every((o) => o.parked || o.out)) {
+            const nl = bots[0].lv + 1
+            bgh = Math.min(20, bgh + 1)
+            for (const o of bots) {
+              const sp = spawnAt(levelOf(nl), o.i % 5, null)
+              Object.assign(o.body, newBody(sp.x, sp.y))
+              o.lv = nl; o.cp = null; o.grace = 1.5; o.script = null; o.stuckT = 0; o.lastX = sp.x; o.retries = 0; o.deadT = 0.05 + o.i * 0.45
+              o.parked = false; o.mode = 'run'; o.blockT = 0; o.route = null
+            }
+          }
         }
       }
+      if (vs > 0 && !isSpec && verdict === null) checkVerdict(now)
       if (isSpec) {
         // Zuschauer: unsichtbarer Geist, fliegt frei oder folgt einer Person
         const i = input.current
@@ -505,7 +566,7 @@ export default function ParkourGame({ st, startLevel = 0 }: { st: TeamState; sta
       if (c !== null && (myCp === null || c > myCp)) myCp = c
       if (c !== null && (cp === null || c > cp)) { cp = c; cpTotal += 1 }
       // Ausgang: im Deathrun sofort ins nächste Level, sonst müssen alle gleichzeitig drin sein
-      if (dr ? inExit(level, me) : inExit(level, me) && mt.length > 0 && mt.every((r) => r.ex)) {
+      if (dr ? inExit(level, me) : inExit(level, me) && (soloTeam || (mt.length > 0 && mt.every((r) => r.ex)))) {
         exitHold += dt
         if (exitHold > (dr ? 0.2 : 0.7) && !finished) {
           goLevel(lv + 1)
@@ -610,7 +671,7 @@ export default function ParkourGame({ st, startLevel = 0 }: { st: TeamState; sta
         }
       }
       // Spieler
-      const drawP = (x: number, y: number, face: 1 | -1, uid: string, name: string, dead: boolean, self: boolean, ghost = false, bf = 0, bot = false) => {
+      const drawP = (x: number, y: number, face: 1 | -1, uid: string, name: string, dead: boolean, self: boolean, ghost = false, bf = 0, bot = false, team = -1) => {
         const look = lookOf(uid)
         const idx = bot ? 0 : idxOf(uid)
         const color = bot ? BOT_COLOR : pkFill(look?.pk_color, COLORS[idx % COLORS.length], t)
@@ -626,6 +687,7 @@ export default function ParkourGame({ st, startLevel = 0 }: { st: TeamState; sta
         ctx!.shadowColor = color; ctx!.shadowBlur = self ? 12 : 8
         ctx!.beginPath(); ctx!.roundRect(x, y, PW, PH, 7); ctx!.fill()
         ctx!.shadowBlur = 0
+        if (team >= 0 && !dead) { ctx!.strokeStyle = team === 0 ? '#f87171' : '#60a5fa'; ctx!.lineWidth = 3; ctx!.beginPath(); ctx!.roundRect(x - 3, y - 3, PW + 6, PH + 6, 10); ctx!.stroke() }
         if (bf === 1 && !dead) { ctx!.strokeStyle = '#a78bfa'; ctx!.lineWidth = 2; ctx!.beginPath(); ctx!.roundRect(x - 2, y - 2, PW + 4, PH + 4, 9); ctx!.stroke() }
         ctx!.fillStyle = '#fff'
         ctx!.fillRect(x + (face > 0 ? 11 : 3), y + 7, 7, 7)
@@ -645,10 +707,14 @@ export default function ParkourGame({ st, startLevel = 0 }: { st: TeamState; sta
       fxField.drawParticles(ctx!)
       for (const [uid, r] of remotes) {
         if (r.lv !== lv || now - r.seen >= STALE_MS || r.el) continue
-        drawP(r.dx, r.dy, r.face, uid, nameOf(uid), r.dead, false, r.gh, r.bf)
+        drawP(r.dx, r.dy, r.face, uid, nameOf(uid), r.dead, false, r.gh, r.bf, false, vs === 2 ? teamOfU(uid) : vs === 1 ? 1 : -1)
       }
-      for (const b of bviews) drawP(bots ? b.x : b.dx, bots ? b.y : b.dy, b.face, 'bot' + b.i, BOT_NAMES[b.i % BOT_NAMES.length], b.dead, false, false, 0, true)
-      drawP(me.x, me.y, me.face, st.me, 'Du', deadT > 0, true, ghostOn || isSpec, buffCode())
+      for (const [uid, r] of rivals) {
+        if (r.lv !== lv || now - r.seen >= STALE_MS || r.el) continue
+        drawP(r.dx, r.dy, r.face, uid, nameOf(uid), r.dead, false, r.gh, r.bf, false, teamOfU(uid))
+      }
+      for (const b of bviews) drawP(bots ? b.x : b.dx, bots ? b.y : b.dy, b.face, 'bot' + b.i, BOT_NAMES[b.i % BOT_NAMES.length], b.dead, false, false, 0, true, vs === 1 ? 0 : -1)
+      drawP(me.x, me.y, me.face, st.me, 'Du', deadT > 0, true, ghostOn || isSpec, buffCode(), false, isSpec ? -1 : vs > 0 ? myTeam : -1)
       ctx!.restore()
       // Pfeile am Bildrand für Mitspielende außerhalb des Bildes
       for (const [uid, r] of remotes) {
@@ -690,6 +756,18 @@ export default function ParkourGame({ st, startLevel = 0 }: { st: TeamState; sta
         if (buff.jet > 0) { ctx!.fillStyle = 'rgba(2,6,23,0.65)'; ctx!.fillRect(8, by - 11, 150, 16); ctx!.fillStyle = '#fed7aa'; ctx!.fillText(`🚀 Flugmodus ${Math.ceil(buff.jet)} s`, 12, by) }
         ctx!.textAlign = 'center'
       }
+      if (vs > 0) {
+        // Wettlauf: unser Stand gegen den Stand der Gegner
+        ctx!.fillStyle = 'rgba(2,6,23,0.45)'; ctx!.fillRect(0, 26, VIEW_W, 18)
+        ctx!.font = '600 11px system-ui, sans-serif'; ctx!.textAlign = 'center'
+        const rs = vs === 1 ? botViews(now).map((b) => ({ lv: b.lv, hp: b.hp, out: b.out })) : [...rivals.values()].map((r) => ({ lv: r.lv, hp: r.hp, out: r.el }))
+        const mine = `Wir: ${finished ? 'raus bei ' : ''}Lv ${lv + 1}${finished ? '' : ' ♥' + hearts}`
+        const rlv = rs.length ? Math.max(...rs.map((r) => r.lv)) : 0
+        const rout = rs.length > 0 && rs.every((r) => r.out)
+        const rhp = rs.length ? Math.max(...rs.map((r) => r.hp)) : 0
+        ctx!.fillStyle = '#93c5fd'; ctx!.fillText(mine, VIEW_W * 0.25, 39)
+        ctx!.fillStyle = '#fca5a5'; ctx!.fillText(`${vs === 1 ? 'Bots' : 'Gegner'}: ${rs.length === 0 ? 'noch nicht da' : `${rout ? 'raus bei ' : ''}Lv ${rlv + 1}${rout ? '' : ' ♥' + rhp}`}`, VIEW_W * 0.75, 39)
+      }
       if (dr) {
         // Stand aller: Level und Herzen, ausgeschiedene Personen durchgestrichen
         ctx!.fillStyle = 'rgba(2,6,23,0.45)'; ctx!.fillRect(0, 26, VIEW_W, 18)
@@ -708,7 +786,7 @@ export default function ParkourGame({ st, startLevel = 0 }: { st: TeamState; sta
           ctx!.fillStyle = 'rgba(2,6,23,0.7)'; ctx!.fillRect(VIEW_W / 2 - 170, 52, 340, 26)
           ctx!.fillStyle = '#86efac'; ctx!.fillText('Allein im Level: alle Tore sind für dich offen', VIEW_W / 2, 69)
         }
-      } else if (!fresh && !isSpec) {
+      } else if (!fresh && !isSpec && !soloTeam) {
         ctx!.fillStyle = 'rgba(2,6,23,0.7)'; ctx!.fillRect(VIEW_W / 2 - 150, 40, 300, 28)
         ctx!.fillStyle = '#fbbf24'; ctx!.fillText('Warte auf die Verbindung zu deinem Team …', VIEW_W / 2, 58)
       } else if (!isSpec && (exitHold > 0 || (inExit(level, me) && !mt.every((r) => r.ex)))) {
@@ -745,7 +823,12 @@ export default function ParkourGame({ st, startLevel = 0 }: { st: TeamState; sta
       if (finished) {
         ctx!.fillStyle = 'rgba(2,6,23,0.75)'; ctx!.fillRect(0, 0, VIEW_W, VIEW_H)
         ctx!.fillStyle = over ? '#fb7185' : '#fde047'; ctx!.font = '700 28px system-ui, sans-serif'
-        ctx!.fillText(over ? (dr ? `Ausgeschieden bei Level ${lv + 1}` : 'Keine Herzen mehr') : 'Alle Level geschafft!', VIEW_W / 2, VIEW_H / 2)
+        if (vs > 0) {
+          const title = verdict === 'win' ? 'Gewonnen!' : verdict === 'lose' ? 'Verloren' : verdict === 'draw' ? 'Unentschieden' : `Ausgeschieden bei Level ${lv + 1}`
+          ctx!.fillStyle = verdict === 'win' ? '#fde047' : verdict === 'lose' ? '#fb7185' : '#e2e8f0'
+          ctx!.fillText(title, VIEW_W / 2, VIEW_H / 2)
+          if (!verdict) { ctx!.font = '500 14px system-ui, sans-serif'; ctx!.fillStyle = '#cbd5e1'; ctx!.fillText(vs === 1 ? 'Warte, ob die Bots weiter kommen …' : 'Warte, ob das andere Team weiter kommt …', VIEW_W / 2, VIEW_H / 2 + 28) }
+        } else ctx!.fillText(over ? (dr ? `Ausgeschieden bei Level ${lv + 1}` : 'Keine Herzen mehr') : 'Alle Level geschafft!', VIEW_W / 2, VIEW_H / 2)
       }
     }
 
@@ -760,7 +843,7 @@ export default function ParkourGame({ st, startLevel = 0 }: { st: TeamState; sta
       if (titleT > 0) titleT -= dt
       let guard = 0
       while (acc >= 1 / 60 && guard++ < 6) { step(1 / 60, now); acc -= 1 / 60 }
-      { const k = Math.min(1, dt * 14); for (const r of remotes.values()) { r.dx += (r.x - r.dx) * k; r.dy += (r.y - r.dy) * k } }
+      { const k = Math.min(1, dt * 14); for (const r of [...remotes.values(), ...rivals.values()]) { r.dx += (r.x - r.dx) * k; r.dy += (r.y - r.dy) * k } }
       { const k = Math.min(1, dt * 12); for (const b of botSnap.values()) { b.dx += (b.x - b.dx) * k; b.dy += (b.y - b.dy) * k } }
       // Effekte nachführen
       if (!isSpec && deadT <= 0 && !finished) fxField.update('me', myFx, me.x, me.y, me.face, t, dt)

@@ -53,6 +53,8 @@ export interface BotState {
   route: { acts: string; k: number; gated: boolean } | null
   /** Im letzten Schritt waren alle Tore offen (kein Mensch im Level) */
   open: boolean
+  /** Bot-Team: steht im Ausgang und wartet auf die anderen */
+  parked: boolean
 }
 
 /** Lage im Level für die Entscheidungen: Menschen im selben Level und alle anderen Körper (Menschen und Bots). */
@@ -62,7 +64,7 @@ export interface BotCtx { humans: Point[]; others: Point[]; bots?: BotInfo[] }
 
 export function newBot(i: number, level: Level, hearts: number, skill: number, lv = 0): BotState {
   const s = spawnAt(level, i % 5, null)
-  return { i, body: newBody(s.x + (i >= 5 ? 6 * (i - 4) : 0), s.y), lv, hearts, cp: null, deadT: 0.05 + i * 0.45, out: false, skill, prevJump: false, stuckT: 0, lastX: s.x, retries: 0, backT: 0, grace: 1, plan: Math.random(), script: null, mistakeT: 0, tick: 0, urgent: false, mode: 'run', holdCh: 'a', holdT: 0, holdMin: 0, gotoT: 0, blockT: 0, noPick: false, gateX1: -1, retT: 0, retCd: 0, spaceT: 0, spaceCd: 0, fineT: 0, route: null, open: false }
+  return { i, body: newBody(s.x + (i >= 5 ? 6 * (i - 4) : 0), s.y), lv, hearts, cp: null, deadT: 0.05 + i * 0.45, out: false, skill, prevJump: false, stuckT: 0, lastX: s.x, retries: 0, backT: 0, grace: 1, plan: Math.random(), script: null, mistakeT: 0, tick: 0, urgent: false, mode: 'run', holdCh: 'a', holdT: 0, holdMin: 0, gotoT: 0, blockT: 0, noPick: false, gateX1: -1, retT: 0, retCd: 0, spaceT: 0, spaceCd: 0, fineT: 0, route: null, open: false, parked: false }
 }
 
 const HORIZON = 96 // 1,6 s vorausrechnen
@@ -401,7 +403,8 @@ function finishStep(lv: Level, s: BotState, r: 'ok' | 'dead' | 'lost', dt: numbe
   if (r === 'dead') { s.hearts -= 1; s.deadT = 0.7; if (s.hearts <= 0) { s.out = true; return 'out' } return 'dead' }
   // Bots merken sich einen Checkpoint auch, wenn sie gerade darüber springen
   const cxx = Math.floor((s.body.x + PW / 2) / TILE)
-  const c = checkpointAt(lv, s.body) ?? (lv.checkpoints.includes(cxx) && s.body.y > 5 * TILE ? cxx : null)
+  const near = lv.checkpoints.find((k) => Math.abs(k - cxx) <= 1 && s.body.y > 3 * TILE)
+  const c = checkpointAt(lv, s.body) ?? (near !== undefined ? near : null)
   if (c !== null && (s.cp === null || c > s.cp)) {
     s.cp = c
     // Profi/Meister: am Checkpoint genau an die Stelle, für die der einprogrammierte Weg berechnet wurde (ein paar Pixel)

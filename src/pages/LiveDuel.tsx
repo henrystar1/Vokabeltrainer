@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useNavigate, useSearchParams, Link } from 'react-router-dom'
-import { Footprints, School, Search, Users, X, Zap } from 'lucide-react'
+import { Footprints, Minus, Plus, School, Search, Users, X, Zap } from 'lucide-react'
 import PlayerTag, { Avatar } from '../components/profile/PlayerTag'
 import Button from '../components/ui/Button'
 import Card from '../components/ui/Card'
@@ -8,8 +8,9 @@ import PageHeader from '../components/ui/PageHeader'
 import { Notice, ErrorBox } from '../components/ui/States'
 import { TextInput, Select } from '../components/ui/Field'
 import { errorMessage } from '../lib/errors'
-import { liveCreate, liveJoinCode, liveJoinOpen, liveOpenClasses, searchPlayers, teamCreate, type OpenClass } from '../services/play'
+import { liveCreate, liveJoinCode, liveJoinOpen, liveOpenClasses, searchPlayers, teamCreate, teamSetBots, type OpenClass } from '../services/play'
 import { listBooks } from '../services/books'
+import { MAX_BOTS, SKILL_NAMES, SKILL_ORDER, encodeMix, mixTotal, type Mix } from '../features/parkour/botmix'
 import { useAsync } from '../lib/useAsync'
 import type { PlayerHit } from '../types'
 
@@ -22,6 +23,8 @@ export default function LiveDuel() {
   const [obstacles, setObstacles] = useState(10)
   const [teamKind, setTeamKind] = useState<'parkour' | 'deathrun' | 'quiz'>(params.get('art') === 'deathrun' ? 'deathrun' : 'parkour')
   const [bookId, setBookId] = useState('')
+  const [mix, setMix] = useState<Mix>([0, 0, 0, 0, 0])
+  const bumpMix = (k: number, d: number) => setMix((m) => { const n: Mix = [...m]; n[k - 1] = Math.max(0, n[k - 1] + d); return mixTotal(n) > MAX_BOTS ? m : n })
   const [code, setCode] = useState('')
   const books = useAsync(listBooks, [])
   const maxInvites = mode === 'class' ? 19 : mode === 'team' ? (teamKind !== 'quiz' ? 4 : 1) : 3
@@ -73,7 +76,12 @@ export default function LiveDuel() {
     setBusy(true)
     setError(null)
     try {
-      if (mode === 'team') nav(`/team/${await teamCreate(picked[0].user_id, obstacles, teamKind, picked.slice(1, 4).map((p) => p.user_id))}`)
+      if (mode === 'team') {
+        const id = await teamCreate(picked[0].user_id, obstacles, teamKind, picked.slice(1, 4).map((p) => p.user_id))
+        // Deathrun: gewählte Bots gleich mit anlegen (in der Lobby jederzeit änderbar)
+        if (teamKind === 'deathrun' && mixTotal(mix) > 0) await teamSetBots(id, mixTotal(mix), encodeMix(mix)).catch(() => undefined)
+        nav(`/team/${id}`)
+      }
       else nav(`/live-duell/${await liveCreate(picked.map((p) => p.user_id), count, mode === 'class' ? bookId : null)}`)
     } catch (e) {
       setError(errorMessage(e))
@@ -192,6 +200,21 @@ export default function LiveDuel() {
             {([['parkour', 'Team-Parkour'], ['deathrun', 'Deathrun'], ['quiz', 'Vokabel-Parcours']] as const).map(([k, label]) => (
               <button key={k} type="button" role="radio" aria-checked={teamKind === k} onClick={() => { setTeamKind(k); if (k === 'quiz') setPicked((c) => c.slice(0, 1)) }}
                 className={`min-h-[48px] rounded-xl border text-sm font-semibold transition ${teamKind === k ? 'border-cyan-300/60 bg-cyan-400/15 text-cyan-200' : 'border-white/10 bg-white/5 text-slate-300'}`}>{label}</button>
+            ))}
+          </div>
+        )}
+        {mode === 'team' && teamKind === 'deathrun' && (
+          <div className="space-y-1.5">
+            <p className="label-mono">Bots dazunehmen (optional)</p>
+            {SKILL_ORDER.map((k) => (
+              <div key={k} className="flex items-center justify-between gap-2">
+                <span className="w-24 text-sm text-slate-200">{SKILL_NAMES[k]}</span>
+                <div className="flex items-center gap-2">
+                  <Button variant="ghost" disabled={mix[k - 1] <= 0} aria-label={`Weniger ${SKILL_NAMES[k]}`} onClick={() => bumpMix(k, -1)}><Minus size={16} /></Button>
+                  <span className="w-8 text-center font-mono text-sm">{mix[k - 1]}</span>
+                  <Button variant="ghost" disabled={mixTotal(mix) >= MAX_BOTS} aria-label={`Mehr ${SKILL_NAMES[k]}`} onClick={() => bumpMix(k, 1)}><Plus size={16} /></Button>
+                </div>
+              </div>
             ))}
           </div>
         )}
