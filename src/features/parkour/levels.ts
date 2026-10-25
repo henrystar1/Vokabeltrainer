@@ -58,8 +58,8 @@ export class Builder {
     const tops = [8, 6, 4, 2]
     const t = xs.map((_, i) => tops[up ? i : 3 - i])
     xs.forEach((px, i) => this.pillar(px, px + 1, t[i]))
-    // Lücken zwischen den Stufen bis zur niedrigeren Stufe füllen: wer von oben fällt, landet auf einer Stufe und steckt nicht fest
-    for (let i = 0; i < 3; i++) this.rect(xs[i] + 2, Math.max(t[i], t[i + 1]), xs[i + 1] - 1, 9, '#')
+    // In den Lücken zwischen den Stufen liegen unten Stacheln: wer hineinfällt, startet am Checkpoint neu und steckt nicht fest
+    for (let i = 0; i < 3; i++) this.spikes(xs[i] + 2, xs[i + 1] - 1)
     const top = up ? x + 12 : x
     return this.plate(ch, top, 1)
   }
@@ -160,7 +160,7 @@ const level5 = new Builder(112)
   .cp(8)
   .tower('a', 10).door('a', 26).pillar(31, 32, 7).plate('a', 31, 6)
   .cp(36).spikes(40, 43)
-  .tower('b', 44).cp(59).door('b', 61).pillar(66, 67, 7).plate('b', 66, 6)
+  .tower('b', 44).door('b', 61).cp(63).pillar(66, 67, 7).plate('b', 66, 6)
   .spikes(75, 78)
   .cp(80)
   .bridgeGap('c', 82)

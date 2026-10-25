@@ -414,6 +414,7 @@ export function botStep(lv: Level, s: BotState, dt: number, ctx: BotCtx = { huma
     }
     if (!s.take && without[s.holdCh] && !own[s.holdCh]) { s.mode = 'run' } // jemand anderes hält die Platte schon: einfach durchgehen
     else if (own[s.holdCh]) { s.mode = 'hold'; s.holdT = 0; s.holdMin = s.take ? 0 : 10 }
+    else if (via !== null && s.gotoT > 8) { s.mode = 'run'; s.take = false; s.deadT = 0.5; s.script = null; return 'ok' } // sitzt in einer Nische hinter dem Tor fest: Neustart am Checkpoint (kein Herz)
     else if (tx === null || s.gotoT > 20) { s.mode = 'run'; s.take = false }
     else {
       s.script = null
