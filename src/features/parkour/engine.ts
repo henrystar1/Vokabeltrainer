@@ -50,7 +50,8 @@ export function solidChar(ch: string, pressed: Pressed): boolean {
 
 function solidAt(lv: Level, pressed: Pressed, tx: number, ty: number): boolean {
   if (tx < 0 || tx >= lv.cols) return true
-  if (ty < 0 || ty >= ROWS) return false
+  if (ty < 0) return true // oben ist eine Decke: niemand fliegt oder hüpft aus dem Bild
+  if (ty >= ROWS) return false
   return solidChar(lv.rows[ty][tx], pressed)
 }
 
@@ -116,7 +117,7 @@ export function stepBody(b: Body, inp: Input, lv: Level, pressed: Pressed, other
     b.x = fx
     let fy = b.y + b.vy * dt
     if (!inp.ghost && hitsSolid(lv, pressed, b.x, fy)) { fy = b.y; b.vy = 0 }
-    b.y = Math.max(-6 * TILE, Math.min(ROWS * TILE - PH - 1, fy))
+    b.y = Math.max(0, Math.min(ROWS * TILE - PH - 1, fy))
     b.jumpHeld = inp.jump
     return 'ok'
   }

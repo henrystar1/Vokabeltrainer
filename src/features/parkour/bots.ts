@@ -58,6 +58,8 @@ export interface BotState {
   /** Zur Platte hinter dem Tor, um den Bot hinter dem Tor abzulösen (kein Wechsel, solange er selbst nur durch eine andere Platte „gedeckt“ ist) */
   take: boolean
   takeX: number
+  /** Weg zu einer Platte auf einem Turm: erst zum Fuß der Treppe (true = dort angekommen), dann hinaufklettern */
+  viaDone: boolean
   /** Gefahr voraus kommt nur von einem geschlossenen Tor: nicht springen, sondern zur Platte / vor dem Tor warten */
   gateWait: boolean
 }
@@ -69,7 +71,7 @@ export interface BotCtx { humans: Point[]; others: Point[]; bots?: BotInfo[] }
 
 export function newBot(i: number, level: Level, hearts: number, skill: number, lv = 0): BotState {
   const s = spawnAt(level, i % 5, null)
-  return { i, body: newBody(s.x + (i >= 5 ? 6 * (i - 4) : 0), s.y), lv, hearts, cp: null, deadT: 0.05 + i * 0.45, out: false, skill, prevJump: false, stuckT: 0, lastX: s.x, retries: 0, backT: 0, grace: 1, plan: Math.random(), script: null, mistakeT: 0, tick: 0, urgent: false, mode: 'run', holdCh: 'a', holdT: 0, holdMin: 0, gotoT: 0, blockT: 0, noPick: false, gateX1: -1, retT: 0, retCd: 0, spaceT: 0, spaceCd: 0, fineT: 0, route: null, open: false, parked: false, take: false, takeX: 0, gateWait: false }
+  return { i, body: newBody(s.x + (i >= 5 ? 6 * (i - 4) : 0), s.y), lv, hearts, cp: null, deadT: 0.05 + i * 0.45, out: false, skill, prevJump: false, stuckT: 0, lastX: s.x, retries: 0, backT: 0, grace: 1, plan: Math.random(), script: null, mistakeT: 0, tick: 0, urgent: false, mode: 'run', holdCh: 'a', holdT: 0, holdMin: 0, gotoT: 0, blockT: 0, noPick: false, gateX1: -1, retT: 0, retCd: 0, spaceT: 0, spaceCd: 0, fineT: 0, route: null, open: false, parked: false, take: false, takeX: 0, viaDone: false, gateWait: false }
 }
 
 const HORIZON = 96 // 1,6 s vorausrechnen
@@ -395,17 +397,28 @@ export function botStep(lv: Level, s: BotState, dt: number, ctx: BotCtx = { huma
       s.mode = 'run'
     }
   }
+  if ((s.mode as string) !== 'goto') s.viaDone = false
   if (s.mode === 'goto') {
     s.gotoT += dt
     const plates = lv.plates.filter((p) => p.ch === s.holdCh && (!s.take || p.x * TILE >= s.takeX))
     let tx: number | null = null
     for (const p of plates) { const px = p.x * TILE + 5; if (tx === null || Math.abs(px - b.x) < Math.abs(tx - b.x)) tx = px }
+    // Platte oben auf einem Turm: vom Tor aus kommt man von der falschen Seite nicht hinauf. Erst zum Fuß der Treppe laufen, dann hinaufklettern.
+    const tower = lv.plates.filter((p) => p.ch === s.holdCh && p.y <= 2).sort((p, q) => Math.abs(p.x * TILE - b.x) - Math.abs(q.x * TILE - b.x))[0]
+    let via: number | null = null
+    if (tower && !s.viaDone) {
+      const colTop = (c: number) => { for (let y = 0; y < ROWS; y++) if (lv.rows[y]?.[c] === '#') return y; return ROWS }
+      const stairsLeft = colTop(tower.x - 4) < ROWS - 2
+      via = (stairsLeft ? tower.x - 15 : tower.x + 15) * TILE
+      if (Math.abs(b.x - via) < 2 * TILE || (stairsLeft ? b.x < via : b.x > via)) { s.viaDone = true; via = null }
+    }
     if (!s.take && without[s.holdCh] && !own[s.holdCh]) { s.mode = 'run' } // jemand anderes hält die Platte schon: einfach durchgehen
     else if (own[s.holdCh]) { s.mode = 'hold'; s.holdT = 0; s.holdMin = s.take ? 0 : 10 }
     else if (tx === null || s.gotoT > 20) { s.mode = 'run'; s.take = false }
     else {
       s.script = null
-      inp = botInput(lv, s, ctx, tx < b.x ? -1 : 1)
+      const goal = via ?? tx
+      inp = botInput(lv, s, ctx, goal < b.x ? -1 : 1)
       return finishStep(lv, s, stepBody(b, inp, lv, pNow, null, dt), dt)
     }
   }

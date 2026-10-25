@@ -56,7 +56,10 @@ export class Builder {
   tower(ch: string, x: number, up = true): this {
     const xs = [x, x + 4, x + 8, x + 12]
     const tops = [8, 6, 4, 2]
-    xs.forEach((px, i) => this.pillar(px, px + 1, tops[up ? i : 3 - i]))
+    const t = xs.map((_, i) => tops[up ? i : 3 - i])
+    xs.forEach((px, i) => this.pillar(px, px + 1, t[i]))
+    // Lücken zwischen den Stufen bis zur niedrigeren Stufe füllen: wer von oben fällt, landet auf einer Stufe und steckt nicht fest
+    for (let i = 0; i < 3; i++) this.rect(xs[i] + 2, Math.max(t[i], t[i + 1]), xs[i + 1] - 1, 9, '#')
     const top = up ? x + 12 : x
     return this.plate(ch, top, 1)
   }

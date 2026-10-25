@@ -134,7 +134,8 @@ describe('parkour', () => {
     for (let i = 0; i < 120; i++) expect(stepBody(b, { move: 0, jump: false, fly: true, vert: 0 }, lv, {}, null, dt)).toBe('ok')
     expect(Math.round(b.y)).toBe(5 * TILE)
     for (let i = 0; i < 60; i++) stepBody(b, { move: 0, jump: false, fly: true, vert: -1 }, lv, {}, null, dt)
-    expect(b.y).toBeLessThan(5 * TILE - 200)
+    expect(b.y).toBeLessThan(5 * TILE - 100)
+    expect(b.y).toBeGreaterThanOrEqual(0) // oben ist eine Decke
     for (let i = 0; i < 60; i++) stepBody(b, { move: 1, jump: false, fly: true, vert: 1 }, lv, {}, null, dt)
     expect(b.x).toBeGreaterThan(20 * TILE + 100)
   })

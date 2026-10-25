@@ -503,3 +503,9 @@ Tabelle `book_library_hidden`; `in_library` blendet ein veröffentlichtes Buch d
 - Tests: `duoSim.ts` + `duo.test.ts` lassen mehrere Bots zusammen Level laufen (Doppelbrücke mit 2 und 3 Bots, Level 1–14).
 - `ParkourGame`: Jede Bot-Stärke hat Farbe und Muster (Punkte, Streifen, Schrägstreifen, Gitter, Pfeile). Der Stand der Bots wird in `pkbots:<id>` gemerkt und in der Ergebnisliste des Deathruns mit einsortiert (`TeamRunRoom` → `Results`).
 - Admin „Hier mitspielen“: aus dem Zuschauen geht es genau an der Stelle des Geists ins Spiel (liegt sie in einer Wand oder in Stacheln, an der nächsten freien Stelle), mit 1,5 s Schonfrist.
+
+## Update 64: Zuschauer steigt ins Spiel ein, Decke, Turm ohne Falle, Bots klettern auf Türme
+- Admin im reinen Zuschauer-Modus (`?zuschauen=1`) bekommt „Hier mitspielen“ wie beim Zuschauen mitten im Lauf: Einstieg an der Stelle des Geists, als Gast (seine Stürze kosten dem Team keine Herzen, `dc` wird mit 0 gesendet).
+- `engine.ts`: oben im Level ist eine Decke (`solidAt` für `ty < 0`, Flug klemmt bei y ≥ 0): man kommt weder durch Sprung noch Jetpack noch Flug über den Bildrand (vorher ließ sich so über Türen hinweg fliegen). Gilt auch für die Bots.
+- `levels.ts` `tower`: Lücken zwischen den Stufen sind bis zur niedrigeren Stufe gefüllt; wer oben herunterfällt, landet auf einer Stufe und steckt nicht mehr in einer zu hohen Grube fest (betrifft Level 5, 8 und alle erzeugten Türme).
+- `bots.ts`: Ein Bot, der zu einer Platte oben auf einem Turm zurück will (`goto`), läuft erst zum Fuß der Treppe (`viaDone`) und klettert dann hinauf, statt von der falschen Seite vergeblich an der Wand zu springen; das Tor öffnet sich so für den Menschen, ohne dass der Bot „weitergesetzt“ werden muss.

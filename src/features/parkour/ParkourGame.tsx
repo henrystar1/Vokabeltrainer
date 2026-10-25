@@ -58,7 +58,8 @@ export default function ParkourGame({ st, startLevel = 0 }: { st: TeamState; sta
   const [ghostUi, setGhostUi] = useState(spec)
   const [followUi, setFollowUi] = useState<string | null>(null)
   const [watchUi, setWatchUi] = useState(false)
-  const specUi = spec || watchUi
+  const [joined, setJoined] = useState(false) // Admin hat vom reinen Zuschauen aus ins Spiel gewechselt
+  const specUi = (spec && !joined) || watchUi
   const watchApi = useRef<((on: boolean) => void) | null>(null)
   const specApi = useRef<((d: number) => void) | null>(null)
   const toggleFly = () => { if (!adminRef.current || specUi) return; input.current.fly = !input.current.fly; if (!input.current.fly) input.current.ghost = false; setFlyUi(input.current.fly); setGhostUi(input.current.ghost) }
@@ -362,7 +363,7 @@ export default function ParkourGame({ st, startLevel = 0 }: { st: TeamState; sta
     specApi.current = (d) => specGo(Math.max(0, lv + d), d < 0)
     /** Admin: mitten im Lauf zum unsichtbaren Zuschauer-Geist werden und wieder zurück ins Spiel. */
     watchApi.current = (on) => {
-      if (!adminRef.current || spec || finished || on === isSpec) return
+      if (!adminRef.current || finished || on === isSpec) return
       if (on) {
         isSpec = true
         hideSend = true
@@ -399,6 +400,7 @@ export default function ParkourGame({ st, startLevel = 0 }: { st: TeamState; sta
         exitHold = 0
         graceT = 1.5
         fxField.clear()
+        setJoined(true)
       }
       setWatchUi(on)
       setFlyUi(input.current.fly)
@@ -415,7 +417,7 @@ export default function ParkourGame({ st, startLevel = 0 }: { st: TeamState; sta
       if (now - lastSend < SEND_MS || (sig === lastSig && now - lastSend < 350)) return
       lastSend = now
       lastSig = sig
-      void ch?.send({ type: 'broadcast', event: 's', payload: { u: st.me, sid, n: ++seq, x, y, face: me.face, lv, cp, dead: deadT > 0, ex: inExit(level, me), dc: deaths, g: me.ground, lh: hashLevel(level), gh: ghostOn, hp: hearts, el: (finished && (dr || vs > 0)) || isSpec, bf: buffCode() } })?.catch?.(() => undefined)
+      void ch?.send({ type: 'broadcast', event: 's', payload: { u: st.me, sid, n: ++seq, x, y, face: me.face, lv, cp, dead: deadT > 0, ex: inExit(level, me), dc: spec ? 0 : deaths, g: me.ground, lh: hashLevel(level), gh: ghostOn, hp: hearts, el: (finished && (dr || vs > 0)) || isSpec, bf: buffCode() } })?.catch?.(() => undefined)
       hideSend = false
     }
 
@@ -1047,7 +1049,7 @@ export default function ParkourGame({ st, startLevel = 0 }: { st: TeamState; sta
             <button type="button" onClick={() => watch(null)} className="min-h-[40px] rounded-xl border border-white/20 bg-white/5 px-3 text-xs text-slate-300">Frei fliegen</button>
             <button type="button" onClick={() => specApi.current?.(-1)} className="min-h-[40px] rounded-xl border border-white/20 bg-white/5 px-3 text-xs text-slate-300">◀ Level</button>
             <button type="button" onClick={() => specApi.current?.(1)} className="min-h-[40px] rounded-xl border border-white/20 bg-white/5 px-3 text-xs text-slate-300">Level ▶</button>
-            {watchUi && (
+            {(watchUi || (spec && isAdmin)) && (
               <button type="button" onClick={() => watchApi.current?.(false)} className="min-h-[40px] rounded-xl border border-emerald-300/50 bg-emerald-400/15 px-3 text-xs font-semibold text-emerald-100">Hier mitspielen</button>
             )}
           </div>
