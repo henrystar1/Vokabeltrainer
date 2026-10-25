@@ -55,16 +55,21 @@ export interface BotState {
   open: boolean
   /** Bot-Team: steht im Ausgang und wartet auf die anderen */
   parked: boolean
+  /** Zur Platte hinter dem Tor, um den Bot hinter dem Tor abzulösen (kein Wechsel, solange er selbst nur durch eine andere Platte „gedeckt“ ist) */
+  take: boolean
+  takeX: number
+  /** Gefahr voraus kommt nur von einem geschlossenen Tor: nicht springen, sondern zur Platte / vor dem Tor warten */
+  gateWait: boolean
 }
 
 /** Lage im Level für die Entscheidungen: Menschen im selben Level und alle anderen Körper (Menschen und Bots). */
 /** Was die Bots untereinander voneinander wissen: wer gerade eine Platte hält oder dorthin geht, und wo die anderen stehen. */
-export interface BotInfo { i: number; x: number; y: number; mode: 'run' | 'goto' | 'hold'; ch: string }
+export interface BotInfo { i: number; x: number; y: number; mode: 'run' | 'goto' | 'hold'; ch: string; take?: boolean }
 export interface BotCtx { humans: Point[]; others: Point[]; bots?: BotInfo[] }
 
 export function newBot(i: number, level: Level, hearts: number, skill: number, lv = 0): BotState {
   const s = spawnAt(level, i % 5, null)
-  return { i, body: newBody(s.x + (i >= 5 ? 6 * (i - 4) : 0), s.y), lv, hearts, cp: null, deadT: 0.05 + i * 0.45, out: false, skill, prevJump: false, stuckT: 0, lastX: s.x, retries: 0, backT: 0, grace: 1, plan: Math.random(), script: null, mistakeT: 0, tick: 0, urgent: false, mode: 'run', holdCh: 'a', holdT: 0, holdMin: 0, gotoT: 0, blockT: 0, noPick: false, gateX1: -1, retT: 0, retCd: 0, spaceT: 0, spaceCd: 0, fineT: 0, route: null, open: false, parked: false }
+  return { i, body: newBody(s.x + (i >= 5 ? 6 * (i - 4) : 0), s.y), lv, hearts, cp: null, deadT: 0.05 + i * 0.45, out: false, skill, prevJump: false, stuckT: 0, lastX: s.x, retries: 0, backT: 0, grace: 1, plan: Math.random(), script: null, mistakeT: 0, tick: 0, urgent: false, mode: 'run', holdCh: 'a', holdT: 0, holdMin: 0, gotoT: 0, blockT: 0, noPick: false, gateX1: -1, retT: 0, retCd: 0, spaceT: 0, spaceCd: 0, fineT: 0, route: null, open: false, parked: false, take: false, takeX: 0, gateWait: false }
 }
 
 const HORIZON = 96 // 1,6 s vorausrechnen
@@ -86,7 +91,9 @@ interface Sim { ok: boolean; dx: number; b?: Body }
 
 /** Alle Tore offen? Nur wenn weder Menschen noch andere Bots im Level sind. */
 const allOpen = (ctx: BotCtx): boolean => ctx.humans.length === 0 && (ctx.bots?.length ?? 0) === 0
-const worldPressed = (lv: Level, b: Point, ctx: BotCtx): Pressed => (allOpen(ctx) ? ALL_OPEN : pressedMap(lv, [b, ...ctx.others]))
+/** Wer in der Vorausberechnung eine Platte hält: Menschen und Bots, die gerade stehen bleiben. Laufende Bots sind gleich weg (die Platte wäre dann wieder los). */
+const simOthers = (ctx: BotCtx): Point[] => (ctx.bots ? [...ctx.humans, ...ctx.bots.filter((o) => o.mode !== 'run')] : ctx.others)
+const worldPressed = (lv: Level, b: Point, ctx: BotCtx): Pressed => (allOpen(ctx) ? ALL_OPEN : pressedMap(lv, [b, ...simOthers(ctx)]))
 
 /** Läuft (mit Sprungfolge) bis zur Landung oder zum Ende des Zeitfensters. dx zählt in Laufrichtung. */
 function simulate(lv: Level, b0: Body, wins: Wins, frames: number, untilLand: boolean, ctx: BotCtx, dir: number): Sim {
@@ -177,13 +184,16 @@ function holdWanted(lv: Level, b: Body, own: Pressed, ctx: BotCtx, me: BotState)
     // Ein anderer Bot hält diese Platte schon (oder ist auf dem Weg): dann geht dieser Bot weiter, statt sich dazuzustellen
     // Steht ein Bot auf der anderen Seite des Tors auf einer Platte desselben Kanals, bleibt der vordere dort stehen und wartet,
     // bis der hintere durch ist; der hintere geht dann einfach durch das offene Tor.
-    if (ctx.bots?.some((o) => o.ch === ch && o.mode !== 'run' && Math.abs(o.x - b.x) < 26 * TILE && (o.x > b.x + 40 || (Math.abs(o.x - b.x) <= 40 && o.i < me.i)))) continue
+    if (ctx.bots?.some((o) => o.ch === ch && o.mode !== 'run' && !(o.mode === 'goto' && o.take) && Math.abs(o.x - b.x) < 26 * TILE && (o.x > b.x + 40 || (Math.abs(o.x - b.x) <= 40 && o.i < me.i)))) continue
     for (const g of gatesOf(lv)) {
       if (g.ch !== ch || Math.abs(g.x0 * TILE - b.x) > 24 * TILE) continue
       // bis der Mensch ganz hinter dem Tor ist (nicht nur an der Tür), sonst schließt es sich über ihm
       if (ctx.humans.some((h) => h.x < (g.x1 + 1) * TILE + 8)) return ch
       // und auch, bis die anderen Bots durch sind
-      if (ctx.bots?.some((o) => o.mode === 'run' && o.x < (g.x1 + 1) * TILE + 8 && o.x > g.x0 * TILE - 30 * TILE)) return ch
+      // (auch einer, der selbst noch hinter dem Tor auf der Platte steht: dann trägt der vordere gleich die Brücke für ihn)
+      // Der vordere Bot kommt gleich zurück auf die Platte hinter dem Tor: so lange weiter halten
+      if (b.x < g.x0 * TILE && me.holdT < 8 && ctx.bots?.some((o) => o.mode !== 'hold' && o.x >= (g.x1 + 1) * TILE + 8 && o.x < (g.x1 + 1) * TILE + 10 * TILE)) return ch
+      if (ctx.bots?.some((o) => (o.mode === 'run' || (o.mode === 'hold' && o.ch === ch && o.x < g.x0 * TILE)) && o.x < (g.x1 + 1) * TILE + 8 && o.x > g.x0 * TILE - 30 * TILE)) return ch
     }
   }
   return null
@@ -201,6 +211,19 @@ function forgottenGate(lv: Level, b: Body, ctx: BotCtx, without: Pressed): Gate 
     if (!best || g.x0 > best.x0) best = g
   }
   return best
+}
+
+/** Tor, das der Bot gerade passiert hat, während ein Bot davor auf der Platte steht und wartet: der Bot löst ihn auf einer Platte hinter dem Tor ab. */
+function takeoverGate(lv: Level, b: Body, ctx: BotCtx, me: BotState): Gate | null {
+  for (const g of gatesOf(lv)) {
+    const gx = (g.x1 + 1) * TILE
+    if (b.x < gx - 4 || b.x - gx > 12 * TILE) continue
+    if (!ctx.bots?.some((o) => o.mode === 'hold' && o.ch === g.ch && o.x < g.x0 * TILE && o.x > g.x0 * TILE - 30 * TILE)) continue
+    if (ctx.bots.some((o) => o.i !== me.i && (o.mode === 'hold' || o.mode === 'goto') && o.ch === g.ch && o.x > g.x1 * TILE)) continue
+    if (!lv.plates.some((p) => p.ch === g.ch && p.x * TILE >= gx - 4 && p.x * TILE - gx < 18 * TILE)) continue
+    return g
+  }
+  return null
 }
 
 /** Nächstes zu ist (noch nicht offenes) Tor vor dem Bot. */
@@ -251,7 +274,10 @@ export function botInput(lv: Level, s: BotState, ctx: BotCtx, dir = 1): Input {
   if (s.tick !== 0 && !s.urgent) return RUN_INPUT
   const err = s.skill <= 1 ? 0.5 : s.skill === 2 ? 0.15 : 0 // Stufe 3 und 4 machen keine Fehler
   s.noPick = false
-  if (fine(simulate(lv, b, NONE, HORIZON, false, ctx, dir), HORIZON)) { s.urgent = false; return RUN_INPUT }
+  if (fine(simulate(lv, b, NONE, HORIZON, false, ctx, dir), HORIZON)) { s.urgent = false; s.gateWait = false; return RUN_INPUT }
+  // Kommt die Gefahr nur daher, dass ein Tor oder eine Brücke gerade zu ist, bringt Springen nichts: zur Platte gehen und dort warten
+  if (!allOpen(ctx) && fine(simulate(lv, b, NONE, HORIZON, false, { humans: [], others: [] }, dir), HORIZON)) { s.gateWait = true; s.urgent = false; return RUN_INPUT }
+  s.gateWait = false
   s.urgent = true // Gefahr voraus: ab jetzt in jedem Bild prüfen, bis es wieder frei ist
   if (s.mistakeT > 0) return RUN_INPUT
   let first: Wins | null = null
@@ -275,6 +301,15 @@ export function botInput(lv: Level, s: BotState, ctx: BotCtx, dir = 1): Input {
       first = w
       break
     }
+  }
+  // Kein sicherer Sprung, aber bei offenen Toren gäbe es einen (Brücke ist noch nicht oben)? Dann nicht hineinspringen, sondern auf die Platte warten
+  if (!first && !allOpen(ctx)) {
+    const free: BotCtx = { humans: [], others: [] }
+    const openOk = candidates(b.ground, b.air, 0).some((w) => {
+      const now = simulate(lv, b, w, 110, true, free, dir)
+      return now.ok && !!now.b && survivable(lv, now.b, 1, free, dir, 0)
+    })
+    if (openOk) { s.gateWait = true; s.noPick = true; return RUN_INPUT }
   }
   const pick = first ?? fallback
   s.noPick = !first
@@ -324,6 +359,11 @@ export function botStep(lv: Level, s: BotState, dt: number, ctx: BotCtx = { huma
     const ch = holdWanted(lv, b, own, ctx, s)
     if (ch) { s.mode = 'hold'; s.holdCh = ch; s.holdT = 0; s.holdMin = 0 }
   }
+  // Ein Bot wartet vor dem Tor auf seiner Platte, bis dieser Bot durch ist: hinter dem Tor auf die Platte stellen, damit der andere nicht ins Leere läuft
+  if (s.mode === 'run' && b.ground && !open) {
+    const tg = takeoverGate(lv, b, ctx, s)
+    if (tg) { s.mode = 'goto'; s.holdCh = tg.ch; s.gotoT = 0; s.gateX1 = -1; s.take = true; s.takeX = (tg.x1 + 1) * TILE - 4 }
+  }
   // Mensch steht noch hinter einem Tor, das der Bot schon hinter sich hat: zurück zur Platte
   if (s.mode === 'run' && !open) {
     const g = s.retCd <= 0 ? forgottenGate(lv, b, ctx, without) : null
@@ -357,17 +397,19 @@ export function botStep(lv: Level, s: BotState, dt: number, ctx: BotCtx = { huma
   }
   if (s.mode === 'goto') {
     s.gotoT += dt
-    const plates = lv.plates.filter((p) => p.ch === s.holdCh)
+    const plates = lv.plates.filter((p) => p.ch === s.holdCh && (!s.take || p.x * TILE >= s.takeX))
     let tx: number | null = null
     for (const p of plates) { const px = p.x * TILE + 5; if (tx === null || Math.abs(px - b.x) < Math.abs(tx - b.x)) tx = px }
-    if (own[s.holdCh]) { s.mode = 'hold'; s.holdT = 0; s.holdMin = 10 }
-    else if (tx === null || s.gotoT > 20) s.mode = 'run'
+    if (!s.take && without[s.holdCh] && !own[s.holdCh]) { s.mode = 'run' } // jemand anderes hält die Platte schon: einfach durchgehen
+    else if (own[s.holdCh]) { s.mode = 'hold'; s.holdT = 0; s.holdMin = s.take ? 0 : 10 }
+    else if (tx === null || s.gotoT > 20) { s.mode = 'run'; s.take = false }
     else {
       s.script = null
       inp = botInput(lv, s, ctx, tx < b.x ? -1 : 1)
       return finishStep(lv, s, stepBody(b, inp, lv, pNow, null, dt), dt)
     }
   }
+  if (s.mode === 'run') s.take = false
   if (s.mode === 'hold') {
     inp = { move: 0, jump: false, airJumps: 1 }
     return finishStep(lv, s, stepBody(b, inp, lv, pNow, null, dt), dt)
@@ -383,7 +425,8 @@ export function botStep(lv: Level, s: BotState, dt: number, ctx: BotCtx = { huma
   inp = botInput(lv, s, ctx, 1)
   // Vor einem geschlossenen Tor: zurück zur Platte, und wenn keiner hilft, nach einer Weile trotzdem weiter
   const g = !open ? closedGateAhead(lv, b, pNow) : null
-  if (g && g.x0 * TILE - b.x < 3 * TILE && (s.noPick || Math.abs(b.vx) < 30)) {
+  if (g && g.x0 * TILE - b.x < 3 * TILE && (s.noPick || Math.abs(b.vx) < 30 || s.gateWait)) {
+    if (s.gateWait && b.ground) inp = { move: 0, jump: false, airJumps: 1 }
     s.blockT += dt
     if (s.blockT > 1.2 && lv.plates.some((p) => p.ch === g.ch && p.x * TILE < b.x && b.x - p.x * TILE < 16 * TILE)) {
       s.mode = 'goto'; s.holdCh = g.ch; s.gotoT = 0; s.gateX1 = g.x1

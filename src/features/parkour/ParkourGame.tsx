@@ -17,6 +17,19 @@ import { PH, PW, checkpointAt, inExit, newBody, pressedMap, spawnAt, spotIsSafe,
 
 const COLORS = ['#22d3ee', '#e879f9', '#facc15', '#4ade80', '#fb923c']
 const BOT_COLOR = '#94a3b8'
+/** Jede Bot-Stärke hat Farbe und Muster, damit man sie auf einen Blick unterscheidet */
+const BOT_SKIN: Record<number, string> = { 1: '#a3b18a', 2: '#94a3b8', 3: '#a78bfa', 4: '#fbbf24', 5: '#34d399' }
+function botTexture(c: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, skill: number) {
+  c.save()
+  c.beginPath(); c.roundRect(x, y, w, h, 7); c.clip()
+  c.strokeStyle = 'rgba(255,255,255,0.55)'; c.fillStyle = 'rgba(255,255,255,0.5)'; c.lineWidth = 1.6
+  if (skill === 1) { for (let yy = y + 5; yy < y + h; yy += 8) for (let xx = x + 4 + ((yy - y) % 16 === 5 ? 0 : 4); xx < x + w; xx += 8) { c.beginPath(); c.arc(xx, yy, 1.6, 0, Math.PI * 2); c.fill() } } // Punkte
+  else if (skill === 2) { for (let yy = y + 4; yy < y + h; yy += 6) { c.beginPath(); c.moveTo(x, yy); c.lineTo(x + w, yy); c.stroke() } } // Querstreifen
+  else if (skill === 3) { for (let k = -h; k < w; k += 7) { c.beginPath(); c.moveTo(x + k, y + h); c.lineTo(x + k + h, y); c.stroke() } } // Schrägstreifen
+  else if (skill === 4) { c.strokeStyle = 'rgba(120,53,15,0.6)'; for (let k = -h; k < w; k += 8) { c.beginPath(); c.moveTo(x + k, y + h); c.lineTo(x + k + h, y); c.moveTo(x + k + h, y + h); c.lineTo(x + k, y); c.stroke() } } // Gitter
+  else { c.strokeStyle = 'rgba(6,78,59,0.7)'; for (let yy = y + 6; yy < y + h; yy += 8) { c.beginPath(); c.moveTo(x, yy + 4); c.lineTo(x + w / 2, yy); c.lineTo(x + w, yy + 4); c.stroke() } } // Pfeile
+  c.restore()
+}
 const STALE_MS = 2500
 const SNAP_PX = 140 // größere Sprünge der Position werden nicht weich nachgezogen (Neustart, Levelwechsel)
 
@@ -366,7 +379,26 @@ export default function ParkourGame({ st, startLevel = 0 }: { st: TeamState; sta
         ghostOn = false
         follow.current = { uid: null, to: null }
         setFollowUi(null)
-        goLevel(lv, true)
+        // Genau dort ins Spiel, wo der Geist gerade ist (steht er in einer Wand oder in Stacheln, dann an der nächsten freien Stelle)
+        const level = levelOf(lv)
+        const pr = pressedMap(level, mates(performance.now()).filter((r) => !r.dead).map((r) => ({ x: r.x, y: r.y })))
+        let px = me.x, py = me.y
+        if (!spotIsSafe(level, pr, px, py)) {
+          let found = false
+          for (const r of [8, 16, 24, 32, 48, 64, 96, 128]) {
+            for (const [dx, dy] of [[0, -r], [0, r], [-r, 0], [r, 0], [-r, -r], [r, -r], [-r, r], [r, r]]) {
+              if (!found && spotIsSafe(level, pr, me.x + dx, Math.max(0, me.y + dy))) { px = me.x + dx; py = Math.max(0, me.y + dy); found = true }
+            }
+            if (found) break
+          }
+          if (!found) { const sp = spawnAt(level, slot, myCp); px = sp.x; py = sp.y }
+        }
+        Object.assign(me, newBody(px, py))
+        cp = cp ?? myCp
+        titleT = 0
+        exitHold = 0
+        graceT = 1.5
+        fxField.clear()
       }
       setWatchUi(on)
       setFlyUi(input.current.fly)
@@ -385,6 +417,16 @@ export default function ParkourGame({ st, startLevel = 0 }: { st: TeamState; sta
       lastSig = sig
       void ch?.send({ type: 'broadcast', event: 's', payload: { u: st.me, sid, n: ++seq, x, y, face: me.face, lv, cp, dead: deadT > 0, ex: inExit(level, me), dc: deaths, g: me.ground, lh: hashLevel(level), gh: ghostOn, hp: hearts, el: (finished && (dr || vs > 0)) || isSpec, bf: buffCode() } })?.catch?.(() => undefined)
       hideSend = false
+    }
+
+    // Stand der Bots für die Rangliste am Ende merken (jeder Rechner sieht sie)
+    let lastBotSave = 0
+    function saveBots(now: number) {
+      if (botsN <= 0 || now - lastBotSave < 1500) return
+      lastBotSave = now
+      const v = botViews(now)
+      if (v.length === 0) return
+      try { window.localStorage.setItem(`pkbots:${st.id}`, JSON.stringify(v.map((b) => ({ i: b.i, lv: b.lv, out: b.out, sk: botSkills[b.i] ?? 2 })))) } catch { /* ignorieren */ }
     }
 
     function sendBots(now: number) {
@@ -476,7 +518,7 @@ export default function ParkourGame({ st, startLevel = 0 }: { st: TeamState; sta
             const bl = levelOf(b.lv)
             const infos = bots.filter((o) => o !== b && o.lv === b.lv && !o.out && !o.parked).map((o) => {
               if (o.deadT > 0) { const sp = spawnAt(bl, o.i % 5, o.cp); return { i: o.i, x: sp.x, y: sp.y, mode: 'run' as const, ch: o.holdCh } } // wartet auf den Neustart: steht gleich wieder am Checkpoint
-              return { i: o.i, x: o.body.x, y: o.body.y, mode: o.mode, ch: o.holdCh }
+              return { i: o.i, x: o.body.x, y: o.body.y, mode: o.mode, ch: o.holdCh, take: o.take }
             })
             const ctx: BotCtx = { humans, others, bots: infos }
             const r = botStep(levelOf(b.lv), b, dt, ctx)
@@ -671,10 +713,10 @@ export default function ParkourGame({ st, startLevel = 0 }: { st: TeamState; sta
         }
       }
       // Spieler
-      const drawP = (x: number, y: number, face: 1 | -1, uid: string, name: string, dead: boolean, self: boolean, ghost = false, bf = 0, bot = false, team = -1) => {
+      const drawP = (x: number, y: number, face: 1 | -1, uid: string, name: string, dead: boolean, self: boolean, ghost = false, bf = 0, bot = false, team = -1, skill = 0) => {
         const look = lookOf(uid)
         const idx = bot ? 0 : idxOf(uid)
-        const color = bot ? BOT_COLOR : pkFill(look?.pk_color, COLORS[idx % COLORS.length], t)
+        const color = bot ? (BOT_SKIN[skill] ?? BOT_COLOR) : pkFill(look?.pk_color, COLORS[idx % COLORS.length], t)
         const hat = bot ? { emoji: '🤖' } : look?.pk_hat ? PK_HATS[look.pk_hat] : undefined
         ctx!.save()
         ctx!.globalAlpha = dead ? 0.25 : ghost ? 0.5 : 1
@@ -687,6 +729,7 @@ export default function ParkourGame({ st, startLevel = 0 }: { st: TeamState; sta
         ctx!.shadowColor = color; ctx!.shadowBlur = self ? 12 : 8
         ctx!.beginPath(); ctx!.roundRect(x, y, PW, PH, 7); ctx!.fill()
         ctx!.shadowBlur = 0
+        if (bot && skill > 0) botTexture(ctx!, x, y, PW, PH, skill)
         if (team >= 0 && !dead) { ctx!.strokeStyle = team === 0 ? '#f87171' : '#60a5fa'; ctx!.lineWidth = 3; ctx!.beginPath(); ctx!.roundRect(x - 3, y - 3, PW + 6, PH + 6, 10); ctx!.stroke() }
         if (bf === 1 && !dead) { ctx!.strokeStyle = '#a78bfa'; ctx!.lineWidth = 2; ctx!.beginPath(); ctx!.roundRect(x - 2, y - 2, PW + 4, PH + 4, 9); ctx!.stroke() }
         ctx!.fillStyle = '#fff'
@@ -713,7 +756,7 @@ export default function ParkourGame({ st, startLevel = 0 }: { st: TeamState; sta
         if (r.lv !== lv || now - r.seen >= STALE_MS || r.el) continue
         drawP(r.dx, r.dy, r.face, uid, nameOf(uid), r.dead, false, r.gh, r.bf, false, teamOfU(uid))
       }
-      for (const b of bviews) drawP(bots ? b.x : b.dx, bots ? b.y : b.dy, b.face, 'bot' + b.i, BOT_NAMES[b.i % BOT_NAMES.length], b.dead, false, false, 0, true, vs === 1 ? 0 : -1)
+      for (const b of bviews) drawP(bots ? b.x : b.dx, bots ? b.y : b.dy, b.face, 'bot' + b.i, BOT_NAMES[b.i % BOT_NAMES.length], b.dead, false, false, 0, true, vs === 1 ? 0 : -1, botSkills[b.i] ?? 2)
       drawP(me.x, me.y, me.face, st.me, 'Du', deadT > 0, true, ghostOn || isSpec, buffCode(), false, isSpec ? -1 : vs > 0 ? myTeam : -1)
       ctx!.restore()
       // Pfeile am Bildrand für Mitspielende außerhalb des Bildes
@@ -779,7 +822,7 @@ export default function ParkourGame({ st, startLevel = 0 }: { st: TeamState; sta
           const out = isMe ? finished : !!r?.el
           rows.push({ text: `${isMe ? 'Du' : pl.name.slice(0, 8)}: ${out ? 'raus bei ' : ''}Lv ${(isMe ? lv : r?.lv ?? 0) + 1}${out ? '' : ' ♥' + (isMe ? hearts : r?.hp ?? '?')}`, color: out ? '#64748b' : COLORS[i % COLORS.length], out })
         })
-        for (const b of botViews(now)) rows.push({ text: `${BOT_NAMES[b.i % BOT_NAMES.length]}: ${b.out ? 'raus bei ' : ''}Lv ${b.lv + 1}${b.out ? '' : ' ♥' + b.hp}`, color: b.out ? '#64748b' : BOT_COLOR, out: b.out })
+        for (const b of botViews(now)) rows.push({ text: `${BOT_NAMES[b.i % BOT_NAMES.length]}: ${b.out ? 'raus bei ' : ''}Lv ${b.lv + 1}${b.out ? '' : ' ♥' + b.hp}`, color: b.out ? '#64748b' : BOT_SKIN[botSkills[b.i] ?? 2] ?? BOT_COLOR, out: b.out })
         rows.forEach((row, i) => { ctx!.fillStyle = row.color; ctx!.fillText(row.text, ((i + 0.5) / rows.length) * VIEW_W, 39) })
         ctx!.font = '600 12px system-ui, sans-serif'
         if (!isSpec && !finished && mt.length === 0 && members().length > 1) {
@@ -855,6 +898,7 @@ export default function ParkourGame({ st, startLevel = 0 }: { st: TeamState; sta
       fxField.step(dt)
       send(now)
       sendBots(now)
+      saveBots(now)
       saveState(now)
       // Funkstille trotz Mitspielenden: Verbindung neu aufbauen
       {
@@ -1004,7 +1048,7 @@ export default function ParkourGame({ st, startLevel = 0 }: { st: TeamState; sta
             <button type="button" onClick={() => specApi.current?.(-1)} className="min-h-[40px] rounded-xl border border-white/20 bg-white/5 px-3 text-xs text-slate-300">◀ Level</button>
             <button type="button" onClick={() => specApi.current?.(1)} className="min-h-[40px] rounded-xl border border-white/20 bg-white/5 px-3 text-xs text-slate-300">Level ▶</button>
             {watchUi && (
-              <button type="button" onClick={() => watchApi.current?.(false)} className="min-h-[40px] rounded-xl border border-emerald-300/50 bg-emerald-400/15 px-3 text-xs font-semibold text-emerald-100">Zurück ins Spiel</button>
+              <button type="button" onClick={() => watchApi.current?.(false)} className="min-h-[40px] rounded-xl border border-emerald-300/50 bg-emerald-400/15 px-3 text-xs font-semibold text-emerald-100">Hier mitspielen</button>
             )}
           </div>
         </div>

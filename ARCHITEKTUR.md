@@ -495,3 +495,11 @@ Tabelle `book_library_hidden`; `in_library` blendet ein veröffentlichtes Buch d
 - Wer allein im Team ist, geht allein durch Ziel und Tore (`soloTeam`).
 - Bots: tote/wartende Bots und tote Menschen zählen für die Bots weiter (sie „vergessen“ niemanden mehr); Checkpoints werden auch ±1 Spalte neben dem Fahnenmast im Sprung registriert.
 - `LiveDuel`: beim Anlegen eines Deathruns können Bots (Mix) gleich gewählt werden (`teamSetBots` direkt nach `teamCreate`).
+
+## Update 63: Doppelbrücken-Bots, Bot-Texturen, Bots in der Deathrun-Rangliste, Admin springt aus dem Zuschauen ins Spiel
+- `bots.ts`: Laufende Bots zählen in der Vorausberechnung nicht mehr als „hält die Platte“ (`simOthers`: nur Menschen und stehende Bots); das war der Grund, warum Bots immer wieder in eine Brücke sprangen, die gleich wieder weg war.
+- Gibt es keinen sicheren Sprung, wohl aber bei offenen Toren, wartet der Bot vor dem Tor (`gateWait`) statt hineinzuspringen; vor einer Tür/Brücke läuft er zur Platte.
+- Staffel an Brücken und Türen: der hintere Bot wartet auf der Platte; der vordere stellt sich danach auf die Platte hinter dem Tor (`takeoverGate`, Modus `goto` mit `take`), bis der hintere durch ist. Der hintere hält so lange, bis der vordere dort steht (Zeitfenster 10 Kacheln, max. 8 s). `BotInfo.take` meldet das den anderen Bots. Wer in `goto` ist, geht weiter, wenn schon jemand anderes die Platte hält.
+- Tests: `duoSim.ts` + `duo.test.ts` lassen mehrere Bots zusammen Level laufen (Doppelbrücke mit 2 und 3 Bots, Level 1–14).
+- `ParkourGame`: Jede Bot-Stärke hat Farbe und Muster (Punkte, Streifen, Schrägstreifen, Gitter, Pfeile). Der Stand der Bots wird in `pkbots:<id>` gemerkt und in der Ergebnisliste des Deathruns mit einsortiert (`TeamRunRoom` → `Results`).
+- Admin „Hier mitspielen“: aus dem Zuschauen geht es genau an der Stelle des Geists ins Spiel (liegt sie in einer Wand oder in Stacheln, an der nächsten freien Stelle), mit 1,5 s Schonfrist.

@@ -1,4 +1,5 @@
 import { MAX_BOTS, SKILL_NAMES, SKILL_ORDER, decodeMix, encodeMix, mixTotal, type Mix } from '../features/parkour/botmix'
+import { BOT_NAMES } from '../features/parkour/bots'
 import { useEffect, useRef, useState } from 'react'
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { Bot, Check, Clock, Crown, Eye, Footprints, Minus, Plus, Trophy } from 'lucide-react'
@@ -37,15 +38,30 @@ function Slot({ p, color, joined, waitingText }: { p?: TeamPerson; color: string
   )
 }
 
-function Results({ list, me }: { list: DeathrunResult[]; me: string }) {
-  if (list.length === 0) return <p className="text-center text-sm text-slate-400">Noch niemand ist fertig.</p>
+interface BotRow { i: number; lv: number; out: boolean; sk: number }
+/** Stand der Bots, den das Spiel am Ende dieses Laufs auf diesem Gerät gemerkt hat. */
+function savedBots(id: string): BotRow[] {
+  try {
+    const a = JSON.parse(window.localStorage.getItem(`pkbots:${id}`) ?? '[]')
+    return Array.isArray(a) ? a.filter((b) => b && Number.isInteger(b.i) && typeof b.lv === 'number').slice(0, 8) : []
+  } catch { return [] }
+}
+
+function Results({ list, me, bots = [] }: { list: DeathrunResult[]; me: string; bots?: BotRow[] }) {
+  if (list.length === 0 && bots.length === 0) return <p className="text-center text-sm text-slate-400">Noch niemand ist fertig.</p>
+  // Menschen und Bots nach geschafften Leveln sortiert (bei Gleichstand zuerst die Menschen)
+  type Row = { key: string; name: string; levels: number; me: boolean; bot: boolean; extra: string }
+  const rows: Row[] = [
+    ...list.map((r) => ({ key: r.user_id, name: r.name, levels: r.levels, me: r.user_id === me, bot: false, extra: `${Math.floor(r.millis / 60000)}:${String(Math.floor((r.millis % 60000) / 1000)).padStart(2, '0')} · +${r.paid}` })),
+    ...bots.map((b) => ({ key: `bot${b.i}`, name: `🤖 ${BOT_NAMES[b.i % BOT_NAMES.length]} (${SKILL_NAMES[b.sk] ?? 'Bot'})`, levels: b.lv, me: false, bot: true, extra: b.out ? 'ausgeschieden' : 'noch dabei' })),
+  ].sort((a, b) => b.levels - a.levels || Number(a.bot) - Number(b.bot))
   return (
     <ol className="space-y-1.5 text-left">
-      {list.map((r, i) => (
-        <li key={r.user_id} className={`flex min-h-[44px] items-center gap-2 rounded-xl px-3 ${r.user_id === me ? 'bg-accent-cyan/10 ring-1 ring-accent-cyan/30' : 'bg-white/5'}`}>
+      {rows.map((r, i) => (
+        <li key={r.key} className={`flex min-h-[44px] items-center gap-2 rounded-xl px-3 ${r.me ? 'bg-accent-cyan/10 ring-1 ring-accent-cyan/30' : 'bg-white/5'}`}>
           <span className="w-6 text-center font-mono text-sm text-slate-400">{i + 1}.</span>
-          <span className="min-w-0 flex-1 truncate text-sm font-semibold">{r.name}{r.user_id === me ? ' (du)' : ''}</span>
-          <span className="shrink-0 text-right font-mono text-xs text-amber-200">Level {r.levels}<br /><span className="text-slate-400">{Math.floor(r.millis / 60000)}:{String(Math.floor((r.millis % 60000) / 1000)).padStart(2, '0')} · +{r.paid}</span></span>
+          <span className="min-w-0 flex-1 truncate text-sm font-semibold">{r.name}{r.me ? ' (du)' : ''}</span>
+          <span className="shrink-0 text-right font-mono text-xs text-amber-200">Level {r.levels}<br /><span className="text-slate-400">{r.extra}</span></span>
         </li>
       ))}
     </ol>
@@ -288,7 +304,7 @@ export default function TeamRunRoom() {
       return (
         <div className="space-y-3">
           <ParkourGame st={st} />
-          {dr && <Card className="space-y-2"><p className="label-mono">Schon fertig</p><Results list={st.results ?? []} me={st.me} /></Card>}
+          {dr && <Card className="space-y-2"><p className="label-mono">Schon fertig</p><Results list={st.results ?? []} me={st.me} bots={(st.bots ?? 0) > 0 ? savedBots(st.id) : []} /></Card>}
           <div className="flex justify-center"><Button variant="ghost" onClick={() => nav('/laeufe')}>Zuschauen beenden</Button></div>
         </div>
       )
