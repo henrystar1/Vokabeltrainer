@@ -11,6 +11,8 @@ export interface HoleAnim {
   kind: 'in' | 'out'
   lv: number
   face: 1 | -1
+  /** 'hammer' = Auftritt der Mods (modFx.ts), sonst Schwarzes Loch */
+  style?: 'hammer'
 }
 export const HOLE_IN = 1.5
 export const HOLE_OUT = 1.5

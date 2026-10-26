@@ -129,6 +129,8 @@ export const SECTIONS: Array<{ title: string; text?: string; rules: Rule[] }> = 
       { key: 'duel_reward', label: 'Duell-Sieg: Coins', hint: 'Unentschieden: jeder die Hälfte' },
       { key: 'sprint_coin_every', label: 'Sprint: 1 Coin je so viele richtige Antworten' },
       { key: 'sprint_coin_cap', label: 'Sprint: Coins pro Tag höchstens' },
+      { key: 'irregular_coin_every', label: 'Unregelmäßige Verben: 1 Coin je so viele richtige Antworten' },
+      { key: 'irregular_coin_cap', label: 'Unregelmäßige Verben: Coins pro Tag höchstens' },
       { key: 'sprint_extra_cost', label: 'Sprint: Coins je zusätzlicher Sekunde' },
       { key: 'sprint_extra_max', label: 'Sprint: höchstens so viele Zusatzsekunden insgesamt (dauerhaft)' },
       { key: 'pay_max', label: '!pay: Höchstbetrag pro Überweisung (Coins)' },

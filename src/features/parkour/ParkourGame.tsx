@@ -6,6 +6,9 @@ import { useFocusMode } from '../koins/focusMode'
 import { useAuth } from '../auth/AuthProvider'
 import { supabase } from '../../lib/supabaseClient'
 import { parkourLearnOffList, parkourShopGet, teamDeathrunFinish, teamParkourFinish, type TeamPerson, type TeamState } from '../../services/play'
+import { HAMMER_APPEAR, HAMMER_IN, HAMMER_OUT, drawHammerAnim, drawModBack, drawModBody, drawModName } from './modFx'
+import { useRunPerks } from './perks'
+import type { RunPerks } from '../../services/play'
 import { HOLE_IN, HOLE_OUT, drawAdminBack, drawAdminBody, drawAdminName, drawHoleAnim, type HoleAnim } from './adminFx'
 import { levelFor } from './generator'
 import { PK_HATS, pkFill } from './cosmetics'
@@ -33,10 +36,11 @@ function botTexture(c: CanvasRenderingContext2D, x: number, y: number, w: number
   else { c.strokeStyle = 'rgba(6,78,59,0.7)'; for (let yy = y + 6; yy < y + h; yy += 8) { c.beginPath(); c.moveTo(x, yy + 4); c.lineTo(x + w / 2, yy); c.lineTo(x + w, yy + 4); c.stroke() } } // Pfeile
   c.restore()
 }
+const JET_FUEL = 3.5 // Sekunden Schub je Jetpack
 const STALE_MS = 2500
 const SNAP_PX = 140 // größere Sprünge der Position werden nicht weich nachgezogen (Neustart, Levelwechsel)
 
-interface Remote { x: number; y: number; face: 1 | -1; lv: number; cp: number | null; dead: boolean; ex: boolean; dc: number; g: boolean; seen: number; lh: number; gh: boolean; dx: number; dy: number; hp: number; el: boolean; sid: string; n: number; bf: number; lk?: Partial<TeamPerson>; ad?: boolean }
+interface Remote { x: number; y: number; face: 1 | -1; lv: number; cp: number | null; dead: boolean; ex: boolean; dc: number; g: boolean; seen: number; lh: number; gh: boolean; dx: number; dy: number; hp: number; el: boolean; sid: string; n: number; bf: number; lk?: Partial<TeamPerson>; ad?: boolean; hm?: boolean; appearAt?: number }
 interface BotView { i: number; x: number; y: number; face: 1 | -1; lv: number; hp: number; out: boolean; dead: boolean; dx: number; dy: number; seen: number }
 
 const hash = (n: number) => {
@@ -47,6 +51,14 @@ const finite = (v: unknown, lo: number, hi: number): number | null => (typeof v 
 
 /** Joystick-Parkour für bis zu 5: alle laufen durch dieselben Level, Positionen laufen über Supabase Realtime. */
 export default function ParkourGame({ st, startLevel = 0 }: { st: TeamState; startLevel?: number }) {
+  const perks = useRunPerks()
+  if (!perks.ready) return <p className="py-10 text-center text-sm text-slate-400">Lade …</p>
+  return <ParkourGameInner st={st} startLevel={startLevel} perks={perks} />
+}
+
+function ParkourGameInner({ st, startLevel = 0, perks }: { st: TeamState; startLevel?: number; perks: RunPerks }) {
+  const perksRef = useRef(perks)
+  perksRef.current = perks
   const canvas = useRef<HTMLCanvasElement>(null)
   useFocusMode(true)
   const { isAdmin, displayName } = useAuth()
@@ -138,11 +150,20 @@ export default function ParkourGame({ st, startLevel = 0 }: { st: TeamState; sta
     let guestLook: Partial<TeamPerson> | null = null
     const lookOf = (uid: string): Partial<TeamPerson> | undefined => peopleRef.current.find((p) => p.user_id === uid) ?? (uid === st.me ? guestLook ?? undefined : remotes.get(uid)?.lk)
     const myFxId = () => lookOf(st.me)?.pk_fx ?? null
-    const isAdminUid = (uid: string): boolean => (uid === st.me ? adminRef.current : lookOf(uid)?.role === 'admin' || !!remotes.get(uid)?.ad || !!rivals.get(uid)?.ad)
+    const lookKindOf = (uid: string): 'blackhole' | 'hammer' | null => {
+      if (uid === st.me) return perksRef.current.look
+      const rm = remotes.get(uid) ?? rivals.get(uid)
+      if (rm?.hm) return 'hammer'
+      if (rm?.ad) return 'blackhole'
+      const l = lookOf(uid)
+      return l?.pk_look ?? (l?.role === 'admin' ? 'blackhole' : null)
+    }
     const holes: HoleAnim[] = [] // Schwarze-Loch-Animationen (Admin kommt herein oder geht ins Zuschauen)
     let animLock = 0 // Sekunden, die der Admin im Loch verschwindet (bis dahin ist er gesperrt)
     let quiet = false // während der Animation keine Positionen mehr senden
     let pendingEv: 'in' | 'out' | null = null
+    let appearT = 0 // Hammer-Auftritt: bis dahin ist die Figur noch nicht da
+    let guestHeartsGiven = false // Shop-Herzen eines Gasts gibt es nur beim ersten Einstieg (sonst unendlich viele durch Hin- und Herwechseln)
     let forceEl = false
     const botsN = (dr || vs === 1) && !isSpec ? Math.max(0, Math.min(8, st.bots ?? 0)) : 0
     const botSkills = skillList(st.bot_skill, st.bots ?? 0)
@@ -151,11 +172,11 @@ export default function ParkourGame({ st, startLevel = 0 }: { st: TeamState; sta
       ? Math.min(12, Math.max(1, st.lives || 3) + Math.max(0, Math.min(10, st.people.find((p) => p.user_id === st.me)?.pk_hearts ?? 0)))
       : Math.min(20, Math.max(1, st.lives || 3) + Math.max(0, players.length - 2) + players.reduce((a, p) => a + Math.max(0, Math.min(10, p.pk_hearts ?? 0)), 0))
     const SEND_MS = players.length <= 2 ? 50 : players.length === 3 ? 70 : players.length === 4 ? 85 : 100
-    if (adminRef.current && spec) {
-      // Gast-Admin: eigene Farbe, Hut, Effekt und Herzen aus dem Shop laden
+    if (perksRef.current.spectate && spec) {
+      // Gast (Admin oder Mod mit Zuschauer-Recht): eigene Farbe, Hut, Effekt und Herzen aus dem Shop laden
       void parkourShopGet().then((sh) => {
         if (disposed) return
-        guestLook = { name: nameRef.current ?? 'Admin', pk_color: sh.color, pk_hat: sh.hat, pk_fx: sh.fx ?? null, pk_hearts: sh.hearts, role: 'admin' }
+        guestLook = { name: nameRef.current ?? 'Admin', pk_color: sh.color, pk_hat: sh.hat, pk_fx: sh.fx ?? null, pk_hearts: sh.hearts, role: adminRef.current ? 'admin' : 'mod', pk_look: perksRef.current.look }
       }).catch(() => undefined)
     }
     const sid = Math.random().toString(36).slice(2, 8)
@@ -191,14 +212,15 @@ export default function ParkourGame({ st, startLevel = 0 }: { st: TeamState; sta
     let disposed = false
 
     // ---- Speedups (kommen als Angebot am Bildschirmrand, Freischalten kostet eine Vokabel) ----
-    const buff = { jump3: 0, jet: 0 }
+    const buff = { jump3: 0, jet: 0, fuel: 0 } // Jetpack: kurz nutzbar, Schub nur mit Sprungknopf in der Luft und solange Treibstoff da ist
     const buffCode = () => (buff.jet > 0 ? 2 : buff.jump3 > 0 ? 1 : 0)
 
     // ---- Wiedereinstieg: Stand nach einem Neuladen oder Verbindungsabbruch wiederherstellen ----
     const saveKey = `pkr:${st.id}:${st.me}`
     let restored = false
     // Admin kommt zu Beginn aus einem Schwarzen Loch über dem Start herausgefallen
-    if (adminRef.current && !isSpec) { me.y -= 70; holes.push({ x: me.x, y: me.y, t: 0, kind: 'in', lv, face: 1 }); pendingEv = 'in' }
+    if (perksRef.current.look === 'blackhole' && !isSpec) { me.y -= 70; holes.push({ x: me.x, y: me.y, t: 0, kind: 'in', lv, face: 1 }); pendingEv = 'in' }
+    else if (perksRef.current.look === 'hammer' && !isSpec) { holes.push({ x: me.x, y: me.y, t: 0, kind: 'in', lv, face: 1, style: 'hammer' }); pendingEv = 'in'; appearT = HAMMER_APPEAR }
     if (!isSpec) {
       try {
         const raw = window.localStorage.getItem(saveKey)
@@ -279,8 +301,11 @@ export default function ParkourGame({ st, startLevel = 0 }: { st: TeamState; sta
       const lvNew = Math.max(0, Math.min(999, Math.floor(p.lv ?? 0)))
       const dead = !!p.dead
       const jump = !prev || prev.lv !== lvNew || prev.dead !== dead || Math.hypot(x - prev.x, y - prev.y) > SNAP_PX
-      const r: Remote = { x, y, face: p.face === -1 ? -1 : 1, lv: lvNew, cp: p.cp ?? null, dead, ex: !!p.ex, dc: p.dc ?? 0, g: !!p.g, seen: performance.now(), lh: p.lh ?? 0, gh: !!p.gh, dx: jump || !prev ? x : prev.dx, dy: jump || !prev ? y : prev.dy, hp: p.hp ?? 0, el: !!p.el, sid: psid, n: pn, bf: p.bf ?? 0, ad: !!p.ad || prev?.ad, lk: p.lk && typeof p.lk === 'object' ? { name: String(p.lk.n ?? '').slice(0, 24), pk_color: p.lk.c ?? null, pk_hat: p.lk.h ?? null, pk_fx: p.lk.f ?? null, role: 'admin' } : prev?.lk }
-      if (p.ev === 'in' || p.ev === 'out') holes.push({ x, y, t: 0, kind: p.ev, lv: lvNew, face: r.face })
+      const r: Remote = { x, y, face: p.face === -1 ? -1 : 1, lv: lvNew, cp: p.cp ?? null, dead, ex: !!p.ex, dc: p.dc ?? 0, g: !!p.g, seen: performance.now(), lh: p.lh ?? 0, gh: !!p.gh, dx: jump || !prev ? x : prev.dx, dy: jump || !prev ? y : prev.dy, hp: p.hp ?? 0, el: !!p.el, sid: psid, n: pn, bf: p.bf ?? 0, ad: !!p.ad || prev?.ad, hm: !!p.hm || prev?.hm, lk: p.lk && typeof p.lk === 'object' ? { name: String(p.lk.n ?? '').slice(0, 24), pk_color: p.lk.c ?? null, pk_hat: p.lk.h ?? null, pk_fx: p.lk.f ?? null, role: p.hm ? 'mod' : 'admin', pk_look: p.hm ? 'hammer' : 'blackhole' } : prev?.lk, appearAt: prev?.appearAt }
+      if (p.ev === 'in' || p.ev === 'out') {
+        holes.push({ x, y, t: 0, kind: p.ev, lv: lvNew, face: r.face, ...(r.hm ? { style: 'hammer' as const } : {}) })
+        if (p.ev === 'in' && r.hm) r.appearAt = performance.now() + HAMMER_APPEAR * 1000
+      }
       store.set(uid, r)
       if (rival) return
       if (isSpec || dr) { seenAny = true; return } // Deathrun: jede Person hat ihr eigenes Level, ihre Herzen und ihre Checkpoints
@@ -427,13 +452,14 @@ export default function ParkourGame({ st, startLevel = 0 }: { st: TeamState; sta
       setGhostUi(true)
     }
     watchApi.current = (on) => {
-      if (!adminRef.current || finished || on === isSpec || animLock > 0) return
+      if (!perksRef.current.spectate || finished || on === isSpec || animLock > 0) return
       if (on) {
-        // Unter dem Admin öffnet sich ein Schwarzes Loch, er fällt hinein und verschwindet mit ihm
-        holes.push({ x: me.x, y: me.y, t: 0, kind: 'out', lv, face: me.face })
-        animLock = HOLE_OUT
+        // Admin: unter ihm öffnet sich ein Schwarzes Loch. Mod mit Hammer: Hammer und Blitz. Sonst verschwindet die Figur einfach.
+        const lookNow = perksRef.current.look
+        if (lookNow) holes.push({ x: me.x, y: me.y, t: 0, kind: 'out', lv, face: me.face, ...(lookNow === 'hammer' ? { style: 'hammer' as const } : {}) })
+        animLock = lookNow === 'hammer' ? HAMMER_OUT : lookNow === 'blackhole' ? HOLE_OUT : 0.05
         forceEl = true
-        pendingEv = 'out'
+        pendingEv = lookNow ? 'out' : null
         lastSend = 0; lastSig = ''
         send(performance.now())
         quiet = true
@@ -469,10 +495,12 @@ export default function ParkourGame({ st, startLevel = 0 }: { st: TeamState; sta
         fxField.clear()
         setJoined(true)
         // Gast-Admin bekommt seine Herzen aus dem Shop
-        if (spec && guestLook) { const extra = Math.max(0, Math.min(10, guestLook.pk_hearts ?? 0)); maxHearts += extra; hearts = maxHearts }
-        // Schwarzes Loch an der Stelle, aus dem er herausfällt
-        holes.push({ x: px, y: py, t: 0, kind: 'in', lv, face: me.face })
-        pendingEv = 'in'
+        if (spec && guestLook && !guestHeartsGiven) { guestHeartsGiven = true; const extra = Math.max(0, Math.min(10, guestLook.pk_hearts ?? 0)); maxHearts += extra; hearts = maxHearts }
+        // Schwarzes Loch (Admin) bzw. Hammer und Blitz (Mod) an der Stelle, an der die Figur erscheint
+        const lookIn = perksRef.current.look
+        if (lookIn === 'hammer') { holes.push({ x: px, y: py, t: 0, kind: 'in', lv, face: me.face, style: 'hammer' }); appearT = HAMMER_APPEAR }
+        else if (lookIn === 'blackhole') holes.push({ x: px, y: py, t: 0, kind: 'in', lv, face: me.face })
+        pendingEv = lookIn ? 'in' : null
         lastSend = 0; lastSig = ''
       }
       setWatchUi(false)
@@ -490,7 +518,7 @@ export default function ParkourGame({ st, startLevel = 0 }: { st: TeamState; sta
       if (now - lastSend < SEND_MS || (sig === lastSig && now - lastSend < 350)) return
       lastSend = now
       lastSig = sig
-      void ch?.send({ type: 'broadcast', event: 's', payload: { u: st.me, sid, n: ++seq, x, y, face: me.face, lv, cp, dead: deadT > 0, ex: inExit(level, me), dc: spec ? 0 : deaths, g: me.ground, lh: hashLevel(level), gh: ghostOn, hp: hearts, el: (finished && (dr || vs > 0)) || isSpec || forceEl, bf: buffCode(), ...(adminRef.current ? { ad: 1, ...(guestLook ? { lk: { n: guestLook.name, c: guestLook.pk_color, h: guestLook.pk_hat, f: guestLook.pk_fx } } : {}) } : {}), ...(pendingEv ? { ev: pendingEv } : {}) } })?.catch?.(() => undefined)
+      void ch?.send({ type: 'broadcast', event: 's', payload: { u: st.me, sid, n: ++seq, x, y, face: me.face, lv, cp, dead: deadT > 0, ex: inExit(level, me), dc: spec ? 0 : deaths, g: me.ground, lh: hashLevel(level), gh: ghostOn, hp: hearts, el: (finished && (dr || vs > 0)) || isSpec || forceEl, bf: buffCode(), ...(perksRef.current.look === 'blackhole' ? { ad: 1 } : perksRef.current.look === 'hammer' ? { hm: 1 } : {}), ...(guestLook ? { lk: { n: guestLook.name, c: guestLook.pk_color, h: guestLook.pk_hat, f: guestLook.pk_fx } } : {}), ...(pendingEv ? { ev: pendingEv } : {}) } })?.catch?.(() => undefined)
       pendingEv = null
       hideSend = false
     }
@@ -535,7 +563,7 @@ export default function ParkourGame({ st, startLevel = 0 }: { st: TeamState; sta
         if (!kind) { toast = { text: 'Falsch – das Upgrade ist weg', t: 2.5 }; return }
         const info = PICKUP_INFO[kind]
         if (kind === 'jump3') buff.jump3 = info.seconds
-        else buff.jet = info.seconds
+        else { buff.jet = info.seconds; buff.fuel = JET_FUEL }
         toast = { text: `${info.name}! ${info.seconds} s`, t: 2 }
       },
     }
@@ -641,6 +669,7 @@ export default function ParkourGame({ st, startLevel = 0 }: { st: TeamState; sta
       }
       if (vs > 0 && !isSpec && verdict === null) checkVerdict(now)
       if (animLock > 0) { animLock -= dt; if (animLock <= 0) finishOut(); return }
+      if (appearT > 0) { appearT -= dt; return } // Hammer-Auftritt: noch nicht da
       if (isSpec) {
         // Zuschauer: unsichtbarer Geist, fliegt frei oder folgt einer Person
         const i = input.current
@@ -684,9 +713,10 @@ export default function ParkourGame({ st, startLevel = 0 }: { st: TeamState; sta
       const i = input.current
       const move = i.stick !== 0 ? i.stick : (i.right ? 1 : 0) - (i.left ? 1 : 0)
       const adm = adminRef.current
-      const jetFly = !adm && buff.jet > 0 // Jetpack: Flugmodus wie beim Admin (Sprungknopf hoch, Runter-Knopf oder S runter), keine Stacheln, Wände bleiben fest
+      const thrust = !adm && buff.jet > 0 && buff.fuel > 0 && i.jump && !me.ground // Jetpack: Sprungknopf in der Luft halten = Schub
+      if (thrust) buff.fuel -= dt
       const airJumps = adm ? 3 : buff.jump3 > 0 ? 2 : 1
-      const r = stepBody(me, { move, jump: i.jump, airJumps, fly: (adm && i.fly) || jetFly, ghost: adm && i.fly && i.ghost, vert: (i.down ? 1 : 0) - (i.jump ? 1 : 0) }, level, pressed, others, dt)
+      const r = stepBody(me, { move, jump: i.jump, airJumps, fly: adm && i.fly, jet: thrust, ghost: adm && i.fly && i.ghost, vert: (i.down ? 1 : 0) - (i.jump ? 1 : 0) }, level, pressed, others, dt)
       // Notausgang: steht ein Mensch lange allein vor einer Tür, die nur Bots hätten öffnen können, gehen die Tore auf
       if (dr && bp.length > 0 && mt.length === 0 && move !== 0 && Math.abs(me.vx) < 5 && me.ground) {
         const tx = Math.floor((me.x + PW + 3) / TILE), ty = Math.floor((me.y + PH - 2) / TILE)
@@ -793,7 +823,7 @@ export default function ParkourGame({ st, startLevel = 0 }: { st: TeamState; sta
       ctx!.strokeStyle = `rgba(253,224,71,${0.6 + 0.4 * Math.sin(t * 4)})`; ctx!.lineWidth = 3
       ctx!.strokeRect(ex + 2, ey + 2, ew - 4, eh - 4)
       // Spieler
-      const drawP = (x: number, y: number, face: 1 | -1, uid: string, name: string, dead: boolean, self: boolean, ghost = false, bf = 0, bot = false, team = -1, skill = 0, adm = false) => {
+      const drawP = (x: number, y: number, face: 1 | -1, uid: string, name: string, dead: boolean, self: boolean, ghost = false, bf = 0, bot = false, team = -1, skill = 0, adm: 'blackhole' | 'hammer' | null = null) => {
         const look = lookOf(uid)
         const idx = bot ? 0 : idxOf(uid)
         const color = bot ? (BOT_SKIN[skill] ?? BOT_COLOR) : pkFill(look?.pk_color, COLORS[idx % COLORS.length], t)
@@ -805,7 +835,12 @@ export default function ParkourGame({ st, startLevel = 0 }: { st: TeamState; sta
           ctx!.fillStyle = '#fb923c'
           ctx!.beginPath(); ctx!.moveTo(x + 4, y + PH); ctx!.lineTo(x + PW / 2, y + PH + 10 + 6 * Math.abs(Math.sin(t * 30))); ctx!.lineTo(x + PW - 4, y + PH); ctx!.fill()
         }
-        if (adm) {
+        if (adm === 'hammer') {
+          // Mod mit Hammer: Stahlfigur mit Blitz-Zeichen, Funken und kleinem Hammer
+          drawModBack(ctx!, x, y, t)
+          drawModBody(ctx!, x, y, face, t)
+          if (team >= 0 && !dead) { ctx!.strokeStyle = team === 0 ? '#f87171' : '#60a5fa'; ctx!.lineWidth = 3; ctx!.beginPath(); ctx!.roundRect(x - 3, y - 3, PW + 6, PH + 6, 10); ctx!.stroke() }
+        } else if (adm === 'blackhole') {
           // Admin: Schwarzes Loch als Figur (Leuchten, Akkretionsscheibe, Galaxie im Körper, Sterne)
           drawAdminBack(ctx!, x, y, t)
           drawAdminBody(ctx!, x, y, face, t)
@@ -826,7 +861,7 @@ export default function ParkourGame({ st, startLevel = 0 }: { st: TeamState; sta
         ctx!.textAlign = 'center'
         if (hat) { ctx!.font = '20px system-ui, "Apple Color Emoji", "Segoe UI Emoji", sans-serif'; ctx!.fillStyle = '#fff'; ctx!.fillText(hat.emoji, x + PW / 2, y + 4) }
         ctx!.font = '600 11px system-ui, sans-serif'; ctx!.fillStyle = 'rgba(255,255,255,0.9)'
-        if (adm && !isSpec) drawAdminName(ctx!, x + PW / 2, y - (hat ? 20 : 8), self ? (nameRef.current ?? 'Admin') : name, t)
+        if (adm && !isSpec) (adm === 'hammer' ? drawModName : drawAdminName)(ctx!, x + PW / 2, y - (hat ? 20 : 8), self ? (nameRef.current ?? 'Admin') : name, t)
         else ctx!.fillText(self ? (isSpec ? 'Zuschauer' : 'Du') : name.slice(0, 10), x + PW / 2, y - (hat ? 20 : 6))
         ctx!.restore()
       }
@@ -836,17 +871,17 @@ export default function ParkourGame({ st, startLevel = 0 }: { st: TeamState; sta
       for (const [uid, r] of remotes) { if (r.lv === lv && now - r.seen < STALE_MS && !r.dead) fxField.drawBehind(ctx!, uid, lookOf(uid)?.pk_fx, t) }
       if (!isSpec && deadT <= 0 && animLock <= 0) fxField.drawBehind(ctx!, 'me', myFxId(), t)
       fxField.drawParticles(ctx!)
-      for (const h of holes) if (h.lv === lv) drawHoleAnim(ctx!, h, t)
+      for (const h of holes) if (h.lv === lv) { if (h.style === 'hammer') drawHammerAnim(ctx!, h, t); else drawHoleAnim(ctx!, h, t) }
       for (const [uid, r] of remotes) {
-        if (r.lv !== lv || now - r.seen >= STALE_MS || r.el) continue
-        drawP(r.dx, r.dy, r.face, uid, nameOf(uid), r.dead, false, r.gh, r.bf, false, vs === 2 ? teamOfU(uid) : vs === 1 ? 1 : -1, 0, isAdminUid(uid))
+        if (r.lv !== lv || now - r.seen >= STALE_MS || r.el || (r.appearAt !== undefined && now < r.appearAt)) continue
+        drawP(r.dx, r.dy, r.face, uid, nameOf(uid), r.dead, false, r.gh, r.bf, false, vs === 2 ? teamOfU(uid) : vs === 1 ? 1 : -1, 0, lookKindOf(uid))
       }
       for (const [uid, r] of rivals) {
         if (r.lv !== lv || now - r.seen >= STALE_MS || r.el) continue
-        drawP(r.dx, r.dy, r.face, uid, nameOf(uid), r.dead, false, r.gh, r.bf, false, teamOfU(uid), 0, isAdminUid(uid))
+        drawP(r.dx, r.dy, r.face, uid, nameOf(uid), r.dead, false, r.gh, r.bf, false, teamOfU(uid), 0, lookKindOf(uid))
       }
       for (const b of bviews) drawP(bots ? b.x : b.dx, bots ? b.y : b.dy, b.face, 'bot' + b.i, BOT_NAMES[b.i % BOT_NAMES.length], b.dead, false, false, 0, true, vs === 1 ? 0 : -1, botSkills[b.i] ?? 2)
-      if (animLock <= 0) drawP(me.x, me.y, me.face, st.me, 'Du', deadT > 0, true, ghostOn || isSpec, buffCode(), false, isSpec ? -1 : vs > 0 ? myTeam : -1, 0, adminRef.current && !isSpec)
+      if (animLock <= 0 && appearT <= 0) drawP(me.x, me.y, me.face, st.me, 'Du', deadT > 0, true, ghostOn || isSpec, buffCode(), false, isSpec ? -1 : vs > 0 ? myTeam : -1, 0, isSpec ? null : perksRef.current.look)
       ctx!.restore()
       // Pfeile am Bildrand für Mitspielende außerhalb des Bildes
       for (const [uid, r] of remotes) {
@@ -885,7 +920,7 @@ export default function ParkourGame({ st, startLevel = 0 }: { st: TeamState; sta
         let by = (dr ? 48 : 32)
         ctx!.font = '600 11px system-ui, sans-serif'; ctx!.textAlign = 'left'
         if (buff.jump3 > 0) { ctx!.fillStyle = 'rgba(2,6,23,0.65)'; ctx!.fillRect(8, by - 11, 128, 16); ctx!.fillStyle = '#c4b5fd'; ctx!.fillText(`3er-Sprung ${Math.ceil(buff.jump3)} s`, 12, by); by += 18 }
-        if (buff.jet > 0) { ctx!.fillStyle = 'rgba(2,6,23,0.65)'; ctx!.fillRect(8, by - 11, 150, 16); ctx!.fillStyle = '#fed7aa'; ctx!.fillText(`🚀 Flugmodus ${Math.ceil(buff.jet)} s`, 12, by) }
+        if (buff.jet > 0) { ctx!.fillStyle = 'rgba(2,6,23,0.65)'; ctx!.fillRect(8, by - 11, 190, 16); ctx!.fillStyle = '#fed7aa'; ctx!.fillText(`🚀 Jetpack ${Math.ceil(buff.jet)} s · Schub ${Math.max(0, buff.fuel).toFixed(1)} s`, 12, by) }
         ctx!.textAlign = 'center'
       }
       if (vs > 0) {
@@ -985,7 +1020,7 @@ export default function ParkourGame({ st, startLevel = 0 }: { st: TeamState; sta
         else fxField.forget(uid)
       }
       fxField.step(dt)
-      for (let i = holes.length - 1; i >= 0; i--) { holes[i].t += dt; if (holes[i].t > (holes[i].kind === 'in' ? HOLE_IN : HOLE_OUT)) holes.splice(i, 1) }
+      for (let i = holes.length - 1; i >= 0; i--) { holes[i].t += dt; if (holes[i].t > (holes[i].style === 'hammer' ? (holes[i].kind === 'in' ? HAMMER_IN : HAMMER_OUT) : holes[i].kind === 'in' ? HOLE_IN : HOLE_OUT)) holes.splice(i, 1) }
       send(now)
       sendBots(now)
       saveBots(now)
@@ -1108,8 +1143,9 @@ export default function ParkourGame({ st, startLevel = 0 }: { st: TeamState; sta
             <Skull size={16} /> Neustart am Checkpoint
           </button>
         )}
-        {isAdmin && !specUi && (
+        {(isAdmin || perks.spectate) && !specUi && (
           <div className="flex flex-col gap-2">
+            {isAdmin && (<>
             <button type="button" onClick={toggleFly} aria-pressed={flyUi}
               className={`min-h-[44px] rounded-2xl border px-3 text-xs font-semibold ${flyUi ? 'border-cyan-300/70 bg-cyan-400/25 text-cyan-100' : 'border-white/20 bg-white/10 text-slate-200'}`}>
               {flyUi ? 'Flug an (F)' : 'Flug (F)'}
@@ -1118,17 +1154,14 @@ export default function ParkourGame({ st, startLevel = 0 }: { st: TeamState; sta
               className={`min-h-[44px] rounded-2xl border px-3 text-xs font-semibold ${ghostUi ? 'border-violet-300/70 bg-violet-400/25 text-violet-100' : 'border-white/20 bg-white/10 text-slate-200'}`}>
               {ghostUi ? 'Geist an (G)' : 'Geist (G)'}
             </button>
+            </>)}
             <button type="button" onClick={() => watchApi.current?.(true)}
               className="min-h-[44px] rounded-2xl border border-violet-300/50 bg-violet-400/10 px-3 text-xs font-semibold text-violet-100 active:bg-violet-400/25">👻 Zuschauen</button>
-            {flyUi && (
+            {isAdmin && flyUi && (
               <button type="button" aria-label="Runter" {...holdProps('down')}
                 className="min-h-[44px] touch-none select-none rounded-2xl border border-white/20 bg-white/10 px-3 text-xs font-semibold text-slate-200 active:bg-white/25">Runter (S)</button>
             )}
           </div>
-        )}
-        {hud.jet && !isAdmin && !specUi && (
-          <button type="button" aria-label="Runter" {...holdProps('down')}
-            className="min-h-[48px] touch-none select-none rounded-2xl border border-orange-300/50 bg-orange-400/15 px-3 text-xs font-semibold text-orange-100 active:bg-orange-400/30">Runter (S)</button>
         )}
         {specUi && (
           <div className="flex flex-col gap-2">
@@ -1158,14 +1191,14 @@ export default function ParkourGame({ st, startLevel = 0 }: { st: TeamState; sta
             <button type="button" onClick={() => watch(null)} className="min-h-[40px] rounded-xl border border-white/20 bg-white/5 px-3 text-xs text-slate-300">Frei fliegen</button>
             <button type="button" onClick={() => specApi.current?.(-1)} className="min-h-[40px] rounded-xl border border-white/20 bg-white/5 px-3 text-xs text-slate-300">◀ Level</button>
             <button type="button" onClick={() => specApi.current?.(1)} className="min-h-[40px] rounded-xl border border-white/20 bg-white/5 px-3 text-xs text-slate-300">Level ▶</button>
-            {(watchUi || (spec && isAdmin)) && (
+            {(watchUi || (spec && perks.spectate)) && (
               <button type="button" onClick={() => watchApi.current?.(false)} className="min-h-[40px] rounded-xl border border-emerald-300/50 bg-emerald-400/15 px-3 text-xs font-semibold text-emerald-100">Hier mitspielen</button>
             )}
           </div>
         </div>
       )}
       <p className="text-center text-xs text-slate-500">
-        Joystick links = laufen, Knopf rechts = springen, in der Luft nochmal tippen = Doppelsprung (Tastatur: Pfeile/WASD und Leertaste). Am rechten Rand erscheint ab und zu ein Speedup (3er-Sprung oder Jetpack) mit ablaufendem Balken: tippen und eine Vokabel richtig beantworten, dann gehört er dir kurz (Jetpack = Flugmodus: Sprungknopf = hoch, Runter-Knopf = runter, Stacheln tun nichts). {st.kind === 'deathrun' ? 'DEATHRUN: Jeder läuft für sich mit eigenen Herzen. Wer im Ziel ist, ist sofort im nächsten Level. Tore öffnen sich nur, wenn jemand im selben Level auf der Platte steht; wer allein im Level ist, für den sind sie offen. ' : 'Ihr teilt euch die Herzen (jedes geschaffte Level bringt eins zurück), jeder Sturz in Stacheln oder Schluchten kostet eins. '} Die Kamera folgt nur dir: Pfeile am Rand zeigen, wo die anderen sind.{st.kind === 'deathrun' ? '' : ' Ins nächste Level kommt ihr, wenn alle im Ausgang stehen.'} Steckt ihr fest, hilft „Neustart“ (Taste R): ihr landet am Checkpoint im Bild oder bei einem Mitspieler. Die Level hören nie auf und werden immer schwerer. Vor jedem neuen Level müssen 2 Vokabeln beantwortet werden. Je weiter ihr kommt, desto mehr Coins.
+        Joystick links = laufen, Knopf rechts = springen, in der Luft nochmal tippen = Doppelsprung (Tastatur: Pfeile/WASD und Leertaste). Am rechten Rand erscheint ab und zu ein Speedup (3er-Sprung oder Jetpack) mit ablaufendem Balken: tippen und eine Vokabel richtig beantworten, dann gehört er dir kurz (Jetpack: Sprungknopf in der Luft halten = Schub, aber nur wenige Sekunden). {st.kind === 'deathrun' ? 'DEATHRUN: Jeder läuft für sich mit eigenen Herzen. Wer im Ziel ist, ist sofort im nächsten Level. Tore öffnen sich nur, wenn jemand im selben Level auf der Platte steht; wer allein im Level ist, für den sind sie offen. ' : 'Ihr teilt euch die Herzen (jedes geschaffte Level bringt eins zurück), jeder Sturz in Stacheln oder Schluchten kostet eins. '} Die Kamera folgt nur dir: Pfeile am Rand zeigen, wo die anderen sind.{st.kind === 'deathrun' ? '' : ' Ins nächste Level kommt ihr, wenn alle im Ausgang stehen.'} Steckt ihr fest, hilft „Neustart“ (Taste R): ihr landet am Checkpoint im Bild oder bei einem Mitspieler. Die Level hören nie auf und werden immer schwerer. Vor jedem neuen Level müssen 2 Vokabeln beantwortet werden. Je weiter ihr kommt, desto mehr Coins.
         {hud.linked ? '' : ' Verbindung zum Partner wird aufgebaut …'}
       </p>
     </div>

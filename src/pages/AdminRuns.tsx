@@ -5,13 +5,14 @@ import Button from '../components/ui/Button'
 import Card from '../components/ui/Card'
 import PageHeader from '../components/ui/PageHeader'
 import { ErrorBox, Notice, Spinner } from '../components/ui/States'
-import { useAuth } from '../features/auth/AuthProvider'
+import { useRunPerks } from '../features/parkour/perks'
 import { errorMessage } from '../lib/errors'
 import { adminOpenRuns, type AdminRun } from '../services/play'
 
-/** Admin: alle offenen und laufenden Parkour- und Deathrun-Läufe, mit Zuschauen als unsichtbarer Geist. */
+/** Admins und Mods mit Zuschauer-Recht: alle laufenden und laufenden Parkour- und Deathrun-Läufe, mit Zuschauen als unsichtbarer Geist. */
 export default function AdminRuns() {
-  const { isAdmin } = useAuth()
+  const perks = useRunPerks()
+  const isAdmin = perks.spectate
   const [runs, setRuns] = useState<AdminRun[] | null>(null)
   const [error, setError] = useState<string | null>(null)
 
@@ -25,7 +26,8 @@ export default function AdminRuns() {
     return () => window.clearInterval(t)
   }, [isAdmin])
 
-  if (!isAdmin) return <Notice tone="warn">Nur für Admins.</Notice>
+  if (!perks.ready && !isAdmin) return <Spinner />
+  if (!isAdmin) return <Notice tone="warn">Dafür fehlt dir das Recht.</Notice>
   return (
     <div className="mx-auto max-w-2xl space-y-4">
       <PageHeader eyebrow="Admin" title="Offene Läufe" />

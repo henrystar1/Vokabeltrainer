@@ -119,11 +119,11 @@ export const setTagsHidden = (hidden: boolean) => rpc<void>('set_tags_hidden', {
 
 export type RightMode = 'none' | 'selected' | 'all'
 export interface StaffRow { user_id: string; display_name: string; role: 'mod' | 'alphamod'; books_mode: RightMode | null; set_mode: RightMode | null; shop: boolean | null; timeout_max: number | null; book_count: number; setting_count: number }
-export interface StaffRights { books_mode: RightMode | null; set_mode: RightMode | null; shop: boolean | null; timeout_max: number | null; book_ids: string[]; setting_keys: string[] }
+export interface StaffRights { books_mode: RightMode | null; set_mode: RightMode | null; shop: boolean | null; timeout_max: number | null; /** Darf Parkour-Läufe ansehen und als Gast einsteigen */ spectate: boolean; /** Auftritt im Parkour (Migration 0054) */ look: 'none' | 'hammer'; book_ids: string[]; setting_keys: string[] }
 export const adminListStaff = () => rpc<StaffRow[]>('admin_list_staff')
 export const adminGetStaffRights = (userId: string) => rpc<StaffRights>('admin_get_staff_rights', { p_user: userId })
-export const adminSetStaffRights = (userId: string, r: Pick<StaffRights, 'books_mode' | 'set_mode' | 'shop' | 'timeout_max'>) =>
-  rpc<void>('admin_set_staff_rights', { p_user: userId, p_books_mode: r.books_mode, p_set_mode: r.set_mode, p_shop: r.shop, p_timeout: r.timeout_max })
+export const adminSetStaffRights = (userId: string, r: Pick<StaffRights, 'books_mode' | 'set_mode' | 'shop' | 'timeout_max' | 'spectate' | 'look'>) =>
+  rpc<void>('admin_set_staff_rights', { p_user: userId, p_books_mode: r.books_mode, p_set_mode: r.set_mode, p_shop: r.shop, p_timeout: r.timeout_max, p_spectate: r.spectate, p_look: r.look })
 export const adminSetStaffBook = (userId: string, bookId: string, allowed: boolean) => rpc<void>('admin_set_staff_book', { p_user: userId, p_book: bookId, p_allowed: allowed })
 export const adminSetStaffSetting = (userId: string, key: string, allowed: boolean) => rpc<void>('admin_set_staff_setting', { p_user: userId, p_key: key, p_allowed: allowed })
 export const adminResetStaffRights = (userId: string) => rpc<void>('admin_reset_staff_rights', { p_user: userId })

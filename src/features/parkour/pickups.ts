@@ -7,7 +7,7 @@ export interface Pickup { id: number; kind: PickupKind; col: number }
 
 export const PICKUP_INFO: Record<PickupKind, { name: string; color: string; glyph: string; seconds: number }> = {
   jump3: { name: '3er-Sprung', color: '#a78bfa', glyph: '3', seconds: 20 },
-  jet: { name: 'Jetpack', color: '#fb923c', glyph: '🚀', seconds: 20 },
+  jet: { name: 'Jetpack', color: '#fb923c', glyph: '🚀', seconds: 12 },
 }
 
 const free = (lv: Level, col: number): boolean => {

@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { BookOpen, Coins, Hash, RotateCcw, Timer } from 'lucide-react'
+import { BookOpen, Coins, Eye, Hash, RotateCcw, Timer } from 'lucide-react'
 import Button from '../../components/ui/Button'
 import Card from '../../components/ui/Card'
 import { Field, TextInput } from '../../components/ui/Field'
@@ -88,9 +88,9 @@ function Editor({ person, onChanged }: { person: StaffRow; onChanged: () => void
     }
   }
 
-  const patch = (change: Partial<Pick<StaffRights, 'books_mode' | 'set_mode' | 'shop' | 'timeout_max'>>) => {
+  const patch = (change: Partial<Pick<StaffRights, 'books_mode' | 'set_mode' | 'shop' | 'timeout_max' | 'spectate' | 'look'>>) => {
     if (!r) return Promise.resolve()
-    return run(() => adminSetStaffRights(person.user_id, { books_mode: r.books_mode, set_mode: r.set_mode, shop: r.shop, timeout_max: r.timeout_max, ...change }))
+    return run(() => adminSetStaffRights(person.user_id, { books_mode: r.books_mode, set_mode: r.set_mode, shop: r.shop, timeout_max: r.timeout_max, spectate: r.spectate, look: r.look, ...change }))
   }
 
   const modeChoices = (value: RightMode | null, set: (m: RightMode | null) => void, labels: [string, string, string]) => (
@@ -165,6 +165,17 @@ function Editor({ person, onChanged }: { person: StaffRow; onChanged: () => void
               <Choice checked={r.shop === null} onSelect={() => void patch({ shop: null })} title="Standard" />
               <Choice checked={r.shop === false} onSelect={() => void patch({ shop: false })} title="Nein" />
               <Choice checked={r.shop === true} onSelect={() => void patch({ shop: true })} title="Ja" />
+            </div>
+          </Block>
+
+          <Block icon={<Eye size={18} />} title="Parkour: Zuschauen und Auftritt" text="Zuschauen: Die Person sieht alle laufenden Parkour- und Deathrun-Läufe, schaut unsichtbar zu und kann an der Stelle ins Spiel einsteigen (wie ein Admin, nur ohne Flug- und Geisterkräfte). Auftritt: So kommt die Person ins Spiel.">
+            <div className="grid gap-2 sm:grid-cols-2">
+              <Choice checked={!r.spectate} onSelect={() => void patch({ spectate: false })} title="Zuschauen: Nein" />
+              <Choice checked={r.spectate} onSelect={() => void patch({ spectate: true })} title="Zuschauen: Ja" />
+            </div>
+            <div className="grid gap-2 sm:grid-cols-2">
+              <Choice checked={r.look === 'none'} onSelect={() => void patch({ look: 'none' })} title="Auftritt: normal" />
+              <Choice checked={r.look === 'hammer'} onSelect={() => void patch({ look: 'hammer' })} title="Auftritt: Hammer" text="Ein Hammer fällt vom Himmel, ein Blitz schlägt ein, dann steht die Person da (mit Name, Effekten und Herzen)." />
             </div>
           </Block>
 

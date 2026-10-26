@@ -8,11 +8,11 @@ import ProgressRing from '../charts/ProgressRing'
 import { useWallet } from '../../features/koins/WalletProvider'
 import { errorMessage } from '../../lib/errors'
 import { getWallet } from '../../services/koins'
-import { submitChoice } from '../../services/play'
+import { submitChoice, submitIrregular } from '../../services/play'
 import type { ChoiceAnswer } from './ChoiceRunner'
 
 /** Ergebnis einer Multiple-Choice-Runde. Meldet das Ergebnis genau einmal an den Server (weniger Coins/Punkte als beim Lernen). */
-export default function ChoiceResult({ answers, onAgain, againLabel = 'Nochmal' }: { answers: ChoiceAnswer[]; onAgain: () => void; againLabel?: string }) {
+export default function ChoiceResult({ answers, onAgain, againLabel = 'Nochmal', irregular = false }: { answers: ChoiceAnswer[]; onAgain: () => void; againLabel?: string; /** Unregelmäßige Verben: zusätzlich eigene Coins (Migration 0054) */ irregular?: boolean }) {
   const wallet = useWallet()
   const correct = answers.filter((a) => a.correct).length
   const wrong = answers.filter((a) => !a.correct)
@@ -24,6 +24,10 @@ export default function ChoiceResult({ answers, onAgain, againLabel = 'Nochmal' 
     if (answers.length === 0) return
     submitChoice(correct, answers.length)
       .then(async (r) => {
+        if (irregular) {
+          const extra = await submitIrregular(correct, Math.min(answers.length, 60)).catch(() => null)
+          if (extra) r = { ...r, coins: r.coins + extra.earned }
+        }
         if (cancelled) return
         setReward(r)
         if (r.coins > 0) {

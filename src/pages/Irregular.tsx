@@ -9,6 +9,7 @@ import Card from '../components/ui/Card'
 import { Field, Select } from '../components/ui/Field'
 import PageHeader from '../components/ui/PageHeader'
 import { ErrorBox, Notice } from '../components/ui/States'
+import PageRules from '../components/admin/PageRules'
 import { useSettings } from '../features/settings/SettingsProvider'
 import {
   EN_FORM_LABEL, EN_VERBS, FR_FORM_LABEL, FR_VERBS, buildEnglishQuestions, buildFrenchQuestions,
@@ -70,7 +71,7 @@ export default function Irregular() {
   if (phase.name === 'result') {
     return (
       <div className="mx-auto max-w-2xl space-y-4">
-        <ChoiceResult answers={phase.answers} onAgain={start} />
+        <ChoiceResult answers={phase.answers} onAgain={start} irregular />
         {wrong.length > 0 && <p className="text-xs text-slate-500">Tipp: Schau dir die Liste an (Seite „Irreguläre Verben“ → Liste) und sprich die Formen laut.</p>}
       </div>
     )
@@ -136,6 +137,7 @@ export default function Irregular() {
           </div>
         )}
       </Card>
+      <PageRules title="Irreguläre Verben" info="Coins gibt es je N richtige Antworten, begrenzt pro Tag (zusätzlich zu den Multiple-Choice-Coins)." keys={['irregular_coin_every', 'irregular_coin_cap']} />
       {lang === 'fr' && <Notice tone="info">Weitere Zeiten (Imparfait, Passé composé) übst du unter „Konjugieren“.</Notice>}
     </div>
   )

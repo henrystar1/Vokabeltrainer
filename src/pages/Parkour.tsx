@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { Check, Eye, Footprints, Heart, Skull, Users } from 'lucide-react'
-import { useAuth } from '../features/auth/AuthProvider'
+import { useRunPerks } from '../features/parkour/perks'
 import Button from '../components/ui/Button'
 import Card from '../components/ui/Card'
 import CoinIcon from '../components/ui/CoinIcon'
@@ -26,7 +26,7 @@ function Figure({ color, hat }: { color: string; hat?: string }) {
 
 export default function Parkour() {
   const wallet = useWallet()
-  const { isAdmin } = useAuth()
+  const perks = useRunPerks()
   const shop = useAsync(parkourShopGet, [])
   const [armed, setArmed] = useState<string | null>(null)
   const [busy, setBusy] = useState<string | null>(null)
@@ -63,9 +63,9 @@ export default function Parkour() {
         <Link to="/deathrun" className="inline-flex min-h-[48px] w-full items-center justify-center gap-2 rounded-xl border border-amber-300/40 bg-amber-400/10 px-4 font-semibold text-amber-100 hover:bg-amber-400/20">
           <Skull size={18} /> Offene Deathrun-Lobby: sofort mitspielen
         </Link>
-        {isAdmin && (
+        {perks.spectate && (
           <Link to="/laeufe" className="inline-flex min-h-[44px] w-full items-center justify-center gap-2 rounded-xl border border-violet-300/40 bg-violet-400/10 px-4 text-sm font-semibold text-violet-100 hover:bg-violet-400/20">
-            <Eye size={16} /> Admin: alle offenen Läufe ansehen
+            <Eye size={16} /> Alle laufenden Läufe ansehen
           </Link>
         )}
         <p className="text-xs text-slate-400">
