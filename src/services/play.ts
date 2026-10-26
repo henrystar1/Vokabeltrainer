@@ -223,6 +223,10 @@ export interface ParkourShop {
   hat_price: number
   fx_price?: number
 }
+/** Wer hat die Parkour-Lernfragen aus? (Migration 0053) */
+export const parkourLearnOffList = (ids: string[]) => rpc<string[]>('parkour_learn_off_list', { p_ids: ids })
+/** Admin: Lernfragen im Parkour für eine Person aus- (off) oder einschalten */
+export const parkourLearnSet = (user: string, off: boolean) => rpc<void>('parkour_learn_set', { p_user: user, p_off: off })
 export const parkourShopGet = () => rpc<ParkourShop>('parkour_shop_get')
 export const parkourShopBuy = (item: string) => rpc<ParkourShop>('parkour_shop_buy', { p_item: item })
 export const parkourEquip = (color: string | null, hat: string | null, fx?: string | null) =>

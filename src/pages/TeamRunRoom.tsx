@@ -10,6 +10,7 @@ import Button from '../components/ui/Button'
 import Card from '../components/ui/Card'
 import PageHeader from '../components/ui/PageHeader'
 import { ErrorBox, Notice, Spinner } from '../components/ui/States'
+import { useAuth } from '../features/auth/AuthProvider'
 import { useWallet } from '../features/koins/WalletProvider'
 import { buildDuelQuestions, type Question } from '../features/learning/questions'
 import { useSettings } from '../features/settings/SettingsProvider'
@@ -17,10 +18,43 @@ import TeamTrack, { Hearts } from '../features/team/TeamTrack'
 import ParkourGame from '../features/parkour/ParkourGame'
 import { errorMessage } from '../lib/errors'
 import { getWallet } from '../services/koins'
-import { deathrunOpenJoin, teamGet, teamLeave, teamRejoin, teamReport, teamRespond, teamSetBots, teamSetVersus, teamSpectate, teamStart, type DeathrunResult, type TeamPerson, type TeamState } from '../services/play'
+import { deathrunOpenJoin, teamGet, teamLeave, teamRejoin, teamReport, teamRespond, teamSetBots, parkourLearnOffList, parkourLearnSet, teamSetVersus, teamSpectate, teamStart, type DeathrunResult, type TeamPerson, type TeamState } from '../services/play'
 
 const POLL_MS = 900
 const COLORS = ['#22d3ee', '#e879f9', '#facc15', '#4ade80', '#fb923c']
+
+/** Admin: Vokabel-Fragen im Parkour für sich oder bestimmte Leute ausschalten (zum Testen). */
+function LearnToggles({ people }: { people: TeamPerson[] }) {
+  const [off, setOff] = useState<string[]>([])
+  const [err, setErr] = useState('')
+  const key = people.map((p) => p.user_id).join(',')
+  useEffect(() => {
+    let alive = true
+    parkourLearnOffList(key.split(',').filter(Boolean)).then((l) => { if (alive) setOff(l) }).catch((e) => { if (alive) setErr(errorMessage(e)) })
+    return () => { alive = false }
+  }, [key])
+  const flip = (uid: string) => {
+    const next = !off.includes(uid)
+    setOff((o) => (next ? [...o, uid] : o.filter((x) => x !== uid)))
+    parkourLearnSet(uid, next).then(() => setErr('')).catch((e) => { setErr(errorMessage(e)); setOff((o) => (next ? o.filter((x) => x !== uid) : [...o, uid])) })
+  }
+  return (
+    <div className="space-y-1.5 rounded-xl border border-violet-300/25 bg-violet-500/5 p-3">
+      <p className="label-mono">Admin: Lernfragen im Parkour</p>
+      <p className="text-xs text-slate-400">Speedups und Levelwechsel verlangen Vokabeln. Hier für einzelne Personen ausschalten (gilt auch für spätere Läufe, bis du es wieder einschaltest).</p>
+      {people.map((p) => (
+        <div key={p.user_id} className="flex items-center justify-between gap-2">
+          <span className="min-w-0 flex-1 truncate text-sm text-slate-200">{p.name}</span>
+          <button type="button" onClick={() => flip(p.user_id)} aria-pressed={!off.includes(p.user_id)}
+            className={`min-h-[36px] rounded-lg border px-3 text-xs font-semibold ${off.includes(p.user_id) ? 'border-rose-300/50 bg-rose-400/10 text-rose-200' : 'border-emerald-300/50 bg-emerald-400/10 text-emerald-100'}`}>
+            {off.includes(p.user_id) ? 'Aus' : 'An'}
+          </button>
+        </div>
+      ))}
+      {err && <p className="text-xs text-rose-300">{err}</p>}
+    </div>
+  )
+}
 
 function Slot({ p, color, joined, waitingText }: { p?: TeamPerson; color: string; joined: boolean; waitingText: string }) {
   if (!p) return null
@@ -75,6 +109,7 @@ export default function TeamRunRoom() {
   const [params] = useSearchParams()
   const watching = params.get('zuschauen') === '1'
   const { settings } = useSettings()
+  const { isAdmin } = useAuth()
   const wallet = useWallet()
   const [st, setSt] = useState<TeamState | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -223,6 +258,7 @@ export default function TeamRunRoom() {
           {run
             ? <p className="text-center text-sm text-amber-200">Coins je nach Fortschritt: {st.coins[0]} pro Level (ab Level 9 mehr), {st.coins[1]} pro Checkpoint, {st.coins[2]} Bonus für Level 8 (für jeden). Bots bekommen keine Coins.</p>
             : st.reward > 0 && <p className="text-center text-sm text-amber-200">Bei Erfolg: {st.reward} Coins für jeden</p>}
+          {isAdmin && !st.spectator && (run || dr) && <LearnToggles people={people.filter(isJoined)} />}
           {st.can_manage && (
             <div className="space-y-2 rounded-xl border border-white/10 bg-white/5 p-3">
               {!dr && (

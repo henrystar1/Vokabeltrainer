@@ -5,14 +5,16 @@ import { Joystick } from '../games/joystick'
 import { useFocusMode } from '../koins/focusMode'
 import { useAuth } from '../auth/AuthProvider'
 import { supabase } from '../../lib/supabaseClient'
-import { parkourShopGet, teamDeathrunFinish, teamParkourFinish, type TeamPerson, type TeamState } from '../../services/play'
+import { parkourLearnOffList, parkourShopGet, teamDeathrunFinish, teamParkourFinish, type TeamPerson, type TeamState } from '../../services/play'
 import { HOLE_IN, HOLE_OUT, drawAdminBack, drawAdminBody, drawAdminName, drawHoleAnim, type HoleAnim } from './adminFx'
 import { levelFor } from './generator'
 import { PK_HATS, pkFill } from './cosmetics'
 import { FxField } from './fx'
 import { skillList } from './botmix'
 import { BOT_NAMES, botStep, newBot, type BotCtx, type BotState } from './bots'
-import { PICKUP_INFO, pickupX, pickupY, pickupsFor, type Pickup, type PickupKind } from './pickups'
+import { PICKUP_INFO, type PickupKind } from './pickups'
+import LearnOverlay from './LearnOverlay'
+import { LEARN_PER_LEVEL, LEARN_PER_OFFER, OFFER_EVERY, OFFER_LIFE, loadLearnPool } from './parkourLearn'
 import { ROWS, TILE, VIEW_H, VIEW_W, type Level } from './levels'
 import { PH, PW, checkpointAt, inExit, newBody, pressedMap, spawnAt, spotIsSafe, stepBody, type Body, type Pressed } from './engine'
 
@@ -68,6 +70,38 @@ export default function ParkourGame({ st, startLevel = 0 }: { st: TeamState; sta
   const toggleFly = () => { if (!adminRef.current || specUi) return; input.current.fly = !input.current.fly; if (!input.current.fly) input.current.ghost = false; setFlyUi(input.current.fly); setGhostUi(input.current.ghost) }
   const toggleGhost = () => { if (!adminRef.current || specUi) return; input.current.ghost = !input.current.ghost; if (input.current.ghost) input.current.fly = true; setGhostUi(input.current.ghost); setFlyUi(input.current.fly) }
   const watch = (uid: string | null) => { follow.current = { uid, to: uid }; setFollowUi(uid) }
+  // Lernen: Speedup-Angebote (Rand) und Vokabeln beim Levelwechsel
+  const learnBusy = useRef(false)
+  const learnOff = useRef(false)
+  const [offer, setOffer] = useState<{ id: number; kind: PickupKind; life: number } | null>(null)
+  const [quiz, setQuiz] = useState<{ title: string; need: number; retry: boolean; done: (ok: boolean) => void } | null>(null)
+  const offerApi = useRef<{ take: (kind: PickupKind | null) => void } | null>(null)
+  const askApi = useRef<(need: number, title: string, retry: boolean, done: (ok: boolean) => void) => void>((_n, _t, _r, done) => done(true))
+  askApi.current = (need, title, retry, done) => {
+    if (learnOff.current) { done(true); return }
+    const i = input.current
+    i.stick = 0; i.left = false; i.right = false; i.jump = false; i.down = false; i.kill = false
+    learnBusy.current = true
+    setQuiz({ title, need, retry, done })
+  }
+  const finishQuiz = (ok: boolean) => {
+    const q = quiz
+    setQuiz(null)
+    learnBusy.current = false
+    q?.done(ok)
+  }
+  const takeOffer = () => {
+    const o = offer
+    if (!o) return
+    setOffer(null)
+    askApi.current(LEARN_PER_OFFER, `${PICKUP_INFO[o.kind].name}: ${LEARN_PER_OFFER} Vokabel`, false, (ok) => offerApi.current?.take(ok ? o.kind : null))
+  }
+  useEffect(() => {
+    let alive = true
+    parkourLearnOffList([st.me]).then((l) => { if (alive) learnOff.current = l.includes(st.me) }).catch(() => undefined)
+    void loadLearnPool() // vorladen, damit die erste Frage sofort da ist
+    return () => { alive = false }
+  }, [st.me])
   const [hud, setHud] = useState({ level: 0, deaths: 0, ms: 0, linked: false, done: false, jet: false })
 
   useEffect(() => {
@@ -89,12 +123,6 @@ export default function ParkourGame({ st, startLevel = 0 }: { st: TeamState; sta
       let l = cache.get(n)
       if (!l) { l = levelFor(st.id, n); cache.set(n, l) }
       return l
-    }
-    const pickCache = new Map<number, Pickup[]>()
-    const pickupsOf = (n: number): Pickup[] => {
-      let p = pickCache.get(n)
-      if (!p) { p = pickupsFor(levelOf(n), st.id); pickCache.set(n, p) }
-      return p
     }
     // Mitspielende (Host zuerst); wer nur eingeladen ist oder ausgestiegen ist, zählt nicht
     const dr = st.kind === 'deathrun' // Deathrun: jeder für sich (eigene Herzen und Level), Tore nur mit Teamarbeit
@@ -162,8 +190,7 @@ export default function ParkourGame({ st, startLevel = 0 }: { st: TeamState; sta
     let reported = false
     let disposed = false
 
-    // ---- Boden-Upgrades ----
-    const taken = new Map<string, number>() // "Level:Nr" → Zeit, ab der das Upgrade wieder da ist
+    // ---- Speedups (kommen als Angebot am Bildschirmrand, Freischalten kostet eine Vokabel) ----
     const buff = { jump3: 0, jet: 0 }
     const buffCode = () => (buff.jet > 0 ? 2 : buff.jump3 > 0 ? 1 : 0)
 
@@ -485,20 +512,32 @@ export default function ParkourGame({ st, startLevel = 0 }: { st: TeamState; sta
       void ch?.send({ type: 'broadcast', event: 'b', payload: { sid, l } })?.catch?.(() => undefined)
     }
 
-    function collectPickups(level: Level) {
-      void level
-      for (const pk of pickupsOf(lv)) {
-        const key = `${lv}:${pk.id}`
-        if ((taken.get(key) ?? 0) > t) continue
-        const dx = me.x + PW / 2 - pickupX(pk), dy = me.y + PH / 2 - pickupY()
-        if (Math.abs(dx) < 22 && Math.abs(dy) < 30) {
-          taken.set(key, t + 35)
-          const info = PICKUP_INFO[pk.kind]
-          if (pk.kind === 'jump3') buff.jump3 = info.seconds
-          else buff.jet = info.seconds
-          toast = { text: `${info.name}! ${info.seconds} s`, t: 2 }
-        }
+    // Angebot am Bildschirmrand: kommt regelmäßig, läuft ab, Tippen = eine Vokabel beantworten
+    let offerIn = OFFER_EVERY * 0.5
+    let offerLeft = 0
+    let offerSeq = 0
+    const clearOffer = () => { offerLeft = 0; setOffer(null) }
+    function tickOffer(dt: number) {
+      if (adminRef.current) { if (offerLeft > 0) clearOffer(); return } // Admins fliegen und springen sowieso
+      if (offerLeft > 0) { offerLeft -= dt; if (offerLeft <= 0) clearOffer(); return }
+      offerIn -= dt
+      if (offerIn <= 0) {
+        offerSeq += 1
+        offerLeft = OFFER_LIFE
+        offerIn = OFFER_EVERY
+        setOffer({ id: offerSeq, kind: hash(offerSeq * 7 + t) < 0.5 ? 'jump3' : 'jet', life: OFFER_LIFE })
       }
+    }
+    offerApi.current = {
+      take: (kind) => {
+        clearOffer()
+        offerIn = OFFER_EVERY
+        if (!kind) { toast = { text: 'Falsch – das Upgrade ist weg', t: 2.5 }; return }
+        const info = PICKUP_INFO[kind]
+        if (kind === 'jump3') buff.jump3 = info.seconds
+        else buff.jet = info.seconds
+        toast = { text: `${info.name}! ${info.seconds} s`, t: 2 }
+      },
     }
     let toast: { text: string; t: number } | null = null
 
@@ -621,6 +660,8 @@ export default function ParkourGame({ st, startLevel = 0 }: { st: TeamState; sta
         return
       }
       if (finished) return
+      if (learnBusy.current) return // Vokabel-Frage offen: die Figur steht still
+      tickOffer(dt)
       if (killCool > 0) killCool -= dt
       if (graceT > 0) graceT -= dt
       if (buff.jump3 > 0) buff.jump3 -= dt
@@ -653,7 +694,6 @@ export default function ParkourGame({ st, startLevel = 0 }: { st: TeamState; sta
       if (r === 'dead' && graceT > 0) { deadT = 0.3; return } // Schonfrist: neu starten ohne Herz zu verlieren
       if (r === 'dead') { deaths += 1; hearts -= 1; deadT = 0.7; checkOver(); return }
       if (r === 'lost') { deadT = 0.5; return } // eingeklemmt / aus der Welt: neu starten, aber kein Herz verlieren
-      collectPickups(level)
       const c = checkpointAt(level, me)
       if (c !== null && (myCp === null || c > myCp)) myCp = c
       if (c !== null && (cp === null || c > cp)) { cp = c; cpTotal += 1 }
@@ -661,7 +701,9 @@ export default function ParkourGame({ st, startLevel = 0 }: { st: TeamState; sta
       if (dr ? inExit(level, me) : inExit(level, me) && (soloTeam || (mt.length > 0 && mt.every((r) => r.ex)))) {
         exitHold += dt
         if (exitHold > (dr ? 0.2 : 0.7) && !finished) {
-          goLevel(lv + 1)
+          const target = lv + 1
+          exitHold = 0
+          askApi.current(LEARN_PER_LEVEL, `Level ${target + 1} wartet: ${LEARN_PER_LEVEL} Vokabeln`, true, () => goLevel(target))
         }
       } else exitHold = 0
     }
@@ -745,23 +787,6 @@ export default function ParkourGame({ st, startLevel = 0 }: { st: TeamState; sta
       ctx!.fillRect(ex - 10, ey - 10, ew + 20, eh + 20)
       ctx!.strokeStyle = `rgba(253,224,71,${0.6 + 0.4 * Math.sin(t * 4)})`; ctx!.lineWidth = 3
       ctx!.strokeRect(ex + 2, ey + 2, ew - 4, eh - 4)
-      // Boden-Upgrades
-      {
-        for (const pk of pickupsOf(lv)) {
-          if ((taken.get(`${lv}:${pk.id}`) ?? 0) > t) continue
-          const px = pickupX(pk), py = pickupY() + Math.sin(t * 3 + pk.id) * 3
-          if (px < cx - 30 || px > cx + VIEW_W + 30) continue
-          const info = PICKUP_INFO[pk.kind as PickupKind]
-          const rg = ctx!.createRadialGradient(px, py, 2, px, py, 26)
-          rg.addColorStop(0, info.color + 'cc'); rg.addColorStop(1, info.color + '00')
-          ctx!.fillStyle = rg
-          ctx!.beginPath(); ctx!.arc(px, py, 26, 0, Math.PI * 2); ctx!.fill()
-          ctx!.fillStyle = '#0f172a'; ctx!.strokeStyle = info.color; ctx!.lineWidth = 2.5
-          ctx!.beginPath(); ctx!.arc(px, py, 12, 0, Math.PI * 2); ctx!.fill(); ctx!.stroke()
-          ctx!.fillStyle = '#fff'; ctx!.font = pk.kind === 'jet' ? '14px system-ui, "Apple Color Emoji", sans-serif' : '700 14px system-ui, sans-serif'; ctx!.textAlign = 'center'
-          ctx!.fillText(info.glyph, px, py + 5)
-        }
-      }
       // Spieler
       const drawP = (x: number, y: number, face: 1 | -1, uid: string, name: string, dead: boolean, self: boolean, ghost = false, bf = 0, bot = false, team = -1, skill = 0, adm = false) => {
         const look = lookOf(uid)
@@ -1045,7 +1070,28 @@ export default function ParkourGame({ st, startLevel = 0 }: { st: TeamState; sta
 
   return (
     <div className="mx-auto flex max-w-[720px] flex-col items-center gap-3" style={noSel} onContextMenu={(e) => e.preventDefault()}>
-      <canvas ref={canvas} className="aspect-[704/384] w-full touch-none select-none rounded-2xl border border-white/10" aria-label="Parkour-Spielfeld" />
+      <div className="relative w-full">
+        <canvas ref={canvas} className="aspect-[704/384] w-full touch-none select-none rounded-2xl border border-white/10" aria-label="Parkour-Spielfeld" />
+        {offer && !specUi && (
+          <button
+            key={offer.id}
+            type="button"
+            onClick={takeOffer}
+            aria-label={`${PICKUP_INFO[offer.kind].name} freischalten`}
+            className="absolute right-0 top-1/3 flex w-[88px] select-none flex-col items-center gap-1 rounded-l-2xl border border-r-0 px-2 pb-2 pt-2 text-center shadow-lg active:brightness-125"
+            style={{ borderColor: PICKUP_INFO[offer.kind].color, background: 'rgba(15,23,42,0.88)' }}
+          >
+            <style>{'@keyframes pkbar{from{width:100%}to{width:0}}'}</style>
+            <span className="text-2xl leading-none">{offer.kind === 'jet' ? '🚀' : '3️⃣'}</span>
+            <span className="text-[11px] font-semibold leading-tight text-white">{PICKUP_INFO[offer.kind].name}</span>
+            <span className="text-[10px] text-slate-300">Tippen: 1 Vokabel</span>
+            <span className="block h-1.5 w-full overflow-hidden rounded-full bg-white/15">
+              <span className="block h-full rounded-full" style={{ background: PICKUP_INFO[offer.kind].color, animation: `pkbar ${offer.life}s linear forwards` }} />
+            </span>
+          </button>
+        )}
+      </div>
+      {quiz && <LearnOverlay title={quiz.title} need={quiz.need} retry={quiz.retry} onDone={finishQuiz} />}
       <div className="flex w-full items-center justify-between px-2">
         <Joystick onChange={(x) => { input.current.stick = x }} />
         {!specUi && (
@@ -1114,7 +1160,7 @@ export default function ParkourGame({ st, startLevel = 0 }: { st: TeamState; sta
         </div>
       )}
       <p className="text-center text-xs text-slate-500">
-        Joystick links = laufen, Knopf rechts = springen, in der Luft nochmal tippen = Doppelsprung (Tastatur: Pfeile/WASD und Leertaste). Leuchtende Kugeln am Boden geben kurz einen 3er-Sprung oder ein Jetpack (Flugmodus: Sprungknopf = hoch, Runter-Knopf = runter, Stacheln tun nichts). {st.kind === 'deathrun' ? 'DEATHRUN: Jeder läuft für sich mit eigenen Herzen. Wer im Ziel ist, ist sofort im nächsten Level. Tore öffnen sich nur, wenn jemand im selben Level auf der Platte steht; wer allein im Level ist, für den sind sie offen. ' : 'Ihr teilt euch die Herzen (jedes geschaffte Level bringt eins zurück), jeder Sturz in Stacheln oder Schluchten kostet eins. '} Die Kamera folgt nur dir: Pfeile am Rand zeigen, wo die anderen sind.{st.kind === 'deathrun' ? '' : ' Ins nächste Level kommt ihr, wenn alle im Ausgang stehen.'} Steckt ihr fest, hilft „Neustart“ (Taste R): ihr landet am Checkpoint im Bild oder bei einem Mitspieler. Die Level hören nie auf und werden immer schwerer. Je weiter ihr kommt, desto mehr Coins.
+        Joystick links = laufen, Knopf rechts = springen, in der Luft nochmal tippen = Doppelsprung (Tastatur: Pfeile/WASD und Leertaste). Am rechten Rand erscheint ab und zu ein Speedup (3er-Sprung oder Jetpack) mit ablaufendem Balken: tippen und eine Vokabel richtig beantworten, dann gehört er dir kurz (Jetpack = Flugmodus: Sprungknopf = hoch, Runter-Knopf = runter, Stacheln tun nichts). {st.kind === 'deathrun' ? 'DEATHRUN: Jeder läuft für sich mit eigenen Herzen. Wer im Ziel ist, ist sofort im nächsten Level. Tore öffnen sich nur, wenn jemand im selben Level auf der Platte steht; wer allein im Level ist, für den sind sie offen. ' : 'Ihr teilt euch die Herzen (jedes geschaffte Level bringt eins zurück), jeder Sturz in Stacheln oder Schluchten kostet eins. '} Die Kamera folgt nur dir: Pfeile am Rand zeigen, wo die anderen sind.{st.kind === 'deathrun' ? '' : ' Ins nächste Level kommt ihr, wenn alle im Ausgang stehen.'} Steckt ihr fest, hilft „Neustart“ (Taste R): ihr landet am Checkpoint im Bild oder bei einem Mitspieler. Die Level hören nie auf und werden immer schwerer. Vor jedem neuen Level müssen 2 Vokabeln beantwortet werden. Je weiter ihr kommt, desto mehr Coins.
         {hud.linked ? '' : ' Verbindung zum Partner wird aufgebaut …'}
       </p>
     </div>
