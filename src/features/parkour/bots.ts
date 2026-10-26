@@ -62,6 +62,10 @@ export interface BotState {
   viaDone: boolean
   /** Gefahr voraus kommt nur von einem geschlossenen Tor: nicht springen, sondern zur Platte / vor dem Tor warten */
   gateWait: boolean
+  /** Wie lange der Bot schon oben auf einem Turm vor einer Tür wartet, die sonst hinter ihm zufällt */
+  ledgeT: number
+  /** x im vorigen Schritt (um Checkpoints zu erkennen, über die der Bot hinwegspringt) */
+  px: number
 }
 
 /** Lage im Level für die Entscheidungen: Menschen im selben Level und alle anderen Körper (Menschen und Bots). */
@@ -71,7 +75,7 @@ export interface BotCtx { humans: Point[]; others: Point[]; bots?: BotInfo[] }
 
 export function newBot(i: number, level: Level, hearts: number, skill: number, lv = 0): BotState {
   const s = spawnAt(level, i % 5, null)
-  return { i, body: newBody(s.x + (i >= 5 ? 6 * (i - 4) : 0), s.y), lv, hearts, cp: null, deadT: 0.05 + i * 0.45, out: false, skill, prevJump: false, stuckT: 0, lastX: s.x, retries: 0, backT: 0, grace: 1, plan: Math.random(), script: null, mistakeT: 0, tick: 0, urgent: false, mode: 'run', holdCh: 'a', holdT: 0, holdMin: 0, gotoT: 0, blockT: 0, noPick: false, gateX1: -1, retT: 0, retCd: 0, spaceT: 0, spaceCd: 0, fineT: 0, route: null, open: false, parked: false, take: false, takeX: 0, viaDone: false, gateWait: false }
+  return { i, body: newBody(s.x + (i >= 5 ? 6 * (i - 4) : 0), s.y), lv, hearts, cp: null, deadT: 0.05 + i * 0.45, out: false, skill, prevJump: false, stuckT: 0, lastX: s.x, retries: 0, backT: 0, grace: 1, plan: Math.random(), script: null, mistakeT: 0, tick: 0, urgent: false, mode: 'run', holdCh: 'a', holdT: 0, holdMin: 0, gotoT: 0, blockT: 0, noPick: false, gateX1: -1, retT: 0, retCd: 0, spaceT: 0, spaceCd: 0, fineT: 0, route: null, open: false, parked: false, take: false, takeX: 0, viaDone: false, gateWait: false, ledgeT: 0, px: s.x }
 }
 
 const HORIZON = 96 // 1,6 s vorausrechnen
@@ -404,7 +408,9 @@ export function botStep(lv: Level, s: BotState, dt: number, ctx: BotCtx = { huma
     let tx: number | null = null
     for (const p of plates) { const px = p.x * TILE + 5; if (tx === null || Math.abs(px - b.x) < Math.abs(tx - b.x)) tx = px }
     // Platte oben auf einem Turm: vom Tor aus kommt man von der falschen Seite nicht hinauf. Erst zum Fuß der Treppe laufen, dann hinaufklettern.
-    const tower = lv.plates.filter((p) => p.ch === s.holdCh && p.y <= 2).sort((p, q) => Math.abs(p.x * TILE - b.x) - Math.abs(q.x * TILE - b.x))[0]
+    // (nur wenn die nächste infrage kommende Platte selbst oben auf dem Turm liegt; hinter dem Tor ist die Platte auf dem Pfeiler gemeint)
+    const nearest = [...plates].sort((p, q) => Math.abs(p.x * TILE - b.x) - Math.abs(q.x * TILE - b.x))[0]
+    const tower = nearest && nearest.y <= 2 ? nearest : undefined
     let via: number | null = null
     if (tower && !s.viaDone) {
       const colTop = (c: number) => { for (let y = 0; y < ROWS; y++) if (lv.rows[y]?.[c] === '#') return y; return ROWS }
@@ -437,6 +443,16 @@ export function botStep(lv: Level, s: BotState, dt: number, ctx: BotCtx = { huma
     return finishStep(lv, s, stepBody(b, inp, lv, pNow, null, dt), dt)
   }
   inp = botInput(lv, s, ctx, 1)
+  // Oben auf einem Turm vor einer Tür, die zufällt, sobald der Bot weggeht: nicht in die Lücke zwischen Turm und Tür springen (dort käme er nicht mehr heraus), sondern warten, bis jemand die Tür offen hält
+  if (!open && b.ground && b.y < 5 * TILE && inp.move > 0) {
+    const g = lv.plates.length > 0 ? closedGateAhead(lv, b, without) : null
+    if (g && g.x0 * TILE - b.x < 6 * TILE && s.ledgeT < 45) {
+      s.ledgeT += dt
+      s.script = null
+      inp = { move: 0, jump: false, airJumps: 1 }
+      return finishStep(lv, s, stepBody(b, inp, lv, pNow, null, dt), dt)
+    }
+  } else s.ledgeT = 0
   // Vor einem geschlossenen Tor: zurück zur Platte, und wenn keiner hilft, nach einer Weile trotzdem weiter
   const g = !open ? closedGateAhead(lv, b, pNow) : null
   if (g && g.x0 * TILE - b.x < 3 * TILE && (s.noPick || Math.abs(b.vx) < 30 || s.gateWait)) {
@@ -460,7 +476,12 @@ function finishStep(lv: Level, s: BotState, r: 'ok' | 'dead' | 'lost', dt: numbe
   if (r === 'dead') { s.hearts -= 1; s.deadT = 0.7; if (s.hearts <= 0) { s.out = true; return 'out' } return 'dead' }
   // Bots merken sich einen Checkpoint auch, wenn sie gerade darüber springen
   const cxx = Math.floor((s.body.x + PW / 2) / TILE)
-  const near = lv.checkpoints.find((k) => Math.abs(k - cxx) <= 1 && s.body.y > 3 * TILE)
+  // Auch wer hoch über eine Fahne springt oder an ihr vorbeifliegt, hat sie mitgenommen: zählt jede Fahne, die zwischen dem letzten und diesem Schritt überquert wurde
+  const pcx = Math.floor((s.px + PW / 2) / TILE)
+  const moved = Math.abs(s.body.x - s.px) < 40
+  const swept = moved ? lv.checkpoints.filter((k) => k >= Math.min(pcx, cxx) - 1 && k <= Math.max(pcx, cxx) + 1 && s.body.y > 2 * TILE) : []
+  s.px = s.body.x
+  const near = [...swept, ...lv.checkpoints.filter((k) => Math.abs(k - cxx) <= 1 && s.body.y > 3 * TILE)].sort((x, y) => y - x)[0]
   const c = checkpointAt(lv, s.body) ?? (near !== undefined ? near : null)
   if (c !== null && (s.cp === null || c > s.cp)) {
     s.cp = c

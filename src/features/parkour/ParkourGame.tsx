@@ -591,8 +591,13 @@ export default function ParkourGame({ st, startLevel = 0 }: { st: TeamState; sta
         if (master && !bots) initBots(now)
         else if (!master && bots) { for (const b of bots) botSnap.set(b.i, { i: b.i, x: b.body.x, y: b.body.y, face: b.body.face, lv: b.lv, hp: group ? bgh : b.hearts, out: group ? bgOut : b.out, dead: b.deadT > 0, dx: b.body.x, dy: b.body.y, seen: now }); bots = null }
         if (bots) {
+          // Die Bots warten am Start des nächsten Levels, bis der erste Mensch dort angekommen ist (der lernt zwischen den Leveln noch)
+          let humanMax = -1
+          if (!isSpec && !finished) humanMax = lv
+          for (const r of remotes.values()) if (!r.el && now - r.seen < STALE_MS * 4) humanMax = Math.max(humanMax, r.lv)
           for (const b of bots) {
             if (group && (b.parked || bgOut)) continue
+            if (!group && humanMax >= 0 && b.lv > humanMax) continue
             // Menschen und andere Bots im Level des Bots: er hält Platten für Menschen und hat selbst feste Türen
             const humans: Array<{ x: number; y: number }> = []
             // Auch wer gerade tot ist und gleich wieder einsteigt, zählt weiter (die Bots vergessen niemanden)
@@ -622,7 +627,7 @@ export default function ParkourGame({ st, startLevel = 0 }: { st: TeamState; sta
             }
           }
           // Bot-Team: sind alle im Ausgang, geht es gemeinsam ins nächste Level (ein Herz zurück)
-          if (group && !bgOut && bots.length > 0 && bots.every((o) => o.parked || o.out)) {
+          if (group && !bgOut && bots.length > 0 && bots.every((o) => o.parked || o.out) && (humanMax < 0 || bots[0].lv + 1 <= humanMax)) {
             const nl = bots[0].lv + 1
             bgh = Math.min(20, bgh + 1)
             for (const o of bots) {

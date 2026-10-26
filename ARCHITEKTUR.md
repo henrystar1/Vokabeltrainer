@@ -522,3 +522,9 @@ Tabelle `book_library_hidden`; `in_library` blendet ein veröffentlichtes Buch d
 - `parkourLearn.ts`: Pool = aktive Vokabeln (`getLearningPool(null, null)`); gibt es keine, Einträge von bis zu 3 öffentlichen Büchern (`listPublicBooks` + `getBookEntries`). Ist gar nichts erreichbar, wird nicht gefragt (blockiert nie). Fragen über `makeQuestion`, Antwortprüfung `isAnswerCorrect`.
 - Admin-Schalter: Tabelle `parkour_learn_off`, RPCs `parkour_learn_off_list(uuid[])` (alle angemeldeten Personen) und `parkour_learn_set(user, off)` (nur Admin). In der Lobby (Parkour und Deathrun) zeigt `LearnToggles` Admins An/Aus je Person, auch für sich selbst. Das Spiel liest beim Start das eigene Flag.
 - SQL `0053_parkour_learn.sql` (wiederholbar): Tabelle und RPCs wie oben; Coins gesenkt (Level 5, Checkpoint 1, Bonus 20, Endlos 3, nur wenn die Werte aktuell höher sind).
+
+## Update 67: Bots – Turm-Lücke, Fahnen, Warten auf Menschen
+- `bots.ts` Turm-Lücke: Ein Bot oben auf einem Turm springt nicht mehr in die Lücke zwischen Turm und Tür, solange niemand sonst die Platte hält (`ledgeT`, wartet bis zu 45 s; steht er auf der Platte, hält er sie offen). Dort kam man mit geschlossener Tür nicht mehr heraus. Außerdem zielte `goto` hinter der Tür fälschlich auf den Fuß der Turmtreppe (`via`), obwohl die nächste Platte der Pfeiler war; `via` gilt jetzt nur, wenn die nächste infrage kommende Platte selbst oben auf dem Turm liegt.
+- Fahnen: `finishStep` zählt jede Fahne, die seit dem letzten Schritt überquert wurde (`px`), auch bei hohen Sprüngen darüber.
+- `ParkourGame`: Bots bleiben am Start des nächsten Levels stehen, bis der erste Mensch (er lernt zwischen den Leveln noch) dort angekommen ist (`humanMax`); der Bot-Team-Wechsel (Versus mit Bots) wartet ebenso.
+- Tests in `duo.test.ts`: Turm-Lücke (kein Bot im Loch bei weit entferntem Menschen) und Fahnen (nach dem Level ist die letzte Fahne gemerkt).

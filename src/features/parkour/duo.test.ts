@@ -40,3 +40,34 @@ describe('Bot und Turm', () => {
     expect(minY).toBeGreaterThanOrEqual(0)
   })
 })
+
+describe('Bots und Turm-Tür', () => {
+  it('Bots springen nicht in die Lücke zwischen Turm und Tür, wenn niemand die Tür offen hält', () => {
+    const lv = levelFor('seed', 4)
+    const bots = [3, 5].map((k, i) => newBot(i, lv, 20, k, 4))
+    let inHole = 0
+    for (let f = 0; f < 70 * 60; f++) {
+      for (const b of bots) {
+        const humans = [{ x: 6 * 32, y: 10 * 32 - 28 }] // ein Mensch steht weit hinten am Start
+        const others = [...humans, ...bots.filter((o) => o !== b && o.deadT <= 0).map((o) => ({ x: o.body.x, y: o.body.y }))]
+        const infos = bots.filter((o) => o !== b).map((o) => ({ i: o.i, x: o.body.x, y: o.body.y, mode: o.mode, ch: o.holdCh, take: o.take }))
+        botStep(lv, b, 1 / 60, { humans, others, bots: infos })
+        if (b.body.x > 57.5 * 32 && b.body.x < 61 * 32 && b.body.y > 8 * 32) inHole++
+      }
+    }
+    expect(inHole).toBe(0)
+  }, 120000)
+})
+
+describe('Bots und Fahnen', () => {
+  it('Wer ein Level schafft, hat alle Fahnen davor mitgenommen', () => {
+    for (const n of [0, 1, 2, 3]) {
+      const lv = levelFor('seed', n)
+      const b = newBot(0, lv, 20, 3, n)
+      let exit = false
+      for (let f = 0; f < 120 * 60 && !exit; f++) exit = botStep(lv, b, 1 / 60, { humans: [], others: [] }) === 'exit'
+      expect(exit).toBe(true)
+      expect(b.cp).toBe(Math.max(...lv.checkpoints.filter((c) => c < lv.exit.x)))
+    }
+  }, 300000)
+})
