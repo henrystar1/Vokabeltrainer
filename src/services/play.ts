@@ -143,7 +143,7 @@ export interface TeamPerson {
   pk_hat?: string | null
   pk_fx?: string | null
   /** Auftritt: 'blackhole' (Admin) oder 'hammer' (Mod) */
-  pk_look?: 'blackhole' | 'hammer' | null
+  pk_look?: 'blackhole' | 'hammer' | 'piano' | null
   /** Parkour mit mehreren: host | invited | joined (declined/left werden nicht geliefert). */
   state?: 'host' | 'invited' | 'joined' | 'declined' | 'left'
 }
@@ -247,8 +247,11 @@ export const teamRejoin = (id: string) => rpc<void>('team_rejoin', { p_id: id })
 export const teamSpectate = (id: string) => rpc<TeamState>('team_spectate', { p_id: id })
 export interface AdminRun { id: string; kind: 'parkour' | 'deathrun'; status: 'lobby' | 'running'; is_open: boolean; bots: number; created_at: string; starts_at: string | null; players: string[] }
 /** Darf ich Läufe ansehen, und mit welchem Auftritt komme ich ins Spiel? (Migration 0054) */
-export interface RunPerks { spectate: boolean; look: 'blackhole' | 'hammer' | null }
+export type EntranceLook = 'blackhole' | 'hammer' | 'piano'
+export interface RunPerks { spectate: boolean; look: EntranceLook | null; allowed: EntranceLook[]; entrance: string | null }
 export const myRunPerks = () => rpc<RunPerks>('my_run_perks')
+/** Auftritt wählen: 'blackhole' | 'hammer' | 'piano' | 'none' */
+export const parkourSetEntrance = (look: EntranceLook | 'none') => rpc<RunPerks>('parkour_set_entrance', { p_look: look })
 export const submitIrregular = (correct: number, total: number) => rpc<{ earned: number; cap_left: number }>('submit_irregular', { p_correct: correct, p_total: total })
 export const adminOpenRuns = () => rpc<AdminRun[]>('admin_open_runs')
 export const teamSetVersus = (id: string, mode: number, map: Record<string, number> = {}) => rpc<void>('team_set_versus', { p_id: id, p_mode: mode, p_map: map })

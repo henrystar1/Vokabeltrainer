@@ -88,9 +88,9 @@ function Editor({ person, onChanged }: { person: StaffRow; onChanged: () => void
     }
   }
 
-  const patch = (change: Partial<Pick<StaffRights, 'books_mode' | 'set_mode' | 'shop' | 'timeout_max' | 'spectate' | 'look'>>) => {
+  const patch = (change: Partial<Pick<StaffRights, 'books_mode' | 'set_mode' | 'shop' | 'timeout_max' | 'spectate' | 'looks'>>) => {
     if (!r) return Promise.resolve()
-    return run(() => adminSetStaffRights(person.user_id, { books_mode: r.books_mode, set_mode: r.set_mode, shop: r.shop, timeout_max: r.timeout_max, spectate: r.spectate, look: r.look, ...change }))
+    return run(() => adminSetStaffRights(person.user_id, { books_mode: r.books_mode, set_mode: r.set_mode, shop: r.shop, timeout_max: r.timeout_max, spectate: r.spectate, looks: r.looks, ...change }))
   }
 
   const modeChoices = (value: RightMode | null, set: (m: RightMode | null) => void, labels: [string, string, string]) => (
@@ -168,14 +168,14 @@ function Editor({ person, onChanged }: { person: StaffRow; onChanged: () => void
             </div>
           </Block>
 
-          <Block icon={<Eye size={18} />} title="Parkour: Zuschauen und Auftritt" text="Zuschauen: Die Person sieht alle laufenden Parkour- und Deathrun-Läufe, schaut unsichtbar zu und kann an der Stelle ins Spiel einsteigen (wie ein Admin, nur ohne Flug- und Geisterkräfte). Auftritt: So kommt die Person ins Spiel.">
+          <Block icon={<Eye size={18} />} title="Parkour: Zuschauen und Auftritt" text="Zuschauen: Die Person sieht alle laufenden Parkour- und Deathrun-Läufe, schaut unsichtbar zu und kann an der Stelle ins Spiel einsteigen (wie ein Admin, nur ohne Flug- und Geisterkräfte). Auftritte: Hier gibst du frei, welche die Person im Parkour-Shop wählen darf.">
             <div className="grid gap-2 sm:grid-cols-2">
               <Choice checked={!r.spectate} onSelect={() => void patch({ spectate: false })} title="Zuschauen: Nein" />
               <Choice checked={r.spectate} onSelect={() => void patch({ spectate: true })} title="Zuschauen: Ja" />
             </div>
             <div className="grid gap-2 sm:grid-cols-2">
-              <Choice checked={r.look === 'none'} onSelect={() => void patch({ look: 'none' })} title="Auftritt: normal" />
-              <Choice checked={r.look === 'hammer'} onSelect={() => void patch({ look: 'hammer' })} title="Auftritt: Hammer" text="Ein Hammer fällt vom Himmel, ein Blitz schlägt ein, dann steht die Person da (mit Name, Effekten und Herzen)." />
+              <Choice checked={r.looks.includes('hammer')} onSelect={() => void patch({ looks: r.looks.includes('hammer') ? r.looks.filter((l) => l !== 'hammer') : [...r.looks, 'hammer'] })} title="Auftritt freigeben: Hammer" text="Ein Hammer fällt vom Himmel, ein Blitz schlägt ein. Die Person wählt im Parkour-Shop." />
+              <Choice checked={r.looks.includes('piano')} onSelect={() => void patch({ looks: r.looks.includes('piano') ? r.looks.filter((l) => l !== 'piano') : [...r.looks, 'piano'] })} title="Auftritt freigeben: Klavier" text="Ein Klavier kracht herunter, beim Gehen fliegt die Person als Klavier davon." />
             </div>
           </Block>
 

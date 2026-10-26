@@ -6,10 +6,10 @@ import { useFocusMode } from '../koins/focusMode'
 import { useAuth } from '../auth/AuthProvider'
 import { supabase } from '../../lib/supabaseClient'
 import { parkourLearnOffList, parkourShopGet, teamDeathrunFinish, teamParkourFinish, type TeamPerson, type TeamState } from '../../services/play'
-import { HAMMER_APPEAR, HAMMER_IN, HAMMER_OUT, drawHammerAnim, drawModBack, drawModBody, drawModName } from './modFx'
+import { LOOKS } from './lookFx'
+import type { HoleAnim, Look } from './lookTypes'
 import { useRunPerks } from './perks'
 import type { RunPerks } from '../../services/play'
-import { HOLE_IN, HOLE_OUT, drawAdminBack, drawAdminBody, drawAdminName, drawHoleAnim, type HoleAnim } from './adminFx'
 import { levelFor } from './generator'
 import { PK_HATS, pkFill } from './cosmetics'
 import { FxField } from './fx'
@@ -40,7 +40,7 @@ const JET_FUEL = 3.5 // Sekunden Schub je Jetpack
 const STALE_MS = 2500
 const SNAP_PX = 140 // größere Sprünge der Position werden nicht weich nachgezogen (Neustart, Levelwechsel)
 
-interface Remote { x: number; y: number; face: 1 | -1; lv: number; cp: number | null; dead: boolean; ex: boolean; dc: number; g: boolean; seen: number; lh: number; gh: boolean; dx: number; dy: number; hp: number; el: boolean; sid: string; n: number; bf: number; lk?: Partial<TeamPerson>; ad?: boolean; hm?: boolean; appearAt?: number }
+interface Remote { x: number; y: number; face: 1 | -1; lv: number; cp: number | null; dead: boolean; ex: boolean; dc: number; g: boolean; seen: number; lh: number; gh: boolean; dx: number; dy: number; hp: number; el: boolean; sid: string; n: number; bf: number; lk?: Partial<TeamPerson>; kd?: Look; appearAt?: number }
 interface BotView { i: number; x: number; y: number; face: 1 | -1; lv: number; hp: number; out: boolean; dead: boolean; dx: number; dy: number; seen: number }
 
 const hash = (n: number) => {
@@ -150,11 +150,10 @@ function ParkourGameInner({ st, startLevel = 0, perks }: { st: TeamState; startL
     let guestLook: Partial<TeamPerson> | null = null
     const lookOf = (uid: string): Partial<TeamPerson> | undefined => peopleRef.current.find((p) => p.user_id === uid) ?? (uid === st.me ? guestLook ?? undefined : remotes.get(uid)?.lk)
     const myFxId = () => lookOf(st.me)?.pk_fx ?? null
-    const lookKindOf = (uid: string): 'blackhole' | 'hammer' | null => {
+    const lookKindOf = (uid: string): Look | null => {
       if (uid === st.me) return perksRef.current.look
       const rm = remotes.get(uid) ?? rivals.get(uid)
-      if (rm?.hm) return 'hammer'
-      if (rm?.ad) return 'blackhole'
+      if (rm?.kd) return rm.kd
       const l = lookOf(uid)
       return l?.pk_look ?? (l?.role === 'admin' ? 'blackhole' : null)
     }
@@ -219,8 +218,7 @@ function ParkourGameInner({ st, startLevel = 0, perks }: { st: TeamState; startL
     const saveKey = `pkr:${st.id}:${st.me}`
     let restored = false
     // Admin kommt zu Beginn aus einem Schwarzen Loch über dem Start herausgefallen
-    if (perksRef.current.look === 'blackhole' && !isSpec) { me.y -= 70; holes.push({ x: me.x, y: me.y, t: 0, kind: 'in', lv, face: 1 }); pendingEv = 'in' }
-    else if (perksRef.current.look === 'hammer' && !isSpec) { holes.push({ x: me.x, y: me.y, t: 0, kind: 'in', lv, face: 1, style: 'hammer' }); pendingEv = 'in'; appearT = HAMMER_APPEAR }
+    if (perksRef.current.look && !isSpec) { holes.push({ x: me.x, y: me.y, t: 0, kind: 'in', lv, face: 1, look: perksRef.current.look }); pendingEv = 'in'; appearT = LOOKS[perksRef.current.look].appear }
     if (!isSpec) {
       try {
         const raw = window.localStorage.getItem(saveKey)
@@ -285,7 +283,7 @@ function ParkourGameInner({ st, startLevel = 0, perks }: { st: TeamState; startL
     let lastBotSend = 0
 
     function onState(payload: unknown) {
-      const p = payload as Partial<Remote> & { u?: string; n?: number; sid?: string; bf?: number; lk?: { n?: string; c?: string | null; h?: string | null; f?: string | null }; ad?: number; ev?: string }
+      const p = payload as Partial<Remote> & { u?: string; n?: number; sid?: string; bf?: number; lk?: { n?: string; c?: string | null; h?: string | null; f?: string | null }; kd?: string; ev?: string }
       const uid = p.u
       const x = finite(p.x, -100, 200000)
       const y = finite(p.y, -800, 1200)
@@ -301,10 +299,10 @@ function ParkourGameInner({ st, startLevel = 0, perks }: { st: TeamState; startL
       const lvNew = Math.max(0, Math.min(999, Math.floor(p.lv ?? 0)))
       const dead = !!p.dead
       const jump = !prev || prev.lv !== lvNew || prev.dead !== dead || Math.hypot(x - prev.x, y - prev.y) > SNAP_PX
-      const r: Remote = { x, y, face: p.face === -1 ? -1 : 1, lv: lvNew, cp: p.cp ?? null, dead, ex: !!p.ex, dc: p.dc ?? 0, g: !!p.g, seen: performance.now(), lh: p.lh ?? 0, gh: !!p.gh, dx: jump || !prev ? x : prev.dx, dy: jump || !prev ? y : prev.dy, hp: p.hp ?? 0, el: !!p.el, sid: psid, n: pn, bf: p.bf ?? 0, ad: !!p.ad || prev?.ad, hm: !!p.hm || prev?.hm, lk: p.lk && typeof p.lk === 'object' ? { name: String(p.lk.n ?? '').slice(0, 24), pk_color: p.lk.c ?? null, pk_hat: p.lk.h ?? null, pk_fx: p.lk.f ?? null, role: p.hm ? 'mod' : 'admin', pk_look: p.hm ? 'hammer' : 'blackhole' } : prev?.lk, appearAt: prev?.appearAt }
+      const r: Remote = { x, y, face: p.face === -1 ? -1 : 1, lv: lvNew, cp: p.cp ?? null, dead, ex: !!p.ex, dc: p.dc ?? 0, g: !!p.g, seen: performance.now(), lh: p.lh ?? 0, gh: !!p.gh, dx: jump || !prev ? x : prev.dx, dy: jump || !prev ? y : prev.dy, hp: p.hp ?? 0, el: !!p.el, sid: psid, n: pn, bf: p.bf ?? 0, kd: p.kd === 'blackhole' || p.kd === 'hammer' || p.kd === 'piano' ? p.kd : prev?.kd, lk: p.lk && typeof p.lk === 'object' ? { name: String(p.lk.n ?? '').slice(0, 24), pk_color: p.lk.c ?? null, pk_hat: p.lk.h ?? null, pk_fx: p.lk.f ?? null, role: p.kd === 'blackhole' ? 'admin' : 'mod', pk_look: p.kd === 'hammer' || p.kd === 'piano' ? p.kd : 'blackhole' } : prev?.lk, appearAt: prev?.appearAt }
       if (p.ev === 'in' || p.ev === 'out') {
-        holes.push({ x, y, t: 0, kind: p.ev, lv: lvNew, face: r.face, ...(r.hm ? { style: 'hammer' as const } : {}) })
-        if (p.ev === 'in' && r.hm) r.appearAt = performance.now() + HAMMER_APPEAR * 1000
+        if (r.kd) holes.push({ x, y, t: 0, kind: p.ev, lv: lvNew, face: r.face, look: r.kd })
+        if (p.ev === 'in' && r.kd) r.appearAt = performance.now() + LOOKS[r.kd].appear * 1000
       }
       store.set(uid, r)
       if (rival) return
@@ -341,6 +339,30 @@ function ParkourGameInner({ st, startLevel = 0, perks }: { st: TeamState; startL
       }
     }
 
+    // Zuschauer-Geister: Zuschauende sehen sich gegenseitig. Eigener Kanal-Event 'g', beeinflusst das Spiel nie.
+    interface Ghost { x: number; y: number; dx: number; dy: number; face: 1 | -1; lv: number; name: string; seen: number }
+    const ghosts = new Map<string, Ghost>()
+    let lastGhost = 0
+    let lastGhostSig = ''
+    function onGhost(payload: unknown) {
+      const p = payload as { u?: string; x?: number; y?: number; face?: number; lv?: number; n?: string } | null
+      if (!p || typeof p.u !== 'string' || p.u === st.me) return
+      const x = finite(p.x, -100, 200000), y = finite(p.y, -800, 1200)
+      if (x === null || y === null) return
+      const lvG = Math.max(0, Math.min(999, Math.floor(Number(p.lv) || 0)))
+      const prev = ghosts.get(p.u)
+      const snap = !prev || prev.lv !== lvG || Math.hypot(x - prev.x, y - prev.y) > SNAP_PX
+      ghosts.set(p.u, { x, y, dx: snap ? x : prev!.dx, dy: snap ? y : prev!.dy, face: p.face === -1 ? -1 : 1, lv: lvG, name: String(p.n ?? '').slice(0, 24), seen: performance.now() })
+    }
+    function sendGhost(now: number) {
+      if (!ready || !isSpec) return
+      const x = Math.round(me.x), y = Math.round(me.y)
+      const sig = `${x}|${y}|${me.face}|${lv}`
+      if (now - lastGhost < 110 || (sig === lastGhostSig && now - lastGhost < 450)) return
+      lastGhost = now; lastGhostSig = sig
+      void ch?.send({ type: 'broadcast', event: 'g', payload: { u: st.me, x, y, face: me.face, lv, n: nameRef.current ?? 'Zuschauer' } })?.catch?.(() => undefined)
+    }
+
     function connect() {
       if (disposed) return
       lastConnect = performance.now()
@@ -350,6 +372,7 @@ function ParkourGameInner({ st, startLevel = 0, perks }: { st: TeamState; startL
       ch = c
       c.on('broadcast', { event: 's' }, ({ payload }) => onState(payload))
         .on('broadcast', { event: 'b' }, ({ payload }) => onBots(payload))
+        .on('broadcast', { event: 'g' }, ({ payload }) => onGhost(payload))
         .subscribe((s) => {
           if (c !== ch || disposed) return
           if (s === 'SUBSCRIBED') { ready = true; attempt = 0; netNote = ''; lastSend = 0; lastSig = ''; lastRx = performance.now() }
@@ -456,8 +479,8 @@ function ParkourGameInner({ st, startLevel = 0, perks }: { st: TeamState; startL
       if (on) {
         // Admin: unter ihm öffnet sich ein Schwarzes Loch. Mod mit Hammer: Hammer und Blitz. Sonst verschwindet die Figur einfach.
         const lookNow = perksRef.current.look
-        if (lookNow) holes.push({ x: me.x, y: me.y, t: 0, kind: 'out', lv, face: me.face, ...(lookNow === 'hammer' ? { style: 'hammer' as const } : {}) })
-        animLock = lookNow === 'hammer' ? HAMMER_OUT : lookNow === 'blackhole' ? HOLE_OUT : 0.05
+        if (lookNow) holes.push({ x: me.x, y: me.y, t: 0, kind: 'out', lv, face: me.face, look: lookNow })
+        animLock = lookNow ? LOOKS[lookNow].outDur : 0.05
         forceEl = true
         pendingEv = lookNow ? 'out' : null
         lastSend = 0; lastSig = ''
@@ -498,8 +521,7 @@ function ParkourGameInner({ st, startLevel = 0, perks }: { st: TeamState; startL
         if (spec && guestLook && !guestHeartsGiven) { guestHeartsGiven = true; const extra = Math.max(0, Math.min(10, guestLook.pk_hearts ?? 0)); maxHearts += extra; hearts = maxHearts }
         // Schwarzes Loch (Admin) bzw. Hammer und Blitz (Mod) an der Stelle, an der die Figur erscheint
         const lookIn = perksRef.current.look
-        if (lookIn === 'hammer') { holes.push({ x: px, y: py, t: 0, kind: 'in', lv, face: me.face, style: 'hammer' }); appearT = HAMMER_APPEAR }
-        else if (lookIn === 'blackhole') holes.push({ x: px, y: py, t: 0, kind: 'in', lv, face: me.face })
+        if (lookIn) { holes.push({ x: px, y: py, t: 0, kind: 'in', lv, face: me.face, look: lookIn }); appearT = LOOKS[lookIn].appear }
         pendingEv = lookIn ? 'in' : null
         lastSend = 0; lastSig = ''
       }
@@ -518,7 +540,7 @@ function ParkourGameInner({ st, startLevel = 0, perks }: { st: TeamState; startL
       if (now - lastSend < SEND_MS || (sig === lastSig && now - lastSend < 350)) return
       lastSend = now
       lastSig = sig
-      void ch?.send({ type: 'broadcast', event: 's', payload: { u: st.me, sid, n: ++seq, x, y, face: me.face, lv, cp, dead: deadT > 0, ex: inExit(level, me), dc: spec ? 0 : deaths, g: me.ground, lh: hashLevel(level), gh: ghostOn, hp: hearts, el: (finished && (dr || vs > 0)) || isSpec || forceEl, bf: buffCode(), ...(perksRef.current.look === 'blackhole' ? { ad: 1 } : perksRef.current.look === 'hammer' ? { hm: 1 } : {}), ...(guestLook ? { lk: { n: guestLook.name, c: guestLook.pk_color, h: guestLook.pk_hat, f: guestLook.pk_fx } } : {}), ...(pendingEv ? { ev: pendingEv } : {}) } })?.catch?.(() => undefined)
+      void ch?.send({ type: 'broadcast', event: 's', payload: { u: st.me, sid, n: ++seq, x, y, face: me.face, lv, cp, dead: deadT > 0, ex: inExit(level, me), dc: spec ? 0 : deaths, g: me.ground, lh: hashLevel(level), gh: ghostOn, hp: hearts, el: (finished && (dr || vs > 0)) || isSpec || forceEl, bf: buffCode(), ...(perksRef.current.look ? { kd: perksRef.current.look } : {}), ...(guestLook ? { lk: { n: guestLook.name, c: guestLook.pk_color, h: guestLook.pk_hat, f: guestLook.pk_fx } } : {}), ...(pendingEv ? { ev: pendingEv } : {}) } })?.catch?.(() => undefined)
       pendingEv = null
       hideSend = false
     }
@@ -823,7 +845,7 @@ function ParkourGameInner({ st, startLevel = 0, perks }: { st: TeamState; startL
       ctx!.strokeStyle = `rgba(253,224,71,${0.6 + 0.4 * Math.sin(t * 4)})`; ctx!.lineWidth = 3
       ctx!.strokeRect(ex + 2, ey + 2, ew - 4, eh - 4)
       // Spieler
-      const drawP = (x: number, y: number, face: 1 | -1, uid: string, name: string, dead: boolean, self: boolean, ghost = false, bf = 0, bot = false, team = -1, skill = 0, adm: 'blackhole' | 'hammer' | null = null) => {
+      const drawP = (x: number, y: number, face: 1 | -1, uid: string, name: string, dead: boolean, self: boolean, ghost = false, bf = 0, bot = false, team = -1, skill = 0, adm: Look | null = null) => {
         const look = lookOf(uid)
         const idx = bot ? 0 : idxOf(uid)
         const color = bot ? (BOT_SKIN[skill] ?? BOT_COLOR) : pkFill(look?.pk_color, COLORS[idx % COLORS.length], t)
@@ -835,15 +857,10 @@ function ParkourGameInner({ st, startLevel = 0, perks }: { st: TeamState; startL
           ctx!.fillStyle = '#fb923c'
           ctx!.beginPath(); ctx!.moveTo(x + 4, y + PH); ctx!.lineTo(x + PW / 2, y + PH + 10 + 6 * Math.abs(Math.sin(t * 30))); ctx!.lineTo(x + PW - 4, y + PH); ctx!.fill()
         }
-        if (adm === 'hammer') {
-          // Mod mit Hammer: Stahlfigur mit Blitz-Zeichen, Funken und kleinem Hammer
-          drawModBack(ctx!, x, y, t)
-          drawModBody(ctx!, x, y, face, t)
-          if (team >= 0 && !dead) { ctx!.strokeStyle = team === 0 ? '#f87171' : '#60a5fa'; ctx!.lineWidth = 3; ctx!.beginPath(); ctx!.roundRect(x - 3, y - 3, PW + 6, PH + 6, 10); ctx!.stroke() }
-        } else if (adm === 'blackhole') {
-          // Admin: Schwarzes Loch als Figur (Leuchten, Akkretionsscheibe, Galaxie im Körper, Sterne)
-          drawAdminBack(ctx!, x, y, t)
-          drawAdminBody(ctx!, x, y, face, t)
+        if (adm) {
+          // Auftritts-Look (Schwarzes Loch, Hammer oder Klavier)
+          LOOKS[adm].back(ctx!, x, y, t)
+          LOOKS[adm].body(ctx!, x, y, face, t)
           if (team >= 0 && !dead) { ctx!.strokeStyle = team === 0 ? '#f87171' : '#60a5fa'; ctx!.lineWidth = 3; ctx!.beginPath(); ctx!.roundRect(x - 3, y - 3, PW + 6, PH + 6, 10); ctx!.stroke() }
         } else {
           ctx!.fillStyle = color
@@ -861,7 +878,7 @@ function ParkourGameInner({ st, startLevel = 0, perks }: { st: TeamState; startL
         ctx!.textAlign = 'center'
         if (hat) { ctx!.font = '20px system-ui, "Apple Color Emoji", "Segoe UI Emoji", sans-serif'; ctx!.fillStyle = '#fff'; ctx!.fillText(hat.emoji, x + PW / 2, y + 4) }
         ctx!.font = '600 11px system-ui, sans-serif'; ctx!.fillStyle = 'rgba(255,255,255,0.9)'
-        if (adm && !isSpec) (adm === 'hammer' ? drawModName : drawAdminName)(ctx!, x + PW / 2, y - (hat ? 20 : 8), self ? (nameRef.current ?? 'Admin') : name, t)
+        if (adm && !isSpec) LOOKS[adm].label(ctx!, x + PW / 2, y - (hat ? 20 : 8), self ? (nameRef.current ?? 'Admin') : name, t)
         else ctx!.fillText(self ? (isSpec ? 'Zuschauer' : 'Du') : name.slice(0, 10), x + PW / 2, y - (hat ? 20 : 6))
         ctx!.restore()
       }
@@ -871,7 +888,7 @@ function ParkourGameInner({ st, startLevel = 0, perks }: { st: TeamState; startL
       for (const [uid, r] of remotes) { if (r.lv === lv && now - r.seen < STALE_MS && !r.dead) fxField.drawBehind(ctx!, uid, lookOf(uid)?.pk_fx, t) }
       if (!isSpec && deadT <= 0 && animLock <= 0) fxField.drawBehind(ctx!, 'me', myFxId(), t)
       fxField.drawParticles(ctx!)
-      for (const h of holes) if (h.lv === lv) { if (h.style === 'hammer') drawHammerAnim(ctx!, h, t); else drawHoleAnim(ctx!, h, t) }
+      for (const h of holes) if (h.lv === lv) LOOKS[h.look].anim(ctx!, h, t)
       for (const [uid, r] of remotes) {
         if (r.lv !== lv || now - r.seen >= STALE_MS || r.el || (r.appearAt !== undefined && now < r.appearAt)) continue
         drawP(r.dx, r.dy, r.face, uid, nameOf(uid), r.dead, false, r.gh, r.bf, false, vs === 2 ? teamOfU(uid) : vs === 1 ? 1 : -1, 0, lookKindOf(uid))
@@ -879,6 +896,23 @@ function ParkourGameInner({ st, startLevel = 0, perks }: { st: TeamState; startL
       for (const [uid, r] of rivals) {
         if (r.lv !== lv || now - r.seen >= STALE_MS || r.el) continue
         drawP(r.dx, r.dy, r.face, uid, nameOf(uid), r.dead, false, r.gh, r.bf, false, teamOfU(uid), 0, lookKindOf(uid))
+      }
+      if (isSpec) {
+        // andere Zuschauer: halbdurchsichtig mit Geist-Namen (Spielende sehen sie nie)
+        for (const [uid, g] of ghosts) {
+          if (g.lv !== lv || now - g.seen >= STALE_MS) { if (now - g.seen > 15000) ghosts.delete(uid); continue }
+          ctx!.save()
+          ctx!.globalAlpha = 0.45
+          ctx!.fillStyle = '#c4b5fd'; ctx!.shadowColor = '#a78bfa'; ctx!.shadowBlur = 10
+          ctx!.beginPath(); ctx!.roundRect(g.dx, g.dy, PW, PH, 7); ctx!.fill()
+          ctx!.shadowBlur = 0
+          ctx!.fillStyle = '#fff'; ctx!.fillRect(g.dx + (g.face > 0 ? 11 : 3), g.dy + 7, 7, 7)
+          ctx!.fillStyle = '#0f172a'; ctx!.fillRect(g.dx + (g.face > 0 ? 15 : 4), g.dy + 9, 3, 4)
+          ctx!.globalAlpha = 0.85; ctx!.textAlign = 'center'
+          ctx!.font = '600 11px system-ui, "Apple Color Emoji", "Segoe UI Emoji", sans-serif'; ctx!.fillStyle = '#e9d5ff'
+          ctx!.fillText(`👻 ${g.name.slice(0, 12)}`, g.dx + PW / 2, g.dy - 6)
+          ctx!.restore()
+        }
       }
       for (const b of bviews) drawP(bots ? b.x : b.dx, bots ? b.y : b.dy, b.face, 'bot' + b.i, BOT_NAMES[b.i % BOT_NAMES.length], b.dead, false, false, 0, true, vs === 1 ? 0 : -1, botSkills[b.i] ?? 2)
       if (animLock <= 0 && appearT <= 0) drawP(me.x, me.y, me.face, st.me, 'Du', deadT > 0, true, ghostOn || isSpec, buffCode(), false, isSpec ? -1 : vs > 0 ? myTeam : -1, 0, isSpec ? null : perksRef.current.look)
@@ -1010,7 +1044,8 @@ function ParkourGameInner({ st, startLevel = 0, perks }: { st: TeamState; startL
       if (titleT > 0) titleT -= dt
       let guard = 0
       while (acc >= 1 / 60 && guard++ < 6) { step(1 / 60, now); acc -= 1 / 60 }
-      { const k = Math.min(1, dt * 14); for (const r of [...remotes.values(), ...rivals.values()]) { r.dx += (r.x - r.dx) * k; r.dy += (r.y - r.dy) * k } }
+      { const k = Math.min(1, dt * 14); for (const r of [...remotes.values(), ...rivals.values()]) { r.dx += (r.x - r.dx) * k; r.dy += (r.y - r.dy) * k }
+        for (const g of ghosts.values()) { g.dx += (g.x - g.dx) * k; g.dy += (g.y - g.dy) * k } }
       { const k = Math.min(1, dt * 12); for (const b of botSnap.values()) { b.dx += (b.x - b.dx) * k; b.dy += (b.y - b.dy) * k } }
       // Effekte nachführen
       if (!isSpec && deadT <= 0 && !finished) fxField.update('me', myFxId(), me.x, me.y, me.face, t, dt)
@@ -1020,8 +1055,9 @@ function ParkourGameInner({ st, startLevel = 0, perks }: { st: TeamState; startL
         else fxField.forget(uid)
       }
       fxField.step(dt)
-      for (let i = holes.length - 1; i >= 0; i--) { holes[i].t += dt; if (holes[i].t > (holes[i].style === 'hammer' ? (holes[i].kind === 'in' ? HAMMER_IN : HAMMER_OUT) : holes[i].kind === 'in' ? HOLE_IN : HOLE_OUT)) holes.splice(i, 1) }
+      for (let i = holes.length - 1; i >= 0; i--) { holes[i].t += dt; if (holes[i].t > (holes[i].kind === 'in' ? LOOKS[holes[i].look].inDur : LOOKS[holes[i].look].outDur)) holes.splice(i, 1) }
       send(now)
+      sendGhost(now)
       sendBots(now)
       saveBots(now)
       saveState(now)

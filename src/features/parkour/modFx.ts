@@ -1,5 +1,5 @@
 import { PH, PW } from './engine'
-import type { HoleAnim } from './adminFx'
+import type { HoleAnim } from './lookTypes'
 
 /** Hammer-Auftritt für Mods: ein Hammer fällt vom Himmel, ein großer Blitz schlägt in den Boden, dann steht die Person da. */
 export const HAMMER_IN = 1.5

@@ -2,6 +2,9 @@ import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { Check, Eye, Footprints, Heart, Skull, Users } from 'lucide-react'
 import { useRunPerks } from '../features/parkour/perks'
+import EntrancePreview from '../features/parkour/EntrancePreview'
+import { LOOKS } from '../features/parkour/lookFx'
+import { useAuth } from '../features/auth/AuthProvider'
 import Button from '../components/ui/Button'
 import Card from '../components/ui/Card'
 import CoinIcon from '../components/ui/CoinIcon'
@@ -11,7 +14,7 @@ import { useWallet } from '../features/koins/WalletProvider'
 import { PK_COLORS, PK_FX, PK_HATS, PK_PREMIUM_FACTOR } from '../features/parkour/cosmetics'
 import { errorMessage } from '../lib/errors'
 import { useAsync } from '../lib/useAsync'
-import { parkourEquip, parkourShopBuy, parkourShopGet, type ParkourShop } from '../services/play'
+import { parkourEquip, parkourSetEntrance, parkourShopBuy, parkourShopGet, type ParkourShop } from '../services/play'
 
 function Figure({ color, hat }: { color: string; hat?: string }) {
   return (
@@ -27,6 +30,7 @@ function Figure({ color, hat }: { color: string; hat?: string }) {
 export default function Parkour() {
   const wallet = useWallet()
   const perks = useRunPerks()
+  const { user } = useAuth()
   const shop = useAsync(parkourShopGet, [])
   const [armed, setArmed] = useState<string | null>(null)
   const [busy, setBusy] = useState<string | null>(null)
@@ -86,6 +90,27 @@ export default function Parkour() {
               <Figure color={activeColor} hat={activeHat} />
               <p className="text-sm text-slate-300">So siehst du im Spiel aus. Deine Partnerin oder dein Partner sieht dasselbe.</p>
             </div>
+
+            {perks.allowed.length > 0 && (
+              <section className="space-y-2">
+                <h3 className="label-mono">Auftritt</h3>
+                <p className="text-xs text-slate-400">So kommst du ins Spiel und so gehst du wieder. Alle anderen sehen es.</p>
+                <div className="grid gap-3 sm:grid-cols-2">
+                  {([null, ...perks.allowed] as const).map((id) => {
+                    const on = id === null ? perks.entrance === 'none' : perks.look === id
+                    return (
+                      <button key={id ?? 'none'} type="button" aria-pressed={on} disabled={busy === 'entrance'}
+                        onClick={() => void run('entrance', async () => perks.apply(await parkourSetEntrance(id ?? 'none')))}
+                        className={`space-y-2 rounded-xl border p-3 text-left transition ${on ? 'border-brand-400 bg-brand-500/10' : 'border-white/10 bg-white/5 hover:bg-white/10'}`}>
+                        {id ? <EntrancePreview look={id} name={user?.user_metadata?.display_name ?? 'Du'} /> : <div className="flex h-[120px] items-center justify-center rounded-lg border border-white/10 text-sm text-slate-400">Normal, ohne Effekt</div>}
+                        <div className="flex items-center gap-2 text-sm font-medium text-white">{on && <Check size={14} />}{id ? LOOKS[id].name : 'Ohne Auftritt'}</div>
+                        {id && <p className="text-xs text-slate-400">{LOOKS[id].blurb}</p>}
+                      </button>
+                    )
+                  })}
+                </div>
+              </section>
+            )}
 
             <section className="space-y-2">
               <h3 className="label-mono">Herzen</h3>

@@ -1,21 +1,11 @@
 import { PH, PW } from './engine'
+import type { HoleAnim } from './lookTypes'
 
 /** Admin-Look im Parkour: eine Figur wie ein kleines Schwarzes Loch (Ereignishorizont, Akkretionsscheibe, Sternenschweif). */
 
-export interface HoleAnim {
-  x: number
-  y: number
-  /** Sekunden seit dem Start */
-  t: number
-  /** in = Loch öffnet sich, Figur fällt heraus; out = Loch öffnet sich unter der Figur, sie fällt hinein und verschwindet mit ihm */
-  kind: 'in' | 'out'
-  lv: number
-  face: 1 | -1
-  /** 'hammer' = Auftritt der Mods (modFx.ts), sonst Schwarzes Loch */
-  style?: 'hammer'
-}
-export const HOLE_IN = 1.5
-export const HOLE_OUT = 1.5
+export const BH_IN = 2.0
+export const BH_APPEAR = 1.35
+export const BH_OUT = 2.3
 
 const clamp01 = (v: number) => Math.max(0, Math.min(1, v))
 const ease = (v: number) => v * v * (3 - 2 * v)
@@ -173,34 +163,176 @@ export function drawAdminName(c: CanvasRenderingContext2D, cx: number, y: number
   c.restore()
 }
 
-/** Die Animation selbst: Loch und (beim Verschwinden) die hineinfallende Figur. Zeichnet den Admin NICHT, wenn er schon echt im Bild ist (in). */
-export function drawHoleAnim(c: CanvasRenderingContext2D, h: HoleAnim, t: number): void {
+const rnd = (n: number) => { const x = Math.sin(n * 127.1 + 311.7) * 43758.5453; return x - Math.floor(x) }
+
+/** Rakete, Spitze nach oben; (0,0) = Mitte. */
+function rocket(c: CanvasRenderingContext2D, t: number, flame: number): void {
+  // Flamme
+  const fl = 14 + 10 * flame + 4 * Math.sin(t * 60)
+  const fg = c.createLinearGradient(0, 12, 0, 12 + fl)
+  fg.addColorStop(0, '#fff7ae'); fg.addColorStop(0.4, '#fb923c'); fg.addColorStop(1, 'rgba(239,68,68,0)')
+  c.fillStyle = fg
+  c.beginPath(); c.moveTo(-5, 12); c.lineTo(0, 12 + fl); c.lineTo(5, 12); c.closePath(); c.fill()
+  // Flossen
+  c.fillStyle = '#dc2626'
+  c.beginPath(); c.moveTo(-5, 4); c.lineTo(-11, 15); c.lineTo(-5, 12); c.closePath(); c.fill()
+  c.beginPath(); c.moveTo(5, 4); c.lineTo(11, 15); c.lineTo(5, 12); c.closePath(); c.fill()
+  // Rumpf
+  const g = c.createLinearGradient(-6, 0, 6, 0)
+  g.addColorStop(0, '#cbd5e1'); g.addColorStop(0.5, '#fff'); g.addColorStop(1, '#94a3b8')
+  c.fillStyle = g
+  c.beginPath(); c.roundRect(-6, -10, 12, 24, 3); c.fill()
+  // Spitze
+  c.fillStyle = '#ef4444'
+  c.beginPath(); c.moveTo(-6, -9); c.quadraticCurveTo(0, -30, 6, -9); c.closePath(); c.fill()
+  // Fenster
+  c.fillStyle = '#38bdf8'; c.beginPath(); c.arc(0, -1, 3, 0, Math.PI * 2); c.fill()
+  c.strokeStyle = '#1e293b'; c.lineWidth = 1; c.stroke()
+}
+
+function flashRect(c: CanvasRenderingContext2D, cx: number, k: number, strength: number, color = '#f5f3ff'): void {
+  if (k <= 0 || k >= 1) return
+  c.save(); c.globalAlpha = strength * (1 - k)
+  c.fillStyle = color; c.fillRect(cx - 700, -200, 1400, 800)
+  c.restore()
+}
+
+/** Schwarzes Loch (Auftritt): oben im Bild öffnet es sich, eine Rakete rast daraus zum Boden und explodiert, dann steht der Admin da. Verlassen: das Loch öffnet sich über ihm, saugt ihn gestreckt in einer Spirale hinein und kollabiert in einer Sternen-Explosion. */
+export function drawBlackholeAnim(c: CanvasRenderingContext2D, h: HoleAnim, t: number): void {
   const cx = h.x + PW / 2
+  const feet = h.y + PH
   if (h.kind === 'in') {
-    const k = h.t / HOLE_IN
-    const open = k < 0.25 ? ease(k / 0.25) : k < 0.7 ? 1 : 1 - ease((k - 0.7) / 0.3)
-    drawHoleDisc(c, cx, h.y + PH / 2, 38 * open, t, 0.8)
-    // Sog: Lichtstreifen strömen aus dem Loch
-    c.save()
-    c.globalAlpha = 0.6 * open
-    c.strokeStyle = '#c4b5fd'; c.lineWidth = 1.4
-    for (let i = 0; i < 8; i++) {
-      const a = (i / 8) * Math.PI * 2 + t * 2
-      const r0 = 20 + 26 * ((h.t * 1.6 + i * 0.13) % 1)
-      c.beginPath(); c.moveTo(cx + Math.cos(a) * r0, h.y + PH / 2 + Math.sin(a) * r0 * 0.8); c.lineTo(cx + Math.cos(a) * (r0 + 6), h.y + PH / 2 + Math.sin(a) * (r0 + 6) * 0.8); c.stroke()
+    const hy = Math.max(36, h.y - 170)
+    const tt = h.t
+    const open = tt < 0.45 ? ease(tt / 0.45) : tt < BH_APPEAR ? 1 : tt < BH_APPEAR + 0.5 ? 1 - ease((tt - BH_APPEAR) / 0.5) : 0
+    // Zielkreis am Boden
+    if (tt > 0.3 && tt < BH_APPEAR) {
+      const k = (tt - 0.3) / (BH_APPEAR - 0.3)
+      c.save(); c.strokeStyle = `rgba(248,113,113,${0.4 + 0.5 * Math.abs(Math.sin(tt * 14))})`; c.lineWidth = 2
+      c.beginPath(); c.ellipse(cx, feet, 40 * (1 - k * 0.6), 9 * (1 - k * 0.6), 0, 0, Math.PI * 2); c.stroke()
+      c.beginPath(); c.moveTo(cx - 12, feet); c.lineTo(cx + 12, feet); c.moveTo(cx, feet - 4); c.lineTo(cx, feet + 4); c.stroke()
+      c.restore()
     }
-    c.restore()
+    drawHoleDisc(c, cx, hy, 40 * open, t, 0.8)
+    // Sog-Streifen
+    if (open > 0.05) {
+      c.save(); c.globalAlpha = 0.6 * open; c.strokeStyle = '#c4b5fd'; c.lineWidth = 1.4
+      for (let i = 0; i < 9; i++) {
+        const a = (i / 9) * Math.PI * 2 + t * 2
+        const r0 = 22 + 28 * ((tt * 1.6 + i * 0.13) % 1)
+        c.beginPath(); c.moveTo(cx + Math.cos(a) * r0, hy + Math.sin(a) * r0 * 0.8); c.lineTo(cx + Math.cos(a) * (r0 + 6), hy + Math.sin(a) * (r0 + 6) * 0.8); c.stroke()
+      }
+      c.restore()
+    }
+    // Rakete
+    if (tt >= 0.5 && tt < BH_APPEAR) {
+      const k = (tt - 0.5) / (BH_APPEAR - 0.5)
+      const ry = hy + (feet - 16 - hy) * k * k
+      // Rauchspur
+      c.save()
+      for (let i = 1; i <= 10; i++) {
+        const kk = Math.max(0, k - i * 0.035)
+        const py = hy + (feet - 16 - hy) * kk * kk
+        c.globalAlpha = (1 - i / 11) * 0.55
+        c.fillStyle = i < 4 ? '#fdba74' : '#94a3b8'
+        c.beginPath(); c.arc(cx + (rnd(i * 3.3 + Math.floor(tt * 20)) - 0.5) * 5, py - 8, 5 - i * 0.3, 0, Math.PI * 2); c.fill()
+      }
+      c.restore()
+      c.save(); c.translate(cx, ry); c.rotate(Math.PI); rocket(c, t, k); c.restore()
+    }
+    // Explosion
+    if (tt >= BH_APPEAR) {
+      const q = (tt - BH_APPEAR) / (BH_IN - BH_APPEAR)
+      flashRect(c, cx, q / 0.22, 0.85, '#fff7ed')
+      const fr = 10 + 54 * ease(clamp01(q / 0.5))
+      c.save()
+      c.globalAlpha = Math.max(0, 1 - q * 1.15)
+      const fg = c.createRadialGradient(cx, feet - 14, 2, cx, feet - 14, fr)
+      fg.addColorStop(0, '#ffffff'); fg.addColorStop(0.25, '#fde047'); fg.addColorStop(0.6, '#f97316'); fg.addColorStop(1, 'rgba(127,29,29,0)')
+      c.fillStyle = fg; c.beginPath(); c.arc(cx, feet - 14, fr, 0, Math.PI * 2); c.fill()
+      c.strokeStyle = '#fed7aa'; c.lineWidth = 4 * (1 - q) + 1
+      c.beginPath(); c.ellipse(cx, feet, 20 + 120 * ease(q), 5 + 26 * ease(q), 0, 0, Math.PI * 2); c.stroke()
+      c.restore()
+      // Funken und Trümmer
+      c.save()
+      for (let i = 0; i < 26; i++) {
+        const a = rnd(i * 4.7) * Math.PI
+        const sp = 90 + rnd(i * 2.2) * 150
+        const px = cx + Math.cos(a) * sp * q * (i % 2 ? 1 : -1) * 0.6
+        const py = feet - 10 - Math.sin(a) * sp * q * 0.9 + 260 * q * q
+        c.globalAlpha = Math.max(0, 1 - q * 1.1)
+        c.fillStyle = i % 3 === 0 ? '#fde047' : i % 3 === 1 ? '#fb923c' : '#64748b'
+        c.fillRect(px, py, 3, 3)
+      }
+      // Rauch
+      for (let i = 0; i < 7; i++) {
+        const k = clamp01((q - 0.15) / 0.85)
+        c.globalAlpha = 0.35 * (1 - k)
+        c.fillStyle = '#475569'
+        c.beginPath(); c.arc(cx + (rnd(i * 6.1) - 0.5) * 50, feet - 10 - 50 * k * (0.5 + rnd(i * 1.7)), 8 + 14 * k, 0, Math.PI * 2); c.fill()
+      }
+      c.restore()
+    }
     return
   }
-  const k = h.t / HOLE_OUT
-  const hy = h.y + PH + 6
-  const open = k < 0.25 ? ease(k / 0.25) : k < 0.75 ? 1 : 1 - ease((k - 0.75) / 0.25)
-  drawHoleDisc(c, cx, hy, 40 * open, t, 0.4)
-  // die Figur sinkt, dreht sich und wird kleiner
-  const s = clamp01((k - 0.22) / 0.5)
-  if (s < 1) {
-    const e = ease(s)
-    const fx = h.x, fy = h.y + (hy - PH / 2 - h.y) * e
-    drawAdminBody(c, fx, fy, h.face, t, 1 - e * 0.4, 1 - e * 0.95, e * 7)
+  // out
+  const tt = h.t
+  const hy = Math.max(36, h.y - 120)
+  const bodyY = h.y + PH / 2
+  const open = tt < 0.5 ? ease(tt / 0.5) : tt < 1.5 ? 1 : tt < 1.95 ? 1 + 0.35 * Math.sin((tt - 1.5) * 28) : Math.max(0, 1 - ease((tt - 1.95) / 0.2))
+  const r = 40 * open * (tt > 1.45 && tt < 1.95 ? 1.25 : 1)
+  // Zugstrahl vom Loch zum Boden
+  if (tt > 0.15 && tt < 1.5) {
+    const g = c.createLinearGradient(0, hy, 0, feet)
+    g.addColorStop(0, 'rgba(196,181,253,0.55)'); g.addColorStop(1, 'rgba(196,181,253,0)')
+    c.save(); c.globalAlpha = Math.min(1, (tt - 0.15) * 3) * (tt > 1.3 ? (1.5 - tt) / 0.2 : 1)
+    c.fillStyle = g
+    c.beginPath(); c.moveTo(cx - 12, hy + 6); c.lineTo(cx + 12, hy + 6); c.lineTo(cx + 46, feet + 4); c.lineTo(cx - 46, feet + 4); c.closePath(); c.fill()
+    c.restore()
+  }
+  drawHoleDisc(c, cx, hy, r, t, 0.8)
+  // Sterne strömen in die Spirale
+  if (tt > 0.3 && tt < 1.95) {
+    c.save(); c.fillStyle = '#e9d5ff'
+    for (let i = 0; i < 18; i++) {
+      const k = ((tt * 0.9 + i * 0.057) % 1)
+      const a = i * 0.9 + k * 5
+      const rr = (1 - k) * 80 + 6
+      c.globalAlpha = Math.min(1, k * 3) * (1 - k * 0.3)
+      c.beginPath(); c.arc(cx + Math.cos(a) * rr, hy + Math.sin(a) * rr * 0.7, 1.7, 0, Math.PI * 2); c.fill()
+    }
+    c.restore()
+  }
+  // Figur: wackelt, wird hochgezogen, gestreckt und in der Spirale hineingedreht
+  if (tt < 1.5) {
+    const k = clamp01((tt - 0.35) / 1.1)
+    const e = k * k * (1.4 - 0.4 * k)
+    const jitter = tt < 0.35 ? Math.sin(tt * 90) * 1.5 : 0
+    const px = cx + Math.sin(k * 16) * (1 - k) * 9 + jitter
+    const py = bodyY + (hy - bodyY) * Math.min(1, e)
+    c.save()
+    c.translate(px, py); c.rotate(k * 9); c.scale(1 - 0.85 * k, 1 + 1.3 * k)
+    drawAdminBody(c, -PW / 2, -PH / 2, h.face, t, 1 - 0.7 * k)
+    c.restore()
+  }
+  // Kollaps: Blitz, Druckwellen, Sterne
+  if (tt >= 1.95) {
+    const q = (tt - 1.95) / (BH_OUT - 1.95)
+    flashRect(c, cx, q / 0.4, 0.9)
+    c.save()
+    for (let ring = 0; ring < 3; ring++) {
+      const k = clamp01(q * 1.1 - ring * 0.12)
+      c.globalAlpha = 0.9 * (1 - k)
+      c.strokeStyle = ring % 2 ? '#e879f9' : '#22d3ee'; c.lineWidth = 4 * (1 - k) + 1
+      c.beginPath(); c.ellipse(cx, hy, 10 + 130 * ease(k), (10 + 130 * ease(k)) * 0.8, 0, 0, Math.PI * 2); c.stroke()
+    }
+    c.fillStyle = '#fff'
+    for (let i = 0; i < 30; i++) {
+      const a = rnd(i * 3.9) * Math.PI * 2
+      const rr = 10 + (60 + rnd(i * 5.1) * 90) * ease(q)
+      c.globalAlpha = Math.max(0, 1 - q * 1.05)
+      c.beginPath(); c.arc(cx + Math.cos(a) * rr, hy + Math.sin(a) * rr * 0.8, 1.6 + (i % 3) * 0.5, 0, Math.PI * 2); c.fill()
+    }
+    c.restore()
   }
 }

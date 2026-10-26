@@ -537,3 +537,11 @@ Tabelle `book_library_hidden`; `in_library` blendet ein veröffentlichtes Buch d
 - Herzen-Bug: Shop-Herzen eines Gasts (Zuschauer, der einsteigt) gibt es nur beim ersten Einstieg (`guestHeartsGiven`); Hin- und Herwechseln füllt weder die Herzen auf noch erhöht es den Vorrat.
 - Jetpack wieder wie am Anfang: 12 s Dauer, Sprungknopf in der Luft halten = Schub (`engine` `jet`), insgesamt 3,5 s Treibstoff (`JET_FUEL`); kein Flugmodus und kein „Runter“-Knopf mehr.
 - Unregelmäßige Verben: `submit_irregular(correct, total)` zahlt 1 Coin je `irregular_coin_every` (5) richtige Antworten, höchstens `irregular_coin_cap` (15) pro Tag (Grund `irregular`); `ChoiceResult` (`irregular`) ruft es zusätzlich zu `submit_choice` auf; Werte in Verwaltung → Zahlen und unter der Seite (nur Admins).
+
+## Update 69: Auftritte (Schwarzes Loch, Hammer, Klavier) und Zuschauer-Geister
+
+- Migration `0055_entrances.sql`: `staff_rights.looks text[]` (vom Admin freigegebene Auftritte `hammer`/`piano`), `parkour_profiles.entrance` (`blackhole|hammer|piano|none`), `_allowed_looks`, `_staff_look`, `my_run_perks()` liefert `{spectate, look, allowed, entrance}`, `parkour_set_entrance(p_look)`. Admins dürfen alle drei, Mods nur freigegebene (Admin-Tab „Mod-Rechte“: Checkboxen Hammer/Klavier, `p_looks`).
+- `lookTypes.ts` (`Look`, `HoleAnim`), `lookFx.ts` (`LOOKS`-Tabelle: Dauer, Erscheinzeitpunkt, `anim/back/body/label` je Look), `adminFx.ts` (Schwarzes Loch weit oben, Rakete rast herab und explodiert; Abgang mit Sog, Spaghettisierung und Kollaps), `modFx.ts` (Hammer), `pianoFx.ts` (Klavier fällt und zerbricht in Trümmer; beim Gehen wird die Figur zum Klavier mit Flügeln und fliegt davon).
+- `ParkourGame`: alles über `LOOKS[look]`; Nutzdaten tragen `kd: Look` statt `ad/hm`; `appearT` gilt für alle Looks.
+- Zuschauer sehen sich: eigener Broadcast-Event `g` (Position, Level, Name; 110 ms bewegt, 450 ms still). Nur Zuschauende zeichnen die Geister (halbtransparent, „👻 Name“); Spielende ignorieren das Event, Spielzustand wird nie berührt.
+- Shop (`Parkour.tsx`): Abschnitt „Auftritt“ mit Live-Vorschau (`EntrancePreview`) für alle erlaubten Looks, Auswahl über `parkourSetEntrance`.
