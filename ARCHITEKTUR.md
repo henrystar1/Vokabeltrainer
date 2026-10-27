@@ -545,3 +545,11 @@ Tabelle `book_library_hidden`; `in_library` blendet ein veröffentlichtes Buch d
 - `ParkourGame`: alles über `LOOKS[look]`; Nutzdaten tragen `kd: Look` statt `ad/hm`; `appearT` gilt für alle Looks.
 - Zuschauer sehen sich: eigener Broadcast-Event `g` (Position, Level, Name; 110 ms bewegt, 450 ms still). Nur Zuschauende zeichnen die Geister (halbtransparent, „👻 Name“); Spielende ignorieren das Event, Spielzustand wird nie berührt.
 - Shop (`Parkour.tsx`): Abschnitt „Auftritt“ mit Live-Vorschau (`EntrancePreview`) für alle erlaubten Looks, Auswahl über `parkourSetEntrance`.
+
+## Update 70: Bots für alle, Bots in Teams, Parkour-Shop im Shop, Seilbahn
+
+- Migration `0056_bot_teams.sql`: `_can_set_bots` (Mods/Admins, Host einer privaten Lobby, im offenen Deathrun jede Person der Lobby, solange kein Mod/Admin drin ist; `_team_get.can_manage` nutzt das), `team_set_bots(p_id, p_bots, p_skill, p_map)` (Bots und Teamkarte in einem Schritt), `team_set_versus` behält Bots bei „Team gegen Team“. Bots stehen in `team_map` unter `b0`…`b7` (0 rot, 1 blau).
+- Team-Lobby (`TeamRunRoom`): bei „Anderes Team“ zwei Spalten, Blau links, Rot rechts, Pfeil je Person und Bot, Bots einzeln („Name · Können · Bot“), „+ Bot“ je Team (`BotAdder`). `botmix.ts`: `lobbyBots`, `rebuildBots` (Bots werden nach Können sortiert, Teams bleiben erhalten).
+- `ParkourGame`: `botTeam(i)`, je Team steuert ein Rechner die Bots (`isMasterFor`, `syncBots`); Bots halten nur Platten für ihr eigenes Team (`botPts`), Bots des anderen Teams zählen im Wettlauf-Urteil und in der Anzeige (`checkVerdict`). Zuschauer-Geister können Bots (`bot<i>`) und eingestiegene Ex-Zuschauer verfolgen (`targets`).
+- Parkour-Shop: `features/parkour/ParkourShopPanel.tsx`, erreichbar als Reiter „Parkour“ im Shop (`/shop?tab=parkour`); die Parkour-Seite verlinkt dorthin.
+- Design „Berge“ (`components/ui/Mountains.tsx`): Seilbahn mit Stationen, Stützen, zwei Seilen und je drei Gondeln auf dem Weg hinauf und hinunter (`drawCableCar`).

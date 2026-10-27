@@ -43,3 +43,24 @@ export function skillList(code: number | null | undefined, bots: number): number
 }
 
 export const mixTotal = (m: Mix): number => m[0] + m[1] + m[2] + m[3] + m[4]
+
+/** Ein Bot in der Lobby: Können und Team (0 rot, 1 blau). */
+export interface LobbyBot { skill: number; team: number }
+
+/** Die Bots einer Lobby als Liste (Index = Bot-Nummer) mit ihrem Team aus der Teamkarte (Schlüssel b0, b1 …). */
+export function lobbyBots(code: number | null | undefined, bots: number, teamMap: Record<string, number> | null | undefined): LobbyBot[] {
+  return skillList(code, bots).map((skill, i) => ({ skill, team: (teamMap ?? {})[`b${i}`] === 1 ? 1 : 0 }))
+}
+
+/**
+ * Bots hinzufügen oder entfernen und dabei die Teams behalten: Die Bots werden nach Können sortiert (so speichert es der Server),
+ * deshalb ändern sich die Nummern. Ergebnis: neue Mischung (Code) und Teamkarte-Einträge b0…bN für die neue Reihenfolge.
+ */
+export function rebuildBots(list: LobbyBot[]): { count: number; code: number; map: Record<string, number> } {
+  const sorted = SKILL_ORDER.flatMap((k) => list.filter((b) => b.skill === k))
+  const m: Mix = [0, 0, 0, 0, 0]
+  for (const b of sorted) m[b.skill - 1] += 1
+  const map: Record<string, number> = {}
+  sorted.forEach((b, i) => { map[`b${i}`] = b.team })
+  return { count: sorted.length, code: sorted.length === 0 ? 2 : encodeMix(m), map }
+}

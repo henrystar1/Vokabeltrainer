@@ -19,6 +19,8 @@ import { useAsync } from '../lib/useAsync'
 import { adminSetItem, buyItem, equipItem, getCoinLockStatus, getMyPermissions, getShop, unequipItem } from '../services/koins'
 import type { ShopItem, ShopKind } from '../types'
 import PlusHint from '../features/plus/PlusHint'
+import ParkourShopPanel from '../features/parkour/ParkourShopPanel'
+import { useSearchParams } from 'react-router-dom'
 
 const KINDS: ShopKind[] = ['avatar', 'color', 'effect', 'tag', 'theme']
 
@@ -42,7 +44,9 @@ export default function Shop() {
   const plus = usePlus()
   const coinLock = useAsync(getCoinLockStatus, [])
   const shop = useAsync(getShop, [])
+  const [params] = useSearchParams()
   const [kind, setKind] = useState<ShopKind>('avatar')
+  const [parkourTab, setParkourTab] = useState(params.get('tab') === 'parkour')
   const [confirm, setConfirm] = useState<ShopItem | null>(null)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -98,22 +102,28 @@ export default function Shop() {
           <button
             key={k}
             role="tab"
-            aria-selected={kind === k}
-            onClick={() => setKind(k)}
-            className={`min-h-[40px] rounded-lg px-4 text-sm font-medium transition ${kind === k ? 'bg-accent-cyan/15 text-accent-cyan' : 'text-slate-400 hover:text-white'}`}
+            aria-selected={!parkourTab && kind === k}
+            onClick={() => { setKind(k); setParkourTab(false) }}
+            className={`min-h-[40px] rounded-lg px-4 text-sm font-medium transition ${!parkourTab && kind === k ? 'bg-accent-cyan/15 text-accent-cyan' : 'text-slate-400 hover:text-white'}`}
           >
             {KIND_LABEL[k]}
           </button>
         ))}
+        <button role="tab" aria-selected={parkourTab} onClick={() => setParkourTab(true)}
+          className={`min-h-[40px] rounded-lg px-4 text-sm font-medium transition ${parkourTab ? 'bg-accent-cyan/15 text-accent-cyan' : 'text-slate-400 hover:text-white'}`}>
+          Parkour
+        </button>
       </div>
+
+      {parkourTab && <ParkourShopPanel />}
 
       {coinLock.data?.locked && <div className="mb-4"><Notice tone="warn">Dein Guthaben ist vom Admin gesperrt{coinLock.data.note ? `: ${coinLock.data.note}` : '.'} Du kannst gerade nichts kaufen, aber weiter spielen und gamblen.</Notice></div>}
       {message && <div className="mb-4"><Notice tone="ok">{message}</Notice></div>}
       {error && <div className="mb-4"><ErrorBox message={error} /></div>}
-      {shop.loading && !shop.data && <Spinner />}
-      {shop.error && <ErrorBox message={shop.error} onRetry={shop.reload} />}
+      {!parkourTab && shop.loading && !shop.data && <Spinner />}
+      {!parkourTab && shop.error && <ErrorBox message={shop.error} onRetry={shop.reload} />}
 
-      {shop.data && (
+      {!parkourTab && shop.data && (
         <>
           {equippedIn(kind) && kind !== 'theme' && (
             <div className="mb-3">

@@ -1,4 +1,4 @@
-import { MAX_BOTS, SKILL_NAMES, SKILL_ORDER, decodeMix, encodeMix, mixTotal, type Mix } from '../features/parkour/botmix'
+import { MAX_BOTS, SKILL_NAMES, SKILL_ORDER, decodeMix, encodeMix, lobbyBots, mixTotal, rebuildBots, type Mix } from '../features/parkour/botmix'
 import { BOT_NAMES } from '../features/parkour/bots'
 import { useEffect, useRef, useState } from 'react'
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
@@ -79,6 +79,19 @@ function savedBots(id: string): BotRow[] {
     const a = JSON.parse(window.localStorage.getItem(`pkbots:${id}`) ?? '[]')
     return Array.isArray(a) ? a.filter((b) => b && Number.isInteger(b.i) && typeof b.lv === 'number').slice(0, 8) : []
   } catch { return [] }
+}
+
+/** Bot-Können wählen und hinzufügen (Team gegen Team). */
+function BotAdder({ onAdd, disabled }: { onAdd: (skill: number) => void; disabled: boolean }) {
+  const [skill, setSkill] = useState(2)
+  return (
+    <div className="flex items-center gap-1 pt-1">
+      <select value={skill} onChange={(e) => setSkill(Number(e.target.value))} aria-label="Bot-Können" className="min-h-[36px] min-w-0 flex-1 rounded-lg border border-white/15 bg-space-900 px-1 text-xs text-slate-200">
+        {SKILL_ORDER.map((k) => <option key={k} value={k}>{SKILL_NAMES[k]}</option>)}
+      </select>
+      <button type="button" disabled={disabled} onClick={() => onAdd(skill)} className="min-h-[36px] rounded-lg border border-white/15 px-2 text-xs font-semibold text-slate-200 disabled:opacity-40">+ Bot</button>
+    </div>
+  )
 }
 
 function Results({ list, me, bots = [] }: { list: DeathrunResult[]; me: string; bots?: BotRow[] }) {
@@ -224,11 +237,28 @@ export default function TeamRunRoom() {
       if (mode === 2) joinedPeople.forEach((p, i) => { map[p.user_id] = i % 2 })
       void act(() => teamSetVersus(id, mode, map))
     }
-    const setTeam = (uid: string, team: number) => {
-      const map: Record<string, number> = {}
-      for (const p of joinedPeople) map[p.user_id] = p.user_id === uid ? team : teamOf(p.user_id)
-      void act(() => teamSetVersus(id, 2, map))
+    // Team gegen Team: Menschen und Bots stehen einzeln in Blau (links) oder Rot (rechts)
+    const lbots = lobbyBots(st.bot_skill, bots, st.team_map)
+    const teamMapNow = (): Record<string, number> => {
+      const m: Record<string, number> = {}
+      for (const p of joinedPeople) m[p.user_id] = teamOf(p.user_id)
+      lbots.forEach((b, i) => { m[`b${i}`] = b.team })
+      return m
     }
+    const moveEntry = (key: string) => {
+      const m = teamMapNow()
+      m[key] = m[key] === 1 ? 0 : 1
+      void act(() => teamSetVersus(id, 2, m))
+    }
+    const changeBots = (list: Array<{ skill: number; team: number }>) => {
+      const r = rebuildBots(list)
+      const humansMap: Record<string, number> = {}
+      for (const p of joinedPeople) humansMap[p.user_id] = teamOf(p.user_id)
+      void act(() => teamSetBots(id, r.count, r.code, { ...humansMap, ...r.map }))
+    }
+    const addBot = (team: number, skill: number) => { if (lbots.length < MAX_BOTS) changeBots([...lbots, { skill, team }]) }
+    const removeBot = (i: number) => changeBots(lbots.filter((_, k) => k !== i))
+    const teamSize = (t: number) => joinedPeople.filter((p) => teamOf(p.user_id) === t).length + lbots.filter((b) => b.team === t).length
     const skillName = SKILL_ORDER.filter((k) => mix[k - 1] > 0).map((k) => `${mix[k - 1]}× ${SKILL_NAMES[k]}`).join(', ')
     const setMix = (k: number, d: number) => {
       const m: Mix = [...mix]
@@ -241,7 +271,7 @@ export default function TeamRunRoom() {
         <Card className="space-y-4">
           <div className={`grid gap-3 ${people.length > 2 ? 'grid-cols-2 sm:grid-cols-3' : 'grid-cols-2'}`}>
             {people.map((p, i) => <Slot key={p.user_id} p={p} color={COLORS[i % COLORS.length]} joined={isJoined(p)} waitingText="wartet auf Antwort …" />)}
-            {bots > 0 && (
+            {bots > 0 && vs !== 2 && (
               <div className="flex min-h-[150px] flex-col items-center justify-center gap-2 rounded-2xl border border-slate-400/40 bg-space-900/60 p-3 text-center">
                 <Bot size={44} className="text-slate-300" />
                 <p className="font-semibold">{bots} {bots === 1 ? 'Bot' : 'Bots'}</p>
@@ -273,18 +303,32 @@ export default function TeamRunRoom() {
                   {vs === 0 && <p className="text-xs text-slate-400">Alle spielen zusammen in einem Team.</p>}
                   {vs === 1 && <p className="text-xs text-slate-400">Ihr lauft als Team (blau) gegen ein Bot-Team (rot) dieselben Level. Wer keine Herzen mehr hat, scheidet aus; es gewinnt, wer weiter kommt.</p>}
                   {vs === 2 && (
-                    <div className="space-y-1.5">
-                      <p className="text-xs text-slate-400">Zwei Teams laufen gleichzeitig dieselben Level, jedes mit eigenen Herzen. Wer weiter kommt, gewinnt. Verteilt euch auf Rot und Blau:</p>
-                      {joinedPeople.map((p) => (
-                        <div key={p.user_id} className="flex items-center justify-between gap-2">
-                          <span className="min-w-0 flex-1 truncate text-sm text-slate-200">{p.name}</span>
-                          {([[0, 'Rot', '#f87171'], [1, 'Blau', '#60a5fa']] as const).map(([k, l, c]) => (
-                            <button key={k} type="button" disabled={busy} onClick={() => setTeam(p.user_id, k)} aria-pressed={teamOf(p.user_id) === k}
-                              className="min-h-[36px] rounded-lg border px-3 text-xs font-semibold" style={teamOf(p.user_id) === k ? { borderColor: c, background: `${c}33`, color: '#fff' } : { borderColor: 'rgb(255 255 255 / 0.15)', color: '#cbd5e1' }}>{l}</button>
-                          ))}
-                        </div>
-                      ))}
-                      {new Set(joinedPeople.map((p) => teamOf(p.user_id))).size < 2 && <p className="text-xs text-amber-200">Es braucht in beiden Teams mindestens eine Person.</p>}
+                    <div className="space-y-2">
+                      <p className="text-xs text-slate-400">Zwei Teams laufen gleichzeitig dieselben Level, jedes mit eigenen Herzen. Wer weiter kommt, gewinnt. Mit dem Pfeil schiebst du eine Person oder einen Bot ins andere Team. Bots gehören gern auch zu deinem eigenen Team.</p>
+                      <div className="grid grid-cols-2 gap-2">
+                        {([[1, 'Blau', '#60a5fa', '→'], [0, 'Rot', '#f87171', '←']] as const).map(([team, label, color, arrow]) => (
+                          <div key={team} className="space-y-1.5 rounded-xl border p-2" style={{ borderColor: `${color}66`, background: `${color}14` }}>
+                            <p className="text-center text-sm font-semibold" style={{ color }}>{label} ({teamSize(team)})</p>
+                            {joinedPeople.filter((p) => teamOf(p.user_id) === team).map((p) => (
+                              <div key={p.user_id} className="flex items-center gap-1.5">
+                                {team === 0 && <button type="button" disabled={busy} onClick={() => moveEntry(p.user_id)} aria-label={`${p.name} zu Blau`} className="min-h-[36px] min-w-[36px] rounded-lg border border-white/15 text-sm font-bold text-slate-200">{arrow}</button>}
+                                <span className="min-w-0 flex-1 truncate text-sm text-slate-100">{p.name}</span>
+                                {team === 1 && <button type="button" disabled={busy} onClick={() => moveEntry(p.user_id)} aria-label={`${p.name} zu Rot`} className="min-h-[36px] min-w-[36px] rounded-lg border border-white/15 text-sm font-bold text-slate-200">{arrow}</button>}
+                              </div>
+                            ))}
+                            {lbots.map((b, i) => b.team !== team ? null : (
+                              <div key={`b${i}`} className="flex items-center gap-1.5">
+                                {team === 0 && <button type="button" disabled={busy} onClick={() => moveEntry(`b${i}`)} aria-label={`${BOT_NAMES[i % BOT_NAMES.length]} zu Blau`} className="min-h-[36px] min-w-[36px] rounded-lg border border-white/15 text-sm font-bold text-slate-200">{arrow}</button>}
+                                <span className="min-w-0 flex-1 text-sm text-slate-100"><Bot size={13} className="mr-1 inline" />{BOT_NAMES[i % BOT_NAMES.length]} <span className="text-xs text-slate-400">· {SKILL_NAMES[b.skill]} · Bot</span></span>
+                                <button type="button" disabled={busy} onClick={() => removeBot(i)} aria-label={`${BOT_NAMES[i % BOT_NAMES.length]} entfernen`} className="min-h-[36px] min-w-[28px] text-xs text-slate-400 hover:text-white">✕</button>
+                                {team === 1 && <button type="button" disabled={busy} onClick={() => moveEntry(`b${i}`)} aria-label={`${BOT_NAMES[i % BOT_NAMES.length]} zu Rot`} className="min-h-[36px] min-w-[36px] rounded-lg border border-white/15 text-sm font-bold text-slate-200">{arrow}</button>}
+                              </div>
+                            ))}
+                            <BotAdder disabled={busy || lbots.length >= MAX_BOTS} onAdd={(skill) => addBot(team, skill)} />
+                          </div>
+                        ))}
+                      </div>
+                      {(teamSize(0) === 0 || teamSize(1) === 0) && <p className="text-xs text-amber-200">Es braucht in beiden Teams mindestens eine Person oder einen Bot.</p>}
                     </div>
                   )}
                 </>

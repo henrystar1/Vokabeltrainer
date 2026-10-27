@@ -75,6 +75,7 @@ function ParkourGameInner({ st, startLevel = 0, perks }: { st: TeamState; startL
   const [ghostUi, setGhostUi] = useState(spec)
   const [followUi, setFollowUi] = useState<string | null>(null)
   const [watchUi, setWatchUi] = useState(false)
+  const [targets, setTargets] = useState<Array<{ id: string; name: string }>>([])
   const [joined, setJoined] = useState(false) // Admin hat vom reinen Zuschauen aus ins Spiel gewechselt
   const specUi = (spec && !joined) || watchUi
   const watchApi = useRef<((on: boolean) => void) | null>(null)
@@ -164,7 +165,7 @@ function ParkourGameInner({ st, startLevel = 0, perks }: { st: TeamState; startL
     let appearT = 0 // Hammer-Auftritt: bis dahin ist die Figur noch nicht da
     let guestHeartsGiven = false // Shop-Herzen eines Gasts gibt es nur beim ersten Einstieg (sonst unendlich viele durch Hin- und Herwechseln)
     let forceEl = false
-    const botsN = (dr || vs === 1) && !isSpec ? Math.max(0, Math.min(8, st.bots ?? 0)) : 0
+    const botsN = (dr || vs > 0) && !isSpec ? Math.max(0, Math.min(8, st.bots ?? 0)) : 0
     const botSkills = skillList(st.bot_skill, st.bots ?? 0)
     // Gemeinsamer Herzvorrat: Grundwert, +1 je Person ab der dritten, plus die im Shop gekauften Extra-Herzen aller
     let maxHearts = dr
@@ -246,27 +247,51 @@ function ParkourGameInner({ st, startLevel = 0, perks }: { st: TeamState; startL
     // ---- Bots (Deathrun): der Rechner mit der kleinsten Nutzer-ID im Lauf steuert sie, alle anderen sehen sie wie Mitspielende ----
     let bots: BotState[] | null = null
     const botSnap = new Map<number, BotView>()
-    const isMaster = (now: number): boolean => {
-      if (botsN <= 0 || (finished && !group)) return false
-      for (const [uid, r] of remotes) if (uid < st.me && (!r.el || group) && now - r.seen < STALE_MS * 2 && members().some((p) => p.user_id === uid)) return false
+    // Team gegen Team: jeder Bot gehört einem Team (Teamkarte b0…b7). Je Team steuert ein Rechner die Bots dieses Teams.
+    const botTeam = (i: number): number => (vs === 2 ? ((st.team_map ?? {})['b' + i] === 1 ? 1 : 0) : vs === 1 ? 0 : -1)
+    const teamUids = (team: number): string[] => {
+      const all = members().map((p) => p.user_id)
+      if (vs !== 2) return all
+      const mine = all.filter((u) => teamOfU(u) === team)
+      return mine.length ? mine : all // ein Team nur aus Bots: alle Menschen kommen als Steuerer in Frage
+    }
+    const isMasterFor = (team: number, now: number): boolean => {
+      if (botsN <= 0 || (finished && !group && vs !== 2)) return false
+      if (vs === 2 && !teamUids(team).includes(st.me)) return false
+      for (const uid of teamUids(team)) {
+        if (uid >= st.me) continue
+        const r = remotes.get(uid) ?? rivals.get(uid)
+        if (r && (!r.el || group) && now - r.seen < STALE_MS * 2) return false
+      }
       return true
     }
-    const initBots = (now: number) => {
-      void now
-      bots = []
+    const makeBots = (idx: number[]): BotState[] => {
+      const out: BotState[] = []
       if (group) { const g0 = botSnap.get(0); if (g0) { bgh = g0.hp; bgOut = g0.out } }
-      for (let i = 0; i < botsN; i++) {
+      for (const i of idx) {
         const sn = group ? botSnap.get(0) : botSnap.get(i)
         const l = sn?.lv ?? 0
         const b = newBot(i, levelOf(l), Math.max(1, st.lives || 3), botSkills[i] ?? 2, l)
         if (group) { b.hearts = 99; b.out = bgOut; b.deadT = 0.05 + i * 0.45 }
         else if (sn) { b.body.x = sn.x; b.body.y = sn.y; b.hearts = sn.hp; b.out = sn.out }
-        bots.push(b)
+        out.push(b)
       }
+      return out
+    }
+    /** Bots übernehmen oder abgeben, wenn sich ändert, wer sie steuert. */
+    const syncBots = (want: Set<number>, now: number) => {
+      const have = (bots ?? []).map((b) => b.i)
+      if (want.size === have.length && have.every((i) => want.has(i))) return
+      for (const b of bots ?? []) if (!want.has(b.i)) botSnap.set(b.i, { i: b.i, x: b.body.x, y: b.body.y, face: b.body.face, lv: b.lv, hp: group ? bgh : b.hearts, out: group ? bgOut : b.out, dead: b.deadT > 0, dx: b.body.x, dy: b.body.y, seen: now })
+      const keep = (bots ?? []).filter((b) => want.has(b.i))
+      const fresh = makeBots([...want].filter((i) => !have.includes(i)))
+      const all = [...keep, ...fresh].sort((a, b) => a.i - b.i)
+      bots = all.length > 0 ? all : null
     }
     const botViews = (now: number): BotView[] => {
-      if (bots) return bots.map((b) => ({ i: b.i, x: b.body.x, y: b.body.y, face: b.body.face, lv: b.lv, hp: group ? bgh : b.hearts, out: group ? bgOut : b.out, dead: b.deadT > 0, dx: b.body.x, dy: b.body.y, seen: now }))
-      return [...botSnap.values()].filter((b) => now - b.seen < STALE_MS * 2)
+      const own: BotView[] = (bots ?? []).map((b) => ({ i: b.i, x: b.body.x, y: b.body.y, face: b.body.face, lv: b.lv, hp: group ? bgh : b.hearts, out: group ? bgOut : b.out, dead: b.deadT > 0, dx: b.body.x, dy: b.body.y, seen: now }))
+      const have = new Set(own.map((b) => b.i))
+      return [...own, ...[...botSnap.values()].filter((b) => !have.has(b.i) && now - b.seen < STALE_MS * 2)]
     }
 
     // ---- Verbindung: bei Fehlern und Funkstille neu aufbauen ----
@@ -280,6 +305,7 @@ function ParkourGameInner({ st, startLevel = 0, perks }: { st: TeamState; startL
     let retryT: number | undefined
     let attempt = 0
     let lastHud = 0
+    let targetSig = ''
     let lastBotSend = 0
 
     function onState(payload: unknown) {
@@ -324,7 +350,7 @@ function ParkourGameInner({ st, startLevel = 0, perks }: { st: TeamState; startL
 
     function onBots(payload: unknown) {
       const p = payload as { sid?: string; l?: number[][] }
-      if (!p || !Array.isArray(p.l) || bots) return
+      if (!p || !Array.isArray(p.l)) return
       lastRx = performance.now()
       const now = performance.now()
       for (const a of p.l) {
@@ -332,6 +358,7 @@ function ParkourGameInner({ st, startLevel = 0, perks }: { st: TeamState; startL
         const i = a[0]
         const x = finite(a[1], -100, 200000), y = finite(a[2], -800, 1200)
         if (x === null || y === null || !Number.isInteger(i) || i < 0 || i > 8) continue
+        if (bots?.some((b) => b.i === i)) continue // meine eigenen Bots kenne ich besser
         const prev = botSnap.get(i)
         const lvN = Math.max(0, Math.min(999, Math.floor(a[4])))
         const jump = !prev || prev.lv !== lvN || Math.hypot(x - prev.x, y - prev.y) > SNAP_PX
@@ -595,7 +622,7 @@ function ParkourGameInner({ st, startLevel = 0, perks }: { st: TeamState; startL
     const botPts = (now: number): Array<{ x: number; y: number }> => {
       const out: Array<{ x: number; y: number }> = []
       if (vs === 1) return out // Gegner-Bots stehen auf keiner Platte von uns
-      for (const b of botViews(now)) if (b.lv === lv && !b.out && !b.dead) out.push({ x: b.x, y: b.y })
+      for (const b of botViews(now)) if (b.lv === lv && !b.out && !b.dead && (vs !== 2 || botTeam(b.i) === myTeam)) out.push({ x: b.x, y: b.y })
       return out
     }
     let openUntil = 0 // Notausgang: Bots konnten nicht helfen, Tore bleiben kurz offen
@@ -615,7 +642,11 @@ function ParkourGameInner({ st, startLevel = 0, perks }: { st: TeamState; startL
         if (v.length > 0) { rLv = Math.max(...v.map((b) => b.lv)); rOut = v.every((b) => b.out) }
       } else {
         const rs = [...rivals.values()]
-        if (rs.length > 0) { rLv = Math.max(...rs.map((r) => r.lv)); rOut = rs.every((r) => r.el || now - r.seen > 15000) }
+        const rb = botViews(now).filter((b) => botTeam(b.i) !== myTeam) // Bots des anderen Teams zählen mit
+        if (rs.length + rb.length > 0) {
+          rLv = Math.max(...rs.map((r) => r.lv), ...rb.map((b) => b.lv))
+          rOut = rs.every((r) => r.el || now - r.seen > 15000) && rb.every((b) => b.out)
+        }
       }
       if (rLv < 0) return
       let v: 'win' | 'lose' | 'draw' | null = null
@@ -637,23 +668,34 @@ function ParkourGameInner({ st, startLevel = 0, perks }: { st: TeamState; startL
       const pressed: Pressed = gatePressed(level, mt, bp, others.slice(0, others.length - bp.length))
       // Bots (nur auf dem Rechner, der sie steuert)
       if (botsN > 0) {
-        const master = isMaster(now)
-        if (master && !bots) initBots(now)
-        else if (!master && bots) { for (const b of bots) botSnap.set(b.i, { i: b.i, x: b.body.x, y: b.body.y, face: b.body.face, lv: b.lv, hp: group ? bgh : b.hearts, out: group ? bgOut : b.out, dead: b.deadT > 0, dx: b.body.x, dy: b.body.y, seen: now }); bots = null }
+        const want = new Set<number>()
+        for (let i = 0; i < botsN; i++) if (isMasterFor(botTeam(i), now)) want.add(i)
+        syncBots(want, now)
         if (bots) {
           // Die Bots warten am Start des nächsten Levels, bis der erste Mensch dort angekommen ist (der lernt zwischen den Leveln noch)
-          let humanMax = -1
-          if (!isSpec && !finished) humanMax = lv
-          for (const r of remotes.values()) if (!r.el && now - r.seen < STALE_MS * 4) humanMax = Math.max(humanMax, r.lv)
+          const humanMaxFor = (team: number): number => {
+            let m = -1
+            if (vs === 2 && team !== myTeam) { for (const r of rivals.values()) if (!r.el && now - r.seen < STALE_MS * 4) m = Math.max(m, r.lv); return m }
+            if (!isSpec && !finished) m = lv
+            for (const r of remotes.values()) if (!r.el && now - r.seen < STALE_MS * 4) m = Math.max(m, r.lv)
+            return m
+          }
+          const humanMax = group ? humanMaxFor(-1) : -1
           for (const b of bots) {
+            const bTeam = botTeam(b.i)
+            const bMax = group ? humanMax : humanMaxFor(bTeam)
             if (group && (b.parked || bgOut)) continue
-            if (!group && humanMax >= 0 && b.lv > humanMax) continue
+            if (!group && bMax >= 0 && b.lv > bMax) continue
             // Menschen und andere Bots im Level des Bots: er hält Platten für Menschen und hat selbst feste Türen
             const humans: Array<{ x: number; y: number }> = []
             // Auch wer gerade tot ist und gleich wieder einsteigt, zählt weiter (die Bots vergessen niemanden)
             if (!group) {
-              if (!isSpec && !finished && lv === b.lv) humans.push({ x: me.x, y: me.y })
-              for (const r of remotes.values()) if (r.lv === b.lv && !r.el && now - r.seen < STALE_MS) humans.push({ x: r.x, y: r.y })
+              if (vs === 2 && bTeam !== myTeam) {
+                for (const r of rivals.values()) if (r.lv === b.lv && !r.el && now - r.seen < STALE_MS) humans.push({ x: r.x, y: r.y })
+              } else {
+                if (!isSpec && !finished && lv === b.lv) humans.push({ x: me.x, y: me.y })
+                for (const r of remotes.values()) if (r.lv === b.lv && !r.el && now - r.seen < STALE_MS) humans.push({ x: r.x, y: r.y })
+              }
             }
             const others = [...humans]
             for (const o of bots) if (o !== b && o.lv === b.lv && !o.out && !o.parked && o.deadT <= 0) others.push({ x: o.body.x, y: o.body.y })
@@ -697,7 +739,9 @@ function ParkourGameInner({ st, startLevel = 0, perks }: { st: TeamState; startL
         const i = input.current
         const fl = follow.current
         if (fl.to) {
-          const r = remotes.get(fl.to)
+          // Folgen: Menschen (auch die, die als Zuschauer eingestiegen sind) und Bots
+          const bi = /^bot(\d)$/.exec(fl.to)
+          const r = bi ? botViews(now).find((b) => b.i === Number(bi[1])) : (remotes.get(fl.to) ?? rivals.get(fl.to))
           if (r && now - r.seen < STALE_MS * 3) {
             if (r.lv !== lv) { lv = r.lv; cam = 0; fxField.clear() }
             me.x = r.dx; me.y = r.dy - 8
@@ -914,7 +958,7 @@ function ParkourGameInner({ st, startLevel = 0, perks }: { st: TeamState; startL
           ctx!.restore()
         }
       }
-      for (const b of bviews) drawP(bots ? b.x : b.dx, bots ? b.y : b.dy, b.face, 'bot' + b.i, BOT_NAMES[b.i % BOT_NAMES.length], b.dead, false, false, 0, true, vs === 1 ? 0 : -1, botSkills[b.i] ?? 2)
+      for (const b of bviews) drawP(b.dx, b.dy, b.face, 'bot' + b.i, BOT_NAMES[b.i % BOT_NAMES.length], b.dead, false, false, 0, true, botTeam(b.i), botSkills[b.i] ?? 2)
       if (animLock <= 0 && appearT <= 0) drawP(me.x, me.y, me.face, st.me, 'Du', deadT > 0, true, ghostOn || isSpec, buffCode(), false, isSpec ? -1 : vs > 0 ? myTeam : -1, 0, isSpec ? null : perksRef.current.look)
       ctx!.restore()
       // Pfeile am Bildrand für Mitspielende außerhalb des Bildes
@@ -961,7 +1005,7 @@ function ParkourGameInner({ st, startLevel = 0, perks }: { st: TeamState; startL
         // Wettlauf: unser Stand gegen den Stand der Gegner
         ctx!.fillStyle = 'rgba(2,6,23,0.45)'; ctx!.fillRect(0, 26, VIEW_W, 18)
         ctx!.font = '600 11px system-ui, sans-serif'; ctx!.textAlign = 'center'
-        const rs = vs === 1 ? botViews(now).map((b) => ({ lv: b.lv, hp: b.hp, out: b.out })) : [...rivals.values()].map((r) => ({ lv: r.lv, hp: r.hp, out: r.el }))
+        const rs = vs === 1 ? botViews(now).map((b) => ({ lv: b.lv, hp: b.hp, out: b.out })) : [...rivals.values()].map((r) => ({ lv: r.lv, hp: r.hp, out: r.el })).concat(botViews(now).filter((b) => botTeam(b.i) !== myTeam).map((b) => ({ lv: b.lv, hp: b.hp, out: b.out })))
         const mine = `Wir: ${finished ? 'raus bei ' : ''}Lv ${lv + 1}${finished ? '' : ' ♥' + hearts}`
         const rlv = rs.length ? Math.max(...rs.map((r) => r.lv)) : 0
         const rout = rs.length > 0 && rs.every((r) => r.out)
@@ -1071,6 +1115,15 @@ function ParkourGameInner({ st, startLevel = 0, perks }: { st: TeamState; startL
       if (now - lastHud > 400) {
         lastHud = now
         setHud({ level: lv, deaths, ms: now - startPerf, linked: mates(now).length > 0, done: finished, jet: buff.jet > 0 })
+        if (isSpec) {
+          // Wen kann ich verfolgen? Alle, die gerade spielen (auch frühere Zuschauer), und alle Bots
+          const nm = (uid: string) => members().find((p) => p.user_id === uid)?.name ?? lookOf(uid)?.name ?? '?'
+          const list: Array<{ id: string; name: string }> = []
+          for (const [uid, r] of [...remotes, ...rivals]) if (!r.el && now - r.seen < STALE_MS) list.push({ id: uid, name: nm(uid) })
+          for (const b of botViews(now)) if (!b.out) list.push({ id: `bot${b.i}`, name: `🤖 ${BOT_NAMES[b.i % BOT_NAMES.length]}` })
+          const sig = list.map((x) => x.id + x.name).join('|')
+          if (sig !== targetSig) { targetSig = sig; setTargets(list) }
+        }
       }
       raf = requestAnimationFrame(loop)
     }
@@ -1218,10 +1271,10 @@ function ParkourGameInner({ st, startLevel = 0, perks }: { st: TeamState; startL
         <div className="w-full rounded-2xl border border-violet-400/30 bg-violet-500/10 p-3">
           <p className="mb-2 flex items-center gap-1.5 text-xs font-semibold text-violet-200"><Eye size={14} /> Zuschauer-Geist: dich sieht niemand, Wände und Tore sind für dich offen. Joystick = fliegen, Knopf = hoch. Durch das Ziel (oder den linken Rand) wechselst du das Level. Tippe eine Person an, um ihr zu folgen.</p>
           <div className="flex flex-wrap gap-2">
-            {humans.map((p) => (
-              <button key={p.user_id} type="button" onClick={() => watch(followUi === p.user_id ? null : p.user_id)}
-                className={`min-h-[40px] rounded-xl border px-3 text-xs font-semibold ${followUi === p.user_id ? 'border-violet-300 bg-violet-400/30 text-white' : 'border-white/20 bg-white/10 text-slate-200'}`}>
-                {followUi === p.user_id ? '👁 ' : ''}{p.name}
+            {[...humans.map((p) => ({ id: p.user_id, name: p.name })), ...targets.filter((x) => !humans.some((p) => p.user_id === x.id))].map((p) => (
+              <button key={p.id} type="button" onClick={() => watch(followUi === p.id ? null : p.id)}
+                className={`min-h-[40px] rounded-xl border px-3 text-xs font-semibold ${followUi === p.id ? 'border-violet-300 bg-violet-400/30 text-white' : 'border-white/20 bg-white/10 text-slate-200'}`}>
+                {followUi === p.id ? '👁 ' : ''}{p.name}
               </button>
             ))}
             <button type="button" onClick={() => watch(null)} className="min-h-[40px] rounded-xl border border-white/20 bg-white/5 px-3 text-xs text-slate-300">Frei fliegen</button>

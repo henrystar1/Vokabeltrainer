@@ -23,6 +23,96 @@ const LAYERS: Layer[] = [
   { base: 1.0, amp: 0.2, speed: 28, top: '#0a1c42', bottom: '#030b21', snow: 0, seed: 8.8, mist: 0 },
 ]
 
+/** Seilbahn auf der dritten Bergreihe: Talstation am tiefsten Punkt, Bergstation auf dem höchsten Gipfel davor (liegt auf der Wiederholungslänge fest). */
+const CABLE_LAYER = 2
+const CABLE = (() => {
+  const L = LAYERS[CABLE_LAYER]
+  let peak = 900
+  for (let x = 900; x < 1900; x += 4) if (ridge(x, L.seed) > ridge(peak, L.seed)) peak = x
+  let valley = peak - 420
+  for (let x = peak - 760; x <= peak - 380; x += 4) if (ridge(x, L.seed) < ridge(valley, L.seed)) valley = x
+  return { peak, valley }
+})()
+const CABIN_COLORS = ['#fb7185', '#fbbf24', '#38bdf8']
+
+function drawCableCar(ctx: CanvasRenderingContext2D, L: Layer, W: number, H: number, scale: number, off: number, t: number): void {
+  const wy = (wx: number) => H * L.base - ridge(wx, L.seed) * L.amp * H
+  for (let rep = -1; rep <= 2; rep++) {
+    const ax = (CABLE.valley + rep * PERIOD) * scale - off
+    const bx = (CABLE.peak + rep * PERIOD) * scale - off
+    if (bx < -60 || ax > W + 60) continue
+    const ay0 = wy(CABLE.valley) - 12
+    const by0 = wy(CABLE.peak) - 12
+    // Seil muss über dem Gelände bleiben: nötigenfalls beide Enden anheben
+    let lift = 0
+    for (let i = 1; i < 12; i++) {
+      const f = i / 12
+      const lineY = ay0 + (by0 - ay0) * f
+      const terrain = wy(CABLE.valley + (CABLE.peak - CABLE.valley) * f)
+      lift = Math.max(lift, lineY - (terrain - 14))
+    }
+    const ay = ay0 - lift
+    const by = by0 - lift
+    const pos = (f: number, side: number): [number, number] => [ax + (bx - ax) * f, ay + (by - ay) * f + side * 6 + Math.sin(f * Math.PI) * 5]
+    ctx.save()
+    // Stützen und Stationen
+    ctx.strokeStyle = '#0a1228'
+    ctx.fillStyle = '#0a1228'
+    ctx.lineWidth = 2
+    for (const f of [0, 0.25, 0.5, 0.75, 1]) {
+      const [px, py] = pos(f, 0)
+      const gy = wy(CABLE.valley + (CABLE.peak - CABLE.valley) * f)
+      ctx.beginPath(); ctx.moveTo(px, py - 2); ctx.lineTo(px, gy + 4); ctx.stroke()
+      ctx.beginPath(); ctx.moveTo(px - 5, py + 1); ctx.lineTo(px + 5, py + 1); ctx.stroke()
+    }
+    for (const f of [0, 1]) {
+      const [px, py] = pos(f, 0)
+      ctx.fillStyle = '#16213f'
+      ctx.fillRect(px - 9, py - 4, 18, 15)
+      ctx.fillStyle = '#0a1228'
+      ctx.beginPath(); ctx.moveTo(px - 11, py - 4); ctx.lineTo(px, py - 11); ctx.lineTo(px + 11, py - 4); ctx.closePath(); ctx.fill()
+      ctx.fillStyle = `rgba(253,224,130,${0.55 + 0.25 * Math.sin(t * 2 + f)})`
+      ctx.fillRect(px - 4, py, 3, 4); ctx.fillRect(px + 1, py, 3, 4)
+    }
+    // zwei Seile
+    ctx.strokeStyle = 'rgba(8,14,32,0.9)'
+    ctx.lineWidth = 1.2
+    for (const side of [-1, 1]) {
+      ctx.beginPath()
+      for (let i = 0; i <= 24; i++) { const [px, py] = pos(i / 24, side); if (i === 0) ctx.moveTo(px, py); else ctx.lineTo(px, py) }
+      ctx.stroke()
+    }
+    // Gondeln: drei fahren hinauf (oberes Seil), drei hinunter (unteres Seil), an den Stationen kurz langsamer
+    const ph = t * 0.035
+    for (let k = 0; k < 3; k++) {
+      for (const dir of [1, -1]) {
+        const raw = (ph + k / 3 + (dir === 1 ? 0 : 1 / 6)) % 1
+        const u = raw
+        const f = dir === 1 ? u : 1 - u
+        const side = dir === 1 ? -1 : 1
+        const [px, py] = pos(Math.max(0.02, Math.min(0.98, f)), side)
+        const col = CABIN_COLORS[(k + (dir === 1 ? 0 : 1)) % 3]
+        const sw = Math.sin(t * 1.7 + k * 2 + dir) * 0.07
+        ctx.save()
+        ctx.translate(px, py)
+        ctx.rotate(sw)
+        ctx.strokeStyle = '#0a1228'; ctx.lineWidth = 1.2
+        ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(0, 6); ctx.stroke()
+        ctx.shadowColor = col; ctx.shadowBlur = 6
+        ctx.fillStyle = col
+        ctx.beginPath(); ctx.roundRect(-6, 6, 12, 9, 2); ctx.fill()
+        ctx.shadowBlur = 0
+        ctx.fillStyle = 'rgba(255,255,255,0.85)'
+        ctx.fillRect(-4, 8, 3, 3); ctx.fillRect(1, 8, 3, 3)
+        ctx.fillStyle = '#0a1228'
+        ctx.fillRect(-7, 5, 14, 2)
+        ctx.restore()
+      }
+    }
+    ctx.restore()
+  }
+}
+
 export function MountainBackdrop() {
   const ref = useRef<HTMLCanvasElement>(null)
   useEffect(() => {
@@ -140,6 +230,7 @@ export function MountainBackdrop() {
           }
           ctx.restore()
         }
+        if (li === CABLE_LAYER) drawCableCar(ctx, L, W, H, scale, off, t)
         // Nebelband vor dem nächsten Berg
         if (L.mist > 0) {
           const yy = H * (L.base + 0.02)

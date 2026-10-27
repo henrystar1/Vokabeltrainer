@@ -22,3 +22,19 @@ describe('Bot-Mischung', () => {
     expect(mixTotal([1, 2, 3, 0, 2])).toBe(8)
   })
 })
+
+import { lobbyBots, rebuildBots } from './botmix'
+describe('Bots in Teams', () => {
+  it('neuer Bot sortiert sich nach Können ein und alle behalten ihr Team', () => {
+    const start = lobbyBots(encodeMix([0, 0, 1, 0, 1]), 2, { b0: 1, b1: 0 }) // Profi (blau), Effizient (rot)? Reihenfolge: Profi(3), Effizient(5)
+    expect(start.map((b) => b.skill)).toEqual([3, 5])
+    const r = rebuildBots([...start, { skill: 1, team: 1 }])
+    expect(r.count).toBe(3)
+    expect(r.map).toEqual({ b0: 1, b1: 1, b2: 0 })
+    const back = lobbyBots(r.code, r.count, r.map)
+    expect(back).toEqual([{ skill: 1, team: 1 }, { skill: 3, team: 1 }, { skill: 5, team: 0 }])
+  })
+  it('ohne Bots bleibt der Standardcode', () => {
+    expect(rebuildBots([]).count).toBe(0)
+  })
+})

@@ -242,7 +242,7 @@ export const teamReport = (id: string, step: number, correct: boolean) => rpc<vo
 
 // ---- Offene Deathrun-Lobby, Bots, Wiedereinstieg, Admin-Zuschauer (Migration 0050) ----
 export const deathrunOpenJoin = () => rpc<string>('deathrun_open_join')
-export const teamSetBots = (id: string, bots: number, skill: number) => rpc<void>('team_set_bots', { p_id: id, p_bots: bots, p_skill: skill })
+export const teamSetBots = (id: string, bots: number, skill: number, map?: Record<string, number>) => rpc<void>('team_set_bots', { p_id: id, p_bots: bots, p_skill: skill, p_map: map ?? null })
 export const teamRejoin = (id: string) => rpc<void>('team_rejoin', { p_id: id })
 export const teamSpectate = (id: string) => rpc<TeamState>('team_spectate', { p_id: id })
 export interface AdminRun { id: string; kind: 'parkour' | 'deathrun'; status: 'lobby' | 'running'; is_open: boolean; bots: number; created_at: string; starts_at: string | null; players: string[] }
