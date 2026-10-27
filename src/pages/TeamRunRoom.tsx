@@ -149,7 +149,7 @@ export default function TeamRunRoom() {
         const r = await (watching ? teamSpectate(id) : teamGet(id))
         if (!alive) return
         offset.current = Date.parse(r.now) - Date.now()
-        const key = JSON.stringify([r.status, r.kind, r.starts_at, r.step, r.lives_left, r.host_ok, r.partner_ok, r.partner_state, r.my_question?.idx, r.paid, r.is_open, r.bots, r.bot_skill, r.can_start, r.can_manage, r.can_rejoin, r.member, r.staff_present, r.people.map((p) => `${p.user_id}:${p.state ?? ''}`)])
+        const key = JSON.stringify([r.status, r.kind, r.starts_at, r.step, r.lives_left, r.host_ok, r.partner_ok, r.partner_state, r.my_question?.idx, r.paid, r.is_open, r.bots, r.bot_skill, r.versus, r.team_map, r.can_start, r.can_manage, r.can_rejoin, r.member, r.staff_present, r.people.map((p) => `${p.user_id}:${p.state ?? ''}`)])
         if (key !== lastJson.current) { lastJson.current = key; setSt(r) }
       } catch (e) {
         if (alive) setError(errorMessage(e))

@@ -871,6 +871,18 @@ function ParkourGameInner({ st, startLevel = 0, perks }: { st: TeamState; startL
             ctx!.globalAlpha = on ? 0.95 : 0.2
             ctx!.fillRect(px, py, TILE, on ? 10 : 4)
             ctx!.globalAlpha = 1
+          } else if (c === 'J') {
+            const bounce = Math.sin(t * 6) * 1.5
+            ctx!.fillStyle = '#475569'; ctx!.fillRect(px + 3, py + 28, TILE - 6, 4)
+            ctx!.strokeStyle = '#cbd5e1'; ctx!.lineWidth = 2
+            ctx!.beginPath()
+            for (let k = 0; k < 4; k++) { const yy = py + 28 - k * 4; ctx!.moveTo(px + 8, yy); ctx!.lineTo(px + TILE - 8, yy - 2) }
+            ctx!.stroke()
+            ctx!.fillStyle = '#f97316'; ctx!.fillRect(px + 2, py + 11 + bounce, TILE - 4, 5)
+            ctx!.fillStyle = '#fdba74'; ctx!.fillRect(px + 2, py + 11 + bounce, TILE - 4, 2)
+            ctx!.fillStyle = '#fff'; ctx!.globalAlpha = 0.8
+            ctx!.beginPath(); ctx!.moveTo(px + 16, py + 1 + bounce); ctx!.lineTo(px + 22, py + 8 + bounce); ctx!.lineTo(px + 10, py + 8 + bounce); ctx!.fill()
+            ctx!.globalAlpha = 1
           } else if (c === 'k') {
             const on = cp === tx
             ctx!.fillStyle = '#94a3b8'; ctx!.fillRect(px + 14, py - 22, 3, 54)

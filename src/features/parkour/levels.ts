@@ -3,6 +3,7 @@
  *   # fester Block      ^ Stacheln (tödlich)      k Checkpoint        X Ausgang (beide müssen hinein)
  *   a b c  Druckplatte (Kanal a/b/c, gedrückt solange jemand darauf steht)
  *   A B C  Tür: zu, solange der Kanal nicht gedrückt ist
+ *   J       Sprungpad (schleudert hoch, ca. 8 Kacheln)
  *   x y z  Brücke: nur da, solange Kanal a/b/c gedrückt ist
  * Alles ist so gebaut, dass man es nur zu zweit schafft (Platte halten, Räuberleiter, Brücke halten).
  */
@@ -43,6 +44,7 @@ export class Builder {
   plat(x0: number, x1: number, y: number): this { return this.rect(x0, y, x1, y, '#') }
   /** Block bis zum Boden, Oberkante in Zeile top. */
   pillar(x0: number, x1: number, top: number): this { return this.rect(x0, top, x1, 9, '#') }
+  pad(x: number, y = 9): this { return this.set(x, y, 'J') }
   plate(ch: string, x: number, y = 9): this { return this.set(x, y, ch) }
   /** Tür über die ganze Höhe (Zeile 0 bis 9), nicht überspringbar. */
   door(ch: string, x: number): this { return this.rect(x, 0, x, 9, ch.toUpperCase()) }

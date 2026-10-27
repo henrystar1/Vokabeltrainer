@@ -26,7 +26,7 @@ export function pickupsFor(level: Level, key: string): Pickup[] {
       if (c < 0 || c >= level.cols) continue
       for (let y = 0; y < ROWS - 1; y++) {
         const ch = level.rows[y][c]
-        if (ch === '^' || (ch >= 'a' && ch <= 'c') || (ch >= 'A' && ch <= 'C') || ch === 'k' || ch === 'X') return true
+        if (ch === '^' || (ch >= 'a' && ch <= 'c') || (ch >= 'A' && ch <= 'C') || ch === 'k' || ch === 'X' || ch === 'J') return true
       }
     }
     return false

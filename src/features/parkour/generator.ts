@@ -31,17 +31,19 @@ export function generateLevel(seed: string, n: number): Level {
   g.cp(8)
   x = 14
   const pieces = Math.min(18, 5 + d)
-  const kinds = ['spikes', 'chain', 'bridge', 'pillar', 'platforms', 'tower', 'double'] as const
+  const kinds = ['spikes', 'chain', 'bridge', 'pillar', 'platforms', 'tower', 'double', 'pad', 'padchain'] as const
   let ch = pick(0, 2)
   let last = ''
   for (let i = 0; i < pieces; i++) {
     // schwere Stücke kommen mit steigender Schwierigkeit häufiger
     const pool: Array<(typeof kinds)[number]> = ['spikes', 'chain', 'pillar', 'platforms']
-    if (d >= 1) pool.push('bridge')
+    if (d >= 1) pool.push('bridge', 'pad')
+    if (d >= 2) pool.push('padchain')
     if (d >= 2) pool.push('tower', 'bridge')
     if (d >= 3) pool.push('double', 'tower', 'platforms')
     let kind = pool[pick(0, pool.length - 1)]
     if (kind === last) kind = pool[pick(0, pool.length - 1)]
+    if (i === 1) kind = 'pad' // jedes zufällige Level hat mindestens ein Sprungpad
     last = kind
     const c = CHANNELS[ch++ % 3]
     switch (kind) {
@@ -85,6 +87,18 @@ export function generateLevel(seed: string, n: number): Level {
         x = groundStart + 1
         break
       }
+      case 'pad':
+        // Hohe Mauer: nur mit dem Sprungpad zu überwinden (oben drauf landen, auf der anderen Seite hinunterspringen)
+        g.pad(x)
+        if (d >= 2) g.spikes(x + 1, x + 3)
+        g.pillar(x + 4, x + 7, 4)
+        x += 11
+        break
+      case 'padchain':
+        // Mit dem Pad auf die hohe Plattform: dort hält die Platte die Tür offen, der andere geht durch und hält von drüben
+        g.pad(x).pillar(x + 4, x + 8, 4).plate(c, x + 6, 3).door(c, x + 13).plate(c, x + 17)
+        x += 21
+        break
       case 'tower':
         // Platte oben auf dem Turm, Tür 4 Kacheln dahinter, niedrige Säule mit Platte (Leine: Platten höchstens 16 Kacheln auseinander)
         g.tower(c, x).door(c, x + 16).pillar(x + 20, x + 21, 7).plate(c, x + 20, 6)
@@ -103,7 +117,7 @@ export function generateLevel(seed: string, n: number): Level {
   }
   g.exit(x + 2)
   const end = x + 6
-  return g.buildCropped(end, `${n + 1} · Endlos ${d}`, 'Zufälliges Level, das mit jedem weiteren schwerer wird: mehr Stacheln, schmalere Plattformen, mehr Türen und Brücken.')
+  return g.buildCropped(end, `${n + 1} · Endlos ${d}`, 'Zufälliges Level, das mit jedem weiteren schwerer wird. Auf das Sprungpad (J) treten, um hoch hinaus zu kommen – dann nach rechts steuern und auf der hohen Mauer landen.')
 }
 
 /** Level n: zuerst die handgebauten, danach zufällige ohne Ende. */

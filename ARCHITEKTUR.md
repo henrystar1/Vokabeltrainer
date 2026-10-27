@@ -553,3 +553,7 @@ Tabelle `book_library_hidden`; `in_library` blendet ein veröffentlichtes Buch d
 - `ParkourGame`: `botTeam(i)`, je Team steuert ein Rechner die Bots (`isMasterFor`, `syncBots`); Bots halten nur Platten für ihr eigenes Team (`botPts`), Bots des anderen Teams zählen im Wettlauf-Urteil und in der Anzeige (`checkVerdict`). Zuschauer-Geister können Bots (`bot<i>`) und eingestiegene Ex-Zuschauer verfolgen (`targets`).
 - Parkour-Shop: `features/parkour/ParkourShopPanel.tsx`, erreichbar als Reiter „Parkour“ im Shop (`/shop?tab=parkour`); die Parkour-Seite verlinkt dorthin.
 - Design „Berge“ (`components/ui/Mountains.tsx`): Seilbahn mit Stationen, Stützen, zwei Seilen und je drei Gondeln auf dem Weg hinauf und hinunter (`drawCableCar`).
+
+## Update 71
+- Lobby (`TeamRunRoom.tsx`): `versus` und `team_map` gehören in den Vergleichsschlüssel des Pollings, damit Teamwechsel (Pfeile) ohne Neuladen erscheinen.
+- Sprungpad: Zeichen `J` (`Builder.pad`), `engine.ts` (`PAD_V`, `onPad`, `Body.pad`), Zeichnung in `ParkourGame.tsx`. Generator: Stücke `pad` (Mauer) und `padchain` (Plattform mit Platte); jedes zufällige Level hat mindestens ein Pad. Handgebaute Level 1–8 unverändert. Test: `pad.test.ts`. Keine SQL.

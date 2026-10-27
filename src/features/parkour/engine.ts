@@ -11,6 +11,8 @@ const FLY = 260
 const JET_UP = 330
 const JET_ACC = 3600
 export const JUMP_V = -570
+/** Sprungpad (Zeichen J): schleudert nach oben, ca. 8 Kacheln hoch. */
+export const PAD_V = -980
 const COYOTE = 0.1
 const BUFFER = 0.12
 
@@ -26,6 +28,8 @@ export interface Body {
   jumpHeld: boolean
   /** Noch verfügbare Luftsprünge (Doppelsprung). */
   air: number
+  /** Fliegt gerade vom Sprungpad (der Sprung wird nicht durch Loslassen gekürzt). */
+  pad?: boolean
 }
 export interface Input { move: number; jump: boolean; /** Luftsprünge nach dem Bodensprung (Standard 1 = Doppelsprung; Admin 3 = Vierfachsprung). */ airJumps?: number
   /** Flugmodus (Admin): schweben, W/S = hoch/runter, keine Stacheln. `vert` −1 = hoch, 1 = runter. */
@@ -92,6 +96,12 @@ function touchesSpike(lv: Level, b: Body): boolean {
   return false
 }
 
+/** Steht der Körper mit den Füßen auf einem Sprungpad? */
+export function onPad(lv: Level, b: Point): boolean {
+  const tx = Math.floor((b.x + PW / 2) / TILE), ty = Math.floor((b.y + PH - 1) / TILE)
+  return lv.rows[ty]?.[tx] === 'J'
+}
+
 /** Steht der Körper an dieser Stelle frei (weder in einem festen Block noch in Stacheln)? */
 export function spotIsSafe(lv: Level, pressed: Pressed, x: number, y: number): boolean {
   return !hitsSolid(lv, pressed, x, y) && !touchesSpike(lv, { x, y } as Body)
@@ -132,6 +142,15 @@ export function stepBody(b: Body, inp: Input, lv: Level, pressed: Pressed, other
   else b.buf = Math.max(0, b.buf - dt)
   b.coyote = b.ground ? COYOTE : Math.max(0, b.coyote - dt)
   if (b.ground) b.air = inp.airJumps ?? 1
+  // Sprungpad: wer darauf steht, wird hochgeschleudert
+  if (b.ground && onPad(lv, b)) {
+    b.vy = PAD_V
+    b.ground = false
+    b.coyote = 0
+    b.buf = 0
+    b.pad = true
+  }
+  if (b.pad && (b.vy >= 0 || b.ground)) b.pad = false
   if (fresh && b.coyote <= 0 && b.air > 0) {
     // Doppelsprung in der Luft
     b.vy = JUMP_V
@@ -143,7 +162,7 @@ export function stepBody(b: Body, inp: Input, lv: Level, pressed: Pressed, other
     b.coyote = 0
     b.ground = false
   }
-  if (!inp.jump && b.jumpHeld && b.vy < -230) b.vy = -230 // früh loslassen = kleiner Sprung
+  if (!inp.jump && b.jumpHeld && b.vy < -230 && !b.pad) b.vy = -230 // früh loslassen = kleiner Sprung
   b.jumpHeld = inp.jump
 
   b.vy = Math.min(MAX_FALL, b.vy + GRAV * dt)
