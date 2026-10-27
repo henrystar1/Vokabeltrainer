@@ -30,15 +30,17 @@ export function generateLevel(seed: string, n: number): Level {
   g.ground(0, 1399)
   g.cp(8)
   x = 14
-  const pieces = Math.min(18, 5 + d)
-  const kinds = ['spikes', 'chain', 'bridge', 'pillar', 'platforms', 'tower', 'double', 'pad', 'padchain'] as const
+  const pieces = Math.min(30, 5 + d + Math.floor(d / 2)) // wird mit jedem Level länger, ohne Obergrenze der Schwierigkeit
+  const kinds = ['spikes', 'chain', 'bridge', 'pillar', 'platforms', 'tower', 'double', 'pad', 'padchain', 'sky'] as const
   let ch = pick(0, 2)
   let last = ''
   for (let i = 0; i < pieces; i++) {
     // schwere Stücke kommen mit steigender Schwierigkeit häufiger
     const pool: Array<(typeof kinds)[number]> = ['spikes', 'chain', 'pillar', 'platforms']
     if (d >= 1) pool.push('bridge', 'pad')
+    if (d >= 1) pool.push('sky')
     if (d >= 2) pool.push('padchain')
+    if (d >= 4) pool.push('sky', 'pad', 'padchain')
     if (d >= 2) pool.push('tower', 'bridge')
     if (d >= 3) pool.push('double', 'tower', 'platforms')
     let kind = pool[pick(0, pool.length - 1)]
@@ -48,9 +50,9 @@ export function generateLevel(seed: string, n: number): Level {
     const c = CHANNELS[ch++ % 3]
     switch (kind) {
       case 'spikes': {
-        const fields = pick(1, Math.min(4, 1 + Math.floor(d / 2)))
+        const fields = pick(1, Math.min(6, 1 + Math.floor(d / 2)))
         for (let k = 0; k < fields; k++) {
-          const w = pick(3, Math.min(6, 3 + Math.ceil(d / 2)))
+          const w = pick(3, Math.min(7, 3 + Math.ceil(d / 2)))
           g.spikes(x, x + w - 1)
           x += w + pick(2, 3)
         }
@@ -70,15 +72,15 @@ export function generateLevel(seed: string, n: number): Level {
         x += 10
         break
       case 'platforms': {
-        const count = pick(3, Math.min(8, 3 + Math.ceil(d / 2)))
+        const count = pick(3, Math.min(14, 3 + Math.ceil(d / 2)))
         const wide = d >= 4 ? 1 : 2
         const spots: Array<{ x: number; top: number }> = []
         let px = x + (d >= 3 ? pick(3, 4) : 3)
         let top = 8
         for (let k = 0; k < count; k++) {
-          top = Math.max(5, Math.min(8, top + pick(-1, 1)))
+          top = d >= 5 ? Math.max(3, Math.min(8, top + pick(-2, 2))) : Math.max(5, Math.min(8, top + pick(-1, 1)))
           spots.push({ x: px, top })
-          px += wide + (d >= 3 ? pick(3, 4) : 3)
+          px += wide + (d >= 7 ? pick(4, 5) : d >= 3 ? pick(3, 4) : 3)
         }
         // Abgrund genau von hier bis kurz hinter die letzte Plattform (höchstens 3 Kacheln Lücke zum Boden)
         const groundStart = spots[spots.length - 1].x + wide + 3
@@ -99,6 +101,26 @@ export function generateLevel(seed: string, n: number): Level {
         g.pad(x).pillar(x + 4, x + 8, 4).plate(c, x + 6, 3).door(c, x + 13).plate(c, x + 17)
         x += 21
         break
+      case 'sky': {
+        // Höhen-Jump&Run: mit dem Sprungpad hoch, dann von Plattform zu Plattform. Je weiter, desto mehr, schmaler, weiter auseinander, mit Stacheln darunter.
+        const n = Math.min(14, 3 + Math.floor(d * 0.8))
+        const w = d >= 6 ? 1 : 2
+        const tops: number[] = []
+        const gaps: number[] = []
+        let t = pick(3, 4)
+        for (let k = 0; k < n; k++) {
+          t = Math.max(2, Math.min(5, t + pick(-1, 1)))
+          tops.push(k === 0 ? Math.max(3, t) : t)
+          gaps.push(pick(3, Math.min(5, 3 + Math.floor(d / 4))))
+        }
+        const pit = d >= 2
+        if (pit) g.cp(x)
+        g.pad(x + (pit ? 2 : 0))
+        const px = x + (pit ? 2 : 0)
+        g.sky(px, tops, gaps, w, pit)
+        x = g.skyEnd + 1
+        break
+      }
       case 'tower':
         // Platte oben auf dem Turm, Tür 4 Kacheln dahinter, niedrige Säule mit Platte (Leine: Platten höchstens 16 Kacheln auseinander)
         g.tower(c, x).door(c, x + 16).pillar(x + 20, x + 21, 7).plate(c, x + 20, 6)
