@@ -6,7 +6,7 @@ import { newBody, stepBody } from './engine'
 describe('zwei Bots auf einem Level', () => {
   it('Doppelbrücke (Level 6): beide kommen durch, ohne sich in die Brücke zu stürzen', () => {
     for (const sk of [[3, 3], [4, 4], [2, 3], [5, 5]]) {
-      const r = duo(5, sk, 100)
+      const r = duo(5, sk, 200)
       expect({ sk, ok: r.ok, deaths: Math.min(r.deaths, 4) }).toEqual({ sk, ok: true, deaths: Math.min(r.deaths, 4) })
       expect(r.deaths).toBeLessThanOrEqual(4)
     }

@@ -100,7 +100,7 @@ export class Builder {
     const W = end3 + 1 + gap
     this.rect(W, R[2], W + 2, 9, '#')
     if (pit) this.clear(x + 1, W - 1)
-    this.skips.push({ from: x - 1, to: W + 5, secs: 5 + 5 * n })
+    this.skips.push({ from: x - 1, to: W + 5, secs: 4 + 4 * n })
     this.towerEnd = W + 3
     return this
   }
