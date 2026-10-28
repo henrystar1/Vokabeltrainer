@@ -80,7 +80,7 @@ export function generateLevel(seed: string, n: number): Level {
         for (let k = 0; k < count; k++) {
           top = d >= 5 ? Math.max(4, Math.min(8, top + pick(-1, 2))) : Math.max(5, Math.min(8, top + pick(-1, 1))) // nach oben höchstens eine Zeile je Schritt: sonst nicht mehr machbar
           spots.push({ x: px, top })
-          px += wide + (d >= 12 ? pick(4, 5) : d >= 7 ? 4 : d >= 3 ? pick(3, 4) : 3)
+          px += wide + (d >= 7 ? 4 : d >= 3 ? pick(3, 4) : 3) // Lücken über 4 Kacheln bei einer 1 Kachel breiten Plattform sind nicht mehr machbar
         }
         // Abgrund genau von hier bis kurz hinter die letzte Plattform (höchstens 3 Kacheln Lücke zum Boden)
         const groundStart = spots[spots.length - 1].x + wide + 3

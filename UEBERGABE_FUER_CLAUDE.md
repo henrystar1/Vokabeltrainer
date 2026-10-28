@@ -12,7 +12,7 @@ Diese Datei fasst zusammen, wie wir arbeiten, was gebaut wurde und was offen ist
 - Jede neue Migration muss auch an `supabase/ALLE_MIGRATIONEN_in_einem.sql` angehängt und in `TESTVERSION.md` (Liste der Dateien) ergänzt werden.
 
 ## Stand: ausgelieferte Updates
-Updates 50–75 wurden geliefert (Update 75 ist das letzte: Versionsanzeige, Pad-Türme, Kamera nach oben). SQL, die Henry für die letzten Updates braucht: 0053 (Update 66), 0054 (Update 68), 0055 (Update 69), 0056 (Update 70). Ob er sie alle eingespielt hat, ist nicht bestätigt.
+Updates 50–76 wurden geliefert (Update 76 ist das letzte: Versionsanzeige, Pad-Türme, Kamera nach oben). SQL, die Henry für die letzten Updates braucht: 0053 (Update 66), 0054 (Update 68), 0055 (Update 69), 0056 (Update 70). Ob er sie alle eingespielt hat, ist nicht bestätigt.
 
 Wichtige Themen der letzten Updates:
 - **66 Lernen im Parkour:** Speedup-Angebote am rechten Bildschirmrand, Vokabel beantworten zum Freischalten (`parkourLearn.ts`, `LearnOverlay.tsx`, Tabelle `parkour_learn_off`), weniger Coins.

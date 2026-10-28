@@ -68,11 +68,11 @@ export class Builder {
   towerEnd = 0
   /**
    * Pad-Turm (Höhen-Jump&Run, geht über den Bildrand hinaus): Pad am Boden bei x. Etappe 1 nach rechts (Zeile 3), am Ende ein Pad,
-   * Etappe 2 ein Stück zurück nach links (step Zeilen höher), wieder ein Pad, Etappe 3 nach rechts (noch höher). Danach eine hohe Mauer,
+   * Etappe 2 ein Stück zurück nach links (step = 6 Zeilen höher, mehr als ein Doppelsprung schafft: die Pads sind Pflicht), wieder ein Pad, Etappe 3 nach rechts (noch höher). Danach eine hohe Mauer,
    * deren Oberkante auf Höhe von Etappe 3 liegt: der Weg am Boden ist versperrt. n = Plattformen je Etappe, w = Breite, gap = Lücke.
    * Mit pit fehlt unten der Boden: ein Absturz endet in den Stacheln.
    */
-  padTower(x: number, n: number, w: number, gap: number, pit: boolean, step = 5): this {
+  padTower(x: number, n: number, w: number, gap: number, pit: boolean, step = 6): this {
     const R = [3, 3 - step, 3 - 2 * step]
     this.pad(x)
     let c = x + 4

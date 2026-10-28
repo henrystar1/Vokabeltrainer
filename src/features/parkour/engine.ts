@@ -99,7 +99,7 @@ function touchesSpike(lv: Level, b: Body): boolean {
 /** Steht der Körper mit den Füßen auf einem Sprungpad? */
 export function onPad(lv: Level, b: Point): boolean {
   const tx = Math.floor((b.x + PW / 2) / TILE), ty = Math.floor((b.y + PH - 1) / TILE)
-  return lv.rows[ty]?.[tx] === 'J'
+  return tileAt(lv, tx, ty) === 'J'
 }
 
 /** Steht der Körper an dieser Stelle frei (weder in einem festen Block noch in Stacheln)? */
