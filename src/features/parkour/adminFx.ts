@@ -3,7 +3,7 @@ import type { HoleAnim } from './lookTypes'
 
 /** Admin-Look im Parkour: eine Figur wie ein kleines Schwarzes Loch (Ereignishorizont, Akkretionsscheibe, Sternenschweif). */
 
-export const BH_IN = 2.0
+export const BH_IN = 3.8 // länger als der Einschlag, damit der Rauch nachwirkt
 export const BH_APPEAR = 1.35
 export const BH_OUT = 2.3
 
@@ -190,10 +190,54 @@ function rocket(c: CanvasRenderingContext2D, t: number, flame: number): void {
   c.strokeStyle = '#1e293b'; c.lineWidth = 1; c.stroke()
 }
 
-function flashRect(c: CanvasRenderingContext2D, cx: number, k: number, strength: number, color = '#f5f3ff'): void {
+function flashRect(c: CanvasRenderingContext2D, cx: number, k: number, strength: number, color = '#f5f3ff', top = 36): void {
   if (k <= 0 || k >= 1) return
   c.save(); c.globalAlpha = strength * (1 - k)
-  c.fillStyle = color; c.fillRect(cx - 700, -200, 1400, 800)
+  c.fillStyle = color; c.fillRect(cx - 700, top - 236, 1400, 800)
+  c.restore()
+}
+
+/**
+ * Rauch nach dem Einschlag: viele aufquellende graue Wolken (je mehrere überlappende Kugeln mit weichem Rand), erst dunkel und heiß mit orangem Kern,
+ * dann hell und durchsichtig; sie steigen auf, werden größer und driften leicht. s = Sekunden seit dem Einschlag.
+ */
+function explosionSmoke(c: CanvasRenderingContext2D, cx: number, feet: number, s: number): void {
+  const LIFE = 1.9
+  c.save()
+  for (let i = 0; i < 34; i++) {
+    const birth = rnd(i * 5.3) * 0.5
+    const u = clamp01((s - birth) / LIFE)
+    if (u <= 0 || u >= 1) continue
+    const side = (rnd(i * 1.9) - 0.5) * 2
+    const rise = 40 + rnd(i * 3.7) * 95
+    const px = cx + side * (14 + 52 * Math.sqrt(u)) + Math.sin(u * 3 + i) * 5 + 14 * u
+    const py = feet - 12 - rise * ease(Math.sqrt(u)) - 10 * u
+    const base = 9 + rnd(i * 7.7) * 9
+    const r = base * (0.5 + 1.8 * Math.sqrt(u))
+    const alpha = Math.min(1, u * 8) * Math.pow(1 - u, 1.4) * 0.6
+    // Farbverlauf: schwarz-braun heiß -> mittelgrau -> hellgrau
+    const shade = Math.round(36 + 150 * Math.pow(u, 0.7))
+    const warm = Math.round(40 * Math.max(0, 1 - u * 3))
+    for (let b = 0; b < 3; b++) {
+      const bx = px + (rnd(i * 2.1 + b * 4.4) - 0.5) * r * 0.9
+      const by = py + (rnd(i * 6.6 + b * 1.3) - 0.5) * r * 0.7
+      const br = r * (0.7 + 0.35 * rnd(i * 9.1 + b))
+      const g = c.createRadialGradient(bx, by, br * 0.1, bx, by, br)
+      g.addColorStop(0, `rgba(${shade + warm},${shade + Math.round(warm * 0.5)},${shade},${alpha})`)
+      g.addColorStop(0.65, `rgba(${shade},${shade},${shade + 4},${alpha * 0.7})`)
+      g.addColorStop(1, `rgba(${shade},${shade},${shade + 6},0)`)
+      c.fillStyle = g
+      c.beginPath(); c.arc(bx, by, br, 0, Math.PI * 2); c.fill()
+    }
+  }
+  // glimmende Glut unten, solange es noch heiß ist
+  if (s < 0.9) {
+    for (let i = 0; i < 10; i++) {
+      c.globalAlpha = Math.max(0, 0.8 - s / 0.9) * (0.5 + 0.5 * Math.sin(s * 30 + i))
+      c.fillStyle = '#fb923c'
+      c.beginPath(); c.arc(cx + (rnd(i * 8.1) - 0.5) * 50, feet - 4 - rnd(i * 2.2) * 8, 1.6, 0, Math.PI * 2); c.fill()
+    }
+  }
   c.restore()
 }
 
@@ -202,7 +246,8 @@ export function drawBlackholeAnim(c: CanvasRenderingContext2D, h: HoleAnim, t: n
   const cx = h.x + PW / 2
   const feet = h.y + PH
   if (h.kind === 'in') {
-    const hy = Math.max(36, h.y - 170)
+    const top = h.top ?? 36 // Oberkante des Bildes: in hohen Ebenen liegt sie weit über dem Boden, das Loch hängt dann entsprechend hoch
+    const hy = Math.max(top, h.y - 170)
     const tt = h.t
     const open = tt < 0.45 ? ease(tt / 0.45) : tt < BH_APPEAR ? 1 : tt < BH_APPEAR + 0.5 ? 1 - ease((tt - BH_APPEAR) / 0.5) : 0
     // Zielkreis am Boden
@@ -228,56 +273,59 @@ export function drawBlackholeAnim(c: CanvasRenderingContext2D, h: HoleAnim, t: n
     if (tt >= 0.5 && tt < BH_APPEAR) {
       const k = (tt - 0.5) / (BH_APPEAR - 0.5)
       const ry = hy + (feet - 16 - hy) * k * k
-      // Rauchspur
+      // Rauchspur: dichte, aufquellende Wolken hinter der Rakete
       c.save()
-      for (let i = 1; i <= 10; i++) {
-        const kk = Math.max(0, k - i * 0.035)
+      for (let i = 1; i <= 16; i++) {
+        const kk = Math.max(0, k - i * 0.025)
         const py = hy + (feet - 16 - hy) * kk * kk
-        c.globalAlpha = (1 - i / 11) * 0.55
-        c.fillStyle = i < 4 ? '#fdba74' : '#94a3b8'
-        c.beginPath(); c.arc(cx + (rnd(i * 3.3 + Math.floor(tt * 20)) - 0.5) * 5, py - 8, 5 - i * 0.3, 0, Math.PI * 2); c.fill()
+        const age = i / 17
+        const rr = 4 + age * 11
+        const px = cx + (rnd(i * 3.3 + Math.floor(tt * 14)) - 0.5) * (5 + age * 10)
+        const sh = Math.round(90 + 110 * age)
+        const g = c.createRadialGradient(px, py - 8, 1, px, py - 8, rr)
+        g.addColorStop(0, i < 4 ? `rgba(253,186,116,${0.8 - age})` : `rgba(${sh},${sh},${sh + 6},${0.7 * (1 - age)})`)
+        g.addColorStop(1, `rgba(${sh},${sh},${sh + 6},0)`)
+        c.fillStyle = g
+        c.beginPath(); c.arc(px, py - 8, rr, 0, Math.PI * 2); c.fill()
       }
       c.restore()
       c.save(); c.translate(cx, ry); c.rotate(Math.PI); rocket(c, t, k); c.restore()
     }
-    // Explosion
+    // Explosion (Feuer und Funken rasch, der Rauch bleibt länger)
     if (tt >= BH_APPEAR) {
-      const q = (tt - BH_APPEAR) / (BH_IN - BH_APPEAR)
-      flashRect(c, cx, q / 0.22, 0.85, '#fff7ed')
-      const fr = 10 + 54 * ease(clamp01(q / 0.5))
-      c.save()
-      c.globalAlpha = Math.max(0, 1 - q * 1.15)
-      const fg = c.createRadialGradient(cx, feet - 14, 2, cx, feet - 14, fr)
-      fg.addColorStop(0, '#ffffff'); fg.addColorStop(0.25, '#fde047'); fg.addColorStop(0.6, '#f97316'); fg.addColorStop(1, 'rgba(127,29,29,0)')
-      c.fillStyle = fg; c.beginPath(); c.arc(cx, feet - 14, fr, 0, Math.PI * 2); c.fill()
-      c.strokeStyle = '#fed7aa'; c.lineWidth = 4 * (1 - q) + 1
-      c.beginPath(); c.ellipse(cx, feet, 20 + 120 * ease(q), 5 + 26 * ease(q), 0, 0, Math.PI * 2); c.stroke()
-      c.restore()
-      // Funken und Trümmer
-      c.save()
-      for (let i = 0; i < 26; i++) {
-        const a = rnd(i * 4.7) * Math.PI
-        const sp = 90 + rnd(i * 2.2) * 150
-        const px = cx + Math.cos(a) * sp * q * (i % 2 ? 1 : -1) * 0.6
-        const py = feet - 10 - Math.sin(a) * sp * q * 0.9 + 260 * q * q
-        c.globalAlpha = Math.max(0, 1 - q * 1.1)
-        c.fillStyle = i % 3 === 0 ? '#fde047' : i % 3 === 1 ? '#fb923c' : '#64748b'
-        c.fillRect(px, py, 3, 3)
+      const qa = (tt - BH_APPEAR) / 0.65
+      const q = clamp01(qa)
+      flashRect(c, cx, qa / 0.22, 0.85, '#fff7ed', top)
+      if (qa < 1) {
+        const fr = 10 + 54 * ease(clamp01(q / 0.5))
+        c.save()
+        c.globalAlpha = Math.max(0, 1 - q * 1.15)
+        const fg = c.createRadialGradient(cx, feet - 14, 2, cx, feet - 14, fr)
+        fg.addColorStop(0, '#ffffff'); fg.addColorStop(0.25, '#fde047'); fg.addColorStop(0.6, '#f97316'); fg.addColorStop(1, 'rgba(127,29,29,0)')
+        c.fillStyle = fg; c.beginPath(); c.arc(cx, feet - 14, fr, 0, Math.PI * 2); c.fill()
+        c.strokeStyle = '#fed7aa'; c.lineWidth = 4 * (1 - q) + 1
+        c.beginPath(); c.ellipse(cx, feet, 20 + 120 * ease(q), 5 + 26 * ease(q), 0, 0, Math.PI * 2); c.stroke()
+        c.restore()
+        // Funken und Trümmer
+        c.save()
+        for (let i = 0; i < 26; i++) {
+          const a = rnd(i * 4.7) * Math.PI
+          const sp = 90 + rnd(i * 2.2) * 150
+          const px = cx + Math.cos(a) * sp * q * (i % 2 ? 1 : -1) * 0.6
+          const py = feet - 10 - Math.sin(a) * sp * q * 0.9 + 260 * q * q
+          c.globalAlpha = Math.max(0, 1 - q * 1.1)
+          c.fillStyle = i % 3 === 0 ? '#fde047' : i % 3 === 1 ? '#fb923c' : '#64748b'
+          c.fillRect(px, py, 3, 3)
+        }
+        c.restore()
       }
-      // Rauch
-      for (let i = 0; i < 7; i++) {
-        const k = clamp01((q - 0.15) / 0.85)
-        c.globalAlpha = 0.35 * (1 - k)
-        c.fillStyle = '#475569'
-        c.beginPath(); c.arc(cx + (rnd(i * 6.1) - 0.5) * 50, feet - 10 - 50 * k * (0.5 + rnd(i * 1.7)), 8 + 14 * k, 0, Math.PI * 2); c.fill()
-      }
-      c.restore()
+      explosionSmoke(c, cx, feet, tt - BH_APPEAR)
     }
     return
   }
   // out
   const tt = h.t
-  const hy = Math.max(36, h.y - 120)
+  const hy = Math.max(h.top ?? 36, h.y - 120)
   const bodyY = h.y + PH / 2
   const open = tt < 0.5 ? ease(tt / 0.5) : tt < 1.5 ? 1 : tt < 1.95 ? 1 + 0.35 * Math.sin((tt - 1.5) * 28) : Math.max(0, 1 - ease((tt - 1.95) / 0.2))
   const r = 40 * open * (tt > 1.45 && tt < 1.95 ? 1.25 : 1)
@@ -318,7 +366,7 @@ export function drawBlackholeAnim(c: CanvasRenderingContext2D, h: HoleAnim, t: n
   // Kollaps: Blitz, Druckwellen, Sterne
   if (tt >= 1.95) {
     const q = (tt - 1.95) / (BH_OUT - 1.95)
-    flashRect(c, cx, q / 0.4, 0.9)
+    flashRect(c, cx, q / 0.4, 0.9, '#f5f3ff', h.top ?? 36)
     c.save()
     for (let ring = 0; ring < 3; ring++) {
       const k = clamp01(q * 1.1 - ring * 0.12)

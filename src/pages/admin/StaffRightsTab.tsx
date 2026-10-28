@@ -176,6 +176,7 @@ function Editor({ person, onChanged }: { person: StaffRow; onChanged: () => void
             <div className="grid gap-2 sm:grid-cols-2">
               <Choice checked={r.looks.includes('hammer')} onSelect={() => void patch({ looks: r.looks.includes('hammer') ? r.looks.filter((l) => l !== 'hammer') : [...r.looks, 'hammer'] })} title="Auftritt freigeben: Hammer" text="Ein Hammer fällt vom Himmel, ein Blitz schlägt ein. Die Person wählt im Parkour-Shop." />
               <Choice checked={r.looks.includes('piano')} onSelect={() => void patch({ looks: r.looks.includes('piano') ? r.looks.filter((l) => l !== 'piano') : [...r.looks, 'piano'] })} title="Auftritt freigeben: Klavier" text="Ein Klavier kracht herunter, beim Gehen fliegt die Person als Klavier davon." />
+              <Choice checked={r.looks.includes('guitar')} onSelect={() => void patch({ looks: r.looks.includes('guitar') ? r.looks.filter((l) => l !== 'guitar') : [...r.looks, 'guitar'] })} title="Auftritt freigeben: Gitarre" text="Ein Gitarre kracht herunter, beim Gehen fliegt die Person als Gitarre davon." />
             </div>
           </Block>
 

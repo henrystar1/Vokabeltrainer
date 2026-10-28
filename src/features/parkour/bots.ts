@@ -354,13 +354,31 @@ export function botStep(lv: Level, s: BotState, dt: number, ctx: BotCtx = { huma
     if (s.skipI >= 0) {
       const q = lv.skips[s.skipI]
       s.skipT += dt
-      if (s.skipT >= q.secs * (s.skill <= 1 ? 1.5 : s.skill === 2 ? 1.2 : 1)) {
+      const slow = s.skill <= 1 ? 1.6 : s.skill === 2 ? 1.25 : 1
+      // Weg entlang der Wegpunkte: je Stück ein Hüpfer (Bogen), damit man sieht, wie der Bot den Turm hinaufspringt
+      let t = s.skipT / slow
+      let k = 0
+      let pos: [number, number] | null = null
+      for (; k < q.path.length - 1; k++) {
+        const [x0, y0] = q.path[k], [x1, y1] = q.path[k + 1]
+        const dur = Math.max(0.5, Math.hypot(x1 - x0, y1 - y0) / 250)
+        if (t < dur) {
+          const u = t / dur
+          const rise = Math.max(0, y0 - y1)
+          pos = [x0 + (x1 - x0) * u, y0 + (y1 - y0) * u - 4 * (28 + rise * 0.2) * u * (1 - u)]
+          s.body.face = x1 >= x0 ? 1 : -1
+          break
+        }
+        t -= dur
+      }
+      if (!pos) {
         Object.assign(s.body, newBody(q.to * TILE, 10 * TILE - PH - 0.5))
         s.skipI = -1; s.skipT = 0; s.px = s.body.x; s.lastX = s.body.x; s.stuckT = 0
         return 'ok'
       }
-      s.stuckT = 0; s.lastX = s.body.x
-      return finishStep(lv, s, stepBody(s.body, { move: 0, jump: false, airJumps: 1 }, lv, ALL_OPEN, null, dt), dt)
+      Object.assign(s.body, { x: pos[0], y: pos[1], vx: 0, vy: 0, ground: false })
+      s.px = pos[0]; s.stuckT = 0; s.lastX = pos[0]
+      return 'ok'
     }
   }
   if (s.backT > 0) s.backT -= dt

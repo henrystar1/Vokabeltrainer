@@ -111,9 +111,13 @@ function ParkourGameInner({ st, startLevel = 0, perks }: { st: TeamState; startL
   }
   useEffect(() => {
     let alive = true
-    parkourLearnOffList([st.me]).then((l) => { if (alive) learnOff.current = l.includes(st.me) }).catch(() => undefined)
+    // Schalter regelmäßig und bei Rückkehr in den Tab neu lesen; bei Fehler bleibt der letzte bekannte Stand.
+    const check = () => { parkourLearnOffList([st.me]).then((l) => { if (alive) learnOff.current = l.includes(st.me) }).catch(() => undefined) }
+    check()
+    const t = window.setInterval(check, 15_000)
+    document.addEventListener('visibilitychange', check)
     void loadLearnPool() // vorladen, damit die erste Frage sofort da ist
-    return () => { alive = false }
+    return () => { alive = false; window.clearInterval(t); document.removeEventListener('visibilitychange', check) }
   }, [st.me])
   const [hud, setHud] = useState({ level: 0, deaths: 0, ms: 0, linked: false, done: false, jet: false })
 
@@ -326,7 +330,7 @@ function ParkourGameInner({ st, startLevel = 0, perks }: { st: TeamState; startL
       const lvNew = Math.max(0, Math.min(999, Math.floor(p.lv ?? 0)))
       const dead = !!p.dead
       const jump = !prev || prev.lv !== lvNew || prev.dead !== dead || Math.hypot(x - prev.x, y - prev.y) > SNAP_PX
-      const r: Remote = { x, y, face: p.face === -1 ? -1 : 1, lv: lvNew, cp: p.cp ?? null, dead, ex: !!p.ex, dc: p.dc ?? 0, g: !!p.g, seen: performance.now(), lh: p.lh ?? 0, gh: !!p.gh, dx: jump || !prev ? x : prev.dx, dy: jump || !prev ? y : prev.dy, hp: p.hp ?? 0, el: !!p.el, sid: psid, n: pn, bf: p.bf ?? 0, kd: p.kd === 'blackhole' || p.kd === 'hammer' || p.kd === 'piano' ? p.kd : prev?.kd, lk: p.lk && typeof p.lk === 'object' ? { name: String(p.lk.n ?? '').slice(0, 24), pk_color: p.lk.c ?? null, pk_hat: p.lk.h ?? null, pk_fx: p.lk.f ?? null, role: p.kd === 'blackhole' ? 'admin' : 'mod', pk_look: p.kd === 'hammer' || p.kd === 'piano' ? p.kd : 'blackhole' } : prev?.lk, appearAt: prev?.appearAt }
+      const r: Remote = { x, y, face: p.face === -1 ? -1 : 1, lv: lvNew, cp: p.cp ?? null, dead, ex: !!p.ex, dc: p.dc ?? 0, g: !!p.g, seen: performance.now(), lh: p.lh ?? 0, gh: !!p.gh, dx: jump || !prev ? x : prev.dx, dy: jump || !prev ? y : prev.dy, hp: p.hp ?? 0, el: !!p.el, sid: psid, n: pn, bf: p.bf ?? 0, kd: p.kd === 'blackhole' || p.kd === 'hammer' || p.kd === 'piano' || p.kd === 'guitar' ? p.kd : prev?.kd, lk: p.lk && typeof p.lk === 'object' ? { name: String(p.lk.n ?? '').slice(0, 24), pk_color: p.lk.c ?? null, pk_hat: p.lk.h ?? null, pk_fx: p.lk.f ?? null, role: p.kd === 'blackhole' ? 'admin' : 'mod', pk_look: p.kd === 'hammer' || p.kd === 'piano' || p.kd === 'guitar' ? p.kd : 'blackhole' } : prev?.lk, appearAt: prev?.appearAt }
       if (p.ev === 'in' || p.ev === 'out') {
         if (r.kd) holes.push({ x, y, t: 0, kind: p.ev, lv: lvNew, face: r.face, look: r.kd })
         if (p.ev === 'in' && r.kd) r.appearAt = performance.now() + LOOKS[r.kd].appear * 1000
@@ -950,7 +954,7 @@ function ParkourGameInner({ st, startLevel = 0, perks }: { st: TeamState; startL
       for (const [uid, r] of remotes) { if (r.lv === lv && now - r.seen < STALE_MS && !r.dead) fxField.drawBehind(ctx!, uid, lookOf(uid)?.pk_fx, t) }
       if (!isSpec && deadT <= 0 && animLock <= 0) fxField.drawBehind(ctx!, 'me', myFxId(), t)
       fxField.drawParticles(ctx!)
-      for (const h of holes) if (h.lv === lv) LOOKS[h.look].anim(ctx!, h, t)
+      for (const h of holes) if (h.lv === lv) { h.top = cy + 36; LOOKS[h.look].anim(ctx!, h, t) }
       for (const [uid, r] of remotes) {
         if (r.lv !== lv || now - r.seen >= STALE_MS || r.el || (r.appearAt !== undefined && now < r.appearAt)) continue
         drawP(r.dx, r.dy, r.face, uid, nameOf(uid), r.dead, false, r.gh, r.bf, false, vs === 2 ? teamOfU(uid) : vs === 1 ? 1 : -1, 0, lookKindOf(uid))

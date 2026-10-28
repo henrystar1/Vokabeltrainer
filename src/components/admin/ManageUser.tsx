@@ -10,6 +10,7 @@ import { errorMessage } from '../../lib/errors'
 import { useAsync } from '../../lib/useAsync'
 import { randomPassword } from '../../pages/admin/AccountsTab'
 import { adminAdjustPoints, adminSetPassword } from '../../services/admin'
+import { parkourLearnOffList, parkourLearnSet } from '../../services/play'
 import { adminGrantItem, adminGrantKoins, adminListItems, adminListUserItems, adminRevokeItem } from '../../services/koins'
 
 
@@ -28,7 +29,7 @@ export function ManageButton({ userId, name, onChanged }: { userId: string; name
   )
 }
 
-type Tab = 'coins' | 'items' | 'points' | 'password'
+type Tab = 'coins' | 'items' | 'points' | 'parkour' | 'password'
 
 /** Schnellaktionen für eine Person: Coins buchen (auch sehr hohe Beträge auf einmal), Artikel schenken/entziehen, Punkte. */
 export default function ManageUser({ userId, name, onClose, onChanged }: { userId: string; name: string; onClose: () => void; onChanged?: () => void }) {
@@ -45,6 +46,8 @@ export default function ManageUser({ userId, name, onClose, onChanged }: { userI
   const [message, setMessage] = useState<string | null>(null)
   const items = useAsync(adminListItems, [])
   const owned = useAsync(() => adminListUserItems(userId), [userId])
+  const learnOff = useAsync(() => parkourLearnOffList([userId]), [userId])
+  const learnIsOff = (learnOff.data ?? []).includes(userId)
 
   async function run(fn: () => Promise<unknown>, ok: string) {
     setBusy(true)
@@ -65,7 +68,7 @@ export default function ManageUser({ userId, name, onClose, onChanged }: { userI
   const n = parseCoins(amount)
   const validAmount = Number.isSafeInteger(n) && n !== 0 && Math.abs(n) <= MAX
   const p = Number.parseInt(pts, 10)
-  const tabs: Array<[Tab, string]> = [['coins', 'Coins'], ['items', 'Artikel'], ['points', 'Punkte'], ['password', 'Kennwort']]
+  const tabs: Array<[Tab, string]> = [['coins', 'Coins'], ['items', 'Artikel'], ['points', 'Punkte'], ['parkour', 'Parkour'], ['password', 'Kennwort']]
 
   return (
     <Modal title={`${name} verwalten`} onClose={onClose}>
@@ -124,6 +127,20 @@ export default function ManageUser({ userId, name, onClose, onChanged }: { userI
         <div className="space-y-3">
           <Field label="Ranglistenpunkte" hint="Plus oder Minus."><TextInput inputMode="numeric" value={pts} onChange={(e) => setPts(e.target.value.replace(/[^\d-]/g, ''))} /></Field>
           <Button disabled={busy || !Number.isInteger(p) || p === 0} onClick={() => void run(() => adminAdjustPoints(userId, p, 'Schnellaktion'), `${name}: ${p > 0 ? '+' : ''}${p} Punkte.`)}>Buchen</Button>
+        </div>
+      )}
+
+      {tab === 'parkour' && (
+        <div className="space-y-3">
+          <p className="text-sm text-slate-300">Vokabelfragen im Parkour (Speedups und Levelwechsel): <strong className={learnIsOff ? 'text-rose-300' : 'text-emerald-300'}>{learnOff.loading && !learnOff.data ? '…' : learnIsOff ? 'AUS' : 'an'}</strong></p>
+          {learnOff.error && <ErrorBox message={learnOff.error} onRetry={learnOff.reload} />}
+          <Button
+            disabled={busy || (learnOff.loading && !learnOff.data)}
+            onClick={() => void run(async () => { await parkourLearnSet(userId, !learnIsOff); learnOff.reload() }, learnIsOff ? `${name}: Vokabelfragen im Parkour wieder an.` : `${name}: Vokabelfragen im Parkour aus.`)}
+          >
+            {learnIsOff ? 'Vokabelfragen wieder einschalten' : 'Vokabelfragen ausschalten'}
+          </Button>
+          <p className="text-xs text-slate-500">Gilt dauerhaft, auch in neuen Runden. Die Person bekommt es innerhalb von ca. 15 Sekunden mit, auch mitten im Spiel.</p>
         </div>
       )}
 

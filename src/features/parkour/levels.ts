@@ -8,6 +8,8 @@
  * Alles ist so gebaut, dass man es nur zu zweit schafft (Platte halten, Räuberleiter, Brücke halten).
  */
 export const TILE = 32
+const PW_ = 22 // Breite und Höhe der Figur (wie PW, PH in engine.ts; hier nur für die Wegpunkte der Bots)
+const PH_ = 28
 export const ROWS = 12
 export const VIEW_W = 704
 export const VIEW_H = ROWS * TILE
@@ -22,8 +24,8 @@ export interface Level {
   exit: { x: number; y: number; w: number; h: number }
   /** Kacheln über der obersten Zeile (up[0] = Zeile −1, up[1] = Zeile −2 …). Leer: das Level hat eine Decke. Sonst geht es nach oben endlos weiter. */
   up: string[]
-  /** Hohe Türme, die Bots nicht selbst erklettern: Der Bot wartet vor dem Pad (Spalte from) und kommt nach einer Weile bei Spalte to wieder heraus. */
-  skips: Array<{ from: number; to: number; secs: number }>
+  /** Hohe Türme, die Bots nicht selbst erklettern: Ein Bot vor dem Pad (Spalte from) folgt dem Weg path (Pixelpunkte der Reihe nach, links oben der Figur) und steht am Ende bei Spalte to auf dem Boden. */
+  skips: Array<{ from: number; to: number; path: Array<[number, number]> }>
 }
 
 /** Zeichen an einer Kachel (auch über dem Bild); außerhalb links/rechts/unten '.' */
@@ -74,33 +76,42 @@ export class Builder {
    */
   padTower(x: number, n: number, w: number, gap: number, pit: boolean, step = 6): this {
     const R = [3, 3 - step, 3 - 2 * step]
+    const path: Array<[number, number]> = []
+    const at = (col: number, row: number) => path.push([col * TILE + TILE / 2 - PW_ / 2, row * TILE - PH_])
     this.pad(x)
+    at(x, 10)
     let c = x + 4
     let last = c
-    for (let j = 0; j < n; j++) { this.plat(c, c + w - 1, R[0]); last = c; c += w + gap }
+    for (let j = 0; j < n; j++) { this.plat(c, c + w - 1, R[0]); at(c + (w - 1) / 2, R[0]); last = c; c += w + gap }
     const p1 = last + w - 1
     this.pad(p1, R[0] - 1)
+    at(p1, R[0])
     let e = p1 - 3
     let left = e
     for (let j = 0; j < n; j++) {
       const ww = j === 0 ? w + 1 : w
       left = e - ww + 1
       this.plat(left, e, R[1])
+      at((left + e) / 2, R[1])
       e = left - gap - 1
     }
     this.pad(left, R[1] - 1)
+    at(left, R[1])
     let c3 = left + 3
     let end3 = c3
     for (let j = 0; j < n; j++) {
       const ww = j === 0 ? w + 1 : w
       this.plat(c3, c3 + ww - 1, R[2])
+      at(c3 + (ww - 1) / 2, R[2])
       end3 = c3 + ww - 1
       c3 += ww + gap
     }
     const W = end3 + 1 + gap
     this.rect(W, R[2], W + 2, 9, '#')
     if (pit) this.clear(x + 1, W - 1)
-    this.skips.push({ from: x - 1, to: W + 5, secs: 4 + 4 * n })
+    at(W + 1, R[2])
+    at(W + 5, 10)
+    this.skips.push({ from: x - 1, to: W + 5, path })
     this.towerEnd = W + 3
     return this
   }

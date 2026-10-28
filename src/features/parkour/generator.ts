@@ -28,6 +28,7 @@ export function generateLevel(seed: string, n: number): Level {
   const g = new Builder(1400)
   let x = 0
   g.ground(0, 1399)
+  let lastCp = 8
   g.cp(8)
   x = 14
   const pieces = Math.min(30, 5 + d + Math.floor(d / 2)) // wird mit jedem Level länger, ohne Obergrenze der Schwierigkeit
@@ -54,7 +55,7 @@ export function generateLevel(seed: string, n: number): Level {
         for (let k = 0; k < fields; k++) {
           const w = pick(3, Math.min(7, 3 + Math.ceil(d / 2)))
           g.spikes(x, x + w - 1)
-          x += w + pick(2, 3)
+          x += w + (w >= 4 ? 3 : pick(2, 3)) // zwischen breiten Stachelfeldern bleibt mehr Platz zum Landen
         }
         break
       }
@@ -73,12 +74,12 @@ export function generateLevel(seed: string, n: number): Level {
         break
       case 'platforms': {
         const count = pick(3, Math.min(14, 3 + Math.ceil(d / 2)))
-        const wide = d >= 4 ? 1 : 2
+        const wide = d >= 6 ? 1 : 2
         const spots: Array<{ x: number; top: number }> = []
         let px = x + (d >= 3 ? pick(3, 4) : 3)
         let top = 8
         for (let k = 0; k < count; k++) {
-          top = d >= 5 ? Math.max(4, Math.min(8, top + pick(-1, 2))) : Math.max(5, Math.min(8, top + pick(-1, 1))) // nach oben höchstens eine Zeile je Schritt: sonst nicht mehr machbar
+          top = Math.max(d >= 8 ? 4 : 5, Math.min(8, top + pick(-1, 1))) // nach oben höchstens eine Zeile je Schritt: sonst nicht mehr machbar
           spots.push({ x: px, top })
           px += wide + (d >= 7 ? 4 : d >= 3 ? pick(3, 4) : 3) // Lücken über 4 Kacheln bei einer 1 Kachel breiten Plattform sind nicht mehr machbar
         }
@@ -107,7 +108,9 @@ export function generateLevel(seed: string, n: number): Level {
         const n = d >= 9 ? 4 : d >= 5 ? 3 : d >= 2 ? 2 : 1
         const w = d >= 6 ? 1 : d >= 1 && n === 1 ? 3 : 2
         const gap = d >= 8 ? 5 : d >= 4 ? 4 : 3
+        if (x - lastCp <= 9) g.set(lastCp, 9, '.') // keine dritte Fahne: die vorige weicht der Doppelfahne
         g.cp2(x)
+        lastCp = x + 2
         x += 6
         g.padTower(x, n, w, gap, d >= 2)
         x = g.towerEnd + 1
@@ -127,7 +130,7 @@ export function generateLevel(seed: string, n: number): Level {
       }
     }
     x += 3
-    if (i % 2 === 1) { g.cp(x); x += 3 }
+    if (i % 2 === 1) { g.cp(x); lastCp = x; x += 3 }
   }
   g.exit(x + 2)
   const end = x + 6

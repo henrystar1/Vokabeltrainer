@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { generateLevel } from './generator'
+import { generateLevel, levelFor } from './generator'
 import { Builder } from './levels'
 import { PH, newBody, stepBody } from './engine'
 import { reachable } from './reach'
@@ -40,4 +40,28 @@ describe('Sprungpad', () => {
     console.log('Bots mit Pad: ok', ok, 'von 4')
     expect(ok).toBeGreaterThanOrEqual(3)
   }, 300000)
+  it('Bot springt den Pad-Turm hinauf (statt davor zu warten) und kommt dahinter an', () => {
+    const lv = levelFor('seed', 5) // Level 6: Turm mit drei Plattformen je Etappe
+    const t = lv.skips[0]
+    expect(t).toBeDefined()
+    const s: BotState = newBot(0, lv, 5, 3, 5)
+    s.cp = null
+    Object.assign(s.body, { x: (t.from - 1) * 32, y: 10 * 32 - PH - 0.5 })
+    s.deadT = 0; s.grace = 0
+    let minY = 1e9, past = false
+    for (let f = 0; f < 60 * 40 && !past; f++) { botStep(lv, s, 1 / 60); minY = Math.min(minY, s.body.y); past = s.body.x >= t.to * 32 }
+    expect(minY).toBeLessThan(-100) // war oben im Turm
+    expect(past).toBe(true)
+  })
+  it('vor jedem Turm stehen genau zwei Fahnen (Doppelfahne), nicht drei', () => {
+    let towers = 0
+    for (const seed of ['a', 'b', 'c', 'd', 'e']) for (let n = 8; n < 24; n++) {
+      const lv = generateLevel(seed, n)
+      for (const t of lv.skips) {
+        towers++
+        expect(lv.checkpoints.filter((c) => c >= t.from - 12 && c <= t.from).length, `${seed}:${n}`).toBe(2)
+      }
+    }
+    expect(towers).toBeGreaterThan(5)
+  })
 })

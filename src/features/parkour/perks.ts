@@ -9,8 +9,8 @@ export function useRunPerks(): RunPerks & { ready: boolean; apply: (r: RunPerks)
   useEffect(() => {
     let alive = true
     if (!user) return
-    myRunPerks().then((r) => { if (alive) setP(r) }).catch(() => { if (alive) setP({ spectate: isAdmin, look: isAdmin ? 'blackhole' : null, allowed: isAdmin ? ['blackhole', 'hammer', 'piano'] : [], entrance: null }) })
+    myRunPerks().then((r) => { if (alive) setP(r) }).catch(() => { if (alive) setP({ spectate: isAdmin, look: isAdmin ? 'blackhole' : null, allowed: isAdmin ? ['blackhole', 'hammer', 'piano', 'guitar'] : [], entrance: null }) })
     return () => { alive = false }
   }, [user?.id, isAdmin]) // eslint-disable-line react-hooks/exhaustive-deps
-  return { spectate: p?.spectate ?? isAdmin, look: p?.look ?? (isAdmin ? 'blackhole' : null), allowed: p?.allowed ?? (isAdmin ? ['blackhole', 'hammer', 'piano'] : []), entrance: p?.entrance ?? null, ready: p !== null, apply: setP }
+  return { spectate: p?.spectate ?? isAdmin, look: p?.look ?? (isAdmin ? 'blackhole' : null), allowed: p?.allowed ?? (isAdmin ? ['blackhole', 'hammer', 'piano', 'guitar'] : []), entrance: p?.entrance ?? null, ready: p !== null, apply: setP }
 }
