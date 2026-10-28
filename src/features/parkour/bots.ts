@@ -14,6 +14,9 @@ export const ALL_OPEN: Pressed = { a: true, b: true, c: true }
 
 export interface BotState {
   i: number
+  /** Pad-Turm, vor dem der Bot gerade wartet (Index in lv.skips), −1 = keiner; skipT = Wartezeit. */
+  skipI: number
+  skipT: number
   body: Body
   lv: number
   hearts: number
@@ -75,7 +78,7 @@ export interface BotCtx { humans: Point[]; others: Point[]; bots?: BotInfo[] }
 
 export function newBot(i: number, level: Level, hearts: number, skill: number, lv = 0): BotState {
   const s = spawnAt(level, i % 5, null)
-  return { i, body: newBody(s.x + (i >= 5 ? 6 * (i - 4) : 0), s.y), lv, hearts, cp: null, deadT: 0.05 + i * 0.45, out: false, skill, prevJump: false, stuckT: 0, lastX: s.x, retries: 0, backT: 0, grace: 1, plan: Math.random(), script: null, mistakeT: 0, tick: 0, urgent: false, mode: 'run', holdCh: 'a', holdT: 0, holdMin: 0, gotoT: 0, blockT: 0, noPick: false, gateX1: -1, retT: 0, retCd: 0, spaceT: 0, spaceCd: 0, fineT: 0, route: null, open: false, parked: false, take: false, takeX: 0, viaDone: false, gateWait: false, ledgeT: 0, px: s.x }
+  return { i, skipI: -1, skipT: 0, body: newBody(s.x + (i >= 5 ? 6 * (i - 4) : 0), s.y), lv, hearts, cp: null, deadT: 0.05 + i * 0.45, out: false, skill, prevJump: false, stuckT: 0, lastX: s.x, retries: 0, backT: 0, grace: 1, plan: Math.random(), script: null, mistakeT: 0, tick: 0, urgent: false, mode: 'run', holdCh: 'a', holdT: 0, holdMin: 0, gotoT: 0, blockT: 0, noPick: false, gateX1: -1, retT: 0, retCd: 0, spaceT: 0, spaceCd: 0, fineT: 0, route: null, open: false, parked: false, take: false, takeX: 0, viaDone: false, gateWait: false, ledgeT: 0, px: s.x }
 }
 
 const HORIZON = 96 // 1,6 s vorausrechnen
@@ -340,6 +343,25 @@ export function botStep(lv: Level, s: BotState, dt: number, ctx: BotCtx = { huma
       s.stuckT = 0; s.lastX = sp.x; s.grace = 1; s.retries = 0; s.script = null; s.mode = 'run'; s.blockT = 0; s.route = routeFor(lv, s)
     }
     return 'ok'
+  }
+  // Hoher Pad-Turm: Bots klettern nicht selbst (sie laufen nur nach rechts). Sie warten davor so lange, wie das Klettern dauern würde,
+  // und stehen dann hinter der Mauer wieder auf dem Boden.
+  if (lv.skips.length > 0 && s.mode === 'run') {
+    if (s.skipI < 0 && s.body.ground) {
+      const k = lv.skips.findIndex((q) => s.body.x > (q.from - 2) * TILE && s.body.x < q.from * TILE + 24)
+      if (k >= 0) { s.skipI = k; s.skipT = 0; s.script = null }
+    }
+    if (s.skipI >= 0) {
+      const q = lv.skips[s.skipI]
+      s.skipT += dt
+      if (s.skipT >= q.secs * (s.skill <= 1 ? 1.5 : s.skill === 2 ? 1.2 : 1)) {
+        Object.assign(s.body, newBody(q.to * TILE, 10 * TILE - PH - 0.5))
+        s.skipI = -1; s.skipT = 0; s.px = s.body.x; s.lastX = s.body.x; s.stuckT = 0
+        return 'ok'
+      }
+      s.stuckT = 0; s.lastX = s.body.x
+      return finishStep(lv, s, stepBody(s.body, { move: 0, jump: false, airJumps: 1 }, lv, ALL_OPEN, null, dt), dt)
+    }
   }
   if (s.backT > 0) s.backT -= dt
   if (s.mistakeT > 0) s.mistakeT -= dt

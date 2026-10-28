@@ -18,7 +18,7 @@ import { BOT_NAMES, botStep, newBot, type BotCtx, type BotState } from './bots'
 import { PICKUP_INFO, type PickupKind } from './pickups'
 import LearnOverlay from './LearnOverlay'
 import { LEARN_PER_LEVEL, LEARN_PER_OFFER, OFFER_EVERY, OFFER_LIFE, loadLearnPool } from './parkourLearn'
-import { ROWS, TILE, VIEW_H, VIEW_W, type Level } from './levels'
+import { ROWS, TILE, VIEW_H, VIEW_W, tileAt, type Level } from './levels'
 import { PH, PW, checkpointAt, inExit, newBody, pressedMap, spawnAt, spotIsSafe, stepBody, type Body, type Pressed } from './engine'
 
 const COLORS = ['#22d3ee', '#e879f9', '#facc15', '#4ade80', '#fb923c']
@@ -192,10 +192,11 @@ function ParkourGameInner({ st, startLevel = 0, perks }: { st: TeamState; startL
     let exitHold = 0
     let finished = false
     let cam = 0
+    let camY = 0 // senkrechte Kamera: nur in Leveln mit Turm folgt sie dir nach oben, du bleibst in der Mitte
     let t = 0
     let titleT = 3
     let graceT = 1.5 // kurz nach Start/Neustart kosten Stacheln und Absturz kein Herz
-    const hashLevel = (l: Level) => { let h = 5381; for (const r of l.rows) for (let i = 0; i < r.length; i++) h = ((h << 5) + h + r.charCodeAt(i)) | 0; return h }
+    const hashLevel = (l: Level) => { let h = 5381; for (const r of [...l.rows, ...l.up]) for (let i = 0; i < r.length; i++) h = ((h << 5) + h + r.charCodeAt(i)) | 0; return h }
     let startPerf = performance.now()
     const me: Body = (() => { const s = spawnAt(levelOf(startLevel), slot, null); return newBody(s.x, s.y) })()
     const remotes = new Map<string, Remote>()
@@ -312,7 +313,7 @@ function ParkourGameInner({ st, startLevel = 0, perks }: { st: TeamState; startL
       const p = payload as Partial<Remote> & { u?: string; n?: number; sid?: string; bf?: number; lk?: { n?: string; c?: string | null; h?: string | null; f?: string | null }; kd?: string; ev?: string }
       const uid = p.u
       const x = finite(p.x, -100, 200000)
-      const y = finite(p.y, -800, 1200)
+      const y = finite(p.y, -100000, 1200)
       if (!uid || uid === st.me || x === null || y === null) return
       lastRx = performance.now()
       const rival = vs === 2 && !spec && !isSpec && teamOfU(uid) !== myTeam
@@ -356,7 +357,7 @@ function ParkourGameInner({ st, startLevel = 0, perks }: { st: TeamState; startL
       for (const a of p.l) {
         if (!Array.isArray(a) || a.length < 8) continue
         const i = a[0]
-        const x = finite(a[1], -100, 200000), y = finite(a[2], -800, 1200)
+        const x = finite(a[1], -100, 200000), y = finite(a[2], -100000, 1200)
         if (x === null || y === null || !Number.isInteger(i) || i < 0 || i > 8) continue
         if (bots?.some((b) => b.i === i)) continue // meine eigenen Bots kenne ich besser
         const prev = botSnap.get(i)
@@ -374,7 +375,7 @@ function ParkourGameInner({ st, startLevel = 0, perks }: { st: TeamState; startL
     function onGhost(payload: unknown) {
       const p = payload as { u?: string; x?: number; y?: number; face?: number; lv?: number; n?: string } | null
       if (!p || typeof p.u !== 'string' || p.u === st.me) return
-      const x = finite(p.x, -100, 200000), y = finite(p.y, -800, 1200)
+      const x = finite(p.x, -100, 200000), y = finite(p.y, -100000, 1200)
       if (x === null || y === null) return
       const lvG = Math.max(0, Math.min(999, Math.floor(Number(p.lv) || 0)))
       const prev = ghosts.get(p.u)
@@ -442,7 +443,7 @@ function ParkourGameInner({ st, startLevel = 0, perks }: { st: TeamState; startL
       Object.assign(me, newBody(s.x, s.y))
       for (const r of remotes.values()) r.ex = false
       fxField.clear()
-      cam = 0
+      cam = 0; camY = 0
     }
 
     /** Zurück ins Spiel: zu einem erreichten Checkpoint, der im Bild ist, sonst zum Mitspieler, sonst zum letzten Checkpoint. */
@@ -472,7 +473,7 @@ function ParkourGameInner({ st, startLevel = 0, perks }: { st: TeamState; startL
     function specGo(n: number, atEnd: boolean) {
       if (n < 0) return
       lv = n
-      cam = 0
+      cam = 0; camY = 0
       fxField.clear()
       follow.current = { uid: null, to: null }
       setFollowUi(null)
@@ -743,7 +744,7 @@ function ParkourGameInner({ st, startLevel = 0, perks }: { st: TeamState; startL
           const bi = /^bot(\d)$/.exec(fl.to)
           const r = bi ? botViews(now).find((b) => b.i === Number(bi[1])) : (remotes.get(fl.to) ?? rivals.get(fl.to))
           if (r && now - r.seen < STALE_MS * 3) {
-            if (r.lv !== lv) { lv = r.lv; cam = 0; fxField.clear() }
+            if (r.lv !== lv) { lv = r.lv; cam = 0; camY = 0; fxField.clear() }
             me.x = r.dx; me.y = r.dy - 8
             if (fl.uid === null) fl.to = null // einmal hinfliegen, dann frei
           }
@@ -819,6 +820,11 @@ function ParkourGameInner({ st, startLevel = 0, perks }: { st: TeamState; startL
       const want = Math.max(0, Math.min(level.cols * TILE - VIEW_W, mid + PW / 2 - VIEW_W / 2))
       cam += (want - cam) * 0.12
       const cx = Math.round(cam)
+      const wantY = level.up.length > 0 ? Math.min(0, me.y + PH / 2 - VIEW_H / 2) : 0
+      camY += (wantY - camY) * 0.15
+      if (Math.abs(wantY - camY) < 0.5) camY = wantY
+      const cy = Math.round(camY)
+      const sky = -cy * 0.25 // Hintergrund wandert beim Steigen langsam nach unten
       // Himmel
       const g = ctx!.createLinearGradient(0, 0, 0, VIEW_H)
       g.addColorStop(0, '#0b1030'); g.addColorStop(0.6, '#1d2a66'); g.addColorStop(1, '#3b2b7a')
@@ -827,26 +833,26 @@ function ParkourGameInner({ st, startLevel = 0, perks }: { st: TeamState; startL
       for (let k = 0; k < 50; k++) {
         const sx = ((hash(k) * VIEW_W * 2 - cx * 0.12) % VIEW_W + VIEW_W) % VIEW_W
         ctx!.fillStyle = `rgba(255,255,255,${0.2 + 0.5 * Math.abs(Math.sin(t * 1.4 + k))})`
-        ctx!.fillRect(sx, hash(k + 50) * VIEW_H * 0.6, 1.5, 1.5)
+        ctx!.fillRect(sx, (hash(k + 50) * VIEW_H * 0.6 + sky * 0.5) % VIEW_H, 1.5, 1.5)
       }
       ctx!.fillStyle = 'rgba(120,100,220,0.18)'
       for (let k = 0; k < 7; k++) {
         const hx = k * 190 - ((cx * 0.3) % 190) - 40
-        ctx!.beginPath(); ctx!.moveTo(hx, VIEW_H - 64); ctx!.lineTo(hx + 95, VIEW_H - 64 - 90 - hash(k + Math.floor(cx / 570)) * 70); ctx!.lineTo(hx + 190, VIEW_H - 64); ctx!.fill()
+        ctx!.beginPath(); ctx!.moveTo(hx, VIEW_H - 64 + sky); ctx!.lineTo(hx + 95, VIEW_H - 64 - 90 - hash(k + Math.floor(cx / 570)) * 70 + sky); ctx!.lineTo(hx + 190, VIEW_H - 64 + sky); ctx!.fill()
       }
       ctx!.save()
-      ctx!.translate(-cx, 0)
+      ctx!.translate(-cx, -cy)
       const x0 = Math.max(0, Math.floor(cx / TILE)), x1 = Math.min(level.cols - 1, Math.floor((cx + VIEW_W) / TILE))
       const chColor: Record<string, string> = { a: '#22d3ee', b: '#e879f9', c: '#fbbf24' }
-      for (let ty = 0; ty < ROWS; ty++) {
+      for (let ty = Math.min(0, Math.floor(cy / TILE)); ty < ROWS; ty++) {
         for (let tx = x0; tx <= x1; tx++) {
-          const c = level.rows[ty][tx]
+          const c = tileAt(level, tx, ty)
           const px = tx * TILE, py = ty * TILE
           if (c === '#') {
             ctx!.fillStyle = '#2a2f55'; ctx!.fillRect(px, py, TILE, TILE)
             ctx!.fillStyle = 'rgba(255,255,255,0.05)'; ctx!.fillRect(px, py, TILE, 2)
             ctx!.fillStyle = 'rgba(0,0,0,0.25)'; ctx!.fillRect(px + 1, py + TILE - 2, TILE - 2, 2)
-            if (ty === 0 || level.rows[ty - 1][tx] !== '#') { ctx!.fillStyle = '#34d399'; ctx!.fillRect(px, py, TILE, 6); ctx!.fillStyle = '#6ee7b7'; ctx!.fillRect(px, py, TILE, 2) }
+            if (tileAt(level, tx, ty - 1) !== '#') { ctx!.fillStyle = '#34d399'; ctx!.fillRect(px, py, TILE, 6); ctx!.fillStyle = '#6ee7b7'; ctx!.fillRect(px, py, TILE, 2) }
           } else if (c === '^') {
             ctx!.fillStyle = '#fb7185'
             for (let s = 0; s < 2; s++) { ctx!.beginPath(); ctx!.moveTo(px + s * 16 + 1, py + TILE); ctx!.lineTo(px + s * 16 + 8, py + 12); ctx!.lineTo(px + s * 16 + 15, py + TILE); ctx!.fill() }
@@ -979,7 +985,7 @@ function ParkourGameInner({ st, startLevel = 0, perks }: { st: TeamState; startL
         const sx = r.dx + PW / 2 - cx
         if (sx >= -4 && sx <= VIEW_W + 4) continue
         const left = sx < 0
-        const ay = Math.max(46, Math.min(VIEW_H - 40, r.dy + PH / 2))
+        const ay = Math.max(46, Math.min(VIEW_H - 40, r.dy + PH / 2 - cy))
         const ax = left ? 16 : VIEW_W - 16
         ctx!.save()
         ctx!.globalAlpha = 0.85

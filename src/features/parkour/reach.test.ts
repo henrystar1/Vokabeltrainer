@@ -31,8 +31,10 @@ export function reachable(lv: Level): { ok: boolean; maxX: number } {
       }
     }
     // Nur die am weitesten rechts liegenden Zustände weiterverfolgen (Speicher begrenzen)
-    next.sort((p, q) => q.x - p.x)
-    frontier = next.slice(0, 1500)
+    // Zwei Gruppen verfolgen: die am weitesten rechts liegenden und die am höchsten gestiegenen (Pad-Türme laufen auch nach links und nach oben)
+    const byX = [...next].sort((p, q) => q.x - p.x).slice(0, 1000)
+    const byUp = [...next].sort((p, q) => (q.x - 4 * q.y) - (p.x - 4 * p.y)).slice(0, 600)
+    frontier = [...new Set([...byX, ...byUp])]
   }
   return { ok: false, maxX }
 }

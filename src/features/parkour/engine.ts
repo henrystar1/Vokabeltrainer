@@ -1,4 +1,4 @@
-import { ROWS, TILE, type Level } from './levels'
+import { ROWS, TILE, tileAt, type Level } from './levels'
 
 export const PW = 22
 export const PH = 28
@@ -54,9 +54,9 @@ export function solidChar(ch: string, pressed: Pressed): boolean {
 
 function solidAt(lv: Level, pressed: Pressed, tx: number, ty: number): boolean {
   if (tx < 0 || tx >= lv.cols) return true
-  if (ty < 0) return true // oben ist eine Decke: niemand fliegt oder hüpft aus dem Bild
+  if (ty < 0 && lv.up.length === 0) return true // Level ohne Türme: oben ist eine Decke, niemand fliegt oder hüpft aus dem Bild
   if (ty >= ROWS) return false
-  return solidChar(lv.rows[ty][tx], pressed)
+  return solidChar(tileAt(lv, tx, ty), pressed)
 }
 
 function hitsSolid(lv: Level, pressed: Pressed, x: number, y: number): boolean {
@@ -127,7 +127,7 @@ export function stepBody(b: Body, inp: Input, lv: Level, pressed: Pressed, other
     b.x = fx
     let fy = b.y + b.vy * dt
     if (!inp.ghost && hitsSolid(lv, pressed, b.x, fy)) { fy = b.y; b.vy = 0 }
-    b.y = Math.max(0, Math.min(ROWS * TILE - PH - 1, fy))
+    b.y = Math.max(lv.up.length > 0 ? -1e6 : 0, Math.min(ROWS * TILE - PH - 1, fy))
     b.jumpHeld = inp.jump
     return 'ok'
   }

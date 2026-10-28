@@ -16,7 +16,7 @@ describe('Sprungpad', () => {
     expect(b.y + PH).toBeCloseTo(4 * 32, 0) // steht oben auf der Mauer
   })
   it('generierte Level haben ein Pad und sind erreichbar', () => {
-    for (const [seed, n] of [['abc', 8], ['abc', 9], ['xyz', 11], ['q', 14], ['abc', 20], ['xyz', 30], ['k', 45]] as const) {
+    for (const [seed, n] of [['abc', 8], ['abc', 9], ['xyz', 11], ['q', 14], ['abc', 20], ['xyz', 30], ['k', 45], ['m', 60]] as const) {
       const g = generateLevel(seed, n)
       expect(g.rows.some((r) => r.includes('J'))).toBe(true)
       expect(reachable(g).ok, `${seed}:${n}`).toBe(true)

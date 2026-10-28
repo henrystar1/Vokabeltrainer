@@ -78,9 +78,9 @@ export function generateLevel(seed: string, n: number): Level {
         let px = x + (d >= 3 ? pick(3, 4) : 3)
         let top = 8
         for (let k = 0; k < count; k++) {
-          top = d >= 5 ? Math.max(3, Math.min(8, top + pick(-2, 2))) : Math.max(5, Math.min(8, top + pick(-1, 1)))
+          top = d >= 5 ? Math.max(4, Math.min(8, top + pick(-1, 2))) : Math.max(5, Math.min(8, top + pick(-1, 1))) // nach oben höchstens eine Zeile je Schritt: sonst nicht mehr machbar
           spots.push({ x: px, top })
-          px += wide + (d >= 7 ? pick(4, 5) : d >= 3 ? pick(3, 4) : 3)
+          px += wide + (d >= 12 ? pick(4, 5) : d >= 7 ? 4 : d >= 3 ? pick(3, 4) : 3)
         }
         // Abgrund genau von hier bis kurz hinter die letzte Plattform (höchstens 3 Kacheln Lücke zum Boden)
         const groundStart = spots[spots.length - 1].x + wide + 3
@@ -102,23 +102,15 @@ export function generateLevel(seed: string, n: number): Level {
         x += 21
         break
       case 'sky': {
-        // Höhen-Jump&Run: mit dem Sprungpad hoch, dann von Plattform zu Plattform. Je weiter, desto mehr, schmaler, weiter auseinander, mit Stacheln darunter.
-        const n = Math.min(14, 3 + Math.floor(d * 0.8))
-        const w = d >= 6 ? 1 : 2
-        const tops: number[] = []
-        const gaps: number[] = []
-        let t = pick(3, 4)
-        for (let k = 0; k < n; k++) {
-          t = Math.max(2, Math.min(5, t + pick(-1, 1)))
-          tops.push(k === 0 ? Math.max(3, t) : t)
-          gaps.push(pick(3, Math.min(5, 3 + Math.floor(d / 4))))
-        }
-        const pit = d >= 2
-        if (pit) g.cp(x)
-        g.pad(x + (pit ? 2 : 0))
-        const px = x + (pit ? 2 : 0)
-        g.sky(px, tops, gaps, w, pit)
-        x = g.skyEnd + 1
+        // Pad-Turm: mit dem Pad hoch, Plattformen nach rechts, Pad, ein Stück zurück nach links und höher, Pad, wieder nach rechts, dann über die Mauer.
+        // Je weiter, desto mehr Plattformen, schmaler, weiter auseinander, mit Stacheln darunter.
+        const n = d >= 9 ? 4 : d >= 5 ? 3 : d >= 2 ? 2 : 1
+        const w = d >= 6 ? 1 : d >= 1 && n === 1 ? 3 : 2
+        const gap = d >= 8 ? 5 : d >= 4 ? 4 : 3
+        g.cp2(x)
+        x += 6
+        g.padTower(x, n, w, gap, d >= 2)
+        x = g.towerEnd + 1
         break
       }
       case 'tower':

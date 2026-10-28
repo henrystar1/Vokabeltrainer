@@ -1,5 +1,6 @@
 import { lazy, Suspense, type ReactNode } from 'react'
-import { Navigate, Route, Routes } from 'react-router-dom'
+import { Navigate, Route, Routes, useLocation } from 'react-router-dom'
+import VersionTag from './components/ui/VersionTag'
 import { PANIC_KEYS, usePanic } from './features/panic/panic'
 import { useLocks } from './features/locks/LocksProvider'
 import type { LockKey } from './services/koins'
@@ -74,9 +75,18 @@ function Gate({ k, children }: { k: LockKey; children: ReactNode }) {
   return <>{children}</>
 }
 
+/** Auf den Seiten ohne Menü (Anmelden usw.) steht die Versionsnummer fest unten; in der App zeigt sie AppShell. */
+function AuthVersion() {
+  const { pathname } = useLocation()
+  const p = pathname.replace(/\/+$/, '').split('/').pop() ?? ''
+  if (!['anmelden', 'registrieren', 'passwort-vergessen', 'passwort-neu'].includes(p)) return null
+  return <VersionTag className="fixed inset-x-0 bottom-2 pointer-events-none" />
+}
+
 export default function App() {
   if (!isSupabaseConfigured) return <ConfigMissing />
   return (
+    <>
     <Routes>
       <Route path="anmelden" element={<Login />} />
       <Route path="registrieren" element={<Register />} />
@@ -129,5 +139,7 @@ export default function App() {
         </Route>
       </Route>
     </Routes>
+    <AuthVersion />
+    </>
   )
 }

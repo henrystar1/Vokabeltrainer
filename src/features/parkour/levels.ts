@@ -20,15 +20,32 @@ export interface Level {
   plates: Array<{ ch: string; x: number; y: number }>
   checkpoints: number[]
   exit: { x: number; y: number; w: number; h: number }
+  /** Kacheln über der obersten Zeile (up[0] = Zeile −1, up[1] = Zeile −2 …). Leer: das Level hat eine Decke. Sonst geht es nach oben endlos weiter. */
+  up: string[]
+  /** Hohe Türme, die Bots nicht selbst erklettern: Der Bot wartet vor dem Pad (Spalte from) und kommt nach einer Weile bei Spalte to wieder heraus. */
+  skips: Array<{ from: number; to: number; secs: number }>
+}
+
+/** Zeichen an einer Kachel (auch über dem Bild); außerhalb links/rechts/unten '.' */
+export function tileAt(lv: Level, tx: number, ty: number): string {
+  if (ty >= 0) return ty < ROWS ? lv.rows[ty]?.[tx] ?? '.' : '.'
+  return lv.up[-ty - 1]?.[tx] ?? '.'
 }
 
 export class Builder {
   readonly g: string[][]
+  /** Zeilen über dem Bild (up[0] = Zeile −1). */
+  readonly upRows: string[][] = []
+  readonly skips: Level['skips'] = []
   constructor(readonly cols: number) {
     this.g = Array.from({ length: ROWS }, () => Array<string>(cols).fill('.'))
   }
   set(x: number, y: number, ch: string): this {
-    if (x >= 0 && x < this.cols && y >= 0 && y < ROWS) this.g[y][x] = ch
+    if (x < 0 || x >= this.cols || y >= ROWS) return this
+    if (y >= 0) { this.g[y][x] = ch; return this }
+    const k = -y - 1
+    while (this.upRows.length <= k) this.upRows.push(Array<string>(this.cols).fill('.'))
+    this.upRows[k][x] = ch
     return this
   }
   rect(x0: number, y0: number, x1: number, y1: number, ch: string): this {
@@ -45,21 +62,46 @@ export class Builder {
   /** Block bis zum Boden, Oberkante in Zeile top. */
   pillar(x0: number, x1: number, top: number): this { return this.rect(x0, top, x1, 9, '#') }
   pad(x: number, y = 9): this { return this.set(x, y, 'J') }
-  /** Ende (Spalte hinter der letzten Plattform) des zuletzt gebauten sky-Abschnitts. */
-  skyEnd = 0
+  /** Doppelfahne: zwei Checkpoints im Abstand von zwei Kacheln (vor den hohen Abschnitten). */
+  cp2(x: number): this { return this.cp(x).cp(x + 2) }
+  /** Spalte hinter dem zuletzt gebauten Pad-Turm (dort geht der Boden weiter). */
+  towerEnd = 0
   /**
-   * Höhen-Jump&Run: ab dem Sprungpad bei x schweben Plattformen in der Luft (tops = Zeile der Oberkante je Plattform, gaps = Lücke
-   * davor). Mit pit fehlt darunter der Boden: Absturz = Stacheln. Ohne pit fällt man nur zurück auf den Boden und versucht es neu.
+   * Pad-Turm (Höhen-Jump&Run, geht über den Bildrand hinaus): Pad am Boden bei x. Etappe 1 nach rechts (Zeile 3), am Ende ein Pad,
+   * Etappe 2 ein Stück zurück nach links (step Zeilen höher), wieder ein Pad, Etappe 3 nach rechts (noch höher). Danach eine hohe Mauer,
+   * deren Oberkante auf Höhe von Etappe 3 liegt: der Weg am Boden ist versperrt. n = Plattformen je Etappe, w = Breite, gap = Lücke.
+   * Mit pit fehlt unten der Boden: ein Absturz endet in den Stacheln.
    */
-  sky(x: number, tops: number[], gaps: number[], w = 2, pit = false): this {
+  padTower(x: number, n: number, w: number, gap: number, pit: boolean, step = 5): this {
+    const R = [3, 3 - step, 3 - 2 * step]
+    this.pad(x)
     let c = x + 4
-    tops.forEach((t, i) => {
-      if (i > 0) c += gaps[i - 1] ?? 3
-      this.plat(c, c + w - 1, t)
-      c += w
-    })
-    this.skyEnd = c
-    if (pit) this.clear(x + 1, c - 1)
+    let last = c
+    for (let j = 0; j < n; j++) { this.plat(c, c + w - 1, R[0]); last = c; c += w + gap }
+    const p1 = last + w - 1
+    this.pad(p1, R[0] - 1)
+    let e = p1 - 3
+    let left = e
+    for (let j = 0; j < n; j++) {
+      const ww = j === 0 ? w + 1 : w
+      left = e - ww + 1
+      this.plat(left, e, R[1])
+      e = left - gap - 1
+    }
+    this.pad(left, R[1] - 1)
+    let c3 = left + 3
+    let end3 = c3
+    for (let j = 0; j < n; j++) {
+      const ww = j === 0 ? w + 1 : w
+      this.plat(c3, c3 + ww - 1, R[2])
+      end3 = c3 + ww - 1
+      c3 += ww + gap
+    }
+    const W = end3 + 1 + gap
+    this.rect(W, R[2], W + 2, 9, '#')
+    if (pit) this.clear(x + 1, W - 1)
+    this.skips.push({ from: x - 1, to: W + 5, secs: 5 + 5 * n })
+    this.towerEnd = W + 3
     return this
   }
   plate(ch: string, x: number, y = 9): this { return this.set(x, y, ch) }
@@ -85,15 +127,15 @@ export class Builder {
   exit(x: number): this { return this.rect(x, 7, x + 1, 9, 'X') }
   /** Wie build, aber auf die ersten `cols` Spalten beschnitten. */
   buildCropped(cols: number, name: string, hint: string): Level {
-    return parse(name, hint, this.g.map((r) => r.slice(0, cols).join('')))
+    return parse(name, hint, this.g.map((r) => r.slice(0, cols).join('')), this.upRows.map((r) => r.slice(0, cols).join('')), this.skips.filter((s) => s.from < cols))
   }
   build(name: string, hint: string): Level {
     const rows = this.g.map((r) => r.join(''))
-    return parse(name, hint, rows)
+    return parse(name, hint, rows, this.upRows.map((r) => r.join('')), this.skips)
   }
 }
 
-export function parse(name: string, hint: string, rows: string[]): Level {
+export function parse(name: string, hint: string, rows: string[], up: string[] = [], skips: Level['skips'] = []): Level {
   const cols = Math.max(...rows.map((r) => r.length))
   const padded = rows.map((r) => r.padEnd(cols, '.'))
   // Schluchten (kein Boden in Zeile 10 und 11) bekommen unten Stacheln: Absturz = Stacheln, sonst nichts kostet ein Herz.
@@ -113,7 +155,7 @@ export function parse(name: string, hint: string, rows: string[]): Level {
       else if (ch === 'X') { x0 = Math.min(x0, x); y0 = Math.min(y0, y); x1 = Math.max(x1, x); y1 = Math.max(y1, y) }
     }
   })
-  return { name, hint, cols, rows: padded, plates, checkpoints, exit: { x: x0, y: y0, w: x1 - x0 + 1, h: y1 - y0 + 1 } }
+  return { name, hint, cols, rows: padded, plates, checkpoints, exit: { x: x0, y: y0, w: x1 - x0 + 1, h: y1 - y0 + 1 }, up: up.map((r) => r.padEnd(cols, '.')), skips }
 }
 
 const level1 = new Builder(86)
@@ -158,8 +200,8 @@ const level3 = new Builder(140)
   .plate('a', 88).door('a', 93).plate('a', 96)
   .cp(97)
   .pillar(99, 100, 7).plate('b', 99, 6).door('b', 104).plate('b', 106)
-  .cp(109).pad(111).sky(111, [4, 3, 4, 3], [3, 3, 3], 2, false)
-level3.exit(level3.skyEnd + 4)
+  .cp2(107).padTower(111, 1, 3, 3, false)
+level3.exit(level3.towerEnd + 4)
 const level3b = level3.build('3 · Gipfel', 'Alles zusammen: Treppen, lange Brücke und viele Türen. Am Ende geht es mit dem Sprungpad hoch hinauf: springt von Plattform zu Plattform über den Wolken. Wer fällt, landet unten und probiert es nochmal.')
 
 
@@ -174,8 +216,8 @@ const level4 = new Builder(140)
   .pillar(82, 83, 7).plate('b', 82, 6).door('b', 88).plate('b', 91)
   .cp(93)
   .chain('c', 96).spikes(106, 107)
-  .cp(109).pad(111).sky(111, [4, 3, 2, 3], [3, 4, 3], 2, true)
-level4.exit(level4.skyEnd + 5)
+  .cp2(108).padTower(113, 2, 2, 3, true)
+level4.exit(level4.towerEnd + 4)
 const level4b = level4.build('4 · Zacken', 'Schmale Plattformen über dem Abgrund und breitere Stachelfelder. Zwei Sprünge hintereinander sind hier Pflicht. Am Ende trägt euch das Sprungpad in die Höhe: unter den Plattformen lauern jetzt Stacheln, ein Absturz kostet ein Herz.')
 
 const level5 = new Builder(150)
@@ -201,8 +243,8 @@ const level6 = new Builder(150)
   .cp(85)
   .pillar(88, 89, 8).pillar(92, 93, 6).plate('b', 92, 5).door('b', 99).plate('b', 102)
   .cp(104).spikes(107, 109)
-  .cp(112).pad(114).sky(114, [4, 3, 2, 3, 4], [4, 3, 4, 3], 2, true)
-level6.exit(level6.skyEnd + 4)
+  .cp2(111).padTower(115, 3, 2, 3, true)
+level6.exit(level6.towerEnd + 4)
 const level6b = level6.build('6 · Doppelbrücke', 'Auf der Mittelinsel gibt es zwei Platten: erst hält einer die erste Brücke, dann der andere die zweite. Zum Schluss geht es mit dem Sprungpad hoch über eine lange Plattformreihe, darunter Stacheln.')
 
 const level7 = new Builder(124)

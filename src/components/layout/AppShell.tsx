@@ -11,6 +11,7 @@ import { NotifyProvider } from '../../features/notify/NotifyProvider'
 import { PlusProvider } from '../../features/plus/PlusProvider'
 import PushPrompt from '../../features/push/PushPrompt'
 import LiveInviteWatcher from '../../features/duel/LiveInviteWatcher'
+import VersionTag from '../ui/VersionTag'
 
 export default function AppShell() {
   const [collapsed, setCollapsed] = useState(false)
@@ -32,6 +33,7 @@ export default function AppShell() {
         >
           <div className="mx-auto max-w-6xl animate-rise">
             <Outlet />
+            <VersionTag className="mt-10" />
           </div>
         </main>
         <PanicButton />
