@@ -175,7 +175,7 @@ function ParkourGameInner({ st, startLevel = 0, perks }: { st: TeamState; startL
     let maxHearts = dr
       ? Math.min(12, Math.max(1, st.lives || 3) + Math.max(0, Math.min(10, st.people.find((p) => p.user_id === st.me)?.pk_hearts ?? 0)))
       : Math.min(20, Math.max(1, st.lives || 3) + Math.max(0, players.length - 2) + players.reduce((a, p) => a + Math.max(0, Math.min(10, p.pk_hearts ?? 0)), 0))
-    const SEND_MS = players.length <= 2 ? 50 : players.length === 3 ? 70 : players.length === 4 ? 85 : 100
+    const SEND_MS = players.length <= 2 ? 90 : players.length === 3 ? 100 : players.length === 4 ? 115 : 130 // Realtime-Nachrichten sparen (Supabase-Kontingent)
     if (perksRef.current.spectate && spec) {
       // Gast (Admin oder Mod mit Zuschauer-Recht): eigene Farbe, Hut, Effekt und Herzen aus dem Shop laden
       void parkourShopGet().then((sh) => {
@@ -390,7 +390,7 @@ function ParkourGameInner({ st, startLevel = 0, perks }: { st: TeamState; startL
       if (!ready || !isSpec) return
       const x = Math.round(me.x), y = Math.round(me.y)
       const sig = `${x}|${y}|${me.face}|${lv}`
-      if (now - lastGhost < 110 || (sig === lastGhostSig && now - lastGhost < 450)) return
+      if (now - lastGhost < 200 || (sig === lastGhostSig && now - lastGhost < 700)) return
       lastGhost = now; lastGhostSig = sig
       void ch?.send({ type: 'broadcast', event: 'g', payload: { u: st.me, x, y, face: me.face, lv, n: nameRef.current ?? 'Zuschauer' } })?.catch?.(() => undefined)
     }
@@ -569,7 +569,7 @@ function ParkourGameInner({ st, startLevel = 0, perks }: { st: TeamState; startL
       const x = Math.round(me.x * 10) / 10, y = Math.round(me.y * 10) / 10
       const sig = `${x}|${y}|${me.face}|${lv}|${cp}|${deadT > 0 ? 1 : 0}|${me.ground ? 1 : 0}|${ghostOn ? 1 : 0}|${hearts}|${deaths}|${finished && (dr || vs > 0) ? 1 : 0}|${buffCode()}`
       // Wer stillsteht, meldet sich nur ein paarmal pro Sekunde (spart Nachrichten bei vielen Spielenden)
-      if (now - lastSend < SEND_MS || (sig === lastSig && now - lastSend < 350)) return
+      if (now - lastSend < SEND_MS || (sig === lastSig && now - lastSend < 600)) return
       lastSend = now
       lastSig = sig
       void ch?.send({ type: 'broadcast', event: 's', payload: { u: st.me, sid, n: ++seq, x, y, face: me.face, lv, cp, dead: deadT > 0, ex: inExit(level, me), dc: spec ? 0 : deaths, g: me.ground, lh: hashLevel(level), gh: ghostOn, hp: hearts, el: (finished && (dr || vs > 0)) || isSpec || forceEl, bf: buffCode(), ...(perksRef.current.look ? { kd: perksRef.current.look } : {}), ...(guestLook ? { lk: { n: guestLook.name, c: guestLook.pk_color, h: guestLook.pk_hat, f: guestLook.pk_fx } } : {}), ...(pendingEv ? { ev: pendingEv } : {}) } })?.catch?.(() => undefined)
@@ -588,7 +588,7 @@ function ParkourGameInner({ st, startLevel = 0, perks }: { st: TeamState; startL
     }
 
     function sendBots(now: number) {
-      if (!bots || !ready || now - lastBotSend < 110) return
+      if (!bots || !ready || now - lastBotSend < 170) return
       lastBotSend = now
       const l = bots.map((b) => [b.i, Math.round(b.body.x * 10) / 10, Math.round(b.body.y * 10) / 10, b.body.face, b.lv, group ? bgh : b.hearts, (group ? bgOut : b.out) ? 1 : 0, b.deadT > 0 ? 1 : 0])
       void ch?.send({ type: 'broadcast', event: 'b', payload: { sid, l } })?.catch?.(() => undefined)
@@ -1110,9 +1110,9 @@ function ParkourGameInner({ st, startLevel = 0, perks }: { st: TeamState; startL
       if (titleT > 0) titleT -= dt
       let guard = 0
       while (acc >= 1 / 60 && guard++ < 6) { step(1 / 60, now); acc -= 1 / 60 }
-      { const k = Math.min(1, dt * 14); for (const r of [...remotes.values(), ...rivals.values()]) { r.dx += (r.x - r.dx) * k; r.dy += (r.y - r.dy) * k }
+      { const k = Math.min(1, dt * 11); for (const r of [...remotes.values(), ...rivals.values()]) { r.dx += (r.x - r.dx) * k; r.dy += (r.y - r.dy) * k }
         for (const g of ghosts.values()) { g.dx += (g.x - g.dx) * k; g.dy += (g.y - g.dy) * k } }
-      { const k = Math.min(1, dt * 12); for (const b of botSnap.values()) { b.dx += (b.x - b.dx) * k; b.dy += (b.y - b.dy) * k } }
+      { const k = Math.min(1, dt * 10); for (const b of botSnap.values()) { b.dx += (b.x - b.dx) * k; b.dy += (b.y - b.dy) * k } }
       // Effekte nachführen
       if (!isSpec && deadT <= 0 && !finished) fxField.update('me', myFxId(), me.x, me.y, me.face, t, dt)
       for (const [uid, r] of remotes) {
