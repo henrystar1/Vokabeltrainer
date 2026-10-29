@@ -10,7 +10,7 @@ import { errorMessage } from '../../lib/errors'
 import { useAsync } from '../../lib/useAsync'
 import { randomPassword } from '../../pages/admin/AccountsTab'
 import { adminAdjustPoints, adminSetPassword } from '../../services/admin'
-import { parkourLearnOffList, parkourLearnSet } from '../../services/play'
+import { parkourJumpsList, parkourJumpsSet, parkourLearnOffList, parkourLearnSet } from '../../services/play'
 import { adminGrantItem, adminGrantKoins, adminListItems, adminListUserItems, adminRevokeItem } from '../../services/koins'
 
 
@@ -47,6 +47,9 @@ export default function ManageUser({ userId, name, onClose, onChanged }: { userI
   const items = useAsync(adminListItems, [])
   const owned = useAsync(() => adminListUserItems(userId), [userId])
   const learnOff = useAsync(() => parkourLearnOffList([userId]), [userId])
+  const jumpsNow = useAsync(() => parkourJumpsList([userId]), [userId])
+  const [jumpsIn, setJumpsIn] = useState('')
+  const curJumps = jumpsNow.data?.[userId] ?? 2
   const learnIsOff = (learnOff.data ?? []).includes(userId)
 
   async function run(fn: () => Promise<unknown>, ok: string) {
@@ -140,6 +143,13 @@ export default function ManageUser({ userId, name, onClose, onChanged }: { userI
           >
             {learnIsOff ? 'Vokabelfragen wieder einschalten' : 'Vokabelfragen ausschalten'}
           </Button>
+          <div className="mt-2 space-y-2 border-t border-white/10 pt-3">
+            <p className="text-sm text-slate-300">Sprünge insgesamt: <strong className="text-accent-cyan">{curJumps}</strong> <span className="text-xs text-slate-500">(2 = normal, Doppelsprung)</span></p>
+            <Field label="Neue Anzahl (2 bis 10)" hint="Gilt dauerhaft für alle Parkour-Läufe dieser Person, auch mitten im Spiel nach ca. 15 Sekunden.">
+              <TextInput inputMode="numeric" value={jumpsIn} onChange={(e) => setJumpsIn(e.target.value.replace(/\D/g, '').slice(0, 2))} placeholder={String(curJumps)} />
+            </Field>
+            <Button disabled={busy || !(Number(jumpsIn) >= 2 && Number(jumpsIn) <= 10)} onClick={() => void run(async () => { await parkourJumpsSet(userId, Number(jumpsIn)); jumpsNow.reload() }, `${name}: ${Number(jumpsIn)} Sprünge im Parkour.`)}>Sprünge setzen</Button>
+          </div>
           <p className="text-xs text-slate-500">Gilt dauerhaft, auch in neuen Runden. Die Person bekommt es innerhalb von ca. 15 Sekunden mit, auch mitten im Spiel.</p>
         </div>
       )}

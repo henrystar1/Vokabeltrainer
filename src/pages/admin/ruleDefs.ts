@@ -150,6 +150,7 @@ export const SECTIONS: Array<{ title: string; text?: string; rules: Rule[] }> = 
       { key: 'parkour_heart_max', label: 'Parkour-Shop: Extra-Herzen pro Person (höchstens)' },
       { key: 'parkour_color_price', label: 'Parkour-Shop: Preis einer Körperfarbe', hint: 'Gold, Neon und Regenbogen kosten das Dreifache' },
       { key: 'parkour_hat_price', label: 'Parkour-Shop: Preis eines Huts', hint: 'Krone und Flamme kosten das Dreifache' },
+      { key: 'parkour_msg_limit_k', label: 'Parkour: Tageslimit für Online-Nachrichten (in Tausend)', hint: 'Schützt das Supabase-Kontingent (2,2 Mio. im Monat ≈ 70 pro Tag). Ist es erreicht, ist Parkour bis Mitternacht gesperrt. 0 = kein Limit' },
       { key: 'team_daily_cap', label: 'Team-Spiele: Erfolge mit Coins pro Tag' },
     ],
   },

@@ -229,6 +229,14 @@ export interface ParkourShop {
 export const parkourLearnOffList = (ids: string[]) => rpc<string[]>('parkour_learn_off_list', { p_ids: ids })
 /** Admin: Lernfragen im Parkour für eine Person aus- (off) oder einschalten */
 export const parkourLearnSet = (user: string, off: boolean) => rpc<void>('parkour_learn_set', { p_user: user, p_off: off })
+/** Parkour-Nachrichten heute: Stand, Tageslimit und ob gesperrt (Migration 0058) */
+export interface ParkourUsage { msgs: number; limit: number; blocked: boolean }
+export const parkourUsageAdd = (n: number) => rpc<ParkourUsage>('parkour_usage_add', { p_n: Math.max(0, Math.round(n)) })
+export const parkourUsageGet = () => rpc<ParkourUsage>('parkour_usage_get')
+/** Sprünge insgesamt je Person ({user_id: Anzahl}, nur wer mehr als 2 hat) */
+export const parkourJumpsList = (ids: string[]) => rpc<Record<string, number>>('parkour_jumps_list', { p_ids: ids })
+/** Admin: Sprünge insgesamt (3–10; 2 oder weniger = Standard) */
+export const parkourJumpsSet = (user: string, jumps: number) => rpc<void>('parkour_jumps_set', { p_user: user, p_jumps: jumps })
 export const parkourShopGet = () => rpc<ParkourShop>('parkour_shop_get')
 export const parkourShopBuy = (item: string) => rpc<ParkourShop>('parkour_shop_buy', { p_item: item })
 export const parkourEquip = (color: string | null, hat: string | null, fx?: string | null) =>

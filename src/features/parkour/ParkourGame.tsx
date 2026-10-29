@@ -5,7 +5,7 @@ import { Joystick } from '../games/joystick'
 import { useFocusMode } from '../koins/focusMode'
 import { useAuth } from '../auth/AuthProvider'
 import { supabase } from '../../lib/supabaseClient'
-import { parkourLearnOffList, parkourShopGet, teamDeathrunFinish, teamParkourFinish, type TeamPerson, type TeamState } from '../../services/play'
+import { parkourJumpsList, parkourLearnOffList, parkourShopGet, parkourUsageAdd, parkourUsageGet, teamDeathrunFinish, teamParkourFinish, type TeamPerson, type TeamState } from '../../services/play'
 import { LOOKS } from './lookFx'
 import type { HoleAnim, Look } from './lookTypes'
 import { useRunPerks } from './perks'
@@ -84,6 +84,11 @@ function ParkourGameInner({ st, startLevel = 0, perks }: { st: TeamState; startL
   const toggleGhost = () => { if (!adminRef.current || specUi) return; input.current.ghost = !input.current.ghost; if (input.current.ghost) input.current.fly = true; setGhostUi(input.current.ghost); setFlyUi(input.current.fly) }
   const watch = (uid: string | null) => { follow.current = { uid, to: uid }; setFollowUi(uid) }
   // Lernen: Speedup-Angebote (Rand) und Vokabeln beim Levelwechsel
+  const msgCount = useRef(0) // Realtime-Nachrichten (gesendet + empfangen) seit der letzten Meldung ans Tageslimit
+  const blockedRef = useRef(false)
+  const netApi = useRef<{ stop: () => void } | null>(null)
+  const jumpsRef = useRef(2) // Sprünge insgesamt (Admin-Einstellung)
+  const [limitHit, setLimitHit] = useState(false)
   const learnBusy = useRef(false)
   const learnOff = useRef(false)
   const [offer, setOffer] = useState<{ id: number; kind: PickupKind; life: number } | null>(null)
@@ -112,13 +117,27 @@ function ParkourGameInner({ st, startLevel = 0, perks }: { st: TeamState; startL
   useEffect(() => {
     let alive = true
     // Schalter regelmäßig und bei Rückkehr in den Tab neu lesen; bei Fehler bleibt der letzte bekannte Stand.
-    const check = () => { parkourLearnOffList([st.me]).then((l) => { if (alive) learnOff.current = l.includes(st.me) }).catch(() => undefined) }
+    const check = () => { parkourJumpsList([st.me]).then((j) => { if (alive) jumpsRef.current = Math.max(2, Math.min(10, j[st.me] ?? 2)) }).catch(() => undefined); parkourLearnOffList([st.me]).then((l) => { if (alive) learnOff.current = l.includes(st.me) }).catch(() => undefined) }
     check()
     const t = window.setInterval(check, 15_000)
     document.addEventListener('visibilitychange', check)
     void loadLearnPool() // vorladen, damit die erste Frage sofort da ist
     return () => { alive = false; window.clearInterval(t); document.removeEventListener('visibilitychange', check) }
   }, [st.me])
+  // Tageslimit: Nachrichten melden; ist es erreicht, wird die Verbindung getrennt und das Spiel gesperrt.
+  useEffect(() => {
+    let alive = true
+    const block = () => { if (blockedRef.current) return; blockedRef.current = true; netApi.current?.stop(); if (alive) setLimitHit(true) }
+    const flush = () => {
+      const n = msgCount.current
+      msgCount.current = 0
+      const p = n > 0 ? parkourUsageAdd(n) : parkourUsageGet()
+      p.then((u) => { if (u.blocked) block() }).catch(() => { msgCount.current += n }) // bei Fehler (z. B. Migration fehlt) nicht sperren
+    }
+    flush()
+    const t = window.setInterval(flush, 15_000)
+    return () => { alive = false; window.clearInterval(t); const n = msgCount.current; msgCount.current = 0; if (n > 0) void parkourUsageAdd(n).catch(() => undefined) }
+  }, [])
   const [hud, setHud] = useState({ level: 0, deaths: 0, ms: 0, linked: false, done: false, jet: false })
 
   useEffect(() => {
@@ -314,6 +333,7 @@ function ParkourGameInner({ st, startLevel = 0, perks }: { st: TeamState; startL
     let lastBotSend = 0
 
     function onState(payload: unknown) {
+      msgCount.current++
       const p = payload as Partial<Remote> & { u?: string; n?: number; sid?: string; bf?: number; lk?: { n?: string; c?: string | null; h?: string | null; f?: string | null }; kd?: string; ev?: string }
       const uid = p.u
       const x = finite(p.x, -100, 200000)
@@ -354,6 +374,7 @@ function ParkourGameInner({ st, startLevel = 0, perks }: { st: TeamState; startL
     }
 
     function onBots(payload: unknown) {
+      msgCount.current++
       const p = payload as { sid?: string; l?: number[][] }
       if (!p || !Array.isArray(p.l)) return
       lastRx = performance.now()
@@ -377,6 +398,7 @@ function ParkourGameInner({ st, startLevel = 0, perks }: { st: TeamState; startL
     let lastGhost = 0
     let lastGhostSig = ''
     function onGhost(payload: unknown) {
+      msgCount.current++
       const p = payload as { u?: string; x?: number; y?: number; face?: number; lv?: number; n?: string } | null
       if (!p || typeof p.u !== 'string' || p.u === st.me) return
       const x = finite(p.x, -100, 200000), y = finite(p.y, -100000, 1200)
@@ -392,11 +414,11 @@ function ParkourGameInner({ st, startLevel = 0, perks }: { st: TeamState; startL
       const sig = `${x}|${y}|${me.face}|${lv}`
       if (now - lastGhost < 200 || (sig === lastGhostSig && now - lastGhost < 700)) return
       lastGhost = now; lastGhostSig = sig
-      void ch?.send({ type: 'broadcast', event: 'g', payload: { u: st.me, x, y, face: me.face, lv, n: nameRef.current ?? 'Zuschauer' } })?.catch?.(() => undefined)
+      msgCount.current++; void ch?.send({ type: 'broadcast', event: 'g', payload: { u: st.me, x, y, face: me.face, lv, n: nameRef.current ?? 'Zuschauer' } })?.catch?.(() => undefined)
     }
 
     function connect() {
-      if (disposed) return
+      if (disposed || blockedRef.current) return
       lastConnect = performance.now()
       if (ch) void supabase.removeChannel(ch)
       ready = false
@@ -417,6 +439,7 @@ function ParkourGameInner({ st, startLevel = 0, perks }: { st: TeamState; startL
       const delay = Math.min(8000, 700 * 2 ** Math.min(attempt++, 4))
       retryT = window.setTimeout(() => { retryT = undefined; connect() }, delay)
     }
+    netApi.current = { stop: () => { if (ch) void supabase.removeChannel(ch); ch = null; ready = false; if (retryT !== undefined) { window.clearTimeout(retryT); retryT = undefined } } }
     connect()
 
     function report(levels: number) {
@@ -572,7 +595,7 @@ function ParkourGameInner({ st, startLevel = 0, perks }: { st: TeamState; startL
       if (now - lastSend < SEND_MS || (sig === lastSig && now - lastSend < 600)) return
       lastSend = now
       lastSig = sig
-      void ch?.send({ type: 'broadcast', event: 's', payload: { u: st.me, sid, n: ++seq, x, y, face: me.face, lv, cp, dead: deadT > 0, ex: inExit(level, me), dc: spec ? 0 : deaths, g: me.ground, lh: hashLevel(level), gh: ghostOn, hp: hearts, el: (finished && (dr || vs > 0)) || isSpec || forceEl, bf: buffCode(), ...(perksRef.current.look ? { kd: perksRef.current.look } : {}), ...(guestLook ? { lk: { n: guestLook.name, c: guestLook.pk_color, h: guestLook.pk_hat, f: guestLook.pk_fx } } : {}), ...(pendingEv ? { ev: pendingEv } : {}) } })?.catch?.(() => undefined)
+      msgCount.current++; void ch?.send({ type: 'broadcast', event: 's', payload: { u: st.me, sid, n: ++seq, x, y, face: me.face, lv, cp, dead: deadT > 0, ex: inExit(level, me), dc: spec ? 0 : deaths, g: me.ground, lh: hashLevel(level), gh: ghostOn, hp: hearts, el: (finished && (dr || vs > 0)) || isSpec || forceEl, bf: buffCode(), ...(perksRef.current.look ? { kd: perksRef.current.look } : {}), ...(guestLook ? { lk: { n: guestLook.name, c: guestLook.pk_color, h: guestLook.pk_hat, f: guestLook.pk_fx } } : {}), ...(pendingEv ? { ev: pendingEv } : {}) } })?.catch?.(() => undefined)
       pendingEv = null
       hideSend = false
     }
@@ -591,7 +614,7 @@ function ParkourGameInner({ st, startLevel = 0, perks }: { st: TeamState; startL
       if (!bots || !ready || now - lastBotSend < 170) return
       lastBotSend = now
       const l = bots.map((b) => [b.i, Math.round(b.body.x * 10) / 10, Math.round(b.body.y * 10) / 10, b.body.face, b.lv, group ? bgh : b.hearts, (group ? bgOut : b.out) ? 1 : 0, b.deadT > 0 ? 1 : 0])
-      void ch?.send({ type: 'broadcast', event: 'b', payload: { sid, l } })?.catch?.(() => undefined)
+      msgCount.current++; void ch?.send({ type: 'broadcast', event: 'b', payload: { sid, l } })?.catch?.(() => undefined)
     }
 
     // Angebot am Bildschirmrand: kommt regelmäßig, läuft ab, Tippen = eine Vokabel beantworten
@@ -786,7 +809,7 @@ function ParkourGameInner({ st, startLevel = 0, perks }: { st: TeamState; startL
       const adm = adminRef.current
       const thrust = !adm && buff.jet > 0 && buff.fuel > 0 && i.jump && !me.ground // Jetpack: Sprungknopf in der Luft halten = Schub
       if (thrust) buff.fuel -= dt
-      const airJumps = adm ? 3 : buff.jump3 > 0 ? 2 : 1
+      const airJumps = Math.max(adm ? 3 : buff.jump3 > 0 ? 2 : 1, jumpsRef.current - 1)
       const r = stepBody(me, { move, jump: i.jump, airJumps, fly: adm && i.fly, jet: thrust, ghost: adm && i.fly && i.ghost, vert: (i.down ? 1 : 0) - (i.jump ? 1 : 0) }, level, pressed, others, dt)
       // Notausgang: steht ein Mensch lange allein vor einer Tür, die nur Bots hätten öffnen können, gehen die Tore auf
       if (dr && bp.length > 0 && mt.length === 0 && move !== 0 && Math.abs(me.vx) < 5 && me.ground) {
@@ -1242,6 +1265,15 @@ function ParkourGameInner({ st, startLevel = 0, perks }: { st: TeamState; startL
           </button>
         )}
       </div>
+      {limitHit && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/85 p-6 text-center">
+          <div className="max-w-sm space-y-3">
+            <p className="text-lg font-bold text-amber-200">Parkour-Limit für heute erreicht</p>
+            <p className="text-sm text-slate-300">Damit die App nicht über das Datenbank-Kontingent kommt, ist Parkour für heute pausiert. Morgen geht es wieder.</p>
+            <button type="button" onClick={() => window.history.back()} className="inline-block rounded-xl border border-white/20 px-4 py-2 text-sm text-slate-100">Zurück</button>
+          </div>
+        </div>
+      )}
       {quiz && <LearnOverlay title={quiz.title} need={quiz.need} retry={quiz.retry} onDone={finishQuiz} />}
       <div className="flex w-full items-center justify-between px-2">
         <Joystick onChange={(x) => { input.current.stick = x }} />
