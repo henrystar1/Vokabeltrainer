@@ -4,7 +4,7 @@ import { ArrowUp, Eye, Skull } from 'lucide-react'
 import { Joystick } from '../games/joystick'
 import { useFocusMode } from '../koins/focusMode'
 import { useAuth } from '../auth/AuthProvider'
-import { supabase } from '../../lib/supabaseClient'
+import { gameRealtime } from '../../lib/gameRealtime'
 import { parkourJumpsList, parkourLearnOffList, parkourShopGet, parkourUsageAdd, parkourUsageGet, teamDeathrunFinish, teamParkourFinish, type TeamPerson, type TeamState } from '../../services/play'
 import { LOOKS } from './lookFx'
 import type { HoleAnim, Look } from './lookTypes'
@@ -420,9 +420,9 @@ function ParkourGameInner({ st, startLevel = 0, perks }: { st: TeamState; startL
     function connect() {
       if (disposed || blockedRef.current) return
       lastConnect = performance.now()
-      if (ch) void supabase.removeChannel(ch)
+      if (ch) void gameRealtime.removeChannel(ch)
       ready = false
-      const c = supabase.channel(`parkour-${st.id}`, { config: { broadcast: { self: false } } })
+      const c = gameRealtime.channel(`parkour-${st.id}`, { config: { broadcast: { self: false } } })
       ch = c
       c.on('broadcast', { event: 's' }, ({ payload }) => onState(payload))
         .on('broadcast', { event: 'b' }, ({ payload }) => onBots(payload))
@@ -439,7 +439,7 @@ function ParkourGameInner({ st, startLevel = 0, perks }: { st: TeamState; startL
       const delay = Math.min(8000, 700 * 2 ** Math.min(attempt++, 4))
       retryT = window.setTimeout(() => { retryT = undefined; connect() }, delay)
     }
-    netApi.current = { stop: () => { if (ch) void supabase.removeChannel(ch); ch = null; ready = false; if (retryT !== undefined) { window.clearTimeout(retryT); retryT = undefined } } }
+    netApi.current = { stop: () => { if (ch) void gameRealtime.removeChannel(ch); ch = null; ready = false; if (retryT !== undefined) { window.clearTimeout(retryT); retryT = undefined } } }
     connect()
 
     function report(levels: number) {
@@ -1227,7 +1227,7 @@ function ParkourGameInner({ st, startLevel = 0, perks }: { st: TeamState; startL
       window.removeEventListener('offline', offline)
       document.removeEventListener('visibilitychange', hiddenFn)
       document.removeEventListener('selectstart', noSelect)
-      if (ch) void supabase.removeChannel(ch)
+      if (ch) void gameRealtime.removeChannel(ch)
     }
   }, [st.id, st.is_host, st.me]) // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -1268,8 +1268,8 @@ function ParkourGameInner({ st, startLevel = 0, perks }: { st: TeamState; startL
       {limitHit && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/85 p-6 text-center">
           <div className="max-w-sm space-y-3">
-            <p className="text-lg font-bold text-amber-200">Parkour-Limit für heute erreicht</p>
-            <p className="text-sm text-slate-300">Damit die App nicht über das Datenbank-Kontingent kommt, ist Parkour für heute pausiert. Morgen geht es wieder.</p>
+            <p className="text-lg font-bold text-amber-200">Parkour-Limit erreicht</p>
+            <p className="text-sm text-slate-300">Damit die App nicht über das Datenbank-Kontingent kommt, ist Parkour gerade pausiert. Spätestens morgen (bei Monatsende im nächsten Monat) geht es wieder.</p>
             <button type="button" onClick={() => window.history.back()} className="inline-block rounded-xl border border-white/20 px-4 py-2 text-sm text-slate-100">Zurück</button>
           </div>
         </div>
