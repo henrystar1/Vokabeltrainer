@@ -1,5 +1,5 @@
 import type { LockKey } from '../services/koins'
-import { BookOpen, MessageSquarePlus, ShoppingBag, UserCircle, Brain, ClipboardCheck, Home, Search, Settings, ShieldCheck, Trophy, BarChart3, Gamepad2, MessagesSquare, Target, Swords, Zap, ListChecks, Languages, ArrowLeftRight, Dices, Users, Pin, PenLine, Printer, Sparkles, Crown, Calculator, Timer, Layers, Shuffle, Mountain, Skull, type LucideIcon } from 'lucide-react'
+import { BookOpen, MessageSquarePlus, ShoppingBag, UserCircle, Brain, ClipboardCheck, Home, Search, Settings, ShieldCheck, Trophy, BarChart3, Gamepad2, MessagesSquare, Target, Swords, Zap, ListChecks, Languages, ArrowLeftRight, Dices, Users, Pin, PenLine, Printer, Sparkles, Crown, Calculator, Timer, Layers, Shuffle, Mountain, Skull, ClipboardList, Globe, Binary, type LucideIcon } from 'lucide-react'
 
 export interface NavItem {
   to: string
@@ -44,6 +44,8 @@ export const NAV_GROUPS: NavGroup[] = [
     { to: '/buecher', label: 'Bücher', icon: BookOpen },
     { to: '/suche', label: 'Suche', icon: Search },
     { to: '/mathe', label: 'Mathe', icon: Calculator },
+    { to: '/auswendig', label: 'Auswendig (Pi, Flaggen)', icon: Binary },
+    { to: '/hausaufgaben', label: 'Hausaufgaben', icon: ClipboardList },
   ]), langPicker: true },
   g('Wettkampf', [
     { lock: 'quests', to: '/quests', label: 'Quests', icon: Target },
@@ -59,6 +61,7 @@ export const NAV_GROUPS: NavGroup[] = [
     { lock: 'gambling', to: '/gambling', label: 'Gambling', icon: Dices },
     { lock: 'chat', to: '/chat', label: 'Chat', icon: MessagesSquare },
     { to: '/online', label: 'Wer ist da?', icon: Users },
+    { to: '/websites', label: 'Websites', icon: Globe },
     { lock: 'shop', to: '/shop', label: 'Shop', icon: ShoppingBag },
     { to: '/plus', label: 'Plus', icon: Crown, brand: true },
     { lock: 'print', to: '/druckshop', label: '3D-Druck-Shop', icon: Printer },

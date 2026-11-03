@@ -24,6 +24,9 @@ import Feedback from './pages/Feedback'
 import Games from './pages/Games'
 import Gambling from './pages/Gambling'
 import MathPage from './pages/Math'
+import Memorize from './pages/Memorize'
+import HomeworkPage from './pages/Homework'
+import WebsitesPage from './pages/Websites'
 import Cram from './pages/Cram'
 import Flashcards from './pages/Flashcards'
 import Practice from './pages/Practice'
@@ -108,6 +111,9 @@ export default function App() {
           <Route path="spiele" element={<Gate k="games"><Games /></Gate>} />
           <Route path="gambling" element={<Gate k="gambling"><Gambling /></Gate>} />
           <Route path="mathe" element={<MathPage />} />
+          <Route path="auswendig" element={<Memorize />} />
+          <Route path="hausaufgaben" element={<HomeworkPage />} />
+          <Route path="websites" element={<WebsitesPage />} />
           <Route path="crashkurs" element={<Cram />} />
           <Route path="karteikarten" element={<Flashcards />} />
           <Route path="ueben" element={<Practice />} />
