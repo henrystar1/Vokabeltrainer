@@ -5,7 +5,10 @@ import Card from '../components/ui/Card'
 import { Field, Select, TextInput } from '../components/ui/Field'
 import PageHeader from '../components/ui/PageHeader'
 import ProgressBar from '../components/ui/ProgressBar'
-import { COUNTRIES, REGIONS, flagUrl, makeQuestions, poolFor, type FlagQuestion, type Region } from '../features/memorize/flags'
+import { useAsync } from '../lib/useAsync'
+import { memoLeaderboard, memoScoreSubmit, type MemoGame } from '../services/tasks'
+import { COUNTRIES, REGIONS, flagUrl, makeQuestions, optionsFor, poolFor, type Country, type FlagQuestion, type Region } from '../features/memorize/flags'
+import { grade, isTyped, loadCards, mastered, matchesName, pickSession, saveCards, type Cards } from '../features/memorize/flagLearn'
 import { PI_DIGITS, checkDigit, groupDigits } from '../features/memorize/pi'
 import { POW_LEVELS, makeProblems, parseNumber, problemText, solutionText, type PowLevel, type PowProblem } from '../features/memorize/potenzen'
 
@@ -52,6 +55,9 @@ function PiTrainer() {
   const best = loadNum('pi-best')
   const typedRef = useRef('')
   typedRef.current = typed
+  const hintsRef = useRef(0)
+  hintsRef.current = hints
+  const [boardKey, setBoardKey] = useState(0)
 
   const press = useCallback((d: string) => {
     if (phase !== 'quiz') return
@@ -59,11 +65,12 @@ function PiTrainer() {
     if (res.ok) {
       const next = typedRef.current + d
       setTyped(next)
-      if (next.length >= PI_DIGITS.length) { setFresh(saveBest('pi-best', next.length)); setPhase('done') }
+      if (next.length >= PI_DIGITS.length) { setFresh(saveBest('pi-best', next.length)); setPhase('done'); void memoScoreSubmit('pi', Math.max(0, next.length - hintsRef.current)).catch(() => undefined); setBoardKey((k) => k + 1) }
     } else {
       setWrong(res.expected)
       setFresh(saveBest('pi-best', typedRef.current.length))
       setPhase('done')
+      void memoScoreSubmit('pi', Math.max(0, typedRef.current.length - hintsRef.current)).then(() => setBoardKey((k) => k + 1)).catch(() => undefined)
     }
   }, [phase])
 
@@ -86,6 +93,7 @@ function PiTrainer() {
 
   if (phase === 'learn') {
     return (
+      <div className="space-y-5">
       <Card className="space-y-4">
         <p className="text-sm text-slate-400">Lies die Stellen in Fünferblöcken, sprich sie laut und deck sie dann ab. Bestwert: <b className="text-accent-cyan">{best}</b> Stellen.</p>
         <Field label="Wie viele Stellen lernen?">
@@ -96,11 +104,14 @@ function PiTrainer() {
         <p className="break-words font-mono text-xl leading-9 text-slate-100" aria-label="Pi">3,<span className="text-accent-cyan">{block(PI_DIGITS.slice(0, shown))}</span></p>
         <Button onClick={startQuiz}><Eye size={18} /> Abfragen</Button>
       </Card>
+      <MemoBoard game="pi" unit="Stellen" refreshKey={boardKey} />
+      </div>
     )
   }
 
   const total = PI_DIGITS.length
   return (
+    <div className="space-y-5">
     <Card className="space-y-4">
       <p className="font-mono text-xl leading-9">3,<span className="break-words text-slate-100">{block(typed)}</span>{phase === 'quiz' && <span className="ml-1 animate-pulse text-accent-cyan">▌</span>}{phase === 'done' && wrong && <span className="ml-1 text-rose-300">{wrong}?</span>}</p>
       <ProgressBar value={(typed.length / Math.min(total, Math.max(shown, 10))) * 100} label="Fortschritt" />
@@ -125,6 +136,8 @@ function PiTrainer() {
         </div>
       )}
     </Card>
+    {phase === 'done' && <MemoBoard game="pi" unit="Stellen" refreshKey={boardKey} />}
+    </div>
   )
 }
 
@@ -212,7 +225,7 @@ function PowTrainer() {
 
 // ---------------------------------------------------------------- Flaggen
 
-function FlagTrainer() {
+function FlagQuiz() {
   const [regions, setRegions] = useState<Region[]>(['europa'])
   const [mode, setMode] = useState<'name' | 'flag'>('name')
   const [count, setCount] = useState(10)
@@ -236,11 +249,7 @@ function FlagTrainer() {
     return (
       <Card className="space-y-4">
         <p className="text-sm text-slate-400">{COUNTRIES.length} Länder. Wähle, welche Weltgegenden du üben willst (nichts gewählt = alle).</p>
-        <div className="flex flex-wrap gap-2" role="group" aria-label="Weltgegenden">
-          {REGIONS.map((r) => (
-            <button key={r.id} type="button" aria-pressed={regions.includes(r.id)} onClick={() => toggle(r.id)} className={`min-h-[44px] rounded-xl border px-4 text-sm ${regions.includes(r.id) ? 'border-accent-cyan/50 bg-accent-cyan/10 text-accent-cyan' : 'border-white/15 text-slate-300 hover:bg-white/5'}`}>{r.name}</button>
-          ))}
-        </div>
+        <RegionChips regions={regions} onToggle={toggle} />
         <Field label="Aufgabenart">
           <Select value={mode} onChange={(e) => setMode(e.target.value as 'name' | 'flag')}>
             <option value="name">Flagge sehen, Land wählen</option>
@@ -303,6 +312,156 @@ function FlagTrainer() {
         <div className="flex items-center justify-between gap-2">
           <p className={`text-sm ${picked === q.country.code ? 'text-emerald-300' : 'text-rose-300'}`}>{picked === q.country.code ? 'Richtig!' : `Falsch – das war ${q.country.name}.`}</p>
           <Button onClick={() => { setPicked(null); setI((x) => x + 1) }}>Weiter</Button>
+        </div>
+      )}
+    </Card>
+  )
+}
+
+function FlagTrainer() {
+  const [view, setView] = useState<'learn' | 'quiz'>('learn')
+  const [boardKey, setBoardKey] = useState(0)
+  return (
+    <div className="space-y-5">
+      <div className="glass inline-flex rounded-xl p-1" role="tablist" aria-label="Flaggen-Modus">
+        {([['learn', 'Lernen (Karteikasten)'], ['quiz', 'Quiz']] as const).map(([k, l]) => (
+          <button key={k} role="tab" aria-selected={view === k} onClick={() => setView(k)} className={`min-h-[40px] rounded-lg px-4 text-sm ${view === k ? 'bg-accent-cyan/15 text-accent-cyan' : 'text-slate-400 hover:text-white'}`}>{l}</button>
+        ))}
+      </div>
+      {view === 'learn' ? <FlagLearn onScore={() => setBoardKey((k) => k + 1)} /> : <FlagQuiz />}
+      <MemoBoard game="flags" unit="Länder gemeistert" refreshKey={boardKey} />
+    </div>
+  )
+}
+
+/** Rangliste (Migration 0062); ohne die Migration oder offline wird sie einfach nicht gezeigt. */
+function MemoBoard({ game, unit, refreshKey }: { game: MemoGame; unit: string; refreshKey: number }) {
+  const rows = useAsync(() => memoLeaderboard(game), [game, refreshKey])
+  if (!rows.data || rows.data.length === 0) return null
+  return (
+    <Card className="space-y-2">
+      <h2 className="label-mono">Rangliste</h2>
+      <ol className="space-y-1">
+        {rows.data.slice(0, 15).map((r) => (
+          <li key={r.user_id} className={`flex items-center gap-3 rounded-lg px-2 py-1.5 text-sm ${r.is_me ? 'bg-accent-cyan/10 text-accent-cyan' : ''}`}>
+            <span className="w-7 text-right font-mono text-slate-400">{r.rank}.</span>
+            <span className="min-w-0 flex-1 truncate">{r.display_name}{r.is_me ? ' (du)' : ''}</span>
+            <span className="font-mono">{r.best} <span className="text-xs text-slate-500">{unit}</span></span>
+          </li>
+        ))}
+      </ol>
+    </Card>
+  )
+}
+
+function RegionChips({ regions, onToggle }: { regions: Region[]; onToggle: (r: Region) => void }) {
+  return (
+    <div className="flex flex-wrap gap-2" role="group" aria-label="Weltgegenden">
+      {REGIONS.map((r) => (
+        <button key={r.id} type="button" aria-pressed={regions.includes(r.id)} onClick={() => onToggle(r.id)} className={`min-h-[44px] rounded-xl border px-4 text-sm ${regions.includes(r.id) ? 'border-accent-cyan/50 bg-accent-cyan/10 text-accent-cyan' : 'border-white/15 text-slate-300 hover:bg-white/5'}`}>{r.name}</button>
+      ))}
+    </div>
+  )
+}
+
+/** Karteikasten: fällige und neue Länder, erst Auswahl, dann Eintippen des Namens. */
+function FlagLearn({ onScore }: { onScore: () => void }) {
+  const [regions, setRegions] = useState<Region[]>([])
+  const [cards, setCards] = useState<Cards>(() => loadCards())
+  const [queue, setQueue] = useState<Country[] | null>(null)
+  const [i, setI] = useState(0)
+  const [input, setInput] = useState('')
+  const [options, setOptions] = useState<Country[]>([])
+  const [fb, setFb] = useState<{ ok: boolean; given: string } | null>(null)
+  const [asked, setAsked] = useState(0)
+  const [right, setRight] = useState(0)
+  const [requeued, setRequeued] = useState<Set<string>>(new Set())
+  const pool = useMemo(() => poolFor(regions), [regions])
+  const got = mastered(cards)
+  const dueNow = useMemo(() => pickSession(pool, cards, Date.now()).length, [pool, cards])
+
+  function toggle(r: Region) { setRegions((x) => (x.includes(r) ? x.filter((y) => y !== r) : [...x, r])) }
+
+  function prepare(q: Country[], idx: number, c: Cards) {
+    setI(idx); setInput(''); setFb(null)
+    const cur = q[idx]
+    setOptions(cur && !isTyped(c[cur.code]) ? optionsFor(cur, pool) : [])
+  }
+  function start(force: boolean) {
+    const now = Date.now()
+    let q = pickSession(pool, cards, now)
+    if (q.length === 0 && force) q = [...pool].sort((a, b) => (cards[a.code]?.box ?? 0) - (cards[b.code]?.box ?? 0)).slice(0, 10)
+    if (q.length === 0) return
+    setQueue(q); setAsked(0); setRight(0); setRequeued(new Set()); prepare(q, 0, cards)
+  }
+
+  function answer(ok: boolean, given: string) {
+    if (!queue || fb) return
+    const cur = queue[i]
+    const next = { ...cards, [cur.code]: grade(cards[cur.code], ok, Date.now()) }
+    setCards(next); saveCards(next)
+    setFb({ ok, given }); setAsked((n) => n + 1); if (ok) setRight((n) => n + 1)
+    if (!ok && !requeued.has(cur.code)) { setRequeued(new Set(requeued).add(cur.code)); setQueue([...queue, cur]) } // einmal am Ende wiederholen
+  }
+
+  function next() {
+    if (!queue) return
+    if (i + 1 >= queue.length) {
+      setQueue(null)
+      setFb(null)
+      void memoScoreSubmit('flags', mastered(cards)).then(onScore).catch(() => undefined)
+      return
+    }
+    prepare(queue, i + 1, cards)
+  }
+
+  function submit(e: FormEvent) {
+    e.preventDefault()
+    if (!queue) return
+    if (fb) { next(); return }
+    if (input.trim() === '') return
+    answer(matchesName(input, queue[i]), input.trim())
+  }
+
+  if (!queue) {
+    return (
+      <Card className="space-y-4">
+        <p className="text-sm text-slate-400">
+          Karteikasten: Neue Flaggen wählst du erst aus vier Ländern aus, was du kannst, musst du später eintippen. Richtiges kommt seltener wieder, Falsches bald. Gemeistert hast du <b className="text-accent-cyan">{got}</b> von {COUNTRIES.length} Ländern.
+        </p>
+        <RegionChips regions={regions} onToggle={toggle} />
+        <p className="text-xs text-slate-500">{regions.length === 0 ? 'Alle Weltgegenden' : 'Nur die gewählten Weltgegenden'} · {pool.length} Länder</p>
+        <div className="flex flex-wrap gap-2">
+          <Button disabled={dueNow === 0} onClick={() => start(false)}>{dueNow > 0 ? `Lernen (${dueNow} Flaggen)` : 'Gerade ist nichts fällig'}</Button>
+          <Button variant="secondary" onClick={() => start(true)}>Trotzdem üben</Button>
+        </div>
+      </Card>
+    )
+  }
+
+  const cur = queue[i]
+  const typed = options.length === 0
+  return (
+    <Card className="space-y-4">
+      <ProgressBar value={(i / queue.length) * 100} label="Fortschritt" />
+      <p className="text-sm text-slate-400">Flagge {i + 1} von {queue.length} · {right} von {asked} richtig</p>
+      <img src={flagUrl(cur.code)} alt="Flagge" className="mx-auto h-40 max-w-full rounded-lg border border-white/10 object-contain" />
+      {options.length > 0 ? (
+        <div className="grid gap-2 sm:grid-cols-2">
+          {options.map((o) => (
+            <Choice key={o.code} state={!fb ? 'idle' : o.code === cur.code ? 'right' : fb.given === o.code ? 'wrong' : 'dim'} onClick={() => answer(o.code === cur.code, o.code)}>{o.name}</Choice>
+          ))}
+        </div>
+      ) : (
+        <form onSubmit={submit} className="space-y-3">
+          <TextInput autoFocus value={input} onChange={(e) => setInput(e.target.value)} disabled={fb !== null} placeholder="Name des Landes" aria-label="Name des Landes" autoComplete="off" autoCapitalize="words" />
+          {!fb && <Button type="submit" disabled={input.trim() === ''}>Prüfen</Button>}
+        </form>
+      )}
+      {fb && (
+        <div className="flex items-center justify-between gap-2">
+          <p className={`text-sm ${fb.ok ? 'text-emerald-300' : 'text-rose-300'}`}>{fb.ok ? 'Richtig!' : `Falsch – das war ${cur.name}.`}{typed && !fb.ok && fb.given ? ` (du: ${fb.given})` : ''}</p>
+          <Button onClick={() => next()} autoFocus>Weiter</Button>
         </div>
       )}
     </Card>

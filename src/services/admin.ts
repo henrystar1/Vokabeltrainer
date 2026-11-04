@@ -6,6 +6,8 @@ import { rpc } from './rpc'
 export const adminListUsers = () => rpc<AdminUser[]>('admin_list_users')
 export const adminListUserBooks = (userId: string) => rpc<AdminBook[]>('admin_list_user_books', { p_user: userId })
 export const adminSetRole = (userId: string, role: 'user' | 'mod' | 'alphamod') => rpc<void>('admin_set_role', { p_user: userId, p_role: role })
+/** Neues Konto freischalten (oder wieder auf „wartet“ setzen), Migration 0061 */
+export const adminSetApproved = (userId: string, approved: boolean) => rpc<void>('admin_set_approved', { p_user: userId, p_approved: approved })
 export const adminSetBlocked = (userId: string, blocked: boolean) =>
   rpc<void>('admin_set_blocked', { p_user: userId, p_blocked: blocked })
 export const adminResetProgress = (userId: string) => rpc<void>('admin_reset_progress', { p_user: userId })

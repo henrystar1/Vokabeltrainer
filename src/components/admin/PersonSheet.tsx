@@ -22,6 +22,7 @@ import {
   adminListUserBooks,
   adminRenameUser,
   adminResetProgress,
+  adminSetApproved,
   adminSetBlocked,
   adminSetRole,
   type UserStatus,
@@ -225,6 +226,7 @@ export default function PersonSheet({ user: u, status, onClose, onChanged }: { u
             <p className="flex flex-wrap items-center gap-2 font-semibold">
               {u.display_name} <RoleChip role={u.role} />
               {u.blocked && <span className="rounded-full border border-rose-500/50 px-2 py-0.5 text-[10px] uppercase tracking-wider text-rose-300">Gesperrt</span>}
+              {u.approved === false && <span className="rounded-full border border-amber-400/60 bg-amber-400/10 px-2 py-0.5 text-[10px] uppercase tracking-wider text-amber-200">Wartet auf Freischaltung</span>}
               {isMe && <span className="text-xs font-normal text-slate-500">(du)</span>}
             </p>
             <p className="truncate text-xs text-slate-500">{u.email ?? 'ohne E-Mail'} · seit {formatDate(u.created_at)}</p>
@@ -314,6 +316,9 @@ export default function PersonSheet({ user: u, status, onClose, onChanged }: { u
             <section className="space-y-2 rounded-xl border border-rose-500/20 p-3">
               <h3 className="label-mono text-rose-300">Konto</h3>
               <div className="flex flex-wrap gap-2">
+                {u.approved === false && (
+                  <Button className={small} disabled={busy} onClick={() => void run(() => adminSetApproved(u.user_id, true), `${u.display_name} ist freigeschaltet.`)}><UserCheck size={15} /> Aktivieren</Button>
+                )}
                 {u.blocked ? (
                   <Button variant="secondary" className={small} disabled={busy} onClick={() => void run(() => adminSetBlocked(u.user_id, false), 'Konto entsperrt.')}><UserCheck size={15} /> Entsperren</Button>
                 ) : (

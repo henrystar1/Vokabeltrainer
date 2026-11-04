@@ -63,3 +63,49 @@ describe('Flaggen', () => {
     }
   })
 })
+
+import { grade, levenshtein, loadCards, mastered, matchesName, normalizeName, pickSession, saveCards, MASTERED_BOX, type Cards } from './flagLearn'
+
+describe('Flaggen-Lernsystem', () => {
+  const find = (code: string) => COUNTRIES.find((x) => x.code === code)!
+  it('Namen: Umlaute, Groß/Klein, Tippfehler, Alternativen', () => {
+    expect(normalizeName('Türkei')).toBe('tuerkei')
+    expect(matchesName('tuerkei', find('tr'))).toBe(true)
+    expect(matchesName('TÜRKEI', find('tr'))).toBe(true)
+    expect(matchesName('Frankreich', find('fr'))).toBe(true)
+    expect(matchesName('Frankreic', find('fr'))).toBe(true)
+    expect(matchesName('Spanin', find('es'))).toBe(true)
+    expect(matchesName('Italien', find('es'))).toBe(false)
+    expect(matchesName('usa', find('us'))).toBe(true)
+    expect(matchesName('Holland', find('nl'))).toBe(true)
+    expect(matchesName('Oman', find('om'))).toBe(true)
+    expect(matchesName('Iran', find('iq'))).toBe(false) // zu kurz für Toleranz
+    expect(matchesName('', find('de'))).toBe(false)
+    expect(levenshtein('abc', 'abd')).toBe(1)
+  })
+  it('Fächer: richtig +1, falsch −2, Fälligkeit', () => {
+    const t = 1_000_000
+    expect(grade(undefined, true, t)).toEqual({ box: 1, due: t + 10 * 60_000 })
+    expect(grade({ box: 3, due: 0 }, false, t)).toEqual({ box: 1, due: t })
+    expect(grade({ box: 5, due: 0 }, true, t).box).toBe(5)
+    expect(grade({ box: 0, due: 0 }, false, t).box).toBe(0)
+  })
+  it('Runde: fällige zuerst, höchstens vier neue', () => {
+    const now = 10_000_000
+    const cards: Cards = { de: { box: 1, due: now - 5 }, fr: { box: 0, due: now - 9 }, it: { box: 3, due: now + 1000 } }
+    const s = pickSession(COUNTRIES, cards, now, 10, 4, () => 0.3)
+    expect(s.slice(0, 2).map((c) => c.code)).toEqual(['fr', 'de'])
+    expect(s.map((c) => c.code)).not.toContain('it')
+    expect(s.filter((c) => !cards[c.code])).toHaveLength(4)
+    expect(new Set(s.map((c) => c.code)).size).toBe(s.length)
+  })
+  it('gemeisterte zählen ab Fach 4; Speichern und Laden', () => {
+    const cards: Cards = { de: { box: MASTERED_BOX, due: 0 }, fr: { box: MASTERED_BOX - 1, due: 0 } }
+    expect(mastered(cards)).toBe(1)
+    const store: Record<string, string> = {}
+    ;(globalThis as { window?: unknown }).window = { localStorage: { getItem: (k: string) => store[k] ?? null, setItem: (k: string, v: string) => { store[k] = v } } }
+    saveCards(cards)
+    expect(loadCards()).toEqual(cards)
+    delete (globalThis as { window?: unknown }).window
+  })
+})

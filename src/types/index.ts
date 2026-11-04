@@ -58,6 +58,8 @@ export interface Profile extends Cosmetics {
   display_name: string
   role: Role
   blocked: boolean
+  /** false: neues Konto wartet auf die Freischaltung durch einen Admin */
+  approved: boolean
   theme_id: string | null
   tag_id: string | null
   tags_hidden: boolean
@@ -99,6 +101,8 @@ export interface AdminUser {
   email: string | null
   role: Role
   blocked: boolean
+  /** false: wartet auf Freischaltung (fehlt, solange Migration 0061 nicht eingespielt ist) */
+  approved?: boolean
   created_at: string
   last_sign_in_at: string | null
   book_count: number

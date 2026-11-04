@@ -42,14 +42,16 @@ function shuffle<T>(a: readonly T[], r: Rng): T[] {
 /** Pool nach Regionen; leere Auswahl = alle. */
 export const poolFor = (regions: readonly Region[]): Country[] => (regions.length === 0 ? COUNTRIES : COUNTRIES.filter((x) => regions.includes(x.region)))
 
-/** Falsche Antworten stammen bevorzugt aus derselben Region, sonst aus allen. */
+/** Vier Antworten (inklusive der richtigen) für ein Land; falsche bevorzugt aus derselben Region. */
+export function optionsFor(country: Country, pool: readonly Country[], r: Rng = Math.random): Country[] {
+  const near = pool.filter((x) => x.code !== country.code && x.region === country.region)
+  const rest = pool.filter((x) => x.code !== country.code && x.region !== country.region)
+  const wrong = [...shuffle(near, r), ...shuffle(rest, r)].slice(0, 3)
+  const extra = wrong.length < 3 ? shuffle(COUNTRIES.filter((x) => x.code !== country.code && !wrong.includes(x)), r).slice(0, 3 - wrong.length) : []
+  return shuffle([country, ...wrong, ...extra], r)
+}
+
 export function makeQuestions(pool: readonly Country[], count: number, mode: 'name' | 'flag', r: Rng = Math.random): FlagQuestion[] {
   const chosen = shuffle(pool, r).slice(0, Math.min(count, pool.length))
-  return chosen.map((country) => {
-    const near = pool.filter((x) => x.code !== country.code && x.region === country.region)
-    const rest = pool.filter((x) => x.code !== country.code && x.region !== country.region)
-    const wrong = [...shuffle(near, r), ...shuffle(rest, r)].slice(0, 3)
-    const extra = wrong.length < 3 ? shuffle(COUNTRIES.filter((x) => x.code !== country.code && !wrong.includes(x)), r).slice(0, 3 - wrong.length) : []
-    return { country, mode, options: shuffle([country, ...wrong, ...extra], r) }
-  })
+  return chosen.map((country) => ({ country, mode, options: optionsFor(country, pool, r) }))
 }

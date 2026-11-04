@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { checkpointAt, inExit, newBody, pressedMap, spawnAt, stepBody, PW, PH } from './engine'
+import { checkpointAt, inExit, newBody, pressedMap, safeLanding, spawnAt, spotIsSafe, stepBody, PW, PH } from './engine'
 import { LEVELS, ROWS, TILE } from './levels'
 
 const dt = 1 / 60
@@ -159,5 +159,22 @@ describe('parkour', () => {
     const far = newBody(40 * TILE, 10 * TILE - PH - 0.5)
     for (let i = 0; i < 120; i++) stepBody(far, { move: -1, jump: false }, lv, {}, [mates[1]], dt)
     expect(Math.abs(far.x - mates[1].x)).toBeGreaterThan(17 * TILE) // weiter als die frühere Leine
+  })
+
+  it('Zuschauer-Landung: aus der Luft immer auf sicheren Boden', () => {
+    for (const lv of LEVELS) {
+      for (let x = 0; x < lv.cols * TILE; x += 40) {
+        for (const y of [0, 100, 250]) {
+          const l = safeLanding(lv, {}, x, y)
+          if (!l) continue
+          expect(spotIsSafe(lv, {}, l.x, l.y)).toBe(true)
+          // steht wirklich: zwei Pixel tiefer wäre fester Boden
+          const b = newBody(l.x, l.y)
+          let r: 'ok' | 'dead' | 'lost' = 'ok'
+          for (let i = 0; i < 90 && r === 'ok'; i++) r = stepBody(b, { move: 0, jump: false }, lv, {}, null, dt)
+          expect(r).toBe('ok')
+        }
+      }
+    }
   })
 })

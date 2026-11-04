@@ -19,7 +19,7 @@ import { PICKUP_INFO, type PickupKind } from './pickups'
 import LearnOverlay from './LearnOverlay'
 import { LEARN_PER_LEVEL, LEARN_PER_OFFER, OFFER_EVERY, OFFER_LIFE, loadLearnPool } from './parkourLearn'
 import { ROWS, TILE, VIEW_H, VIEW_W, tileAt, type Level } from './levels'
-import { PH, PW, checkpointAt, inExit, newBody, pressedMap, spawnAt, spotIsSafe, stepBody, type Body, type Pressed } from './engine'
+import { PH, PW, checkpointAt, inExit, newBody, pressedMap, safeLanding, spawnAt, spotIsSafe, stepBody, type Body, type Pressed } from './engine'
 
 const COLORS = ['#22d3ee', '#e879f9', '#facc15', '#4ade80', '#fb923c']
 const BOT_COLOR = '#94a3b8'
@@ -61,7 +61,7 @@ function ParkourGameInner({ st, startLevel = 0, perks }: { st: TeamState; startL
   perksRef.current = perks
   const canvas = useRef<HTMLCanvasElement>(null)
   useFocusMode(true)
-  const { isAdmin, displayName } = useAuth()
+  const { isAdmin, isStaff, displayName } = useAuth()
   const nameRef = useRef(displayName)
   nameRef.current = displayName
   const adminRef = useRef(isAdmin)
@@ -79,6 +79,7 @@ function ParkourGameInner({ st, startLevel = 0, perks }: { st: TeamState; startL
   const [joined, setJoined] = useState(false) // Admin hat vom reinen Zuschauen aus ins Spiel gewechselt
   const specUi = (spec && !joined) || watchUi
   const watchApi = useRef<((on: boolean) => void) | null>(null)
+  const healApi = useRef<(() => void) | null>(null) // Mods und Admins: Herzen auffüllen (für alle im Team)
   const specApi = useRef<((d: number) => void) | null>(null)
   const toggleFly = () => { if (!adminRef.current || specUi) return; input.current.fly = !input.current.fly; if (!input.current.fly) input.current.ghost = false; setFlyUi(input.current.fly); setGhostUi(input.current.ghost) }
   const toggleGhost = () => { if (!adminRef.current || specUi) return; input.current.ghost = !input.current.ghost; if (input.current.ghost) input.current.fly = true; setGhostUi(input.current.ghost); setFlyUi(input.current.fly) }
@@ -207,6 +208,8 @@ function ParkourGameInner({ st, startLevel = 0, perks }: { st: TeamState; startL
     let hearts = maxHearts
     let cpTotal = 0
     const dcSeen = new Map<string, number>() // gezählte Tode je Mitspieler
+    const healSeen = new Map<string, number>() // Heil-Zähler je Mitspieler
+    let healSeq = 0
     let myCp: number | null = null
     let ghostOn = false
     let killCool = 0
@@ -334,7 +337,7 @@ function ParkourGameInner({ st, startLevel = 0, perks }: { st: TeamState; startL
 
     function onState(payload: unknown) {
       msgCount.current++
-      const p = payload as Partial<Remote> & { u?: string; n?: number; sid?: string; bf?: number; lk?: { n?: string; c?: string | null; h?: string | null; f?: string | null }; kd?: string; ev?: string }
+      const p = payload as Partial<Remote> & { hl?: number; u?: string; n?: number; sid?: string; bf?: number; lk?: { n?: string; c?: string | null; h?: string | null; f?: string | null }; kd?: string; ev?: string }
       const uid = p.u
       const x = finite(p.x, -100, 200000)
       const y = finite(p.y, -100000, 1200)
@@ -357,6 +360,16 @@ function ParkourGameInner({ st, startLevel = 0, perks }: { st: TeamState; startL
       }
       store.set(uid, r)
       if (rival) return
+      // Heilung durch Mods/Admins: füllt die Herzen aller im Team auf (nicht rückwirkend bei spätem Einstieg)
+      {
+        const hl = typeof p.hl === 'number' ? Math.max(0, Math.floor(p.hl)) : 0
+        const seen = healSeen.get(uid)
+        if (seen === undefined) healSeen.set(uid, hl)
+        else if (hl > seen) {
+          healSeen.set(uid, hl)
+          if (!dr && !isSpec && !finished && !over) { hearts = maxHearts; toast = { text: 'Herzen aufgefüllt ♥', t: 2 } }
+        }
+      }
       if (isSpec || dr) { seenAny = true; return } // Deathrun: jede Person hat ihr eigenes Level, ihre Herzen und ihre Checkpoints
       if (!seenAny) {
         // Späterer Einstieg: Level und Herzen der anderen übernehmen
@@ -529,6 +542,12 @@ function ParkourGameInner({ st, startLevel = 0, perks }: { st: TeamState; startL
       setFlyUi(true)
       setGhostUi(true)
     }
+    healApi.current = () => {
+      if (isSpec || finished || over) return
+      hearts = maxHearts
+      healSeq += 1
+      toast = { text: 'Herzen aufgefüllt ♥', t: 2 }
+    }
     watchApi.current = (on) => {
       if (!perksRef.current.spectate || finished || on === isSpec || animLock > 0) return
       if (on) {
@@ -554,22 +573,15 @@ function ParkourGameInner({ st, startLevel = 0, perks }: { st: TeamState; startL
         // Genau dort ins Spiel, wo der Geist gerade ist (steht er in einer Wand oder in Stacheln, dann an der nächsten freien Stelle)
         const level = levelOf(lv)
         const pr = pressedMap(level, mates(performance.now()).filter((r) => !r.dead).map((r) => ({ x: r.x, y: r.y })))
-        let px = me.x, py = me.y
-        if (!spotIsSafe(level, pr, px, py)) {
-          let found = false
-          for (const r of [8, 16, 24, 32, 48, 64, 96, 128]) {
-            for (const [dx, dy] of [[0, -r], [0, r], [-r, 0], [r, 0], [-r, -r], [r, -r], [-r, r], [r, r]]) {
-              if (!found && spotIsSafe(level, pr, me.x + dx, Math.max(0, me.y + dy))) { px = me.x + dx; py = Math.max(0, me.y + dy); found = true }
-            }
-            if (found) break
-          }
-          if (!found) { const sp = spawnAt(level, slot, myCp); px = sp.x; py = sp.y }
-        }
+        // Der Geist schwebt oft über Stacheln oder Löchern: nach unten auf sicheren Boden setzen, sonst an den Checkpoint
+        const land = safeLanding(level, pr, me.x, me.y)
+        let px: number, py: number
+        if (land) { px = land.x; py = land.y } else { const sp = spawnAt(level, slot, myCp); px = sp.x; py = sp.y }
         Object.assign(me, newBody(px, py))
         cp = cp ?? myCp
         titleT = 0
         exitHold = 0
-        graceT = 1.5
+        graceT = 2.5
         fxField.clear()
         setJoined(true)
         // Gast-Admin bekommt seine Herzen aus dem Shop
@@ -590,12 +602,12 @@ function ParkourGameInner({ st, startLevel = 0, perks }: { st: TeamState; startL
       if (hideSend) { lastSend = 0; lastSig = '' } // einmal "ausgeblendet" melden, dann still
       const level = levelOf(lv)
       const x = Math.round(me.x * 10) / 10, y = Math.round(me.y * 10) / 10
-      const sig = `${x}|${y}|${me.face}|${lv}|${cp}|${deadT > 0 ? 1 : 0}|${me.ground ? 1 : 0}|${ghostOn ? 1 : 0}|${hearts}|${deaths}|${finished && (dr || vs > 0) ? 1 : 0}|${buffCode()}`
+      const sig = `${x}|${y}|${me.face}|${lv}|${cp}|${deadT > 0 ? 1 : 0}|${me.ground ? 1 : 0}|${ghostOn ? 1 : 0}|${hearts}|${healSeq}|${deaths}|${finished && (dr || vs > 0) ? 1 : 0}|${buffCode()}`
       // Wer stillsteht, meldet sich nur ein paarmal pro Sekunde (spart Nachrichten bei vielen Spielenden)
       if (now - lastSend < SEND_MS || (sig === lastSig && now - lastSend < 600)) return
       lastSend = now
       lastSig = sig
-      msgCount.current++; void ch?.send({ type: 'broadcast', event: 's', payload: { u: st.me, sid, n: ++seq, x, y, face: me.face, lv, cp, dead: deadT > 0, ex: inExit(level, me), dc: spec ? 0 : deaths, g: me.ground, lh: hashLevel(level), gh: ghostOn, hp: hearts, el: (finished && (dr || vs > 0)) || isSpec || forceEl, bf: buffCode(), ...(perksRef.current.look ? { kd: perksRef.current.look } : {}), ...(guestLook ? { lk: { n: guestLook.name, c: guestLook.pk_color, h: guestLook.pk_hat, f: guestLook.pk_fx } } : {}), ...(pendingEv ? { ev: pendingEv } : {}) } })?.catch?.(() => undefined)
+      msgCount.current++; void ch?.send({ type: 'broadcast', event: 's', payload: { u: st.me, sid, n: ++seq, x, y, face: me.face, lv, cp, dead: deadT > 0, ex: inExit(level, me), dc: spec ? 0 : deaths, g: me.ground, lh: hashLevel(level), gh: ghostOn, hp: hearts, ...(healSeq > 0 ? { hl: healSeq } : {}), el: (finished && (dr || vs > 0)) || isSpec || forceEl, bf: buffCode(), ...(perksRef.current.look ? { kd: perksRef.current.look } : {}), ...(guestLook ? { lk: { n: guestLook.name, c: guestLook.pk_color, h: guestLook.pk_hat, f: guestLook.pk_fx } } : {}), ...(pendingEv ? { ev: pendingEv } : {}) } })?.catch?.(() => undefined)
       pendingEv = null
       hideSend = false
     }
@@ -1132,6 +1144,7 @@ function ParkourGameInner({ st, startLevel = 0, perks }: { st: TeamState; startL
       t += dt
       if (titleT > 0) titleT -= dt
       let guard = 0
+      if (blockedRef.current) { acc = 0; releaseAll() } // Tageslimit erreicht: nichts läuft mehr, auch keine Tastatur
       while (acc >= 1 / 60 && guard++ < 6) { step(1 / 60, now); acc -= 1 / 60 }
       { const k = Math.min(1, dt * 11); for (const r of [...remotes.values(), ...rivals.values()]) { r.dx += (r.x - r.dx) * k; r.dy += (r.y - r.dy) * k }
         for (const g of ghosts.values()) { g.dx += (g.x - g.dx) * k; g.dy += (g.y - g.dy) * k } }
@@ -1180,6 +1193,7 @@ function ParkourGameInner({ st, startLevel = 0, perks }: { st: TeamState; startL
       i.stick = 0; i.left = false; i.right = false; i.jump = false; i.down = false
     }
     const key = (e: KeyboardEvent, down: boolean) => {
+      if (blockedRef.current) return
       const k = e.key
       const el = e.target as HTMLElement | null
       if (el && (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA' || el.isContentEditable)) return
@@ -1285,6 +1299,10 @@ function ParkourGameInner({ st, startLevel = 0, perks }: { st: TeamState; startL
           >
             <Skull size={16} /> Neustart am Checkpoint
           </button>
+        )}
+        {isStaff && !specUi && (
+          <button type="button" onClick={() => healApi.current?.()}
+            className="min-h-[44px] rounded-2xl border border-rose-300/50 bg-rose-400/10 px-3 text-xs font-semibold text-rose-100 active:bg-rose-400/25">♥ Heilen</button>
         )}
         {(isAdmin || perks.spectate) && !specUi && (
           <div className="flex flex-col gap-2">

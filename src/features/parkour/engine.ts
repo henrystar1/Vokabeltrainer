@@ -108,6 +108,33 @@ export function spotIsSafe(lv: Level, pressed: Pressed, x: number, y: number): b
 }
 
 /**
+ * Sichere Landestelle für jemanden, der aus der Luft (Zuschauer-Geist) ins Spiel wechselt: von (x, y) senkrecht nach unten
+ * bis zum ersten festen Boden, ohne unterwegs Stacheln zu berühren. Gibt es dort keinen sicheren Boden (Loch, Stacheln),
+ * werden Spalten links und rechts daneben probiert. `null` = nichts gefunden (dann an den Checkpoint setzen).
+ */
+export function safeLanding(lv: Level, pressed: Pressed, x: number, y: number): Point | null {
+  const maxY = ROWS * TILE - PH - 1
+  const cx = Math.max(0, Math.min(lv.cols * TILE - PW, x))
+  const offsets = [0]
+  for (let k = 1; k <= 12; k++) offsets.push(k * 16, -k * 16)
+  for (const dx of offsets) {
+    const px = cx + dx
+    if (px < 0 || px > lv.cols * TILE - PW) continue
+    let yy = Math.min(y, maxY)
+    if (hitsSolid(lv, pressed, px, yy)) continue // steckt in einer Wand
+    let ok = true
+    while (yy < maxY && !hitsSolid(lv, pressed, px, yy + 2)) {
+      if (touchesSpike(lv, { x: px, y: yy } as Body)) { ok = false; break }
+      yy += 2
+    }
+    if (!ok || yy >= maxY - 1) continue // Stacheln im Weg oder Loch ohne Boden
+    if (!spotIsSafe(lv, pressed, px, yy) || !spotIsSafe(lv, pressed, px - 8, yy) || !spotIsSafe(lv, pressed, px + 8, yy)) continue
+    return { x: px, y: yy }
+  }
+  return null
+}
+
+/**
  * Ein Schritt (dt Sekunden). 'dead' = Stacheln berührt (das einzige, was ein Herz kostet).
  * 'lost' = eingeklemmt oder aus der Welt gefallen: Neustart ohne Herzverlust.
  */

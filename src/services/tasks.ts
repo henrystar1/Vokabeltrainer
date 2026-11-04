@@ -24,3 +24,9 @@ export const siteLinksList = () => rpc<SiteLink[]>('site_links_list')
 export const siteLinkSave = (id: string | null, title: string, url: string, description: string, image: string, sort: number) =>
   rpc<string>('site_link_save', { p_id: id, p_title: title, p_url: url, p_description: description, p_image: image, p_sort: sort })
 export const siteLinkDelete = (id: string) => rpc<void>('site_link_delete', { p_id: id })
+
+/** Ranglisten für Pi und Flaggen (Migration 0062) */
+export type MemoGame = 'pi' | 'flags'
+export interface MemoRow { rank: number; user_id: string; display_name: string; best: number; is_me: boolean }
+export const memoScoreSubmit = (game: MemoGame, score: number) => rpc<number>('memo_score_submit', { p_game: game, p_score: Math.max(0, Math.floor(score)) })
+export const memoLeaderboard = (game: MemoGame) => rpc<MemoRow[]>('memo_leaderboard', { p_game: game })

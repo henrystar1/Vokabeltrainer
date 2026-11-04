@@ -19,6 +19,8 @@ interface AuthState {
   canEditRules: boolean
   /** true, wenn ein Admin das Konto gesperrt hat. */
   blocked: boolean
+  /** false, solange ein Admin das neue Konto noch nicht freigeschaltet hat. */
+  approved: boolean
   /** true, sobald das Profil (und damit die Rolle) geladen ist. */
   profileReady: boolean
   /** true, solange der Benutzer über den Link aus der Passwort-vergessen-Mail gekommen ist. */
@@ -57,6 +59,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [displayName, setDisplayName] = useState<string | null>(null)
   const [role, setRole] = useState<Role>('user')
   const [blocked, setBlocked] = useState(false)
+  const [approved, setApproved] = useState(true)
   const [profileReady, setProfileReady] = useState(false)
   const [cosmetics, setCosmetics] = useState<Flair>(NO_COSMETICS)
   const [tagsHidden, setTagsHidden] = useState(false)
@@ -98,6 +101,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setDisplayName(p.display_name)
     setRole(p.role)
     setBlocked(p.blocked)
+    setApproved(p.approved)
     setTagsHidden(p.tags_hidden)
     setHidePresenceState(p.hide_presence)
     setCosmetics({ avatar_id: p.avatar_id, color_id: p.color_id, effect_id: p.effect_id, tag_id: p.tags_hidden ? null : p.tag_id, theme_id: p.theme_id, role: p.tags_hidden ? 'user' : p.role })
@@ -188,6 +192,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       canEditRules: role === 'alphamod' || role === 'admin',
       isAdmin: role === 'admin',
       blocked,
+      approved,
       profileReady,
       cosmetics,
       tagsHidden,
@@ -202,7 +207,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setNewPassword,
       setDisplayNameLocal: setDisplayName,
     }),
-    [loading, session, displayName, role, blocked, profileReady, cosmetics, tagsHidden, hidePresence, themeId, refreshProfile, recovering, signIn, signUp, signOut, sendReset, setNewPassword],
+    [loading, session, displayName, role, blocked, approved, profileReady, cosmetics, tagsHidden, hidePresence, themeId, refreshProfile, recovering, signIn, signUp, signOut, sendReset, setNewPassword],
   )
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>
 }

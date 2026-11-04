@@ -1,3 +1,4 @@
+import { Link } from 'react-router-dom'
 import { memo, useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from 'react'
 import { ChevronUp, EyeOff, Send, Smile, Timer, Trash2 } from 'lucide-react'
 import { parseSticker, Sticker, StickerPicker, stickerBody } from '../features/chat/stickers'
@@ -10,6 +11,7 @@ import { ErrorBox } from '../components/ui/States'
 import { useAuth } from '../features/auth/AuthProvider'
 import { useChat } from '../features/chat/ChatProvider'
 import { errorMessage } from '../lib/errors'
+import { chatParts } from '../lib/chatLinks'
 import { mentionsName } from '../lib/mentions'
 import { deleteChatMessage, getChat, postChat, searchPlayers, timeoutChatUser } from '../services/play'
 import { getMyPermissions } from '../services/koins'
@@ -66,6 +68,17 @@ interface RowProps {
   onTimeout: (m: ChatMessage) => void
 }
 
+/** Nachrichtentext mit anklickbaren Menü-Links (#Start, #Websites, #Websites/Name). */
+function ChatText({ body }: { body: string }) {
+  return (
+    <>
+      {chatParts(body).map((p, i) => ('to' in p
+        ? <Link key={i} to={p.to} className="font-medium text-accent-cyan underline decoration-dotted underline-offset-2 hover:text-white">{p.text}</Link>
+        : <span key={i}>{p.text}</span>))}
+    </>
+  )
+}
+
 const GroupRow = memo(function GroupRow({ g, live, isStaff, me, onDelete, onTimeout }: RowProps) {
   const h = g.head
   const whisper = h.kind === 'whisper'
@@ -88,14 +101,14 @@ const GroupRow = memo(function GroupRow({ g, live, isStaff, me, onDelete, onTime
           {g.items.map((m) => {
             const canDelete = isStaff || m.is_me || (m.kind === 'whisper' && !m.is_me)
             const canMute = isStaff && !m.is_me && m.kind === 'text' && m.role === 'user'
-            const pinged = !m.is_me && m.kind === 'text' && mentionsName(m.body, me)
+            const pinged = !m.is_me && m.kind === 'text' && (mentionsName(m.body, me) || mentionsName(m.body, 'everyone'))
             return (
               <li key={m.id} className={`group flex items-start gap-2 ${pinged ? '-mx-2 rounded-lg bg-amber-300/15 px-2 py-1 ring-1 ring-amber-300/30' : ''}`} data-pinged={pinged || undefined}>
                 {(() => {
                   const st = m.kind === 'text' ? parseSticker(m.body) : null
                   return st
                     ? <div className="min-w-0 flex-1"><Sticker def={st} size={112} /></div>
-                    : <p className="min-w-0 flex-1 whitespace-pre-wrap break-words text-sm text-slate-100">{m.body}</p>
+                    : <p className="min-w-0 flex-1 whitespace-pre-wrap break-words text-sm text-slate-100"><ChatText body={m.body} /></p>
                 })()}
                 <span className="mt-0.5 flex shrink-0 items-center gap-1.5 text-[11px] text-slate-500">
                   {time(m.created_at)}
@@ -214,11 +227,12 @@ export default function Chat() {
     const q = mention.query.toLowerCase()
     const local = [...new Set(messages.filter((m) => m.display_name && m.display_name !== displayName).map((m) => m.display_name))].reverse()
     const names = [...local.filter((n) => n.toLowerCase().startsWith(q)), ...remote]
-    return [...new Set(names)].filter((n) => n !== displayName).slice(0, 5)
-  }, [mention, messages, remote, displayName])
+    const special = ['everyone', ...(/^!pay\s/i.test(text) ? ['random'] : [])].filter((n) => n.startsWith(q))
+    return [...special, ...new Set(names)].filter((n) => n !== displayName).slice(0, 6)
+  }, [mention, messages, remote, displayName, text])
 
   const COMMANDS = [
-    { cmd: '!pay', hint: 'Coins verschicken: !pay @Name 100' },
+    { cmd: '!pay', hint: 'Coins verschicken: !pay @Name 100 – auch @everyone (alle) oder @random (Zufall)' },
     { cmd: '!whisper', hint: 'Heimlich schreiben: !whisper @Name Text' },
   ]
   const cmdSuggestions = /^![a-zäöü]*$/i.test(text) ? COMMANDS.filter((c) => c.cmd.startsWith(text.toLowerCase())) : []
@@ -423,6 +437,7 @@ export default function Chat() {
       </Card>
       <p className="mt-3 text-xs text-slate-500">
         Coins verschicken: <span className="font-mono text-slate-300">!pay @Anzeigename 100</span>{isAdmin && <> (Admin auch <span className="font-mono text-slate-300">1k</span>, <span className="font-mono text-slate-300">2,5m</span>, <span className="font-mono text-slate-300">1mrd</span>, <span className="font-mono text-slate-300">1b</span> = Billion)</>} · Heimlich schreiben:{' '}
+        Alle schenken: <span className="font-mono text-slate-300">!pay @everyone 100</span> (jeder bekommt 100, du zahlst für alle), Zufall: <span className="font-mono text-slate-300">!pay @random 100</span>. Mit <span className="font-mono text-slate-300">@everyone</span> markierst du alle, mit <span className="font-mono text-slate-300">#Websites</span> oder <span className="font-mono text-slate-300">#Websites/Name</span> verlinkst du Seiten.<br />
         <span className="font-mono text-slate-300">!whisper @Anzeigename Text</span> (nur ihr beide seht es). Sei nett zueinander – Mods können Nachrichten löschen und kurz stummschalten.
       </p>
 

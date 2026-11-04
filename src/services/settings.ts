@@ -44,7 +44,7 @@ export async function loadDisplayName(userId: string): Promise<string | null> {
 export async function loadProfile(userId: string): Promise<Profile | null> {
   const { data, error } = await supabase
     .from('profiles')
-    .select('display_name,role,blocked,avatar_id,color_id,effect_id,theme_id,tag_id,tags_hidden,hide_presence')
+    .select('*')
     .eq('id', userId)
     .maybeSingle()
   if (error) throw error
@@ -53,6 +53,7 @@ export async function loadProfile(userId: string): Promise<Profile | null> {
     display_name: data.display_name as string,
     role: (data.role as Role) ?? 'user',
     blocked: Boolean(data.blocked),
+    approved: data.approved !== false,
     avatar_id: (data.avatar_id as string | null) ?? null,
     color_id: (data.color_id as string | null) ?? null,
     effect_id: (data.effect_id as string | null) ?? null,

@@ -10,8 +10,8 @@ import { formatBytes } from '../../lib/format'
 import { useAsync } from '../../lib/useAsync'
 import { adminListUsers, adminUserStatus } from '../../services/admin'
 
-type Filter = 'all' | 'online' | 'team' | 'blocked'
-const FILTERS: Array<[Filter, string]> = [['all', 'Alle'], ['online', 'Online'], ['team', 'Team'], ['blocked', 'Gesperrt']]
+type Filter = 'all' | 'online' | 'team' | 'blocked' | 'pending'
+const FILTERS: Array<[Filter, string]> = [['all', 'Alle'], ['online', 'Online'], ['team', 'Team'], ['blocked', 'Gesperrt'], ['pending', 'Wartet']]
 
 /**
  * Personen (nur Admins): Liste mit Online-Punkt und Tätigkeit. Antippen öffnet ein Fenster mit Status,
@@ -38,7 +38,7 @@ export default function UsersTab() {
     const q = query.trim().toLowerCase()
     return (users.data ?? [])
       .filter((u) => (q === '' || u.display_name.toLowerCase().includes(q) || (u.email ?? '').toLowerCase().includes(q)))
-      .filter((u) => filter === 'all' || (filter === 'online' && byId.get(u.user_id)?.online) || (filter === 'team' && u.role !== 'user') || (filter === 'blocked' && u.blocked))
+      .filter((u) => filter === 'all' || (filter === 'online' && byId.get(u.user_id)?.online) || (filter === 'team' && u.role !== 'user') || (filter === 'blocked' && u.blocked) || (filter === 'pending' && u.approved === false))
       .sort((a, b) => Number(byId.get(b.user_id)?.online ?? false) - Number(byId.get(a.user_id)?.online ?? false) || a.display_name.localeCompare(b.display_name, 'de'))
   }, [users.data, byId, query, filter])
 
@@ -85,7 +85,7 @@ export default function UsersTab() {
               <button
                 type="button"
                 onClick={() => open(u.user_id)}
-                className={`glass flex min-h-[64px] w-full items-center gap-3 rounded-2xl p-3 text-left transition hover:bg-white/10 ${u.blocked ? 'border-rose-500/40' : ''}`}
+                className={`glass flex min-h-[64px] w-full items-center gap-3 rounded-2xl p-3 text-left transition hover:bg-white/10 ${u.blocked ? 'border-rose-500/40' : u.approved === false ? 'border-amber-400/50' : ''}`}
               >
                 <span className="relative shrink-0">
                   <Avatar name={u.display_name} size={40} />
@@ -96,6 +96,7 @@ export default function UsersTab() {
                     <span className="truncate">{u.display_name}</span>
                     <RoleChip role={u.role} />
                     {u.blocked && <span className="rounded-full border border-rose-500/50 px-2 py-0.5 text-[10px] uppercase tracking-wider text-rose-300">Gesperrt</span>}
+                    {u.approved === false && <span className="rounded-full border border-amber-400/60 bg-amber-400/10 px-2 py-0.5 text-[10px] uppercase tracking-wider text-amber-200">Wartet</span>}
                     {u.user_id === me?.id && <span className="text-xs font-normal text-slate-500">(du)</span>}
                   </span>
                   <span className={`block truncate text-xs ${st?.online ? 'text-emerald-300' : 'text-slate-500'}`}>

@@ -1,4 +1,6 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
+import { useSearchParams } from 'react-router-dom'
+import { normKey } from '../lib/chatLinks'
 import { ExternalLink, Pencil, Plus, Trash2 } from 'lucide-react'
 import Button from '../components/ui/Button'
 import Card from '../components/ui/Card'
@@ -37,6 +39,17 @@ function Preview({ s }: { s: SiteLink }) {
 export default function WebsitesPage() {
   const { isAdmin } = useAuth()
   const list = useAsync(siteLinksList, [])
+  const [params] = useSearchParams()
+  const wanted = params.get('site') // aus einem Chat-Link (#Websites/Name)
+  const [lit, setLit] = useState<string | null>(null)
+  useEffect(() => {
+    if (!wanted || !list.data) return
+    const k = normKey(wanted)
+    const hit = list.data.find((s) => normKey(s.title) === k) ?? list.data.find((s) => normKey(s.title).includes(k))
+    if (!hit) return
+    setLit(hit.id)
+    window.requestAnimationFrame(() => document.getElementById(`site-${hit.id}`)?.scrollIntoView({ block: 'center', behavior: 'smooth' }))
+  }, [wanted, list.data])
   const [edit, setEdit] = useState<SiteLink | 'new' | null>(null)
   const [title, setTitle] = useState('')
   const [url, setUrl] = useState('')
@@ -80,7 +93,7 @@ export default function WebsitesPage() {
       {list.data?.length === 0 && <EmptyState title="Noch keine Websites" text={isAdmin ? 'Mit „Website“ fügst du die erste hinzu.' : 'Hier kommt bald etwas.'} />}
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
         {list.data?.map((s) => (
-          <Card key={s.id} interactive className="relative space-y-3 !p-3">
+          <Card key={s.id} interactive className={`relative space-y-3 !p-3 ${lit === s.id ? 'ring-2 ring-accent-cyan' : ''}`} id={`site-${s.id}`}>
             <a href={s.url} target="_blank" rel="noopener noreferrer" className="block space-y-3" aria-label={`${s.title} öffnen`}>
               <Preview s={s} />
               <div className="px-1">
