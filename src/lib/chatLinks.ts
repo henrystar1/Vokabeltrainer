@@ -10,7 +10,7 @@ export function normKey(s: string): string {
 }
 
 const ITEMS = [...NAV_ITEMS, STAFF_NAV_ITEM]
-const ALIAS: Record<string, string> = { startseite: '/', home: '/', brett: '/brett', hausaufgabe: '/hausaufgaben', flaggen: '/auswendig', pi: '/auswendig', hochzahlen: '/auswendig', website: '/websites', admin: '/verwaltung' }
+const ALIAS: Record<string, string> = { startseite: '/', home: '/', brett: '/brett', hausaufgabe: '/hausaufgaben', flaggen: '/auswendig', pi: '/auswendig', hochzahlen: '/auswendig', website: '/websites', advent: '/advent', kalender: '/advent', admin: '/verwaltung' }
 
 /** Welche Seite meint #Name? Passt auf Menünamen (ohne Klammerzusatz) und auf den Pfad. */
 export function menuTarget(name: string): { to: string; label: string } | null {
@@ -46,4 +46,40 @@ export function chatParts(body: string): ChatPart[] {
   }
   if (last < body.length) out.push({ text: body.slice(last) })
   return out.length > 0 ? out : [{ text: body }]
+}
+
+/** Namen für #Vorschläge: Menüpunkte (Leerzeichen als _), nach `Websites/` die Namen der eingetragenen Seiten. */
+export function tagSuggestions(query: string, siteNames: string[] = [], max = 6): string[] {
+  const slash = query.indexOf('/')
+  if (slash >= 0) {
+    const t = menuTarget(query.slice(0, slash))
+    if (!t || t.to !== '/websites') return []
+    const q = normKey(query.slice(slash + 1))
+    const base = query.slice(0, slash)
+    const names = siteNames.map((n) => ({ n, k: normKey(n) })).filter((x) => x.k.includes(q))
+    names.sort((a, b) => Number(b.k.startsWith(q)) - Number(a.k.startsWith(q)))
+    return names.slice(0, max).map((x) => `${base}/${x.n.trim().replace(/\s+/g, '_')}`)
+  }
+  const q = normKey(query)
+  const seen = new Set<string>()
+  const scored: Array<{ name: string; rank: number }> = []
+  const add = (name: string, keys: string[]) => {
+    if (seen.has(name)) return
+    const prefix = keys.some((k) => k.startsWith(q))
+    const inside = keys.some((k) => k.includes(q))
+    if (q && !inside) return
+    seen.add(name)
+    scored.push({ name, rank: prefix || !q ? 0 : 1 })
+  }
+  for (const it of ITEMS) {
+    const label = it.label.split(' (')[0]
+    add(label.trim().replace(/\s+/g, '_'), [normKey(label), it.to === '/' ? 'start' : normKey(it.to.slice(1))])
+  }
+  for (const [alias, to] of Object.entries(ALIAS)) {
+    const it = ITEMS.find((x) => x.to === to)
+    if (!it) continue
+    const label = it.label.split(' (')[0].trim().replace(/\s+/g, '_')
+    if (!seen.has(label)) add(alias.charAt(0).toUpperCase() + alias.slice(1), [alias])
+  }
+  return scored.sort((a, b) => a.rank - b.rank).slice(0, max).map((x) => x.name)
 }

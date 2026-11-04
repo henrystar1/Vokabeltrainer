@@ -158,6 +158,7 @@ export const SECTIONS: Array<{ title: string; text?: string; rules: Rule[] }> = 
   {
     title: 'Spiele',
     rules: [
+      { key: 'advent_force_day', label: 'Adventskalender testen: so tun, als wäre heute Türchen …', hint: '0 = echtes Datum (nur 1. bis 24. Dezember). 1 bis 24 = dieser Tag ist heute offen, auch außerhalb des Dezembers. Nach dem Test wieder auf 0 stellen.' },
       { key: 'game_fee', label: 'Eintritt pro Runde (Coins)' },
       { key: 'game_record_reward', label: 'Coins für einen neuen Rekord', hint: 'Wer die Bestenliste des Spiels übertrifft' },
     ],

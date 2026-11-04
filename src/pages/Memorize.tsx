@@ -5,7 +5,9 @@ import Card from '../components/ui/Card'
 import { Field, Select, TextInput } from '../components/ui/Field'
 import PageHeader from '../components/ui/PageHeader'
 import ProgressBar from '../components/ui/ProgressBar'
-import { memoScoreSubmit } from '../services/tasks'
+import RewardReveal, { type Reward } from '../components/ui/RewardReveal'
+import { useWallet } from '../features/koins/WalletProvider'
+import { memoScoreSubmit, type MemoGame } from '../services/tasks'
 import { COUNTRIES, REGIONS, flagUrl, makeQuestions, optionsFor, poolFor, type Country, type FlagQuestion, type Region } from '../features/memorize/flags'
 import { grade, isTyped, loadCards, mastered, matchesName, pickSession, saveCards, type Cards } from '../features/memorize/flagLearn'
 import { PI_DIGITS, checkDigit, groupDigits } from '../features/memorize/pi'
@@ -44,7 +46,24 @@ export default function Memorize() {
 
 // ---------------------------------------------------------------- Pi
 
+/** Bestwert melden; bei einem neuen Rekord gibt es Coins und Punkte mit Animation. */
+function useMemoSubmit() {
+  const wallet = useWallet()
+  const [rewards, setRewards] = useState<Reward[] | null>(null)
+  const submit = useCallback((game: MemoGame, score: number) => {
+    void memoScoreSubmit(game, score).then((r) => {
+      if (r.coins > 0 || r.points > 0) {
+        setRewards([...(r.coins > 0 ? [{ type: 'coins' as const, amount: r.coins }] : []), ...(r.points > 0 ? [{ type: 'points' as const, amount: r.points }] : [])])
+        void wallet.refresh()
+      }
+    }).catch(() => undefined)
+  }, [wallet])
+  const reveal = rewards ? <RewardReveal gift={false} title="Neuer Rekord!" rewards={rewards} onClose={() => setRewards(null)} /> : null
+  return { submit, reveal }
+}
+
 function PiTrainer() {
+  const { submit: submitScore, reveal } = useMemoSubmit()
   const [phase, setPhase] = useState<'learn' | 'quiz' | 'done'>('learn')
   const [shown, setShown] = useState(50)
   const [typed, setTyped] = useState('')
@@ -63,14 +82,14 @@ function PiTrainer() {
     if (res.ok) {
       const next = typedRef.current + d
       setTyped(next)
-      if (next.length >= PI_DIGITS.length) { setFresh(saveBest('pi-best', next.length)); setPhase('done'); void memoScoreSubmit('pi', Math.max(0, next.length - hintsRef.current)).catch(() => undefined) }
+      if (next.length >= PI_DIGITS.length) { setFresh(saveBest('pi-best', next.length)); setPhase('done'); submitScore('pi', Math.max(0, next.length - hintsRef.current)) }
     } else {
       setWrong(res.expected)
       setFresh(saveBest('pi-best', typedRef.current.length))
       setPhase('done')
-      void memoScoreSubmit('pi', Math.max(0, typedRef.current.length - hintsRef.current)).catch(() => undefined)
+      submitScore('pi', Math.max(0, typedRef.current.length - hintsRef.current))
     }
-  }, [phase])
+  }, [phase, submitScore])
 
   useEffect(() => {
     if (phase !== 'quiz') return
@@ -109,6 +128,7 @@ function PiTrainer() {
   const total = PI_DIGITS.length
   return (
     <div className="space-y-5">
+    {reveal}
     <Card className="space-y-4">
       <p className="font-mono text-xl leading-9">3,<span className="break-words text-slate-100">{block(typed)}</span>{phase === 'quiz' && <span className="ml-1 animate-pulse text-accent-cyan">▌</span>}{phase === 'done' && wrong && <span className="ml-1 text-rose-300">{wrong}?</span>}</p>
       <ProgressBar value={(typed.length / Math.min(total, Math.max(shown, 10))) * 100} label="Fortschritt" />
@@ -340,6 +360,7 @@ function RegionChips({ regions, onToggle }: { regions: Region[]; onToggle: (r: R
 
 /** Karteikasten: fällige und neue Länder, erst Auswahl, dann Eintippen des Namens. */
 function FlagLearn() {
+  const { submit: submitScore, reveal } = useMemoSubmit()
   const [regions, setRegions] = useState<Region[]>([])
   const [cards, setCards] = useState<Cards>(() => loadCards())
   const [queue, setQueue] = useState<Country[] | null>(null)
@@ -383,7 +404,7 @@ function FlagLearn() {
     if (i + 1 >= queue.length) {
       setQueue(null)
       setFb(null)
-      void memoScoreSubmit('flags', mastered(cards)).catch(() => undefined)
+      submitScore('flags', mastered(cards))
       return
     }
     prepare(queue, i + 1, cards)
@@ -399,6 +420,8 @@ function FlagLearn() {
 
   if (!queue) {
     return (
+      <>
+      {reveal}
       <Card className="space-y-4">
         <p className="text-sm text-slate-400">
           Karteikasten: Neue Flaggen wählst du erst aus vier Ländern aus, was du kannst, musst du später eintippen. Richtiges kommt seltener wieder, Falsches bald. Gemeistert hast du <b className="text-accent-cyan">{got}</b> von {COUNTRIES.length} Ländern.
@@ -410,12 +433,15 @@ function FlagLearn() {
           <Button variant="secondary" onClick={() => start(true)}>Trotzdem üben</Button>
         </div>
       </Card>
+      </>
     )
   }
 
   const cur = queue[i]
   const typed = options.length === 0
   return (
+    <>
+    {reveal}
     <Card className="space-y-4">
       <ProgressBar value={(i / queue.length) * 100} label="Fortschritt" />
       <p className="text-sm text-slate-400">Flagge {i + 1} von {queue.length} · {right} von {asked} richtig</p>
@@ -439,6 +465,7 @@ function FlagLearn() {
         </div>
       )}
     </Card>
+    </>
   )
 }
 

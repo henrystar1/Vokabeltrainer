@@ -11,7 +11,8 @@ import { ErrorBox } from '../components/ui/States'
 import { useAuth } from '../features/auth/AuthProvider'
 import { useChat } from '../features/chat/ChatProvider'
 import { errorMessage } from '../lib/errors'
-import { chatParts } from '../lib/chatLinks'
+import { chatParts, tagSuggestions } from '../lib/chatLinks'
+import { siteLinksList } from '../services/tasks'
 import { mentionsName } from '../lib/mentions'
 import { deleteChatMessage, getChat, postChat, searchPlayers, timeoutChatUser } from '../services/play'
 import { getMyPermissions } from '../services/koins'
@@ -148,6 +149,8 @@ export default function Chat() {
   const [muteFor, setMuteFor] = useState<ChatMessage | null>(null)
   const [maxMute, setMaxMute] = useState(1)
   const [mention, setMention] = useState<{ query: string; start: number } | null>(null)
+  const [hashTag, setHashTag] = useState<{ query: string; start: number } | null>(null)
+  const [siteNames, setSiteNames] = useState<string[] | null>(null)
   const [remote, setRemote] = useState<string[]>([])
   const inputRef = useRef<HTMLInputElement>(null)
   const listRef = useRef<HTMLDivElement>(null)
@@ -231,6 +234,21 @@ export default function Chat() {
     return [...special, ...new Set(names)].filter((n) => n !== displayName).slice(0, 6)
   }, [mention, messages, remote, displayName, text])
 
+  const tagList = useMemo(() => (hashTag ? tagSuggestions(hashTag.query, siteNames ?? []) : []), [hashTag, siteNames])
+  useEffect(() => {
+    if (hashTag?.query.includes('/') && siteNames === null) void siteLinksList().then((r) => setSiteNames(r.map((x) => x.title))).catch(() => setSiteNames([]))
+  }, [hashTag, siteNames])
+
+  function pickTag(name: string) {
+    if (!hashTag) return
+    const caret = hashTag.start + 1 + hashTag.query.length
+    const next = `${text.slice(0, hashTag.start)}#${name} ${text.slice(caret)}`
+    setText(next)
+    setHashTag(null)
+    const pos = hashTag.start + name.length + 2
+    requestAnimationFrame(() => { inputRef.current?.focus(); inputRef.current?.setSelectionRange(pos, pos) })
+  }
+
   const COMMANDS = [
     { cmd: '!pay', hint: 'Coins verschicken: !pay @Name 100 – auch @everyone (alle) oder @random (Zufall)' },
     { cmd: '!whisper', hint: 'Heimlich schreiben: !whisper @Name Text' },
@@ -251,12 +269,15 @@ export default function Chat() {
     if (e.key !== 'Tab' || e.shiftKey) return
     if (cmdSuggestions.length > 0) { e.preventDefault(); pickCommand(cmdSuggestions[0].cmd) }
     else if (mention && suggestions.length > 0) { e.preventDefault(); pick(suggestions[0]) }
+    else if (hashTag && tagList.length > 0) { e.preventDefault(); pickTag(tagList[0]) }
   }
 
   function onType(value: string, caret: number) {
     setText(value)
     const m = /@([^\s@]*)$/.exec(value.slice(0, caret))
     setMention(m ? { query: m[1], start: caret - m[0].length } : null)
+    const h = /(?:^|\s)#([^\s#]*)$/.exec(value.slice(0, caret))
+    setHashTag(h ? { query: h[1], start: caret - h[1].length - 1 } : null)
     if (value.trim() && !value.startsWith('!whisper')) announceTyping()
   }
 
@@ -411,6 +432,19 @@ export default function Chat() {
                 </button>
               </li>
             ))}
+          </ul>
+        )}
+        {hashTag && tagList.length > 0 && (
+          <ul className="mb-2 flex flex-wrap gap-2" role="listbox" aria-label="Menüpunkte vorschlagen">
+            {tagList.map((n) => (
+              <li key={n}>
+                <button type="button" role="option" aria-selected={false} onMouseDown={(e) => e.preventDefault()} onClick={() => pickTag(n)}
+                  className="min-h-[40px] rounded-full border border-amber-300/30 bg-amber-300/10 px-4 text-sm text-amber-200 hover:bg-amber-300/20">
+                  #{n}
+                </button>
+              </li>
+            ))}
+            <li className="self-center text-xs text-slate-500">Tab zum Übernehmen</li>
           </ul>
         )}
         {stickers && <div className="mb-3"><StickerPicker onPick={(id) => void send({ preventDefault() { /* kein Formular */ } } as FormEvent, stickerBody(id))} /></div>}

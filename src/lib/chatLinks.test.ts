@@ -19,3 +19,19 @@ describe('Chat-Links', () => {
     expect(chatParts('ohne links')).toEqual([{ text: 'ohne links' }])
   })
 })
+
+import { tagSuggestions } from './chatLinks'
+describe('#-Vorschläge', () => {
+  it('schlägt Menüpunkte nach Anfangsbuchstaben vor', () => {
+    expect(tagSuggestions('Web')).toContain('Websites')
+    expect(tagSuggestions('st')).toContain('Start')
+    expect(tagSuggestions('zzzzz')).toEqual([])
+  })
+  it('ohne Eingabe kommen die ersten Menüpunkte', () => {
+    expect(tagSuggestions('').length).toBeGreaterThan(3)
+  })
+  it('nach Websites/ kommen die Namen der Seiten', () => {
+    expect(tagSuggestions('Websites/me', ['Mein Spiel', 'Anderes', 'Memory'])).toEqual(['Websites/Mein_Spiel', 'Websites/Memory'])
+    expect(tagSuggestions('Start/x', ['x'])).toEqual([])
+  })
+})

@@ -69,47 +69,45 @@ export class Builder {
   /** Spalte hinter dem zuletzt gebauten Pad-Turm (dort geht der Boden weiter). */
   towerEnd = 0
   /**
-   * Pad-Turm (Höhen-Jump&Run, geht über den Bildrand hinaus): Pad am Boden bei x. Etappe 1 nach rechts (Zeile 3), am Ende ein Pad,
-   * Etappe 2 ein Stück zurück nach links (step = 6 Zeilen höher, mehr als ein Doppelsprung schafft: die Pads sind Pflicht), wieder ein Pad, Etappe 3 nach rechts (noch höher). Danach eine hohe Mauer,
-   * deren Oberkante auf Höhe von Etappe 3 liegt: der Weg am Boden ist versperrt. n = Plattformen je Etappe, w = Breite, gap = Lücke.
-   * Mit pit fehlt unten der Boden: ein Absturz endet in den Stacheln.
+   * Pad-Turm (Höhen-Jump&Run, geht über den Bildrand hinaus): Pad am Boden bei x. Die Etappen zickzacken übereinander:
+   * Etappe 1 (Zeile 3), am Ende ein Pad, Etappe 2 ein Stück zurück und step = 6 Zeilen höher (mehr als ein Doppelsprung schafft:
+   * die Pads sind Pflicht), wieder ein Pad, und so weiter. `floors` = Zahl der Etagen (Etappen), 3 bis 9. Die letzte Etappe läuft immer
+   * nach rechts: bei geraden Etagenzahlen beginnt die erste nach links vom Bodenpad aus (dort muss freier Platz sein, auf dem Boden
+   * davor). Danach eine hohe Mauer, deren Oberkante auf Höhe der letzten Etappe liegt: der Weg am Boden ist versperrt.
+   * n = Plattformen je Etappe, w = Breite, gap = Lücke. Mit pit fehlt unten der Boden: ein Absturz endet in den Stacheln.
    */
-  padTower(x: number, n: number, w: number, gap: number, pit: boolean, step = 6): this {
-    const R = [3, 3 - step, 3 - 2 * step]
+  padTower(x: number, n: number, w: number, gap: number, pit: boolean, floors = 3, step = 6): this {
+    const F = Math.max(1, Math.min(9, Math.floor(floors)))
     const path: Array<[number, number]> = []
     const at = (col: number, row: number) => path.push([col * TILE + TILE / 2 - PW_ / 2, row * TILE - PH_])
     this.pad(x)
     at(x, 10)
-    let c = x + 4
-    let last = c
-    for (let j = 0; j < n; j++) { this.plat(c, c + w - 1, R[0]); at(c + (w - 1) / 2, R[0]); last = c; c += w + gap }
-    const p1 = last + w - 1
-    this.pad(p1, R[0] - 1)
-    at(p1, R[0])
-    let e = p1 - 3
-    let left = e
-    for (let j = 0; j < n; j++) {
-      const ww = j === 0 ? w + 1 : w
-      left = e - ww + 1
-      this.plat(left, e, R[1])
-      at((left + e) / 2, R[1])
-      e = left - gap - 1
+    let dir = F % 2 === 1 ? 1 : -1 // Richtung der ersten Etappe: die letzte soll nach rechts gehen
+    let cur = x + 4 * dir // erste Kachel der ersten Plattform (die dem Pad nächste)
+    let extreme = x
+    for (let k = 0; k < F; k++) {
+      const row = 3 - k * step
+      for (let j = 0; j < n; j++) {
+        const ww = j === 0 && k > 0 ? w + 1 : w
+        const lo = dir > 0 ? cur : cur - ww + 1
+        const hi = dir > 0 ? cur + ww - 1 : cur
+        this.plat(lo, hi, row)
+        at((lo + hi) / 2, row)
+        extreme = dir > 0 ? hi : lo
+        cur += dir * (ww + gap)
+      }
+      if (k < F - 1) {
+        this.pad(extreme, row - 1)
+        at(extreme, row)
+        cur = extreme - 3 * dir // nächste Etappe: ein Stück zurück
+        dir = -dir
+      }
     }
-    this.pad(left, R[1] - 1)
-    at(left, R[1])
-    let c3 = left + 3
-    let end3 = c3
-    for (let j = 0; j < n; j++) {
-      const ww = j === 0 ? w + 1 : w
-      this.plat(c3, c3 + ww - 1, R[2])
-      at(c3 + (ww - 1) / 2, R[2])
-      end3 = c3 + ww - 1
-      c3 += ww + gap
-    }
-    const W = end3 + 1 + gap
-    this.rect(W, R[2], W + 2, 9, '#')
+    const rowTop = 3 - (F - 1) * step
+    const W = extreme + 1 + gap
+    this.rect(W, rowTop, W + 2, 9, '#')
     if (pit) this.clear(x + 1, W - 1)
-    at(W + 1, R[2])
+    at(W + 1, rowTop)
     at(W + 5, 10)
     this.skips.push({ from: x - 1, to: W + 5, path })
     this.towerEnd = W + 3

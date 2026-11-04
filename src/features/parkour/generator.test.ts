@@ -47,3 +47,24 @@ describe('Level-Zufallsgenerator', () => {
     expect(prevLen).toBeGreaterThan(300)
   })
 })
+
+import { towerFloors } from './generator'
+describe('Etagenzahl der Pad-Türme', () => {
+  it('liegt zwischen 3 und 9, hohe sind selten', () => {
+    const count = new Map<number, number>()
+    for (let i = 0; i < 10000; i++) { const f = towerFloors(i / 10000); count.set(f, (count.get(f) ?? 0) + 1) }
+    expect([...count.keys()].sort()).toEqual([3, 4, 5, 6, 7, 8, 9])
+    expect(count.get(3)!).toBeGreaterThan(count.get(9)!)
+    expect(count.get(9)!).toBeGreaterThan(300) // kommt aber vor
+    expect(towerFloors(0.9999)).toBe(9)
+    expect(towerFloors(0)).toBe(3)
+  })
+  it('generierte Levels enthalten Türme mit unterschiedlicher Höhe', () => {
+    const heights = new Set<number>()
+    for (let n = 8; n < 60; n++) {
+      const lv = generateLevel('hoehe', n)
+      if (lv.up.length > 0) heights.add(Math.round(lv.up.length / 6))
+    }
+    expect(heights.size).toBeGreaterThanOrEqual(3)
+  })
+})

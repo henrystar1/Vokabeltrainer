@@ -28,5 +28,16 @@ export const siteLinkDelete = (id: string) => rpc<void>('site_link_delete', { p_
 /** Ranglisten für Pi und Flaggen (Migration 0062) */
 export type MemoGame = 'pi' | 'flags'
 export interface MemoRow { rank: number; user_id: string; display_name: string; best: number; is_me: boolean }
-export const memoScoreSubmit = (game: MemoGame, score: number) => rpc<number>('memo_score_submit', { p_game: game, p_score: Math.max(0, Math.floor(score)) })
+export interface MemoReward { best: number; coins: number; points: number }
+export const memoScoreSubmit = (game: MemoGame, score: number) => rpc<MemoReward>('memo_score_submit', { p_game: game, p_score: Math.max(0, Math.floor(score)) })
 export const memoLeaderboard = (game: MemoGame) => rpc<MemoRow[]>('memo_leaderboard', { p_game: game })
+
+/** Adventskalender (Migration 0065) */
+export type AdventReward =
+  | { type: 'coins'; amount: number; dup?: string }
+  | { type: 'points'; amount: number }
+  | { type: 'plus'; days: number }
+  | { type: 'item'; id: string; kind: 'avatar' | 'color' | 'effect' | 'theme' | 'tag'; name: string; price: number }
+export interface AdventStatus { state: 'before' | 'active' | 'over'; today: number; year: number; opened: Array<{ day: number; rewards: AdventReward[] }> }
+export const adventStatus = () => rpc<AdventStatus>('advent_status')
+export const adventOpen = (day: number) => rpc<{ day: number; rewards: AdventReward[] }>('advent_open', { p_day: day })

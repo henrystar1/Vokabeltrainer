@@ -8,11 +8,12 @@ import Modal from '../components/ui/Modal'
 import PageHeader from '../components/ui/PageHeader'
 import { ErrorBox, Notice, Spinner } from '../components/ui/States'
 import KoinBadge from '../components/profile/KoinBadge'
-import { Avatar, StyledName, Tags } from '../components/profile/PlayerTag'
+import ItemPreview from '../components/shop/ItemPreview'
+import RewardReveal from '../components/ui/RewardReveal'
 import ItemEditor from '../components/shop/ItemEditor'
 import { useAuth } from '../features/auth/AuthProvider'
 import { useWallet } from '../features/koins/WalletProvider'
-import { AVATARS, KIND_LABEL, TAGS, resolveTheme } from '../features/shop/catalog'
+import { AVATARS, KIND_LABEL } from '../features/shop/catalog'
 import { refreshCustomItems, useCustomVersion } from '../features/shop/custom'
 import { errorMessage } from '../lib/errors'
 import { useAsync } from '../lib/useAsync'
@@ -24,14 +25,7 @@ import { useSearchParams } from 'react-router-dom'
 
 const KINDS: ShopKind[] = ['avatar', 'color', 'effect', 'tag', 'theme']
 
-function Preview({ item, name, cosmetics }: { item: ShopItem; name: string; cosmetics: { color_id: string | null; effect_id: string | null } }) {
-  if (item.kind === 'avatar') return <Avatar name={name} avatarId={item.id} size={item.price >= 700 ? 76 : 56} />
-  if (item.kind === 'tag') return TAGS[item.id] ? <span className={`tag ${TAGS[item.id].className} !text-xs`}>{TAGS[item.id].label}</span> : <Tags tagId={item.id} />
-  if (item.kind === 'color') return <StyledName name={name} colorId={item.id} className="text-xl font-semibold" />
-  if (item.kind === 'effect') return <StyledName name={name} colorId={cosmetics.color_id} effectId={item.id} className="text-xl font-semibold" />
-  const t = resolveTheme(item.id)
-  return <div className="h-14 w-full rounded-xl border border-white/10" style={{ background: t?.preview ?? '#222' }} />
-}
+const Preview = ItemPreview
 
 export default function Shop() {
   const { displayName, cosmetics, themeId, refreshProfile, isAdmin, isStaff } = useAuth()
@@ -48,6 +42,7 @@ export default function Shop() {
   const [kind, setKind] = useState<ShopKind>('avatar')
   const [parkourTab, setParkourTab] = useState(params.get('tab') === 'parkour')
   const [confirm, setConfirm] = useState<ShopItem | null>(null)
+  const [bought, setBought] = useState<ShopItem | null>(null)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [message, setMessage] = useState<string | null>(null)
@@ -212,12 +207,14 @@ export default function Shop() {
             <Button busy={busy} onClick={() => void act(async () => {
               await buyItem(confirm.id)
               await equipItem(confirm.id)
+              setBought(confirm)
             }, 'Gekauft und ausgewählt!')}>
               Kaufen
             </Button>
           </div>
         </Modal>
       )}
+      {bought && <RewardReveal gift={false} title="Gekauft!" rewards={[{ type: 'item', item: { id: bought.id, kind: bought.kind, name: bought.name, price: bought.price } }]} onClose={() => setBought(null)} />}
       <PlusHint ctx="shop" />
     </div>
   )

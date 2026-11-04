@@ -16,6 +16,15 @@ export function rng(seed: string): () => number {
 
 const CHANNELS = ['a', 'b', 'c']
 
+const FLOOR_WEIGHTS = [26, 22, 17, 13, 10, 7, 5] // Etagen 3 bis 9
+/** Etagenzahl eines Pad-Turms (3 bis 9) aus einer Zufallszahl u in [0, 1): niedrige oft, ganz hohe selten. */
+export function towerFloors(u: number): number {
+  let acc = 0
+  const x = u * 100
+  for (let i = 0; i < FLOOR_WEIGHTS.length; i++) { acc += FLOOR_WEIGHTS[i]; if (x < acc) return 3 + i }
+  return 9
+}
+
 /**
  * Zufälliges Level Nummer n (0-basiert, ab den handgebauten Leveln). Je höher n, desto mehr Abschnitte, breitere
  * Stachelfelder, schmalere Plattformen und häufiger Brücken, Türme und Türketten. Alles bleibt innerhalb der
@@ -112,7 +121,8 @@ export function generateLevel(seed: string, n: number): Level {
         g.cp2(x)
         lastCp = x + 2
         x += 6
-        g.padTower(x, n, w, gap, d >= 2)
+        // Höhe 3 bis 9 Etagen, die hohen sind selten (3: 26 %, 4: 22 %, 5: 17 %, 6: 13 %, 7: 10 %, 8: 7 %, 9: 5 %)
+        g.padTower(x, n, w, gap, d >= 2, towerFloors(r()))
         x = g.towerEnd + 1
         break
       }

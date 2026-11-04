@@ -79,6 +79,7 @@ function ParkourGameInner({ st, startLevel = 0, perks }: { st: TeamState; startL
   const [joined, setJoined] = useState(false) // Admin hat vom reinen Zuschauen aus ins Spiel gewechselt
   const specUi = (spec && !joined) || watchUi
   const watchApi = useRef<((on: boolean) => void) | null>(null)
+  const reviveApi = useRef<(() => void) | null>(null) // Mods mit Zuschauer-Recht: nach „Keine Herzen mehr“ wiederbeleben (Team: alle)
   const healApi = useRef<(() => void) | null>(null) // Mods und Admins: Herzen auffüllen (für alle im Team)
   const specApi = useRef<((d: number) => void) | null>(null)
   const toggleFly = () => { if (!adminRef.current || specUi) return; input.current.fly = !input.current.fly; if (!input.current.fly) input.current.ghost = false; setFlyUi(input.current.fly); setGhostUi(input.current.ghost) }
@@ -139,7 +140,7 @@ function ParkourGameInner({ st, startLevel = 0, perks }: { st: TeamState; startL
     const t = window.setInterval(flush, 15_000)
     return () => { alive = false; window.clearInterval(t); const n = msgCount.current; msgCount.current = 0; if (n > 0) void parkourUsageAdd(n).catch(() => undefined) }
   }, [])
-  const [hud, setHud] = useState({ level: 0, deaths: 0, ms: 0, linked: false, done: false, jet: false })
+  const [hud, setHud] = useState({ level: 0, deaths: 0, ms: 0, linked: false, done: false, over: false, jet: false })
 
   useEffect(() => {
     const cv = canvas.current
@@ -210,6 +211,9 @@ function ParkourGameInner({ st, startLevel = 0, perks }: { st: TeamState; startL
     const dcSeen = new Map<string, number>() // gezählte Tode je Mitspieler
     const healSeen = new Map<string, number>() // Heil-Zähler je Mitspieler
     let healSeq = 0
+    const reviveSeen = new Map<string, number>() // Wiederbelebungs-Zähler je Mitspieler
+    let reviveSeq = 0
+    let overTimer: number | undefined
     let myCp: number | null = null
     let ghostOn = false
     let killCool = 0
@@ -337,7 +341,7 @@ function ParkourGameInner({ st, startLevel = 0, perks }: { st: TeamState; startL
 
     function onState(payload: unknown) {
       msgCount.current++
-      const p = payload as Partial<Remote> & { hl?: number; u?: string; n?: number; sid?: string; bf?: number; lk?: { n?: string; c?: string | null; h?: string | null; f?: string | null }; kd?: string; ev?: string }
+      const p = payload as Partial<Remote> & { hl?: number; rv?: number; u?: string; n?: number; sid?: string; bf?: number; lk?: { n?: string; c?: string | null; h?: string | null; f?: string | null }; kd?: string; ev?: string }
       const uid = p.u
       const x = finite(p.x, -100, 200000)
       const y = finite(p.y, -100000, 1200)
@@ -368,6 +372,16 @@ function ParkourGameInner({ st, startLevel = 0, perks }: { st: TeamState; startL
         else if (hl > seen) {
           healSeen.set(uid, hl)
           if (!dr && !isSpec && !finished && !over) { hearts = maxHearts; toast = { text: 'Herzen aufgefüllt ♥', t: 2 } }
+        }
+      }
+      // Wiederbelebung durch einen Mod: alle im Team bekommen volle Herzen, auch wer schon raus war
+      {
+        const rv = typeof p.rv === 'number' ? Math.max(0, Math.floor(p.rv)) : 0
+        const seenRv = reviveSeen.get(uid)
+        if (seenRv === undefined) reviveSeen.set(uid, rv)
+        else if (rv > seenRv) {
+          reviveSeen.set(uid, rv)
+          if (!dr && !isSpec && vs === 0) { reviveSelf(); toast = { text: 'Wiederbelebt: volle Herzen ♥', t: 2.5 } }
         }
       }
       if (isSpec || dr) { seenAny = true; return } // Deathrun: jede Person hat ihr eigenes Level, ihre Herzen und ihre Checkpoints
@@ -466,9 +480,17 @@ function ParkourGameInner({ st, startLevel = 0, perks }: { st: TeamState; startL
       else void teamParkourFinish(st.id, ms, deaths + [...dcSeen.values()].reduce((x, y) => x + y, 0), levels, cpTotal).catch(() => undefined)
     }
 
+    /** Aus „Keine Herzen mehr“ zurück ins Spiel (Herzen voll, Bericht an den Server wieder offen). */
+    function reviveSelf() {
+      if (isSpec) return
+      if (overTimer !== undefined) { window.clearTimeout(overTimer); overTimer = undefined }
+      hearts = maxHearts
+      if (over) { over = false; finished = false; reported = false }
+    }
+
     function checkOver() {
       if (isSpec) return
-      if (hearts <= 0 && !finished) { over = true; hearts = 0; if (vs === 0) window.setTimeout(() => report(lv), 1800); finished = true }
+      if (hearts <= 0 && !finished) { over = true; hearts = 0; if (vs === 0) overTimer = window.setTimeout(() => { overTimer = undefined; report(lv) }, 1800); finished = true }
     }
 
     function goLevel(n: number, adopt = false) {
@@ -548,6 +570,14 @@ function ParkourGameInner({ st, startLevel = 0, perks }: { st: TeamState; startL
       healSeq += 1
       toast = { text: 'Herzen aufgefüllt ♥', t: 2 }
     }
+    reviveApi.current = () => {
+      if (isSpec || !over || vs !== 0 || !perksRef.current.spectate) return
+      reviveSelf()
+      reviveSeq += 1
+      healSeq += 1
+      toast = { text: 'Wiederbelebt: volle Herzen ♥', t: 2.5 }
+      lastSig = ''
+    }
     watchApi.current = (on) => {
       if (!perksRef.current.spectate || finished || on === isSpec || animLock > 0) return
       if (on) {
@@ -602,12 +632,12 @@ function ParkourGameInner({ st, startLevel = 0, perks }: { st: TeamState; startL
       if (hideSend) { lastSend = 0; lastSig = '' } // einmal "ausgeblendet" melden, dann still
       const level = levelOf(lv)
       const x = Math.round(me.x * 10) / 10, y = Math.round(me.y * 10) / 10
-      const sig = `${x}|${y}|${me.face}|${lv}|${cp}|${deadT > 0 ? 1 : 0}|${me.ground ? 1 : 0}|${ghostOn ? 1 : 0}|${hearts}|${healSeq}|${deaths}|${finished && (dr || vs > 0) ? 1 : 0}|${buffCode()}`
+      const sig = `${x}|${y}|${me.face}|${lv}|${cp}|${deadT > 0 ? 1 : 0}|${me.ground ? 1 : 0}|${ghostOn ? 1 : 0}|${hearts}|${healSeq}|${reviveSeq}|${deaths}|${finished && (dr || vs > 0) ? 1 : 0}|${buffCode()}`
       // Wer stillsteht, meldet sich nur ein paarmal pro Sekunde (spart Nachrichten bei vielen Spielenden)
       if (now - lastSend < SEND_MS || (sig === lastSig && now - lastSend < 600)) return
       lastSend = now
       lastSig = sig
-      msgCount.current++; void ch?.send({ type: 'broadcast', event: 's', payload: { u: st.me, sid, n: ++seq, x, y, face: me.face, lv, cp, dead: deadT > 0, ex: inExit(level, me), dc: spec ? 0 : deaths, g: me.ground, lh: hashLevel(level), gh: ghostOn, hp: hearts, ...(healSeq > 0 ? { hl: healSeq } : {}), el: (finished && (dr || vs > 0)) || isSpec || forceEl, bf: buffCode(), ...(perksRef.current.look ? { kd: perksRef.current.look } : {}), ...(guestLook ? { lk: { n: guestLook.name, c: guestLook.pk_color, h: guestLook.pk_hat, f: guestLook.pk_fx } } : {}), ...(pendingEv ? { ev: pendingEv } : {}) } })?.catch?.(() => undefined)
+      msgCount.current++; void ch?.send({ type: 'broadcast', event: 's', payload: { u: st.me, sid, n: ++seq, x, y, face: me.face, lv, cp, dead: deadT > 0, ex: inExit(level, me), dc: spec ? 0 : deaths, g: me.ground, lh: hashLevel(level), gh: ghostOn, hp: hearts, ...(healSeq > 0 ? { hl: healSeq } : {}), ...(reviveSeq > 0 ? { rv: reviveSeq } : {}), el: (finished && (dr || vs > 0)) || isSpec || forceEl, bf: buffCode(), ...(perksRef.current.look ? { kd: perksRef.current.look } : {}), ...(guestLook ? { lk: { n: guestLook.name, c: guestLook.pk_color, h: guestLook.pk_hat, f: guestLook.pk_fx } } : {}), ...(pendingEv ? { ev: pendingEv } : {}) } })?.catch?.(() => undefined)
       pendingEv = null
       hideSend = false
     }
@@ -1172,7 +1202,7 @@ function ParkourGameInner({ st, startLevel = 0, perks }: { st: TeamState; startL
       render(now)
       if (now - lastHud > 400) {
         lastHud = now
-        setHud({ level: lv, deaths, ms: now - startPerf, linked: mates(now).length > 0, done: finished, jet: buff.jet > 0 })
+        setHud({ level: lv, deaths, ms: now - startPerf, linked: mates(now).length > 0, done: finished, over: over && vs === 0, jet: buff.jet > 0 })
         if (isSpec) {
           // Wen kann ich verfolgen? Alle, die gerade spielen (auch frühere Zuschauer), und alle Bots
           const nm = (uid: string) => members().find((p) => p.user_id === uid)?.name ?? lookOf(uid)?.name ?? '?'
@@ -1299,6 +1329,10 @@ function ParkourGameInner({ st, startLevel = 0, perks }: { st: TeamState; startL
           >
             <Skull size={16} /> Neustart am Checkpoint
           </button>
+        )}
+        {perks.spectate && hud.over && !specUi && (
+          <button type="button" onClick={() => reviveApi.current?.()}
+            className="min-h-[44px] rounded-2xl border border-emerald-300/60 bg-emerald-400/20 px-3 text-xs font-semibold text-emerald-100 active:bg-emerald-400/35">✨ Wiederbeleben</button>
         )}
         {isStaff && !specUi && (
           <button type="button" onClick={() => healApi.current?.()}
