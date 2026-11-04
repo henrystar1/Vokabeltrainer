@@ -11,9 +11,11 @@ import LeagueView from './LeagueView'
 import CoinBoard from './CoinBoard'
 import GamblingBoard from './GamblingBoard'
 import ParkourBoard from './ParkourBoard'
+import MemoBoard from './MemoBoard'
 import PlusHint from '../features/plus/PlusHint'
 
-const PERIODS: Array<{ id: LeaderboardPeriod | 'league' | 'coins' | 'gambling' | 'parkour'; label: string }> = [
+type Tab = LeaderboardPeriod | 'league' | 'coins' | 'gambling' | 'parkour' | 'pi' | 'flags'
+const PERIODS: Array<{ id: Tab; label: string }> = [
   { id: 'week', label: 'Woche' },
   { id: 'month', label: 'Monat' },
   { id: 'all', label: 'Gesamt' },
@@ -21,13 +23,16 @@ const PERIODS: Array<{ id: LeaderboardPeriod | 'league' | 'coins' | 'gambling' |
   { id: 'coins', label: 'Coins' },
   { id: 'gambling', label: 'Gambling' },
   { id: 'parkour', label: 'Parkour' },
+  { id: 'pi', label: 'Pi' },
+  { id: 'flags', label: 'Flaggen' },
 ]
+const SPECIAL: Tab[] = ['league', 'coins', 'gambling', 'parkour', 'pi', 'flags']
 
 const MEDAL = ['text-amber-300', 'text-slate-300', 'text-orange-400']
 
 export default function Leaderboard() {
-  const [period, setPeriod] = useState<LeaderboardPeriod | 'league' | 'coins' | 'gambling' | 'parkour'>('week')
-  const board = useAsync(() => (period === 'league' || period === 'coins' || period === 'gambling' || period === 'parkour' ? Promise.resolve([]) : getLeaderboard(period)), [period])
+  const [period, setPeriod] = useState<Tab>('week')
+  const board = useAsync(() => (SPECIAL.includes(period) ? Promise.resolve([]) : getLeaderboard(period as LeaderboardPeriod)), [period])
 
   return (
     <div>
@@ -52,7 +57,9 @@ export default function Leaderboard() {
       {period === 'coins' && <CoinBoard />}
       {period === 'gambling' && <GamblingBoard />}
       {period === 'parkour' && <ParkourBoard />}
-      {period !== 'league' && period !== 'coins' && period !== 'gambling' && period !== 'parkour' && (<>
+      {period === 'pi' && <MemoBoard game="pi" />}
+      {period === 'flags' && <MemoBoard game="flags" />}
+      {!SPECIAL.includes(period) && (<>
       {board.loading && !board.data && <Spinner />}
       {board.error && <ErrorBox message={board.error} onRetry={board.reload} />}
       {board.data && board.data.length === 0 && <EmptyState title="Noch niemand auf der Rangliste" text="Starte eine Lernrunde, um Punkte zu sammeln." />}

@@ -145,7 +145,7 @@ returns table (
   created_at timestamptz, last_sign_in_at timestamptz,
   book_count integer, public_book_count integer, vocab_count integer,
   progress_count integer, session_count integer, answer_count integer, approx_bytes bigint,
-  koins integer, approved boolean
+  koins bigint, approved boolean
 )
 language plpgsql
 stable

@@ -5,8 +5,7 @@ import Card from '../components/ui/Card'
 import { Field, Select, TextInput } from '../components/ui/Field'
 import PageHeader from '../components/ui/PageHeader'
 import ProgressBar from '../components/ui/ProgressBar'
-import { useAsync } from '../lib/useAsync'
-import { memoLeaderboard, memoScoreSubmit, type MemoGame } from '../services/tasks'
+import { memoScoreSubmit } from '../services/tasks'
 import { COUNTRIES, REGIONS, flagUrl, makeQuestions, optionsFor, poolFor, type Country, type FlagQuestion, type Region } from '../features/memorize/flags'
 import { grade, isTyped, loadCards, mastered, matchesName, pickSession, saveCards, type Cards } from '../features/memorize/flagLearn'
 import { PI_DIGITS, checkDigit, groupDigits } from '../features/memorize/pi'
@@ -57,7 +56,6 @@ function PiTrainer() {
   typedRef.current = typed
   const hintsRef = useRef(0)
   hintsRef.current = hints
-  const [boardKey, setBoardKey] = useState(0)
 
   const press = useCallback((d: string) => {
     if (phase !== 'quiz') return
@@ -65,12 +63,12 @@ function PiTrainer() {
     if (res.ok) {
       const next = typedRef.current + d
       setTyped(next)
-      if (next.length >= PI_DIGITS.length) { setFresh(saveBest('pi-best', next.length)); setPhase('done'); void memoScoreSubmit('pi', Math.max(0, next.length - hintsRef.current)).catch(() => undefined); setBoardKey((k) => k + 1) }
+      if (next.length >= PI_DIGITS.length) { setFresh(saveBest('pi-best', next.length)); setPhase('done'); void memoScoreSubmit('pi', Math.max(0, next.length - hintsRef.current)).catch(() => undefined) }
     } else {
       setWrong(res.expected)
       setFresh(saveBest('pi-best', typedRef.current.length))
       setPhase('done')
-      void memoScoreSubmit('pi', Math.max(0, typedRef.current.length - hintsRef.current)).then(() => setBoardKey((k) => k + 1)).catch(() => undefined)
+      void memoScoreSubmit('pi', Math.max(0, typedRef.current.length - hintsRef.current)).catch(() => undefined)
     }
   }, [phase])
 
@@ -104,7 +102,6 @@ function PiTrainer() {
         <p className="break-words font-mono text-xl leading-9 text-slate-100" aria-label="Pi">3,<span className="text-accent-cyan">{block(PI_DIGITS.slice(0, shown))}</span></p>
         <Button onClick={startQuiz}><Eye size={18} /> Abfragen</Button>
       </Card>
-      <MemoBoard game="pi" unit="Stellen" refreshKey={boardKey} />
       </div>
     )
   }
@@ -136,7 +133,6 @@ function PiTrainer() {
         </div>
       )}
     </Card>
-    {phase === 'done' && <MemoBoard game="pi" unit="Stellen" refreshKey={boardKey} />}
     </div>
   )
 }
@@ -320,7 +316,6 @@ function FlagQuiz() {
 
 function FlagTrainer() {
   const [view, setView] = useState<'learn' | 'quiz'>('learn')
-  const [boardKey, setBoardKey] = useState(0)
   return (
     <div className="space-y-5">
       <div className="glass inline-flex rounded-xl p-1" role="tablist" aria-label="Flaggen-Modus">
@@ -328,29 +323,8 @@ function FlagTrainer() {
           <button key={k} role="tab" aria-selected={view === k} onClick={() => setView(k)} className={`min-h-[40px] rounded-lg px-4 text-sm ${view === k ? 'bg-accent-cyan/15 text-accent-cyan' : 'text-slate-400 hover:text-white'}`}>{l}</button>
         ))}
       </div>
-      {view === 'learn' ? <FlagLearn onScore={() => setBoardKey((k) => k + 1)} /> : <FlagQuiz />}
-      <MemoBoard game="flags" unit="Länder gemeistert" refreshKey={boardKey} />
+      {view === 'learn' ? <FlagLearn /> : <FlagQuiz />}
     </div>
-  )
-}
-
-/** Rangliste (Migration 0062); ohne die Migration oder offline wird sie einfach nicht gezeigt. */
-function MemoBoard({ game, unit, refreshKey }: { game: MemoGame; unit: string; refreshKey: number }) {
-  const rows = useAsync(() => memoLeaderboard(game), [game, refreshKey])
-  if (!rows.data || rows.data.length === 0) return null
-  return (
-    <Card className="space-y-2">
-      <h2 className="label-mono">Rangliste</h2>
-      <ol className="space-y-1">
-        {rows.data.slice(0, 15).map((r) => (
-          <li key={r.user_id} className={`flex items-center gap-3 rounded-lg px-2 py-1.5 text-sm ${r.is_me ? 'bg-accent-cyan/10 text-accent-cyan' : ''}`}>
-            <span className="w-7 text-right font-mono text-slate-400">{r.rank}.</span>
-            <span className="min-w-0 flex-1 truncate">{r.display_name}{r.is_me ? ' (du)' : ''}</span>
-            <span className="font-mono">{r.best} <span className="text-xs text-slate-500">{unit}</span></span>
-          </li>
-        ))}
-      </ol>
-    </Card>
   )
 }
 
@@ -365,7 +339,7 @@ function RegionChips({ regions, onToggle }: { regions: Region[]; onToggle: (r: R
 }
 
 /** Karteikasten: fällige und neue Länder, erst Auswahl, dann Eintippen des Namens. */
-function FlagLearn({ onScore }: { onScore: () => void }) {
+function FlagLearn() {
   const [regions, setRegions] = useState<Region[]>([])
   const [cards, setCards] = useState<Cards>(() => loadCards())
   const [queue, setQueue] = useState<Country[] | null>(null)
@@ -409,7 +383,7 @@ function FlagLearn({ onScore }: { onScore: () => void }) {
     if (i + 1 >= queue.length) {
       setQueue(null)
       setFb(null)
-      void memoScoreSubmit('flags', mastered(cards)).then(onScore).catch(() => undefined)
+      void memoScoreSubmit('flags', mastered(cards)).catch(() => undefined)
       return
     }
     prepare(queue, i + 1, cards)
