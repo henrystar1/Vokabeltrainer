@@ -20,7 +20,13 @@ begin
   if p_game not in ('pi', 'flags') then
     raise exception 'Unbekanntes Spiel.' using errcode = '22023';
   end if;
-  if p_score is null or p_score < 0 or p_score > case p_game when 'pi' then 500 else 300 end then
+  if p_score is null or p_score < 0 then
+    raise exception 'Ungültiger Wert.' using errcode = '22023';
+  end if;
+  if p_game = 'pi' and p_score > 500 then
+    raise exception 'Ungültiger Wert.' using errcode = '22023';
+  end if;
+  if p_game = 'flags' and p_score > 1500 then
     raise exception 'Ungültiger Wert.' using errcode = '22023';
   end if;
   select best into v_old from public.memo_scores where user_id = v_uid and game = p_game for update;
@@ -36,8 +42,8 @@ begin
       v_coins := v_delta * 3;            -- 3 Coins je neue Stelle
       v_points := greatest(1, v_delta / 5); -- 1 Punkt je 5 neue Stellen
     else
-      v_coins := v_delta * 10;           -- 10 Coins je neu gemeistertes Land
-      v_points := greatest(1, v_delta / 2);
+      v_coins := v_delta * 2;            -- 2 Coins je Lernpunkt (Summe der Fächer aller Länder)
+      v_points := greatest(1, v_delta / 10);
     end if;
     perform public._grant_koins(v_uid, v_coins, 'memo_' || p_game, null);
     insert into public.points_adjustments (user_id, points, reason, created_by)

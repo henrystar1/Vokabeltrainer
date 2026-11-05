@@ -593,3 +593,9 @@ Tabelle `book_library_hidden`; `in_library` blendet ein veröffentlichtes Buch d
 - **Chat `#`-Vorschläge**: `tagSuggestions()` in `lib/chatLinks.ts`; nach `Websites/` kommen die Seitennamen (`siteLinksList`). Tab übernimmt den ersten Vorschlag.
 - **Adventskalender (0065)**: Tabelle `advent_opened`, Plan in `_advent_plan(day)`, RPCs `advent_status`, `advent_open(day)`. Nur das Türchen des Tages (Berlin-Datum, 1.–24. Dezember) lässt sich öffnen; Test über Einstellung `advent_force_day` (Verwaltung → Zahlen). Doppelte Artikel geben den halben Preis als Coins. Türchen-Reihenfolge pro Jahr gemischt (`features/advent/doors.ts`). Seite `/advent`.
 - **Wiederbeleben (Parkour)**: Mods mit Zuschauer-Recht sehen nach „Keine Herzen mehr“ den Knopf „Wiederbeleben“ (nur Team-Parkour, nicht Deathrun/Versus). Sendet `rv`-Zähler, alle im Team bekommen volle Herzen und sind wieder im Spiel (`reviveSelf`).
+
+
+## Update 86
+- **`#Menü/Unterpunkt` für alle Reiter-Seiten**: `lib/subTabs.ts` (`SUB_TABS`, `matchSubTab`) listet die Reiter von Rangliste, Auswendig, Gambling, Shop, Einstellungen, Verwaltung. Der Chat-Link wird `/<seite>?t=<id>`, die Seiten lesen `?t=` beim Start. `tagSuggestions` schlägt die Reiter nach `Rangliste/` vor.
+- **Gambling-Bank (0066)**: `gambling_bank()` (Summe aus `gambling_stats`: Bank = gesetzt − gewonnen, Schnitt pro Spiel, Auszahlungsquote), `admin_gambling_reset(p_user)` (null = alle). Anzeige und Zurücksetzen in `GamblingBoard.tsx` (Reset nur Admin).
+- **Flaggen-Rangliste**: Wert sind jetzt Lernpunkte (`lernpunkte(cards)` = Summe der Fächer, Höchstwert 1500 im Server), damit man sofort auf die Rangliste kommt; Belohnung 2 Coins je Lernpunkt, 1 Punkt je 10 (in 0064). Karteikasten-Ansicht vereinfacht (ein Startknopf, Kennzahlen, „Beenden“-Knopf sendet den Stand).

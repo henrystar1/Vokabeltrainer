@@ -5,10 +5,10 @@ import { memoLeaderboard, type MemoGame } from '../services/tasks'
 
 const MEDAL = ['text-amber-300', 'text-slate-300', 'text-orange-400']
 
-/** Rangliste für Pi (Stellen ohne Tipp) und Flaggen (gemeisterte Länder), Migration 0062. */
+/** Rangliste für Pi (Stellen ohne Tipp) und Flaggen (Lernpunkte = Summe der Fächer), Migration 0062. */
 export default function MemoBoard({ game }: { game: MemoGame }) {
   const rows = useAsync(() => memoLeaderboard(game), [game])
-  const unit = game === 'pi' ? 'Stellen' : 'Länder gemeistert'
+  const unit = game === 'pi' ? 'Stellen' : 'Lernpunkte'
   return (
     <>
       {rows.loading && !rows.data && <Spinner />}

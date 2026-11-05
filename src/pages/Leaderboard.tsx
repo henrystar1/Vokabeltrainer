@@ -1,4 +1,6 @@
 import { useState } from 'react'
+import { useSearchParams } from 'react-router-dom'
+import { matchSubTab } from '../lib/subTabs'
 import { Trophy } from 'lucide-react'
 import PlayerTag from '../components/profile/PlayerTag'
 import Card from '../components/ui/Card'
@@ -31,7 +33,8 @@ const SPECIAL: Tab[] = ['league', 'coins', 'gambling', 'parkour', 'pi', 'flags']
 const MEDAL = ['text-amber-300', 'text-slate-300', 'text-orange-400']
 
 export default function Leaderboard() {
-  const [period, setPeriod] = useState<Tab>('week')
+  const [params] = useSearchParams()
+  const [period, setPeriod] = useState<Tab>((matchSubTab('/rangliste', params.get('t')) as Tab | null) ?? 'week')
   const board = useAsync(() => (SPECIAL.includes(period) ? Promise.resolve([]) : getLeaderboard(period as LeaderboardPeriod)), [period])
 
   return (

@@ -1,4 +1,5 @@
 import { useEffect, useState, type ReactNode } from 'react'
+import { matchSubTab } from '../lib/subTabs'
 import { useSearchParams } from 'react-router-dom'
 import { Ban, Box, Sparkles, ListOrdered, Palette, Printer, Calculator, Flag, Gift, KeyRound, UserPlus, Power, MessageSquarePlus, Radio, ShieldCheck, SlidersHorizontal, Store, Ticket, UserCog, Users } from 'lucide-react'
 import PageHeader from '../components/ui/PageHeader'
@@ -108,7 +109,7 @@ export default function Admin() {
       : []),
   ]
 
-  const [tab, setTab] = useState<Tab>(DEEP_LINKS[params.get('bereich') ?? ''] ?? 'reviews')
+  const [tab, setTab] = useState<Tab>(DEEP_LINKS[params.get('bereich') ?? ''] ?? (matchSubTab('/verwaltung', params.get('t')) as Tab | null) ?? 'reviews')
   const group = groups.find((g) => g.tabs.some((t) => t.id === tab)) ?? groups[0]
   const active = group.tabs.some((t) => t.id === tab) ? tab : group.tabs[0].id
 

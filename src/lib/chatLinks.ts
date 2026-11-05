@@ -1,4 +1,5 @@
 import { NAV_ITEMS, STAFF_NAV_ITEM } from './navigation'
+import { SUB_TABS, matchSubTab } from './subTabs'
 
 /** Schlüssel zum Vergleichen: Kleinbuchstaben, ä/ö/ü/ß ausgeschrieben, nur Buchstaben und Ziffern. */
 export function normKey(s: string): string {
@@ -40,7 +41,10 @@ export function chatParts(body: string): ChatPart[] {
     const raw = `#${m[2]}${m[3] !== undefined ? '/' + (m[3]) : ''}`
     const shown = m[3] !== undefined ? `#${m[2]}/${sub}` : raw
     if (start > last) out.push({ text: body.slice(last, start) })
-    const to = target.to === '/websites' && sub ? `/websites?site=${encodeURIComponent(sub.replace(/_/g, ' '))}` : target.to
+    const subName = sub.replace(/_/g, ' ')
+    const to = target.to === '/websites' && sub ? `/websites?site=${encodeURIComponent(subName)}`
+      : sub && matchSubTab(target.to, subName) ? `${target.to}?t=${encodeURIComponent(matchSubTab(target.to, subName) as string)}`
+      : target.to
     out.push({ text: shown, to })
     last = start + shown.length
   }
@@ -53,7 +57,13 @@ export function tagSuggestions(query: string, siteNames: string[] = [], max = 6)
   const slash = query.indexOf('/')
   if (slash >= 0) {
     const t = menuTarget(query.slice(0, slash))
-    if (!t || t.to !== '/websites') return []
+    if (!t) return []
+    if (t.to !== '/websites') {
+      const q2 = normKey(query.slice(slash + 1))
+      const subs = (SUB_TABS[t.to] ?? []).filter((x) => normKey(x.label).includes(q2) || normKey(x.id).includes(q2))
+      subs.sort((a, b) => Number(normKey(b.label).startsWith(q2)) - Number(normKey(a.label).startsWith(q2)))
+      return subs.slice(0, max).map((x) => `${query.slice(0, slash)}/${x.label.trim().replace(/\s+/g, '_')}`)
+    }
     const q = normKey(query.slice(slash + 1))
     const base = query.slice(0, slash)
     const names = siteNames.map((n) => ({ n, k: normKey(n) })).filter((x) => x.k.includes(q))

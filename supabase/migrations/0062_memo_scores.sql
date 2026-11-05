@@ -24,7 +24,13 @@ begin
   if p_game not in ('pi', 'flags') then
     raise exception 'Unbekanntes Spiel.' using errcode = '22023';
   end if;
-  if p_score is null or p_score < 0 or p_score > case p_game when 'pi' then 500 else 300 end then
+  if p_score is null or p_score < 0 then
+    raise exception 'Ungültiger Wert.' using errcode = '22023';
+  end if;
+  if p_game = 'pi' and p_score > 500 then
+    raise exception 'Ungültiger Wert.' using errcode = '22023';
+  end if;
+  if p_game = 'flags' and p_score > 1500 then
     raise exception 'Ungültiger Wert.' using errcode = '22023';
   end if;
   insert into public.memo_scores (user_id, game, best) values ((select auth.uid()), p_game, p_score)

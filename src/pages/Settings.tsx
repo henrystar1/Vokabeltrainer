@@ -1,4 +1,6 @@
 import { useEffect, useState, type FormEvent } from 'react'
+import { useSearchParams } from 'react-router-dom'
+import { matchSubTab } from '../lib/subTabs'
 import { Bell, BookOpen, KeyRound, LogOut, User } from 'lucide-react'
 import Button from '../components/ui/Button'
 import Card from '../components/ui/Card'
@@ -45,7 +47,8 @@ export default function Settings() {
   const [message, setMessage] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
-  const [tab, setTab] = useState<'konto' | 'lernen' | 'hinweise' | 'sicherheit'>('konto')
+  const [params] = useSearchParams()
+  const [tab, setTab] = useState<'konto' | 'lernen' | 'hinweise' | 'sicherheit'>((matchSubTab('/einstellungen', params.get('t')) as 'konto' | null) ?? 'konto')
   const [oldPw, setOldPw] = useState('')
   const [newPw, setNewPw] = useState('')
   const [newPw2, setNewPw2] = useState('')

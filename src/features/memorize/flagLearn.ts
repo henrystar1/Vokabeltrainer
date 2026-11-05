@@ -17,6 +17,9 @@ export type Cards = Record<string, Card>
 
 export const mastered = (cards: Cards): number => COUNTRIES.filter((c) => (cards[c.code]?.box ?? 0) >= MASTERED_BOX).length
 
+/** Lernpunkte = Summe der Fächer aller Länder (0 bis 5 je Land). Steigt mit jeder richtigen Antwort, zählt für die Rangliste. */
+export const lernpunkte = (cards: Cards): number => COUNTRIES.reduce((s, c) => s + (cards[c.code]?.box ?? 0), 0)
+
 export function grade(card: Card | undefined, correct: boolean, now: number): Card {
   const box = card?.box ?? 0
   const next = correct ? Math.min(MAX_BOX, box + 1) : Math.max(0, box - 2)

@@ -12,3 +12,8 @@ export const getBoard = () => rpc<BoardPost[]>('get_board')
 export const saveBoardPost = (id: string | null, title: string, body: string, status: BoardPost['status']) =>
   rpc<string>('admin_save_board_post', { p_id: id, p_title: title, p_body: body, p_status: status })
 export const deleteBoardPost = (id: string) => rpc<void>('admin_delete_board_post', { p_id: id })
+
+/** Gambling-Bank und Zurücksetzen der Statistik (Migration 0066) */
+export interface GamblingBank { plays: number; players: number; wagered: number; won: number; bank: number; avg_per_play: number; payout_percent: number }
+export const getGamblingBank = () => rpc<GamblingBank>('gambling_bank')
+export const adminGamblingReset = (user: string | null) => rpc<number>('admin_gambling_reset', { p_user: user })

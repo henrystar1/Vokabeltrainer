@@ -1,4 +1,6 @@
 import { useEffect, useState } from 'react'
+import { useSearchParams } from 'react-router-dom'
+import { matchSubTab } from '../lib/subTabs'
 import { CircleDot, Dice5, Disc3, Cherry, Spade, Sparkles, TrendingDown, Trophy } from 'lucide-react'
 import Card from '../components/ui/Card'
 import PageHeader from '../components/ui/PageHeader'
@@ -47,7 +49,8 @@ export default function Gambling() {
   const bjX = (settings.data?.gambling_bj_blackjack_x10 ?? 12) / 10
   const bjHit17 = (settings.data?.gambling_bj_dealer_hits_soft17 ?? 1) !== 0
   const feed = useAsync(getGamblingFeed, [])
-  const [tab, setTab] = useState<Tab>('slots')
+  const [params] = useSearchParams()
+  const [tab, setTab] = useState<Tab>((matchSubTab('/gambling', params.get('t')) as Tab | null) ?? 'slots')
   useEffect(() => {
     const t = window.setInterval(() => { if (document.visibilityState === 'visible') feed.reload() }, 15_000)
     return () => window.clearInterval(t)

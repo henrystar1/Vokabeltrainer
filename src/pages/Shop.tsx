@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react'
+import { matchSubTab } from '../lib/subTabs'
 import CoinIcon from '../components/ui/CoinIcon'
 import { Check, Lock, Pencil, Plus } from 'lucide-react'
 import { usePlus } from '../features/plus/PlusProvider'
@@ -39,8 +40,9 @@ export default function Shop() {
   const coinLock = useAsync(getCoinLockStatus, [])
   const shop = useAsync(getShop, [])
   const [params] = useSearchParams()
-  const [kind, setKind] = useState<ShopKind>('avatar')
-  const [parkourTab, setParkourTab] = useState(params.get('tab') === 'parkour')
+  const subT = matchSubTab('/shop', params.get('t'))
+  const [kind, setKind] = useState<ShopKind>(subT && subT !== 'parkour' ? (subT as ShopKind) : 'avatar')
+  const [parkourTab, setParkourTab] = useState(params.get('tab') === 'parkour' || subT === 'parkour')
   const [confirm, setConfirm] = useState<ShopItem | null>(null)
   const [bought, setBought] = useState<ShopItem | null>(null)
   const [busy, setBusy] = useState(false)

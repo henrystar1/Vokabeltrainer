@@ -35,3 +35,21 @@ describe('#-Vorschläge', () => {
     expect(tagSuggestions('Start/x', ['x'])).toEqual([])
   })
 })
+
+describe('#Menü/Unterpunkt', () => {
+  it('führt zum Reiter', () => {
+    const to = (b: string) => (chatParts(b).find((p) => 'to' in p) as { to: string } | undefined)?.to
+    expect(to('schau #Rangliste/Pi an')).toBe('/rangliste?t=pi')
+    expect(to('#Rangliste/Flaggen')).toBe('/rangliste?t=flags')
+    expect(to('#Gambling/Black_Jack')).toBe('/gambling?t=blackjack')
+    expect(to('#Auswendig/Hochzahlen')).toBe('/auswendig?t=pow')
+    expect(to('#Shop/Designs')).toBe('/shop?t=theme')
+    expect(to('#Shop/Parkour')).toBe('/shop?t=parkour')
+    expect(to('#Einstellungen/Passwort')).toBe('/einstellungen?t=sicherheit')
+    expect(to('#Rangliste/Unsinn')).toBe('/rangliste')
+  })
+  it('schlägt Reiter vor', () => {
+    expect([...tagSuggestions('Rangliste/p')].sort()).toEqual(['Rangliste/Parkour', 'Rangliste/Pi'])
+    expect(tagSuggestions('Gambling/')).toContain('Gambling/Roulette')
+  })
+})

@@ -1,4 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent, type ReactNode } from 'react'
+import { useSearchParams } from 'react-router-dom'
+import { matchSubTab } from '../lib/subTabs'
 import { Check, Eye, Lightbulb, RotateCcw, X } from 'lucide-react'
 import Button from '../components/ui/Button'
 import Card from '../components/ui/Card'
@@ -9,7 +11,7 @@ import RewardReveal, { type Reward } from '../components/ui/RewardReveal'
 import { useWallet } from '../features/koins/WalletProvider'
 import { memoScoreSubmit, type MemoGame } from '../services/tasks'
 import { COUNTRIES, REGIONS, flagUrl, makeQuestions, optionsFor, poolFor, type Country, type FlagQuestion, type Region } from '../features/memorize/flags'
-import { grade, isTyped, loadCards, mastered, matchesName, pickSession, saveCards, type Cards } from '../features/memorize/flagLearn'
+import { grade, isTyped, lernpunkte, loadCards, mastered, matchesName, pickSession, saveCards, type Cards } from '../features/memorize/flagLearn'
 import { PI_DIGITS, checkDigit, groupDigits } from '../features/memorize/pi'
 import { POW_LEVELS, makeProblems, parseNumber, problemText, solutionText, type PowLevel, type PowProblem } from '../features/memorize/potenzen'
 
@@ -28,7 +30,8 @@ function saveBest(key: string, v: number): boolean {
 
 /** Auswendig lernen: Pi, Hochzahlen (Potenzen) und Flaggen. Bestwerte merkt sich der Browser. */
 export default function Memorize() {
-  const [tab, setTab] = useState<Tab>('pi')
+  const [params] = useSearchParams()
+  const [tab, setTab] = useState<Tab>((matchSubTab('/auswendig', params.get('t')) as Tab | null) ?? 'pi')
   return (
     <div>
       <PageHeader eyebrow="Lernen" title="Auswendig" />
@@ -385,7 +388,7 @@ function FlagLearn() {
   function start(force: boolean) {
     const now = Date.now()
     let q = pickSession(pool, cards, now)
-    if (q.length === 0 && force) q = [...pool].sort((a, b) => (cards[a.code]?.box ?? 0) - (cards[b.code]?.box ?? 0)).slice(0, 10)
+    if (q.length === 0 && force) q = [...pool].sort((a, b) => (cards[a.code]?.box ?? 0) - (cards[b.code]?.box ?? 0) || Math.random() - 0.5).slice(0, 10)
     if (q.length === 0) return
     setQueue(q); setAsked(0); setRight(0); setRequeued(new Set()); prepare(q, 0, cards)
   }
@@ -404,7 +407,7 @@ function FlagLearn() {
     if (i + 1 >= queue.length) {
       setQueue(null)
       setFb(null)
-      submitScore('flags', mastered(cards))
+      submitScore('flags', lernpunkte(cards))
       return
     }
     prepare(queue, i + 1, cards)
@@ -424,15 +427,20 @@ function FlagLearn() {
       {reveal}
       <Card className="space-y-4">
         <p className="text-sm text-slate-400">
-          Karteikasten: Neue Flaggen wählst du erst aus vier Ländern aus, was du kannst, musst du später eintippen. Richtiges kommt seltener wieder, Falsches bald. Gemeistert hast du <b className="text-accent-cyan">{got}</b> von {COUNTRIES.length} Ländern.
+          So geht's: Du siehst eine Flagge. Neue Länder wählst du aus vier Namen aus, was du schon kannst, tippst du ein. Richtig = das Land rutscht ein Fach hoch und kommt später wieder, falsch = es kommt bald nochmal.
         </p>
-        <RegionChips regions={regions} onToggle={toggle} />
-        <p className="text-xs text-slate-500">{regions.length === 0 ? 'Alle Weltgegenden' : 'Nur die gewählten Weltgegenden'} · {pool.length} Länder</p>
-        <div className="flex flex-wrap gap-2">
-          <Button disabled={dueNow === 0} onClick={() => start(false)}>{dueNow > 0 ? `Lernen (${dueNow} Flaggen)` : 'Gerade ist nichts fällig'}</Button>
-          <Button variant="secondary" onClick={() => start(true)}>Trotzdem üben</Button>
+        <div className="grid grid-cols-3 gap-2 text-center text-sm">
+          <div className="rounded-xl bg-white/5 p-3"><b className="block text-xl text-accent-cyan">{lernpunkte(cards)}</b>Lernpunkte (Rangliste)</div>
+          <div className="rounded-xl bg-white/5 p-3"><b className="block text-xl text-accent-cyan">{got}</b>von {COUNTRIES.length} gemeistert</div>
+          <div className="rounded-xl bg-white/5 p-3"><b className="block text-xl text-accent-cyan">{dueNow}</b>Flaggen in der nächsten Runde</div>
         </div>
-      </Card>
+        <div className="space-y-2">
+          <p className="text-sm text-slate-300">Welche Weltgegenden? <span className="text-slate-500">({regions.length === 0 ? 'keine Auswahl = alle' : 'nur die markierten'}, {pool.length} Länder)</span></p>
+          <RegionChips regions={regions} onToggle={toggle} />
+        </div>
+        <Button onClick={() => start(true)}>{dueNow > 0 ? `Lernen starten (${Math.min(10, dueNow)} Flaggen)` : 'Weiter üben (10 Flaggen)'}</Button>
+        {dueNow === 0 && <p className="text-xs text-slate-500">Gerade ist nichts fällig. Du kannst trotzdem üben, die schwächsten Länder kommen zuerst.</p>}
+            </Card>
       </>
     )
   }
@@ -444,7 +452,10 @@ function FlagLearn() {
     {reveal}
     <Card className="space-y-4">
       <ProgressBar value={(i / queue.length) * 100} label="Fortschritt" />
-      <p className="text-sm text-slate-400">Flagge {i + 1} von {queue.length} · {right} von {asked} richtig</p>
+      <div className="flex items-center justify-between gap-2">
+        <p className="text-sm text-slate-400">Flagge {i + 1} von {queue.length} · {right} von {asked} richtig</p>
+        <button type="button" className="min-h-[36px] rounded-lg px-3 text-xs text-slate-400 hover:bg-white/10 hover:text-white" onClick={() => { setQueue(null); setFb(null); submitScore('flags', lernpunkte(cards)) }}>Beenden</button>
+      </div>
       <img src={flagUrl(cur.code)} alt="Flagge" className="mx-auto h-40 max-w-full rounded-lg border border-white/10 object-contain" />
       {options.length > 0 ? (
         <div className="grid gap-2 sm:grid-cols-2">
