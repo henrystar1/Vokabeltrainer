@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import RewardPopup from '../components/ui/RewardPopup'
 import { Blocks, Bird, Brain, Crown, Footprints, Gamepad2, Grid3x3, Hammer, LayoutGrid, Target, Mountain, Trophy, Zap, Square } from 'lucide-react'
 import PlayerTag from '../components/profile/PlayerTag'
 import CoinIcon from '../components/ui/CoinIcon'
@@ -88,6 +89,7 @@ export default function Games() {
           <Trophy size={40} className={`mx-auto ${r.record ? 'text-amber-300' : 'text-slate-600'}`} />
           <p className="font-mono text-4xl text-accent-cyan">{r.score} <span className="text-base text-slate-400">{g.unit}</span></p>
           <p className="text-sm text-slate-400">Bisheriger Rekord: {r.prev_record} {g.unit}</p>
+          {r.record && r.reward > 0 && <RewardPopup coins={r.reward} title="Neuer Rekord!" />}
           {r.record && r.reward > 0 && <Notice tone="ok">+{r.reward} Coins für den neuen Rekord!</Notice>}
           {!r.record && <Notice tone="info">Um den Rekord zu brechen, brauchst du mehr als {r.prev_record} {g.unit}.</Notice>}
         </Card>

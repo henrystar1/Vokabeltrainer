@@ -59,6 +59,8 @@ import PlusPage from './pages/PlusPage'
 import Test from './pages/Test'
 import ForgotPassword from './pages/auth/ForgotPassword'
 import Login from './pages/auth/Login'
+import Impressum from './pages/legal/Impressum'
+import Datenschutz from './pages/legal/Datenschutz'
 import Register from './pages/auth/Register'
 import ResetPassword from './pages/auth/ResetPassword'
 
@@ -92,6 +94,8 @@ export default function App() {
   return (
     <>
     <Routes>
+      <Route path="impressum" element={<Impressum />} />
+      <Route path="datenschutz" element={<Datenschutz />} />
       <Route path="anmelden" element={<Login />} />
       <Route path="registrieren" element={<Register />} />
       <Route path="passwort-vergessen" element={<ForgotPassword />} />

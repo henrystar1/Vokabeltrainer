@@ -1,0 +1,23 @@
+# Hier trägst du deine Angaben für Impressum und Datenschutz ein.
+# Schreibe sie hinter das = (ohne Anführungszeichen). Zeilen mit # davor werden ignoriert.
+# Nach dem Ändern die Datei neu hochladen (liegt im Ordner public, danach bei GitHub Pages unter /rechtliches.txt).
+# Leere Felder zeigt die Website als rote Platzhalter an, damit du nichts vergisst.
+
+# --- Impressum ---
+NAME=
+STRASSE=
+PLZ_ORT=
+EMAIL=
+# Zweiter schneller Kontaktweg ist Pflicht: Telefonnummer ODER ein Hinweis auf ein Kontaktformular.
+TELEFON=
+
+# --- Datenschutz ---
+# Wo steht dein Supabase-Projekt? (Das hast du gesagt: Deutschland, also Frankfurt.)
+SUPABASE_REGION=Deutschland (Frankfurt)
+# Das zweite Supabase-Projekt für das Parkour-Spiel gehört deinem Freund. Wo steht es und wie heißt er (oder "Freund von mir")?
+SPIEL_SUPABASE_REGION=
+SPIEL_SUPABASE_BETREIBER=
+# Optional: Wenn du eine Datenschutz-Kontaktadresse hast, die nicht die normale E-Mail ist.
+DATENSCHUTZ_EMAIL=
+# Optional: Name deiner zuständigen Datenschutz-Aufsichtsbehörde (Landesbeauftragte/r für Datenschutz deines Bundeslandes).
+AUFSICHTSBEHOERDE=

@@ -1,5 +1,5 @@
 -- 0065: Adventskalender. Vom 1. bis 24. Dezember (Berlin) lässt sich jeden Tag nur das Türchen des Tages öffnen.
--- Belohnungen stehen hier im Plan (Coins, Punkte, Plus-Tage, Verkleidungen/Designs). Wiederholbar.
+-- Die Belohnungen werden pro Person zufällig gewürfelt (Coins, Punkte, Plus-Tage, Verkleidungen/Designs). Wiederholbar.
 -- Zum Testen: Einstellung advent_force_day (0 = echtes Datum, 1 bis 24 = so tun, als wäre heute dieser Tag).
 insert into public.app_settings (key, value, mod_editable) values ('advent_force_day', 0, false)
 on conflict (key) do nothing;
@@ -15,40 +15,36 @@ create table if not exists public.advent_opened (
 alter table public.advent_opened enable row level security;
 revoke all on public.advent_opened from anon, authenticated;
 
--- Plan: je Türchen eine Liste von Belohnungen. type = coins | points | plus | item
+-- Zufälliger Plan: Jede Person bekommt beim Öffnen ihre eigene Belohnung (nicht für alle gleich).
+-- Je später im Dezember, desto mehr ist drin. Tür 24 ist immer groß (Verkleidung + Plus + Coins).
+-- type = coins | points | plus | item (item ohne id = zufälliger, noch nicht besessener Artikel bis max_price)
 create or replace function public._advent_plan(p_day integer)
 returns jsonb
-language sql
-immutable
+language plpgsql
+volatile
 set search_path = public
 as $$
-  select case p_day
-    when 1 then '[{"type":"coins","amount":50}]'
-    when 2 then '[{"type":"item","id":"avatar_cat"}]'
-    when 3 then '[{"type":"coins","amount":100}]'
-    when 4 then '[{"type":"points","amount":20}]'
-    when 5 then '[{"type":"plus","days":2}]'
-    when 6 then '[{"type":"item","id":"color_cyan"},{"type":"coins","amount":50}]'
-    when 7 then '[{"type":"coins","amount":150}]'
-    when 8 then '[{"type":"points","amount":30}]'
-    when 9 then '[{"type":"item","id":"effect_glow"}]'
-    when 10 then '[{"type":"plus","days":3},{"type":"coins","amount":100}]'
-    when 11 then '[{"type":"coins","amount":200}]'
-    when 12 then '[{"type":"item","id":"avatar_ghost"}]'
-    when 13 then '[{"type":"points","amount":40},{"type":"coins","amount":100}]'
-    when 14 then '[{"type":"item","id":"theme_mono"}]'
-    when 15 then '[{"type":"coins","amount":300}]'
-    when 16 then '[{"type":"plus","days":4}]'
-    when 17 then '[{"type":"item","id":"color_candy"}]'
-    when 18 then '[{"type":"points","amount":60},{"type":"coins","amount":150}]'
-    when 19 then '[{"type":"coins","amount":400}]'
-    when 20 then '[{"type":"item","id":"effect_sparkle"},{"type":"coins","amount":100}]'
-    when 21 then '[{"type":"plus","days":5}]'
-    when 22 then '[{"type":"item","id":"theme_sunset"}]'
-    when 23 then '[{"type":"points","amount":100},{"type":"coins","amount":300}]'
-    when 24 then '[{"type":"item","id":"avatar_crown"},{"type":"plus","days":7},{"type":"coins","amount":1000}]'
-    else '[]'
-  end::jsonb;
+declare
+  v_roll numeric := random() * 100;
+  v_maxp integer := 100 + p_day * 60;
+begin
+  if p_day = 24 then
+    return jsonb_build_array(
+      jsonb_build_object('type', 'item', 'max_price', 2500),
+      jsonb_build_object('type', 'plus', 'days', 7),
+      jsonb_build_object('type', 'coins', 'amount', 800 + floor(random() * 400)::integer));
+  end if;
+  if v_roll < 38 then
+    return jsonb_build_array(jsonb_build_object('type', 'coins', 'amount', (30 + floor(random() * (40 + p_day * 15))::integer) / 10 * 10));
+  elsif v_roll < 58 then
+    return jsonb_build_array(jsonb_build_object('type', 'points', 'amount', 10 + floor(random() * (10 + p_day * 3))::integer));
+  elsif v_roll < 73 then
+    return jsonb_build_array(jsonb_build_object('type', 'plus', 'days', 2 + floor(random() * (1 + p_day / 6.0))::integer));
+  elsif p_day >= 2 then
+    return jsonb_build_array(jsonb_build_object('type', 'item', 'max_price', v_maxp));
+  end if;
+  return jsonb_build_array(jsonb_build_object('type', 'coins', 'amount', 50));
+end;
 $$;
 
 -- Welcher Tag ist heute? (0 = kein Türchen offen: vor dem 1. oder nach dem 24. Dezember)
@@ -151,7 +147,16 @@ begin
          where id = v_me;
         v_out := v_out || v_r;
       when 'item' then
-        select i.id, i.kind, i.name, i.price into v_item from public.shop_items i where i.id = v_r ->> 'id';
+        if v_r ? 'id' then
+          select i.id, i.kind, i.name, i.price into v_item from public.shop_items i where i.id = v_r ->> 'id';
+        else
+          select i.id, i.kind, i.name, i.price into v_item
+            from public.shop_items i
+           where i.kind in ('avatar', 'color', 'effect', 'theme')
+             and i.price > 0 and i.price <= coalesce((v_r ->> 'max_price')::integer, 1000)
+             and not exists (select 1 from public.user_items u where u.user_id = v_me and u.item_id = i.id)
+           order by random() limit 1;
+        end if;
         if not found then
           v_amount := 100;
           perform public._grant_koins(v_me, v_amount, 'advent', 'day' || p_day);

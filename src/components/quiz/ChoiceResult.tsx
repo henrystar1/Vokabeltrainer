@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import RewardPopup from '../ui/RewardPopup'
 import { Link } from 'react-router-dom'
 import CoinIcon from '../ui/CoinIcon'
 import Button from '../ui/Button'
@@ -53,6 +54,7 @@ export default function ChoiceResult({ answers, onAgain, againLabel = 'Nochmal',
           <p className="mt-1 text-sm text-slate-400">{wrong.length === 0 ? 'Fehlerfrei – stark!' : `${wrong.length} Fehler`}</p>
         </div>
       </Card>
+      {reward && (reward.points > 0 || reward.coins > 0) && <RewardPopup coins={reward.coins} points={reward.points} title="Geschafft!" />}
       {reward && (reward.points > 0 || reward.coins > 0) && (
         <Notice tone="ok">
           <span className="inline-flex items-center gap-1.5">

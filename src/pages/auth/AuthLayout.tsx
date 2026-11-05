@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react'
 import { Rocket } from 'lucide-react'
 import StarField from '../../components/ui/StarField'
+import { LegalLinks } from '../legal/LegalLayout'
 
 export default function AuthLayout({ title, subtitle, children }: { title: string; subtitle?: string; children: ReactNode }) {
   return (
@@ -16,6 +17,7 @@ export default function AuthLayout({ title, subtitle, children }: { title: strin
         <h1 className="text-2xl font-semibold tracking-tight">{title}</h1>
         {subtitle && <p className="mt-1 text-sm text-slate-400">{subtitle}</p>}
         <div className="mt-6">{children}</div>
+        <LegalLinks className="mt-6" />
       </div>
     </div>
   )

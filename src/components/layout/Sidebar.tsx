@@ -111,6 +111,12 @@ export default function Sidebar({ collapsed, onToggle }: SidebarProps) {
           <LogOut size={16} />
           {!collapsed && 'Abmelden'}
         </button>
+        {!collapsed && (
+          <p className="flex justify-center gap-3 text-[11px] text-slate-500">
+            <NavLink to="/impressum" className="hover:text-white">Impressum</NavLink>
+            <NavLink to="/datenschutz" className="hover:text-white">Datenschutz</NavLink>
+          </p>
+        )}
         <button
           onClick={onToggle}
           aria-label={collapsed ? 'Sidebar ausklappen' : 'Sidebar einklappen'}

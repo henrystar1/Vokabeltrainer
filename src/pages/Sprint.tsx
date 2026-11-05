@@ -1,4 +1,5 @@
 import { useRef, useState } from 'react'
+import RewardPopup from '../components/ui/RewardPopup'
 import { accentsFor } from '../components/ui/AccentBar'
 import { Link } from 'react-router-dom'
 import { Play, Trophy, Zap } from 'lucide-react'
@@ -167,6 +168,7 @@ export default function Sprint() {
         <PageHeader eyebrow="Sprint" title={`${correct} richtig`} />
         <ResultSummary total={answered} correct={correct} wrong={wrong} />
         <div className="mt-4 space-y-3">
+          {earned > 0 && <RewardPopup coins={earned} title="Sprint geschafft!" />}
           {earned > 0 && <Notice tone="ok">+{earned} Coins für deinen Sprint!</Notice>}
           {best !== null && <p className="text-sm text-slate-300">Deine Bestleistung diese Woche: <span className="font-mono text-accent-cyan">{best}</span></p>}
           {saveError && <ErrorBox message={`Das Ergebnis konnte nicht gespeichert werden: ${saveError}`} onRetry={() => void save(correct, answered)} />}

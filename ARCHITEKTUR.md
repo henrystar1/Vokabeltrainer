@@ -599,3 +599,10 @@ Tabelle `book_library_hidden`; `in_library` blendet ein veröffentlichtes Buch d
 - **`#Menü/Unterpunkt` für alle Reiter-Seiten**: `lib/subTabs.ts` (`SUB_TABS`, `matchSubTab`) listet die Reiter von Rangliste, Auswendig, Gambling, Shop, Einstellungen, Verwaltung. Der Chat-Link wird `/<seite>?t=<id>`, die Seiten lesen `?t=` beim Start. `tagSuggestions` schlägt die Reiter nach `Rangliste/` vor.
 - **Gambling-Bank (0066)**: `gambling_bank()` (Summe aus `gambling_stats`: Bank = gesetzt − gewonnen, Schnitt pro Spiel, Auszahlungsquote), `admin_gambling_reset(p_user)` (null = alle). Anzeige und Zurücksetzen in `GamblingBoard.tsx` (Reset nur Admin).
 - **Flaggen-Rangliste**: Wert sind jetzt Lernpunkte (`lernpunkte(cards)` = Summe der Fächer, Höchstwert 1500 im Server), damit man sofort auf die Rangliste kommt; Belohnung 2 Coins je Lernpunkt, 1 Punkt je 10 (in 0064). Karteikasten-Ansicht vereinfacht (ein Startknopf, Kennzahlen, „Beenden“-Knopf sendet den Stand).
+
+
+## Update 87
+- **Adventskalender zufällig pro Person**: `_advent_plan(day)` ist jetzt volatil und würfelt bei jedem Öffnen (Coins 38 %, Punkte 20 %, Plus 15 %, sonst Artikel bis Preisgrenze 100 + 60·Tag, nicht schon besessen; Tür 24 immer Artikel + 7 Tage Plus + ~1000 Coins). 0065 ist wiederholbar und muss neu ausgeführt werden.
+- **Belohnungs-Popup überall**: `components/ui/RewardPopup.tsx` (nutzt `RewardReveal`) nach Lernen, Test/Üben (`ChoiceResult`), Mathe, Sprint, Spiele-Rekord und Team-Lauf.
+- **Impressum und Datenschutz**: öffentliche Seiten `/impressum`, `/datenschutz` (`pages/legal/`), Links in der Anmeldeseite (`AuthLayout`) und in der Seitenleiste. Die Angaben stehen in `public/rechtliches.txt` (`lib/legalInfo.ts` liest sie, leere Felder werden rot markiert). Texte sind Entwürfe.
+- **Schriften lokal**: Inter und JetBrains Mono liegen als woff2 in `src/fonts/` (`fonts.css`, in `main.tsx` importiert). Kein Google-Fonts-Aufruf mehr (Datenschutz). Keine neue npm-Abhängigkeit.

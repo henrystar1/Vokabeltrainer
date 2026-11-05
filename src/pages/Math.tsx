@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react'
+import RewardPopup from '../components/ui/RewardPopup'
 import { Check, Play, RotateCcw, X } from 'lucide-react'
 import Button from '../components/ui/Button'
 import Card from '../components/ui/Card'
@@ -149,6 +150,7 @@ export default function MathPage() {
         <Card className="mx-auto max-w-md space-y-4">
           <p className="text-center font-mono text-4xl text-accent-cyan">{correct} / {results.length}</p>
           <p className="text-center text-sm text-slate-400">{pct} % richtig · {Math.floor(seconds / 60)}:{String(seconds % 60).padStart(2, '0')} min · ⌀ {(seconds / Math.max(results.length, 1)).toFixed(1).replace('.', ',')} s pro Aufgabe</p>
+          {reward && (reward.points > 0 || reward.coins > 0) && <RewardPopup coins={reward.coins} points={reward.points} title="Geschafft!" />}
           {reward && (
             <Notice tone="ok">
               <span className="inline-flex items-center gap-1">+{reward.points} Ranglistenpunkte{reward.coins > 0 && <> · +{reward.coins} <CoinIcon size={14} /> Coins</>}{reward.points === 0 && reward.coins === 0 && ' (das Tageslimit ist erreicht)'}</span>

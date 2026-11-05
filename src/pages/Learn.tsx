@@ -1,4 +1,5 @@
 import { useMemo, useRef, useState } from 'react'
+import RewardPopup from '../components/ui/RewardPopup'
 import { accentsFor } from '../components/ui/AccentBar'
 import { Link, useSearchParams } from 'react-router-dom'
 import { ChevronsRight, Play, RotateCcw, Settings as SettingsIcon } from 'lucide-react'
@@ -270,6 +271,7 @@ export default function Learn() {
             </Notice>
           )}
           {autoRounds > 0 && <Notice tone="ok">Alle falschen Vokabeln wiederholt, bis sie richtig waren ({autoRounds} {autoRounds === 1 ? 'Runde' : 'Runden'}).</Notice>}
+          {earned > 0 && <RewardPopup coins={earned} title="Gut gelernt!" />}
           {earned > 0 && <Notice tone="info">+{earned} Coins fürs Lernen – gut gemacht!</Notice>}
           {saveError && <ErrorBox message={`Die Runde konnte nicht gespeichert werden: ${saveError}`} onRetry={() => void saveMain()} />}
         </div>

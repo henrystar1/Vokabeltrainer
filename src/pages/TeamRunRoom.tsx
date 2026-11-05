@@ -1,4 +1,5 @@
 import { MAX_BOTS, SKILL_NAMES, SKILL_ORDER, decodeMix, encodeMix, lobbyBots, mixTotal, rebuildBots, type Mix } from '../features/parkour/botmix'
+import RewardPopup from '../components/ui/RewardPopup'
 import { BOT_NAMES } from '../features/parkour/bots'
 import { useEffect, useRef, useState } from 'react'
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
@@ -522,6 +523,7 @@ export default function TeamRunRoom() {
           ))}
         </div>}
         {st.kind === 'quiz' && <p className="text-xs text-slate-500">{right} richtige und {wrong} falsche Antworten zusammen</p>}
+        {(won || run) && st.paid > 0 && <RewardPopup coins={st.paid} title="Geschafft!" />}
         {(won || run) && (st.paid > 0
           ? <p className="text-lg font-semibold text-amber-200">+{st.paid} Coins</p>
           : (st.reward > 0 || run) && (st.levels ?? 1) > 0 && <p className="text-sm text-slate-400">Für heute gibt es keine Coins mehr (Tageslimit).</p>)}
