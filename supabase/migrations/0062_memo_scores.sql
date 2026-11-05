@@ -10,6 +10,7 @@ alter table public.memo_scores enable row level security;
 revoke all on public.memo_scores from anon, authenticated;
 
 -- Bestwert melden (es zählt immer der höchste).
+drop function if exists public.memo_score_submit(text, integer); -- Rückgabetyp wurde in 0064 geändert, so geht die Reihenfolge immer
 create or replace function public.memo_score_submit(p_game text, p_score integer)
 returns integer
 language plpgsql

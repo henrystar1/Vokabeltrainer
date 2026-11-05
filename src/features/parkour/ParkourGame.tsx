@@ -4,7 +4,7 @@ import { ArrowUp, Eye, Skull } from 'lucide-react'
 import { Joystick } from '../games/joystick'
 import { useFocusMode } from '../koins/focusMode'
 import { useAuth } from '../auth/AuthProvider'
-import { gameRealtime } from '../../lib/gameRealtime'
+import { gameClientFor, gameRealtime, getGameSlot, setGameSlot } from '../../lib/gameRealtime'
 import { parkourJumpsList, parkourLearnOffList, parkourShopGet, parkourUsageAdd, parkourUsageGet, teamDeathrunFinish, teamParkourFinish, type TeamPerson, type TeamState } from '../../services/play'
 import { LOOKS } from './lookFx'
 import type { HoleAnim, Look } from './lookTypes'
@@ -88,7 +88,7 @@ function ParkourGameInner({ st, startLevel = 0, perks }: { st: TeamState; startL
   // Lernen: Speedup-Angebote (Rand) und Vokabeln beim Levelwechsel
   const msgCount = useRef(0) // Realtime-Nachrichten (gesendet + empfangen) seit der letzten Meldung ans Tageslimit
   const blockedRef = useRef(false)
-  const netApi = useRef<{ stop: () => void } | null>(null)
+  const netApi = useRef<{ stop: () => void; reconnect: () => void } | null>(null)
   const jumpsRef = useRef(2) // Sprünge insgesamt (Admin-Einstellung)
   const [limitHit, setLimitHit] = useState(false)
   const learnBusy = useRef(false)
@@ -134,7 +134,7 @@ function ParkourGameInner({ st, startLevel = 0, perks }: { st: TeamState; startL
       const n = msgCount.current
       msgCount.current = 0
       const p = n > 0 ? parkourUsageAdd(n) : parkourUsageGet()
-      p.then((u) => { if (u.blocked) block() }).catch(() => { msgCount.current += n }) // bei Fehler (z. B. Migration fehlt) nicht sperren
+      p.then((u) => { if (u.blocked) block(); else if (setGameSlot(u.slot ?? 0)) netApi.current?.reconnect() }).catch(() => { msgCount.current += n }) // bei Fehler (z. B. Migration fehlt) nicht sperren
     }
     flush()
     const t = window.setInterval(flush, 15_000)
@@ -444,12 +444,14 @@ function ParkourGameInner({ st, startLevel = 0, perks }: { st: TeamState; startL
       msgCount.current++; void ch?.send({ type: 'broadcast', event: 'g', payload: { u: st.me, x, y, face: me.face, lv, n: nameRef.current ?? 'Zuschauer' } })?.catch?.(() => undefined)
     }
 
+    let chSlot = getGameSlot() // Datenbank, auf der `ch` gerade läuft
     function connect() {
       if (disposed || blockedRef.current) return
       lastConnect = performance.now()
-      if (ch) void gameRealtime.removeChannel(ch)
+      if (ch) void gameClientFor(chSlot).removeChannel(ch)
       ready = false
-      const c = gameRealtime.channel(`parkour-${st.id}`, { config: { broadcast: { self: false } } })
+      chSlot = getGameSlot()
+      const c = gameRealtime().channel(`parkour-${st.id}`, { config: { broadcast: { self: false } } })
       ch = c
       c.on('broadcast', { event: 's' }, ({ payload }) => onState(payload))
         .on('broadcast', { event: 'b' }, ({ payload }) => onBots(payload))
@@ -466,7 +468,7 @@ function ParkourGameInner({ st, startLevel = 0, perks }: { st: TeamState; startL
       const delay = Math.min(8000, 700 * 2 ** Math.min(attempt++, 4))
       retryT = window.setTimeout(() => { retryT = undefined; connect() }, delay)
     }
-    netApi.current = { stop: () => { if (ch) void gameRealtime.removeChannel(ch); ch = null; ready = false; if (retryT !== undefined) { window.clearTimeout(retryT); retryT = undefined } } }
+    netApi.current = { reconnect: () => { attempt = 0; if (retryT !== undefined) { window.clearTimeout(retryT); retryT = undefined } connect() }, stop: () => { if (ch) void gameClientFor(chSlot).removeChannel(ch); ch = null; ready = false; if (retryT !== undefined) { window.clearTimeout(retryT); retryT = undefined } } }
     connect()
 
     function report(levels: number) {
@@ -1271,7 +1273,7 @@ function ParkourGameInner({ st, startLevel = 0, perks }: { st: TeamState; startL
       window.removeEventListener('offline', offline)
       document.removeEventListener('visibilitychange', hiddenFn)
       document.removeEventListener('selectstart', noSelect)
-      if (ch) void gameRealtime.removeChannel(ch)
+      if (ch) void gameClientFor(chSlot).removeChannel(ch)
     }
   }, [st.id, st.is_host, st.me]) // eslint-disable-line react-hooks/exhaustive-deps
 

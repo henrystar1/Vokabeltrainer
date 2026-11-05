@@ -1,18 +1,42 @@
-import { createClient } from '@supabase/supabase-js'
+import { createClient, type SupabaseClient } from '@supabase/supabase-js'
 import { supabase } from './supabaseClient'
 
 /**
- * Zweites Supabase-Projekt nur für die Parkour-Echtzeit (Positionen, Bots, Zuschauer). Dadurch zählen diese
- * Nachrichten nicht auf das Kontingent der Haupt-Datenbank. Es braucht dort weder Tabellen noch eine Anmeldung,
- * nur Realtime (Broadcast). Der Publishable Key ist öffentlich; per Build-Variable änderbar
- * (VITE_GAME_SUPABASE_URL / VITE_GAME_SUPABASE_PUBLISHABLE_KEY). Ohne Werte läuft alles über die Haupt-Datenbank.
+ * Zwei weitere Supabase-Projekte nur für die Parkour-Echtzeit (Positionen, Bots, Zuschauer). Dadurch zählen diese
+ * Nachrichten nicht auf das Kontingent der Haupt-Datenbank. Sie brauchen weder Tabellen noch eine Anmeldung, nur
+ * Realtime (Broadcast). Die Publishable Keys sind öffentlich. Der Server sagt über `slot` (parkour_usage_add), welche
+ * Datenbank gerade gilt: erst die erste, ist deren Monatsbudget voll, die zweite. Per Build-Variable änderbar
+ * (VITE_GAME_SUPABASE_URL / _PUBLISHABLE_KEY und VITE_GAME2_...). Ohne Werte läuft alles über die Haupt-Datenbank.
  */
-const GAME_URL = 'https://xuqwinmiborgjvgsxscv.supabase.co'
-const GAME_KEY = 'sb_publishable_G6CP3tpWXtrN0tsZN9V7KA_RkOnrtYB'
+const SLOTS: Array<{ url: string; key: string }> = [
+  {
+    url: (import.meta.env.VITE_GAME_SUPABASE_URL as string | undefined)?.trim() || 'https://xuqwinmiborgjvgsxscv.supabase.co',
+    key: (import.meta.env.VITE_GAME_SUPABASE_PUBLISHABLE_KEY as string | undefined)?.trim() || 'sb_publishable_G6CP3tpWXtrN0tsZN9V7KA_RkOnrtYB',
+  },
+  {
+    url: (import.meta.env.VITE_GAME2_SUPABASE_URL as string | undefined)?.trim() || 'https://kvkpjbdkezquvfdrdkjo.supabase.co',
+    key: (import.meta.env.VITE_GAME2_SUPABASE_PUBLISHABLE_KEY as string | undefined)?.trim() || 'sb_publishable_RFKGqSIUdOHXX68MGN0H3A_fH5V8YT4',
+  },
+]
 
-const url = (import.meta.env.VITE_GAME_SUPABASE_URL as string | undefined)?.trim() || GAME_URL
-const key = (import.meta.env.VITE_GAME_SUPABASE_PUBLISHABLE_KEY as string | undefined)?.trim() || GAME_KEY
+const clients: SupabaseClient[] = SLOTS.filter((s) => s.url && s.key).map((s) =>
+  createClient(s.url, s.key, { auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false }, realtime: { params: { eventsPerSecond: 40 } } }),
+)
+if (clients.length === 0) clients.push(supabase)
 
-export const gameRealtime = url && key
-  ? createClient(url, key, { auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false }, realtime: { params: { eventsPerSecond: 40 } } })
-  : supabase
+/** Anzahl der Spiel-Datenbanken. */
+export const GAME_SLOTS = clients.length
+
+let current = 0
+/** Welche Datenbank gerade gilt (0 oder 1). Wird bei jeder Meldung vom Server gesetzt. */
+export function setGameSlot(slot: number): boolean {
+  const s = Math.max(0, Math.min(Math.floor(slot) || 0, clients.length - 1))
+  const changed = s !== current
+  current = s
+  return changed
+}
+export const getGameSlot = () => current
+/** Der Client der gerade geltenden Spiel-Datenbank. */
+export const gameRealtime = (): SupabaseClient => clients[current]
+/** Client einer bestimmten Datenbank (zum sauberen Abbauen eines Kanals). */
+export const gameClientFor = (slot: number): SupabaseClient => clients[Math.max(0, Math.min(slot, clients.length - 1))]

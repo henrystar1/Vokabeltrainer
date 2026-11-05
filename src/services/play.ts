@@ -230,7 +230,7 @@ export const parkourLearnOffList = (ids: string[]) => rpc<string[]>('parkour_lea
 /** Admin: Lernfragen im Parkour für eine Person aus- (off) oder einschalten */
 export const parkourLearnSet = (user: string, off: boolean) => rpc<void>('parkour_learn_set', { p_user: user, p_off: off })
 /** Parkour-Nachrichten heute: Stand, Tageslimit und ob gesperrt (Migration 0058) */
-export interface ParkourUsage { msgs: number; limit: number; blocked: boolean; month?: number; budget?: number }
+export interface ParkourUsage { msgs: number; limit: number; blocked: boolean; month?: number; budget?: number; slot?: number }
 export const parkourUsageAdd = (n: number) => rpc<ParkourUsage>('parkour_usage_add', { p_n: Math.max(0, Math.round(n)) })
 export const parkourUsageGet = () => rpc<ParkourUsage>('parkour_usage_get')
 /** Sprünge insgesamt je Person ({user_id: Anzahl}, nur wer mehr als 2 hat) */
