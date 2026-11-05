@@ -6,7 +6,7 @@ import { Avatar } from '../../components/profile/PlayerTag'
 import { liveMyInvites, liveRespond, teamMyInvites, teamRespond } from '../../services/play'
 import { useAuth } from '../auth/AuthProvider'
 
-const POLL_MS = 5_000
+const POLL_MS = 15_000
 
 interface Invite { kind: 'live' | 'team'; id: string; host_name: string; host_avatar_id: string | null; host_color_id: string | null; text: string }
 

@@ -18,7 +18,7 @@ import { deleteChatMessage, getChat, postChat, searchPlayers, timeoutChatUser } 
 import { getMyPermissions } from '../services/koins'
 import type { ChatMessage } from '../types'
 
-const POLL_MS = 4000
+const POLL_MS = 10_000
 const PAGE = 60
 /** Nur die neuesten Beiträge zeigen animierte Avatare/Namen – ältere stehen still (spart Rechenleistung). */
 const LIVE_GROUPS = 10

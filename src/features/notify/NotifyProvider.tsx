@@ -10,10 +10,10 @@ type Kind = 'mention' | 'chat' | 'print' | 'online' | 'dm'
 /** `to` = null: kein Ziel (Nachricht vom Team); `until` = Infinity: bleibt, bis man sie wegklickt. */
 interface Toast { key: string; kind: Kind; title: string; text: string; to: string | null; until: number; messageId?: string }
 
-const POLL_MS = 8_000
+const POLL_MS = 30_000
 const MAX_TOASTS = 3
 const LIFETIME: Record<Kind, number> = { mention: 10_000, chat: 6_000, print: 12_000, online: 5_000, dm: Infinity }
-const DM_MS = 7_000
+const DM_MS = 20_000
 
 const LOOK: Record<Kind, { icon: LucideIcon; box: string; icon_: string }> = {
   mention: { icon: AtSign, box: 'border-amber-300/40 bg-amber-300/15', icon_: 'text-amber-300' },
