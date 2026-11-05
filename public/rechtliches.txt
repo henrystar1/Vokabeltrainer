@@ -4,12 +4,12 @@
 # Leere Felder zeigt die Website als rote Platzhalter an, damit du nichts vergisst.
 
 # --- Impressum ---
-NAME=
-STRASSE=
-PLZ_ORT=
-EMAIL=
+NAME=Masterking
+STRASSE=Droidenweg 10
+PLZ_ORT=6767
+EMAIL=vokabeltrainer@gmx.de
 # Zweiter schneller Kontaktweg ist Pflicht: Telefonnummer ODER ein Hinweis auf ein Kontaktformular.
-TELEFON=
+TELEFON=67 676767
 
 # --- Datenschutz ---
 # Wo steht dein Supabase-Projekt? (Das hast du gesagt: Deutschland, also Frankfurt.)
