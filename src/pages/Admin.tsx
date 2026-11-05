@@ -24,10 +24,11 @@ import PricesTab from './admin/print/PricesTab'
 import BansTab from './admin/print/BansTab'
 import PlusTab from './admin/PlusTab'
 import PlusMoneyTab from './admin/PlusMoneyTab'
+import GameDbsTab from './admin/GameDbsTab'
 import { adminPlusCounts } from '../services/plus'
 import { usePrintTodo } from '../features/print/hooks'
 
-type Tab = 'reviews' | 'feedback' | 'online' | 'users' | 'staff' | 'modrights' | 'rules' | 'shop' | 'codes' | 'grant' | 'locks' | 'accounts' | 'pqueue' | 'pcatalog' | 'pcolors' | 'pprices' | 'pbans' | 'plus' | 'plusmoney'
+type Tab = 'reviews' | 'feedback' | 'online' | 'users' | 'staff' | 'modrights' | 'rules' | 'shop' | 'codes' | 'grant' | 'locks' | 'accounts' | 'pqueue' | 'pcatalog' | 'pcolors' | 'pprices' | 'gamedbs' | 'pbans' | 'plus' | 'plusmoney'
 
 /** Adresse ?bereich=… → Startseite der Verwaltung. */
 const DEEP_LINKS: Record<string, Tab> = { druck: 'pqueue', 'druck-katalog': 'pcatalog', 'druck-preise': 'pprices' }
@@ -80,7 +81,7 @@ export default function Admin() {
           tabs: [
             ...(p.settings ? [{ id: 'rules' as const, label: 'Zahlen', icon: <SlidersHorizontal size={15} /> }] : []),
             ...(p.shop ? [{ id: 'shop' as const, label: 'Shop-Preise', icon: <Store size={15} /> }] : []),
-            ...(isAdmin ? [{ id: 'codes' as const, label: 'Codes', icon: <Ticket size={15} /> }, { id: 'grant' as const, label: 'Coins schenken', icon: <Gift size={15} /> }, { id: 'locks' as const, label: 'Sperren', icon: <Power size={15} /> }] : []),
+            ...(isAdmin ? [{ id: 'codes' as const, label: 'Codes', icon: <Ticket size={15} /> }, { id: 'grant' as const, label: 'Coins schenken', icon: <Gift size={15} /> }, { id: 'gamedbs' as const, label: 'Spiel-Datenbanken', icon: <Radio size={15} /> }, { id: 'locks' as const, label: 'Sperren', icon: <Power size={15} /> }] : []),
           ],
         }]
       : []),
@@ -152,6 +153,7 @@ export default function Admin() {
       {active === 'codes' && isAdmin && <CodesSection />}
       {active === 'grant' && isAdmin && <GrantSection />}
       {active === 'locks' && isAdmin && <LocksTab />}
+      {active === 'gamedbs' && isAdmin && <GameDbsTab />}
       {active === 'pqueue' && isAdmin && <QueueTab />}
       {active === 'pcatalog' && isAdmin && <CatalogTab />}
       {active === 'pcolors' && isAdmin && <ColorsTab />}

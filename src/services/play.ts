@@ -263,3 +263,11 @@ export const parkourSetEntrance = (look: EntranceLook | 'none') => rpc<RunPerks>
 export const submitIrregular = (correct: number, total: number) => rpc<{ earned: number; cap_left: number }>('submit_irregular', { p_correct: correct, p_total: total })
 export const adminOpenRuns = () => rpc<AdminRun[]>('admin_open_runs')
 export const teamSetVersus = (id: string, mode: number, map: Record<string, number> = {}) => rpc<void>('team_set_versus', { p_id: id, p_mode: mode, p_map: map })
+
+/** Spiel-Datenbanken für Parkour (Migration 0068, nur Admin) */
+export interface GameDbRow { id: string; name: string; url: string; key: string; active: boolean }
+export const adminGameDbsList = () => rpc<GameDbRow[]>('admin_game_dbs_list')
+export const adminGameDbAdd = (name: string, url: string, key: string) => rpc<string>('admin_game_db_add', { p_name: name, p_url: url, p_key: key })
+export const adminGameDbUpdate = (id: string, name: string, url: string, key: string, active: boolean) => rpc<void>('admin_game_db_update', { p_id: id, p_name: name, p_url: url, p_key: key, p_active: active })
+export const adminGameDbDelete = (id: string) => rpc<void>('admin_game_db_delete', { p_id: id })
+export const adminGameDbMove = (id: string, dir: -1 | 1) => rpc<void>('admin_game_db_move', { p_id: id, p_dir: dir })

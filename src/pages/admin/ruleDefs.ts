@@ -163,7 +163,6 @@ export const SECTIONS: Array<{ title: string; text?: string; rules: Rule[] }> = 
       { key: 'memo_pi_points_per_10', label: 'Pi lernen: Punkte je 10 neue Stellen', hint: '0 = keine Punkte' },
       { key: 'memo_flags_coins_per_10', label: 'Flaggen lernen: Coins je 10 Lernpunkte', hint: 'Lernpunkte = Summe der Fächer aller Länder (bis 5 je Land). 2 = 1 Coin je 5 Lernpunkte, 0 = keine Coins.' },
       { key: 'memo_flags_points_per_100', label: 'Flaggen lernen: Punkte je 100 Lernpunkte', hint: '0 = keine Punkte' },
-      { key: 'parkour_projects', label: 'Parkour: Anzahl Spiel-Datenbanken (1 oder 2)', hint: '2 = bei vollem Budget der ersten wird zur zweiten gewechselt. 1 = nur die erste.' },
       { key: 'game_fee', label: 'Eintritt pro Runde (Coins)' },
       { key: 'game_record_reward', label: 'Coins für einen neuen Rekord', hint: 'Wer die Bestenliste des Spiels übertrifft' },
     ],

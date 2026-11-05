@@ -4,7 +4,7 @@ import { ArrowUp, Eye, Skull } from 'lucide-react'
 import { Joystick } from '../games/joystick'
 import { useFocusMode } from '../koins/focusMode'
 import { useAuth } from '../auth/AuthProvider'
-import { gameClientFor, gameRealtime, getGameSlot, setGameSlot } from '../../lib/gameRealtime'
+import { gameClientFor, gameRealtime, getGameSlot, setGameSlot, whenGameDbsReady } from '../../lib/gameRealtime'
 import { parkourJumpsList, parkourLearnOffList, parkourShopGet, parkourUsageAdd, parkourUsageGet, teamDeathrunFinish, teamParkourFinish, type TeamPerson, type TeamState } from '../../services/play'
 import { LOOKS } from './lookFx'
 import type { HoleAnim, Look } from './lookTypes'
@@ -469,7 +469,7 @@ function ParkourGameInner({ st, startLevel = 0, perks }: { st: TeamState; startL
       retryT = window.setTimeout(() => { retryT = undefined; connect() }, delay)
     }
     netApi.current = { reconnect: () => { attempt = 0; if (retryT !== undefined) { window.clearTimeout(retryT); retryT = undefined } connect() }, stop: () => { if (ch) void gameClientFor(chSlot).removeChannel(ch); ch = null; ready = false; if (retryT !== undefined) { window.clearTimeout(retryT); retryT = undefined } } }
-    connect()
+    void whenGameDbsReady().then(() => { if (!disposed) connect() })
 
     function report(levels: number) {
       if (isSpec) return
