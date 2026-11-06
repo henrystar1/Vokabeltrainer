@@ -23,10 +23,6 @@ export function splitGaps(text: string): Segment[] {
   return out
 }
 
-export function gapCount(item: GapItem): number {
-  return item.answers.length
-}
-
 export interface GapGrade {
   /** Pro Lücke richtig? */
   gaps: boolean[]

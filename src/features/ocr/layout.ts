@@ -11,7 +11,7 @@ const MIN_WORD_CONF = 60
 const COLUMN_TOLERANCE = 50
 const MIN_COLUMN_DISTANCE = 250
 
-interface Line {
+export interface Line {
   y: number
   words: OcrWord[]
   text: string
@@ -25,20 +25,20 @@ interface FrLine extends Line {
   hasBracket: boolean
 }
 
-const median = (xs: number[]): number => {
+export const median = (xs: number[]): number => {
   if (xs.length === 0) return 0
   const s = [...xs].sort((a, b) => a - b)
   return s[Math.floor(s.length / 2)]
 }
 
-const yc = (w: OcrWord): number => (w.y0 + w.y1) / 2
-const hasLetter = (s: string): boolean => /\p{L}/u.test(s)
+export const yc = (w: OcrWord): number => (w.y0 + w.y1) / 2
+export const hasLetter = (s: string): boolean => /\p{L}/u.test(s)
 
 /**
  * Häufungen bei den Wortanfängen (x0) finden: Kandidat mit den meisten Wörtern im Umkreis von ±`radius`
  * Pixeln, dann Nachbarn im Abstand von mindestens `minGap` ausblenden, und so weiter.
  */
-function findPeaks(values: number[], radius = 15, minGap = 100): Array<{ x: number; count: number }> {
+export function findPeaks(values: number[], radius = 15, minGap = 100): Array<{ x: number; count: number }> {
   const sorted = [...values].sort((a, b) => a - b)
   const scored = sorted.map((v) => {
     const near = sorted.filter((u) => Math.abs(u - v) <= radius)
@@ -53,23 +53,26 @@ function findPeaks(values: number[], radius = 15, minGap = 100): Array<{ x: numb
 }
 
 /** Spaltenanfänge finden: Spalte 1 = stärkster linker Cluster, Spalte 2 = nächster starker Cluster rechts davon. */
-export function detectColumns(words: OcrWord[]): { c1: number; c2: number; c3: number } | null {
+export function detectColumns(words: OcrWord[], lh?: number, leftmost = false): { c1: number; c2: number; c3: number } | null {
+  // Mit bekannter Zeilenhöhe (lh) skalieren die Abstände mit der Bildgröße; ohne bleiben die alten festen Pixelwerte.
+  const minDist = lh ? 6 * lh : MIN_COLUMN_DISTANCE
   const starts = words.filter((w) => w.conf >= MIN_WORD_CONF && w.text.length >= 2 && hasLetter(w.text)).map((w) => w.x0)
-  const clusters = findPeaks(starts).filter((c) => c.count >= 4)
+  const clusters = (lh ? findPeaks(starts, 0.6 * lh, 4 * lh) : findPeaks(starts)).filter((c) => c.count >= 4)
   if (clusters.length < 2) return null
   const max = Math.max(...clusters.map((c) => c.count))
-  const strong = clusters.filter((c) => c.count >= 0.3 * max).sort((a, b) => a.x - b.x)
+  const strong = clusters.filter((c) => c.count >= (leftmost ? 0.2 : 0.3) * max).sort((a, b) => a.x - b.x)
   // Spalte 1: der häufigste Anfang unter den linken Kandidaten
-  const c1 = strong.filter((c) => c.count >= 0.6 * max).sort((a, b) => a.x - b.x)[0] ?? strong[0]
-  const right = strong.filter((c) => c.x - c1.x >= MIN_COLUMN_DISTANCE)
+  const c1 = leftmost ? strong[0] : (strong.filter((c) => c.count >= 0.6 * max).sort((a, b) => a.x - b.x)[0] ?? strong[0])
+  const right = strong.filter((c) => c.x - c1.x >= minDist)
   if (right.length === 0) return null
-  const c2 = right[0]
-  const c3 = right.find((c) => c.x - c2.x >= MIN_COLUMN_DISTANCE)
+  const rmax = Math.max(...right.map((c) => c.count))
+  const c2 = leftmost ? (right.find((c) => c.count >= 0.5 * rmax) ?? right[0]) : right[0]
+  const c3 = right.find((c) => c.x - c2.x >= minDist && (!leftmost || c.count >= 0.4 * rmax))
   return { c1: c1.x, c2: c2.x, c3: c3 ? c3.x : c2.x + (c2.x - c1.x) }
 }
 
 /** Wörter zu Zeilen gruppieren (Mittelpunkt-Abstand kleiner als ~ eine halbe Zeilenhöhe). */
-function groupLines(words: OcrWord[], lineHeight: number): Line[] {
+export function groupLines(words: OcrWord[], lineHeight: number): Line[] {
   const sorted = [...words].sort((a, b) => yc(a) - yc(b))
   const groups: OcrWord[][] = []
   for (const w of sorted) {
@@ -112,7 +115,7 @@ function classify(line: Line): FrLine {
 
 const FR_NUMBER = /\b(cent|vingt|trente|quarante|cinquante|soixante|mille|dix|onze|douze|treize|quatorze|quinze|seize|deux|trois|quatre|cinq|six|sept|huit|neuf)/i
 
-function detectUnit(words: OcrWord[], lineHeight: number): number | null {
+export function detectUnit(words: OcrWord[], lineHeight: number): number | null {
   const sorted = [...words].sort((a, b) => yc(a) - yc(b) || a.x0 - b.x0)
   for (let i = 0; i < sorted.length; i++) {
     if (!/^Unit[eé]s?$/i.test(sorted[i].text)) continue
@@ -125,7 +128,7 @@ function detectUnit(words: OcrWord[], lineHeight: number): number | null {
   return null
 }
 
-function detectPage(words: OcrWord[], lineHeight: number): number | null {
+export function detectPage(words: OcrWord[], lineHeight: number): number | null {
   const lines = groupLines(words.filter((w) => w.conf >= 40), lineHeight)
   const candidates = lines.filter((l) => FR_NUMBER.test(l.text) && /\d/.test(l.text) && l.text.length < 60)
   for (const l of candidates.sort((a, b) => b.y - a.y)) {
@@ -138,7 +141,23 @@ function detectPage(words: OcrWord[], lineHeight: number): number | null {
   return null
 }
 
-const avg = (xs: number[]): number => (xs.length === 0 ? 0 : xs.reduce((a, b) => a + b, 0) / xs.length)
+export const avg = (xs: number[]): number => (xs.length === 0 ? 0 : xs.reduce((a, b) => a + b, 0) / xs.length)
+
+/** Wörter der Zeile ohne Lautschrift [..] und Grammatik-Kürzel (nur diese werden im Bild markiert). */
+export function frContentWords(line: Line): OcrWord[] {
+  const out: OcrWord[] = []
+  let inPhon = false
+  for (const w of line.words) {
+    if (!inPhon && /\[/.test(w.text)) inPhon = true
+    if (inPhon) {
+      if (/\]/.test(w.text)) inPhon = false
+      continue
+    }
+    if (/\]/.test(w.text) || isGrammarToken(w.text) || !hasLetter(w.text)) continue
+    out.push(w)
+  }
+  return out
+}
 
 export function parsePage(allWords: OcrWord[]): ParsedPage {
   const words = allWords.filter((w) => w.text.trim() !== '')
@@ -168,11 +187,14 @@ export function parsePage(allWords: OcrWord[]): ParsedPage {
     const from = line.y - 0.6 * lineHeight
     const to = structural[i + 1] ? structural[i + 1].y - 0.6 * lineHeight : Infinity
     const de = deLines.filter((l) => l.y >= from && l.y < to)
-    const aligned = de.some((l) => Math.abs(l.words[0].x0 - cols.c2) <= 25 && hasLetter(l.text))
+    const aligned = de.some((l) => Math.abs(l.words[0].x0 - cols.c2) <= Math.max(25, 1.3 * lineHeight) && hasLetter(l.text))
 
     if (line.kind === 'skip' && /\|/.test(line.text)) inBox = true
     else if (inBox && line.kind === 'entry' && line.hasBracket && aligned) inBox = false
     if (inBox || line.kind !== 'entry') return
+    if (/^Unit[eé]\b/i.test(line.text)) return // Abschnittsüberschrift
+    // Deutsch muss in der zweiten Spalte beginnen; Fließtext aus Kästen läuft dagegen ohne Spaltenabstand durch
+    if (!aligned && cleanGermanText(de.map((l) => l.text).join(' ')).length > 0) return
 
     const german = cleanGermanText(de.map((l) => l.text).join(' '))
     // Ohne Lautschrift und ohne deutsche Entsprechung ist es keine Vokabelzeile (z. B. Seitenüberschrift).
@@ -184,7 +206,10 @@ export function parsePage(allWords: OcrWord[]): ParsedPage {
     if (german.length === 0) notes.push('Deutsch nicht erkannt')
     if (avg(frWords.map((w) => w.conf)) < 70) notes.push('Französisch unsicher erkannt')
     if (german.length > 0 && avg(deWords.map((w) => w.conf)) < 70) notes.push('Deutsch unsicher erkannt')
-    rows.push({ foreign: line.foreign, german, uncertain: notes.length > 0, notes })
+    // Fließtext aus Kästen ohne Wortliste-Aufbau: zu lange "Stichwörter" sind keine Vokabeln
+    if (line.foreign.some((f) => f.split(/\s+/).length > 7)) return
+    if (!line.hasBracket && line.foreign.some((f) => f.split(/\s+/).length > 4)) return
+    rows.push({ foreign: line.foreign, german, uncertain: notes.length > 0, notes, boxes: { foreign: frContentWords(line), german: deWords } })
   })
 
   if (rows.length === 0) warnings.push('Es wurden keine Vokabeln erkannt.')

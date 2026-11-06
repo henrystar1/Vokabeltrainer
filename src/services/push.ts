@@ -9,17 +9,6 @@ const pushSubscribeRpc = (endpoint: string, p256dh: string, auth: string, ua: st
   rpc<void>('push_subscribe', { p_endpoint: endpoint, p_p256dh: p256dh, p_auth: auth, p_ua: ua })
 const pushUnsubscribeRpc = (endpoint: string | null) => rpc<void>('push_unsubscribe', { p_endpoint: endpoint })
 
-export interface PushOverview {
-  url: boolean
-  public_key: boolean
-  secret: boolean
-  pg_net: boolean
-  devices: number
-  users: number
-  log: { title: string; status: string; created_at: string; name: string | null }[]
-}
-export const adminPushOverview = () => rpc<PushOverview>('admin_push_overview')
-
 /** VAPID-Schlüssel (URL-sicheres Base64) → Bytes für die Push-Anmeldung. */
 export function urlBase64ToBytes(b64: string): Uint8Array {
   const pad = '='.repeat((4 - (b64.length % 4)) % 4)

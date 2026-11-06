@@ -11,7 +11,6 @@ export function setSkipAnim(v: boolean): void {
   try { localStorage.setItem(KEY, v ? '1' : '0') } catch { /* egal */ }
   listeners.forEach((l) => l())
 }
-export function getSkipAnim(): boolean { return value }
 export function useSkipAnim(): boolean {
   return useSyncExternalStore((cb) => { listeners.add(cb); return () => { listeners.delete(cb) } }, () => value, () => false)
 }

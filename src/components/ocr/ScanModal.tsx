@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Camera, Plus, Trash2 } from 'lucide-react'
 import AccentBar, { accentsFor } from '../ui/AccentBar'
 import Button from '../ui/Button'
@@ -8,8 +8,9 @@ import ProgressBar from '../ui/ProgressBar'
 import { ErrorBox, Notice } from '../ui/States'
 import { cleanList, toSavePayload } from '../../features/entry/rows'
 import { scanPage } from '../../features/ocr/pipeline'
-import type { ParsedPage } from '../../features/ocr/types'
+import type { OcrWord, ParsedPage } from '../../features/ocr/types'
 import { errorMessage } from '../../lib/errors'
+import ScanOverlay from './ScanOverlay'
 import { saveEntry } from '../../services/entry'
 
 interface ReviewRow {
@@ -18,6 +19,7 @@ interface ReviewRow {
   german: string
   uncertain: boolean
   notes: string[]
+  boxes?: { foreign: OcrWord[]; german: OcrWord[] }
 }
 
 const join = (list: string[]): string => list.join('; ')
@@ -48,6 +50,9 @@ export default function ScanModal({ bookId, language, defaultUnit, defaultPage, 
   const [page, setPage] = useState(String(defaultPage))
   const [detected, setDetected] = useState<{ unit: number | null; page: number | null }>({ unit: null, page: null })
   const [saved, setSaved] = useState(0)
+  const [image, setImage] = useState<HTMLCanvasElement | null>(null)
+  const [selected, setSelected] = useState<number | null>(null)
+  const rowRefs = useRef<Record<number, HTMLDivElement | null>>({})
   const nextKey = useRef(1)
   const fileInput = useRef<HTMLInputElement>(null)
 
@@ -58,6 +63,7 @@ export default function ScanModal({ bookId, language, defaultUnit, defaultPage, 
       german: join(r.german),
       uncertain: r.uncertain,
       notes: r.notes,
+      boxes: r.boxes,
     }))
   }
 
@@ -75,6 +81,8 @@ export default function ScanModal({ bookId, language, defaultUnit, defaultPage, 
         },
         language,
       )
+      setImage(parsed.image)
+      setSelected(null)
       setRows(toRows(parsed))
       setWarnings(parsed.warnings)
       setDetected({ unit: parsed.unit, page: parsed.page })
@@ -86,6 +94,14 @@ export default function ScanModal({ bookId, language, defaultUnit, defaultPage, 
       setPhase('pick')
     }
     if (fileInput.current) fileInput.current.value = ''
+  }
+
+  // Das Foto nur im Arbeitsspeicher halten: beim Schließen oder bei einem neuen Foto freigeben
+  useEffect(() => () => { if (image) { image.width = 0; image.height = 0 } }, [image])
+
+  function pick(key: number) {
+    setSelected(key)
+    rowRefs.current[key]?.scrollIntoView({ block: 'nearest', behavior: 'smooth' })
   }
 
   function patch(key: number, p: Partial<ReviewRow>) {
@@ -146,14 +162,15 @@ export default function ScanModal({ bookId, language, defaultUnit, defaultPage, 
         <div className="space-y-4">
           <p className="text-sm text-slate-300">
             Fotografiere die Wortliste-Seite des Buchs möglichst gerade und gut beleuchtet. Gelesen werden {foreignName} und
-            Deutsch; die Beispielsätze und die blauen Kästen werden ausgelassen.
+            Deutsch; die Beispielsätze und die Kästen werden ausgelassen. Danach siehst du das Foto mit Markierung: rot = Wort erkannt, blau = Übersetzung erkannt.
           </p>
-          {language !== 'fr' && (
+          {language !== 'fr' && language !== 'en' && (
             <Notice tone="warn">
-              Die Erkennung ist auf das französische Buch abgestimmt. Bei englischen Büchern klappt sie, wenn das Layout ähnlich ist
-              (Wort links, Deutsch rechts) – prüfe das Ergebnis bitte besonders genau.
+              Die Erkennung ist auf die Bücher Camden Town (Englisch) und A Plus (Französisch) abgestimmt. Bei anderen Büchern klappt sie, wenn das Layout
+              ähnlich ist (Wort links, Deutsch rechts) – prüfe das Ergebnis bitte besonders genau.
             </Notice>
           )}
+          <Notice tone="info">Am besten eine Seite pro Foto, gerade von oben und ohne Schatten. Doppelseiten gehen, sind aber ungenauer.</Notice>
           <Notice tone="info">
             Das Foto wird nur auf deinem Gerät ausgewertet und <strong>nicht gespeichert oder hochgeladen</strong>. Die Texterkennung ist
             kostenlos und braucht keinen Schlüssel – sie ist aber nicht perfekt, darum prüfst du das Ergebnis vor dem Speichern.
@@ -192,6 +209,8 @@ export default function ScanModal({ bookId, language, defaultUnit, defaultPage, 
             </label>
           </div>
 
+          {image && <ScanOverlay image={image} rows={rows} selected={selected} onSelect={pick} />}
+
           <p className="text-xs text-slate-400">
             {rows.length} Zeilen erkannt. Mehrere Lösungen trennst du mit einem Semikolon (<code>;</code>). Gelb markierte Zeilen bitte
             besonders prüfen.
@@ -199,7 +218,13 @@ export default function ScanModal({ bookId, language, defaultUnit, defaultPage, 
 
           <div className="max-h-[45vh] space-y-2 overflow-y-auto pr-1">
             {rows.map((r, i) => (
-              <div key={r.key} className={`rounded-xl border p-2 ${r.uncertain ? 'border-amber-400/50 bg-amber-400/5' : 'border-white/10'}`}>
+              <div
+                key={r.key}
+                ref={(el) => { rowRefs.current[r.key] = el }}
+                onFocus={() => setSelected(r.key)}
+                className={`rounded-xl border p-2 ${selected === r.key ? 'border-yellow-300/70 bg-yellow-300/5' : r.uncertain ? 'border-amber-400/50 bg-amber-400/5' : 'border-white/10'}`}
+              >
+                <span className="label-mono mb-1 block text-slate-500">{i + 1}</span>
                 <div className="grid grid-cols-1 gap-2 sm:grid-cols-[1fr_1fr_auto]">
                   <input
                     aria-label={`Fremdsprache, Zeile ${i + 1}`}
@@ -247,7 +272,7 @@ export default function ScanModal({ bookId, language, defaultUnit, defaultPage, 
             <Button variant="ghost" onClick={onClose} disabled={phase === 'saving'}>
               Abbrechen
             </Button>
-            <Button variant="secondary" disabled={phase === 'saving'} onClick={() => { setRows([]); setPhase('pick') }}>
+            <Button variant="secondary" disabled={phase === 'saving'} onClick={() => { setRows([]); setImage(null); setPhase('pick') }}>
               Anderes Foto
             </Button>
             <Button busy={phase === 'saving'} disabled={!validTarget || usable.length === 0} onClick={() => void saveAll()}>

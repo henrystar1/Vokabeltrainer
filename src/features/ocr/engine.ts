@@ -43,5 +43,3 @@ export function createTesseractEngine(languageCode: string): OcrEngine {
     },
   }
 }
-
-export const tesseractEngine = createTesseractEngine('fr')

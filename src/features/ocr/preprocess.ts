@@ -7,7 +7,7 @@ const MAX_SIDE = 3000
  * Foto → Graubild auf einem Canvas. Die Datei wird nur im Arbeitsspeicher gelesen,
  * nichts wird hochgeladen oder gespeichert.
  */
-export async function prepareCanvas(file: Blob): Promise<HTMLCanvasElement> {
+export async function prepareCanvas(file: Blob): Promise<{ gray: HTMLCanvasElement; color: HTMLCanvasElement }> {
   const bitmap = await createImageBitmap(file, { imageOrientation: 'from-image' })
   const scale = Math.min(1, MAX_SIDE / Math.max(bitmap.width, bitmap.height))
   const w = Math.max(1, Math.round(bitmap.width * scale))
@@ -19,6 +19,11 @@ export async function prepareCanvas(file: Blob): Promise<HTMLCanvasElement> {
   if (!ctx) throw new Error('Das Bild kann in diesem Browser nicht verarbeitet werden.')
   ctx.drawImage(bitmap, 0, 0, w, h)
   bitmap.close()
+  // Farbkopie für die Anzeige mit Markierungen (gleiche Größe, damit die Wortpositionen passen); bleibt im Arbeitsspeicher
+  const color = document.createElement('canvas')
+  color.width = w
+  color.height = h
+  color.getContext('2d')?.drawImage(canvas, 0, 0)
 
   const img = ctx.getImageData(0, 0, w, h)
   const gray = new Uint8ClampedArray(w * h)
@@ -33,5 +38,5 @@ export async function prepareCanvas(file: Blob): Promise<HTMLCanvasElement> {
     img.data[i * 4 + 3] = 255
   }
   ctx.putImageData(img, 0, 0)
-  return canvas
+  return { gray: canvas, color }
 }

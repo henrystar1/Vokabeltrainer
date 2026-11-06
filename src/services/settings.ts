@@ -35,12 +35,6 @@ export async function updateDisplayName(userId: string, name: string): Promise<v
   if (error) throw error
 }
 
-export async function loadDisplayName(userId: string): Promise<string | null> {
-  const { data, error } = await supabase.from('profiles').select('display_name').eq('id', userId).maybeSingle()
-  if (error) throw error
-  return (data?.display_name as string | undefined) ?? null
-}
-
 export async function loadProfile(userId: string): Promise<Profile | null> {
   const { data, error } = await supabase
     .from('profiles')

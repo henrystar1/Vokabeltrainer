@@ -55,5 +55,3 @@ export function loadLearnPool(): Promise<LearnPool> {
   }
   return cached
 }
-
-export const resetLearnPool = (): void => { cached = null }

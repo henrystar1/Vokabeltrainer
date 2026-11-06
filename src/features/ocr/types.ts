@@ -23,6 +23,8 @@ export interface ParsedRow {
   /** true, wenn die Zeile besonders geprüft werden sollte (fehlendes Deutsch, unsichere Erkennung). */
   uncertain: boolean
   notes: string[]
+  /** Wörter auf dem Foto, aus denen die Zeile gelesen wurde (für die Markierung im Bild: Fremdsprache rot, Deutsch blau). */
+  boxes?: { foreign: OcrWord[]; german: OcrWord[] }
 }
 
 export interface ParsedPage {

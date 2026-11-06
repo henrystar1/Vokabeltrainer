@@ -30,9 +30,6 @@ export interface PlusStatus {
 }
 
 export const getPlusStatus = () => rpc<PlusStatus>('plus_status')
-export const plusRequest = () => rpc<void>('plus_request')
-export const plusCancelRequest = () => rpc<void>('plus_cancel_request')
-export const plusBuyDay = () => rpc<PlusStatus>('plus_buy_day')
 export const plusBuy = (tier: PlusTier['id']) => rpc<PlusStatus>('plus_buy', { p_tier: tier })
 /** Stufe 5 → Stufe 4: macht gelernte Vokabeln wieder fällig (optional nur ein Buch). Gibt die Anzahl zurück. */
 export const plusMakeDue = (book: string | null = null) => rpc<number>('plus_make_due', { p_book: book })

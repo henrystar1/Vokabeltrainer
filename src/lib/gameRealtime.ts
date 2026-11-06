@@ -39,8 +39,6 @@ function clientFor(d: GameDb): SupabaseClient {
 }
 
 let list: GameDb[] = envList() ?? FALLBACK
-/** Anzahl der Spiel-Datenbanken. */
-export const gameSlots = () => list.length
 
 let current = 0
 /** Welche Datenbank gerade gilt (0, 1, …). Wird bei jeder Meldung vom Server gesetzt. */

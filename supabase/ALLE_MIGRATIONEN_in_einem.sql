@@ -21097,7 +21097,7 @@ begin
   select m.tier into v_tier from public.league_members m where m.user_id = v_me;
 
   create temporary table if not exists _lg_tmp (user_id uuid, pts integer, rnk bigint) on commit drop;
-  delete from _lg_tmp;
+  delete from _lg_tmp where true;
   insert into _lg_tmp
     select x.user_id, x.pts, rank() over (order by x.pts desc)
       from (

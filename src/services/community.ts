@@ -23,7 +23,6 @@ export const setVocabActive = (bookId: string, active: boolean, unitNumber?: num
     p_unit_number: unitNumber ?? null,
     p_page_number: pageNumber ?? null,
   })
-export const countOpenReviews = () => rpc<number>('count_open_reviews')
 
 /** Schaltet die nächste Seite mit inaktiven Vokabeln frei (null = alles schon aktiv). */
 export const activateNextPage = (bookId: string) => rpc<NextPageResult | null>('activate_next_page', { p_book_id: bookId })

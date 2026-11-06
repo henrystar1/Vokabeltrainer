@@ -1,22 +1,30 @@
 import { createTesseractEngine } from './engine'
-import { parsePage } from './layout'
+import { parseWords } from './parse'
 import { prepareCanvas } from './preprocess'
 import type { OcrEngine, ParsedPage } from './types'
 
-/** Foto einer Wortlisten-Seite → erkannte Vokabelzeilen (zur Prüfung, noch nicht gespeichert). */
+/** Ergebnis einer Seite: Zeilen plus das Foto (Farbe, im Arbeitsspeicher) zum Markieren, was erkannt wurde. */
+export interface ScanResult extends ParsedPage {
+  image: HTMLCanvasElement
+}
+
+/**
+ * Foto einer Wortlisten-Seite → erkannte Vokabelzeilen (zur Prüfung, noch nicht gespeichert).
+ * Alles läuft lokal im Browser; das Foto wird nirgends hochgeladen.
+ */
 export async function scanPage(
   file: Blob,
   onProgress?: (fraction: number, status: string) => void,
   language = 'fr',
   engine: OcrEngine = createTesseractEngine(language),
-): Promise<ParsedPage> {
+): Promise<ScanResult> {
   onProgress?.(0, 'Bild wird aufbereitet …')
-  const canvas = await prepareCanvas(file)
+  const { gray, color } = await prepareCanvas(file)
   try {
-    const words = await engine.recognize(canvas, onProgress)
-    return parsePage(words)
+    const words = await engine.recognize(gray, onProgress)
+    return { ...parseWords(words, language), image: color }
   } finally {
-    canvas.width = 0
-    canvas.height = 0
+    gray.width = 0
+    gray.height = 0
   }
 }

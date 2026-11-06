@@ -64,7 +64,7 @@ export function cleanGermanText(raw: string): string[] {
   t = t.replace(/\s*[▶►»>]\s*(Verbes|Méthodes|Methodes|Grammatik|Lektion|p\.?\s*\d).*$/i, '')
   t = t.replace(/\s*(Verbes|Méthodes),?\s*p\.?\s*\d+.*$/i, '')
   t = t.replace(/\bwird wie\b.*?\bkonjugiert\b/gi, ' ')
-  t = t.replace(/\bauch\s*[:;.]\s*/gi, ', ')
+  t = t.replace(/\b(?:auch|hier)\s*[:;.]\s*/gi, ', ')
   const parts = splitOutsideParens(t)
     .map((p) => p.replace(/^[\s\-–—|_]+|[\s|_]+$/g, '').replace(/[.:]+$/, '').trim())
     .filter((p) => hasLetter(p))
