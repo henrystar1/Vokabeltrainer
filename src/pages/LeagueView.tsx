@@ -42,10 +42,20 @@ export default function LeagueView() {
   if (!l) return null
   const tier = TIERS[l.tier - 1] ?? TIERS[0]
   const rows = l.rows
-  // Mitglieder ohne Punkte stehen unten (und steigen ab, ab Bronze); Auf- und Abstieg gelten nur für Aktive.
-  const active = rows.filter((r) => r.points > 0).length
-  const promoCut = l.tier < TIERS.length ? Math.min(3, active) : 0
-  const relegStart = l.tier > 1 ? (l.relegation_active ? Math.max(active - 3, promoCut) : active) : rows.length
+  // Auf- und Abstieg nach Rang (Zahlen kommen vom Server, einstellbar in der Verwaltung); Mitglieder ohne Punkte steigen ab Bronze ab.
+  const active = l.participants
+  const up = l.tier < TIERS.length ? (l.promote ?? 3) : 0
+  const down = l.tier > 1 ? (l.relegate ?? 3) : 0
+  const isPromo = (r: { points: number; rank: number }) => up > 0 && r.points > 0 && r.rank <= up
+  const isReleg = (r: { points: number; rank: number }) =>
+    l.tier > 1 && (r.points === 0 || (l.relegation_active && down > 0 && r.rank > active - down))
+  const me = rows.find((r) => r.is_me)
+  const myHint = !viewTier && me
+    ? isPromo(me) ? 'Du liegst im Aufstiegsbereich – bleib dran!'
+      : l.promote_points != null && up > 0 && me.points < l.promote_points ? `Noch ${l.promote_points - me.points + 1} Punkte bis zum Aufstiegsbereich.`
+      : isReleg(me) && l.tier > 1 ? (me.points === 0 ? 'Ohne Punkte steigst du ab – lerne ein paar Vokabeln!' : l.relegate_points != null ? `Noch ${l.relegate_points - me.points + 1} Punkte, um den Abstiegsbereich zu verlassen.` : null)
+      : null
+    : null
   const last = l.last
 
   const counts = viewTier ? (league.data as { counts?: { tier: number; members: number; active: number }[] } | null)?.counts : undefined
@@ -73,11 +83,11 @@ export default function LeagueView() {
         <div>
           <p className="label-mono">{viewTier ? 'Liga (Admin-Ansicht)' : 'Deine Liga'}</p>
           <p className="text-3xl font-semibold" style={{ color: tier.color }}>{tier.name}</p>
-          <p className="text-sm text-slate-400">{l.participants} Teilnehmer diese Woche</p>
+          <p className="text-sm text-slate-400">{l.participants} Teilnehmer diese Woche{me && me.points > 0 ? ` · du: Platz ${me.rank}` : ''}</p>
         </div>
         <div className="text-right text-sm text-slate-300">
           <p className="flex items-center justify-end gap-1"><Clock size={15} /> endet in {countdown(l.ends_at, now)}</p>
-          <p className="mt-1 flex items-center justify-end gap-1 text-amber-300"><CoinIcon size={15} /> Top 3: {l.rewards.join(' / ')} Coins</p>
+          <p className="mt-1 flex items-center justify-end gap-1 text-amber-300"><CoinIcon size={15} /> Top 3: {l.rewards.join(' / ')} Coins (ab {l.min_points} Punkten)</p>
         </div>
       </Card>
 
@@ -89,17 +99,18 @@ export default function LeagueView() {
         </Notice>
       )}
 
-      <div className="flex gap-4 text-xs text-slate-400">
-        {promoCut > 0 && <span className="flex items-center gap-1 text-emerald-300"><ArrowUp size={13} /> Aufstieg: Top 3</span>}
-        {l.relegation_active && l.tier > 1 && <span className="flex items-center gap-1 text-rose-300"><ArrowDown size={13} /> Abstieg: letzte 3 oder unter {l.min_points} Punkten</span>}
+      {myHint && <Notice tone="info">{myHint}</Notice>}
+      <div className="flex flex-wrap gap-4 text-xs text-slate-400">
+        {up > 0 && <span className="flex items-center gap-1 text-emerald-300"><ArrowUp size={13} /> Aufstieg: Top {up}</span>}
+        {l.tier > 1 && <span className="flex items-center gap-1 text-rose-300"><ArrowDown size={13} /> Abstieg: {l.relegation_active && down > 0 ? `letzte ${down} oder ` : ''}ohne Punkte</span>}
       </div>
 
       <Card className="p-2">
         {rows.length === 0 && <p className="p-4 text-sm text-slate-400">Noch niemand in dieser Liga. Lerne ein paar Vokabeln!</p>}
         <ol>
           {rows.map((r, i) => {
-            const promo = i < promoCut
-            const releg = i >= relegStart
+            const promo = isPromo(r)
+            const releg = isReleg(r)
             return (
               <li
                 key={`${i}-${r.display_name}`}
@@ -119,7 +130,7 @@ export default function LeagueView() {
         </ol>
       </Card>
       <p className="max-w-xl text-xs text-slate-500">
-        Es zählen dieselben Wochenpunkte wie in der Rangliste. Am Wochenende (Montag 00:00) steigen die Top 3 auf, wer zu wenig gelernt hat oder ganz unten steht, steigt ab.
+        Es zählen dieselben Wochenpunkte wie in der Rangliste. Am Wochenende (Montag 00:00) steigen die Bestplatzierten auf, wer keine Punkte hat oder ganz unten steht, steigt ab.
       </p>
     </div>
   )

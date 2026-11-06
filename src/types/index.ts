@@ -495,6 +495,13 @@ export interface League {
   relegation_active: boolean
   min_points: number
   rewards: number[]
+  /** Neu (Migration 0071); fehlt bei älteren Servern, dann gelten die Standardwerte 3/3. */
+  promote?: number
+  relegate?: number
+  my_rank?: number | null
+  my_points?: number
+  promote_points?: number | null
+  relegate_points?: number | null
   rows: LeagueRow[]
   last: LeagueLast | null
 }

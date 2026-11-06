@@ -7,9 +7,10 @@ import Card from '../components/ui/Card'
 import { Field, Select, TextInput } from '../components/ui/Field'
 import PageHeader from '../components/ui/PageHeader'
 import ProgressBar from '../components/ui/ProgressBar'
+import { Notice } from '../components/ui/States'
 import RewardReveal, { type Reward } from '../components/ui/RewardReveal'
 import { useWallet } from '../features/koins/WalletProvider'
-import { memoScoreSubmit, type MemoGame } from '../services/tasks'
+import { memoPiStart, memoScoreSubmit, type MemoGame } from '../services/tasks'
 import { COUNTRIES, REGIONS, flagUrl, makeQuestions, optionsFor, poolFor, type Country, type FlagQuestion, type Region } from '../features/memorize/flags'
 import { grade, isTyped, lernpunkte, loadCards, mastered, matchesName, pickSession, saveCards, type Cards } from '../features/memorize/flagLearn'
 import { PI_DIGITS, checkDigit, groupDigits } from '../features/memorize/pi'
@@ -53,8 +54,10 @@ export default function Memorize() {
 function useMemoSubmit() {
   const wallet = useWallet()
   const [rewards, setRewards] = useState<Reward[] | null>(null)
+  const [rejected, setRejected] = useState(false)
   const submit = useCallback((game: MemoGame, score: number) => {
     void memoScoreSubmit(game, score).then((r) => {
+      if (r.rejected) { setRejected(true); return }
       if (r.coins > 0 || r.points > 0) {
         setRewards([...(r.coins > 0 ? [{ type: 'coins' as const, amount: r.coins }] : []), ...(r.points > 0 ? [{ type: 'points' as const, amount: r.points }] : [])])
         void wallet.refresh()
@@ -62,12 +65,13 @@ function useMemoSubmit() {
     }).catch(() => undefined)
   }, [wallet])
   const reveal = rewards ? <RewardReveal gift={false} title="Neuer Rekord!" rewards={rewards} onClose={() => setRewards(null)} /> : null
-  return { submit, reveal }
+  return { submit, reveal, rejected, clearRejected: () => setRejected(false) }
 }
 
 function PiTrainer() {
-  const { submit: submitScore, reveal } = useMemoSubmit()
+  const { submit: submitScore, reveal, rejected, clearRejected } = useMemoSubmit()
   const [phase, setPhase] = useState<'learn' | 'quiz' | 'done'>('learn')
+  const [left, setLeft] = useState(false)
   const [shown, setShown] = useState(50)
   const [typed, setTyped] = useState('')
   const [hints, setHints] = useState(0)
@@ -101,7 +105,17 @@ function PiTrainer() {
     return () => window.removeEventListener('keydown', on)
   }, [phase, press])
 
-  function startQuiz() { setTyped(''); setHints(0); setWrong(null); setFresh(false); setPhase('quiz') }
+  // Schummelschutz: Fenster/Tab verlassen beendet den Versuch ohne Wertung (z. B. zum Nachschauen oder Einfügen aus einem Textdokument).
+  useEffect(() => {
+    if (phase !== 'quiz') return
+    const leave = () => { setLeft(true); setPhase('learn'); setTyped('') }
+    const vis = () => { if (document.hidden) leave() }
+    document.addEventListener('visibilitychange', vis)
+    window.addEventListener('blur', leave)
+    return () => { document.removeEventListener('visibilitychange', vis); window.removeEventListener('blur', leave) }
+  }, [phase])
+
+  function startQuiz() { setTyped(''); setHints(0); setWrong(null); setFresh(false); setLeft(false); clearRejected(); void memoPiStart().catch(() => undefined); setPhase('quiz') }
   function hint() {
     const d = PI_DIGITS[typed.length]
     if (!d) return
@@ -114,6 +128,7 @@ function PiTrainer() {
   if (phase === 'learn') {
     return (
       <div className="space-y-5">
+      {left && <Notice tone="warn">Versuch abgebrochen: Du hast das Fenster verlassen. Für die Rangliste zählt nur ein Versuch am Stück in diesem Fenster.</Notice>}
       <Card className="space-y-4">
         <p className="text-sm text-slate-400">Lies die Stellen in Fünferblöcken, sprich sie laut und deck sie dann ab. Bestwert: <b className="text-accent-cyan">{best}</b> Stellen.</p>
         <Field label="Wie viele Stellen lernen?">
@@ -151,6 +166,7 @@ function PiTrainer() {
       ) : (
         <div className="space-y-3">
           <p className="text-lg font-semibold">{wrong ? `Fehler bei Stelle ${typed.length + 1}: richtig wäre ${wrong}.` : 'Alle 500 Stellen geschafft!'}</p>
+          {rejected && <Notice tone="warn">Dein Wert kommt nicht in die Rangliste: Er wurde zu schnell eingegeben, um echt auswendig zu sein. (Der Server prüft die Zeit.)</Notice>}
           <p className="text-sm text-slate-300">Du kannst {Math.max(0, typed.length - hints)} Stellen ohne Tipp.{fresh && <b className="ml-1 text-emerald-300">Neuer Bestwert!</b>}</p>
           <div className="flex gap-2"><Button onClick={startQuiz}><RotateCcw size={16} /> Nochmal</Button><Button variant="secondary" onClick={() => setPhase('learn')}>Lernen</Button></div>
         </div>

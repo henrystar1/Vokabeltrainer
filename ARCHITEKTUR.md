@@ -619,3 +619,8 @@ Tabelle `book_library_hidden`; `in_library` blendet ein veröffentlichtes Buch d
 - **Panik im Parkour**: `PANIC_PATHS` enthält /parkour, /deathrun, /team/. Esc löst dort keine Panik aus (nur der Knopf). `parkour` ist in `PANIC_KEYS`.
 - **Verwaltung**: „Einzelne Mods“ ist in die Personen-Ansicht (Benutzer → Person → Reiter „Mod-Rechte“) gewandert (`StaffEditor` aus `StaffRightsTab.tsx`). Die Personen-Ansicht hat Reiter Überblick / Coins & Plus / Mod-Rechte / Rolle & Konto. Zahlen-Tab hat Hauptbereiche (`CATEGORIES` in `ruleDefs.ts`) und Suche; „Coins & Belohnungen“ ist in sechs Abschnitte geteilt.
 - **Adventskalender komplett einstellbar (0070)**: Gewichte, Mengen, Preisgrenzen und Türchen 24 sind Einstellungen `advent_*`.
+
+
+## Update 92
+- Liga (0071): Auf-/Abstieg einstellbar (`league_promote`, `league_relegate`, `league_relegate_min_group`, `league_rows_max`), `_league_rollover`/`get_league` neu, Wochenpunkte nur einmal je Person berechnet, Liste begrenzt; `get_league` liefert `my_rank`, `promote_points`, `relegate_points` → Hinweis „Noch X Punkte“ in `LeagueView`.
+- Pi-Schummelschutz (0072): `memo_pi_start()` startet Versuch serverseitig, `memo_score_submit` prüft Zeit (`memo_pi_min_ms` je Stelle, `memo_pi_max_minutes`), sonst `rejected`; Client bricht Versuch bei Fenster-/Tab-Wechsel ab. `admin_memo_delete(game,user)` + Löschen-Buttons in `MemoBoard`.

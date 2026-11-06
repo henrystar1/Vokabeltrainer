@@ -129,6 +129,10 @@ export const SECTIONS: Array<{ title: string; text?: string; rules: Rule[] }> = 
       { key: 'league_reward_2', label: 'Liga: Coins für Platz 2' },
       { key: 'league_reward_3', label: 'Liga: Coins für Platz 3' },
       { key: 'league_min_points', label: 'Liga: Mindestpunkte pro Woche (sonst Abstieg)' },
+      { key: 'league_promote', label: 'Liga: Wie viele steigen pro Woche auf' },
+      { key: 'league_relegate', label: 'Liga: Wie viele steigen pro Woche ab (0 = keine Abstiege nach Rang)' },
+      { key: 'league_relegate_min_group', label: 'Liga: Abstieg nach Rang erst ab so vielen Aktiven in der Stufe' },
+      { key: 'league_rows_max', label: 'Liga: Zeilen in der Liste (Platzierte)' },
     ],
   },
   {
@@ -192,6 +196,8 @@ export const SECTIONS: Array<{ title: string; text?: string; rules: Rule[] }> = 
     text: 'Belohnung gibt es nur, wenn der eigene Bestwert steigt.',
     rules: [
       { key: 'memo_pi_coins_per_10', label: 'Pi lernen: Coins je 10 neue Stellen', hint: '10 = 1 Coin je Stelle, 0 = keine Coins.' },
+      { key: 'memo_pi_min_ms', label: 'Pi Schummelschutz: Mindestzeit pro Stelle (Millisekunden)', hint: 'Wer schneller tippt, dessen Rekord wird abgelehnt. 450 = ca. 2 Stellen pro Sekunde.' },
+      { key: 'memo_pi_max_minutes', label: 'Pi Schummelschutz: längster Versuch (Minuten)' },
       { key: 'memo_pi_points_per_10', label: 'Pi lernen: Punkte je 10 neue Stellen', hint: '0 = keine Punkte' },
       { key: 'memo_flags_coins_per_10', label: 'Flaggen lernen: Coins je 10 Lernpunkte', hint: 'Lernpunkte = Summe der Fächer aller Länder (bis 5 je Land). 2 = 1 Coin je 5 Lernpunkte, 0 = keine Coins.' },
       { key: 'memo_flags_points_per_100', label: 'Flaggen lernen: Punkte je 100 Lernpunkte', hint: '0 = keine Punkte' },

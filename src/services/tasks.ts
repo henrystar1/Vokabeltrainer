@@ -28,8 +28,12 @@ export const siteLinkDelete = (id: string) => rpc<void>('site_link_delete', { p_
 /** Ranglisten für Pi und Flaggen (Migration 0062) */
 export type MemoGame = 'pi' | 'flags'
 export interface MemoRow { rank: number; user_id: string; display_name: string; best: number; is_me: boolean }
-export interface MemoReward { best: number; coins: number; points: number }
+export interface MemoReward { best: number; coins: number; points: number; rejected?: boolean }
 export const memoScoreSubmit = (game: MemoGame, score: number) => rpc<MemoReward>('memo_score_submit', { p_game: game, p_score: Math.max(0, Math.floor(score)) })
+/** Pi-Versuch auf dem Server starten (Zeitprüfung gegen Schummeln, Migration 0072). */
+export const memoPiStart = () => rpc<void>('memo_pi_start')
+/** Nur Admin: Rekord einer Person (oder aller) löschen. */
+export const adminMemoDelete = (game: MemoGame, user: string | null) => rpc<number>('admin_memo_delete', { p_game: game, p_user: user })
 export const memoLeaderboard = (game: MemoGame) => rpc<MemoRow[]>('memo_leaderboard', { p_game: game })
 
 /** Adventskalender (Migration 0065) */
