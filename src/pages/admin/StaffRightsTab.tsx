@@ -12,7 +12,7 @@ import {
   adminListStaff,
   adminResetStaffRights,
   adminSetStaffBook,
-  adminSetStaffRights,
+  adminSetStaffHeal, adminSetStaffRights,
   adminSetStaffSetting,
   getAppSettings,
   type RightMode,
@@ -55,7 +55,7 @@ export default function StaffRightsTab() {
           </li>
         ))}
       </ul>
-      {person && <Editor key={person.user_id} person={person} onChanged={staff.reload} />}
+      {person && <StaffEditor key={person.user_id} person={person} onChanged={staff.reload} />}
     </div>
   )
 }
@@ -65,7 +65,8 @@ function summary(x: StaffRow): string {
   return own ? 'eigene Rechte' : 'Standard'
 }
 
-function Editor({ person, onChanged }: { person: StaffRow; onChanged: () => void }) {
+/** Rechte einer Person (auch in der Personen-Ansicht unter Benutzer eingebettet). */
+export function StaffEditor({ person, onChanged }: { person: StaffRow; onChanged: () => void }) {
   const rights = useAsync(() => adminGetStaffRights(person.user_id), [person.user_id])
   const books = useAsync(adminListPublicBooks, [])
   const settings = useAsync(getAppSettings, [])
@@ -172,6 +173,10 @@ function Editor({ person, onChanged }: { person: StaffRow; onChanged: () => void
             <div className="grid gap-2 sm:grid-cols-2">
               <Choice checked={!r.spectate} onSelect={() => void patch({ spectate: false })} title="Zuschauen: Nein" />
               <Choice checked={r.spectate} onSelect={() => void patch({ spectate: true })} title="Zuschauen: Ja" />
+            </div>
+            <div className="grid gap-2 sm:grid-cols-2">
+              <Choice checked={!r.heal} onSelect={() => void run(() => adminSetStaffHeal(person.user_id, false))} title="Heilen und Wiederbeleben: Nein" />
+              <Choice checked={r.heal} onSelect={() => void run(() => adminSetStaffHeal(person.user_id, true))} title="Heilen und Wiederbeleben: Ja" text="Im Parkour Herzen auffüllen (für das ganze Team) und sich nach „Keine Herzen mehr“ wiederbeleben." />
             </div>
             <div className="grid gap-2 sm:grid-cols-2">
               <Choice checked={r.looks.includes('hammer')} onSelect={() => void patch({ looks: r.looks.includes('hammer') ? r.looks.filter((l) => l !== 'hammer') : [...r.looks, 'hammer'] })} title="Auftritt freigeben: Hammer" text="Ein Hammer fällt vom Himmel, ein Blitz schlägt ein. Die Person wählt im Parkour-Shop." />

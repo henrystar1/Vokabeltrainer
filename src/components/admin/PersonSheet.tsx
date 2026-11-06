@@ -1,3 +1,4 @@
+import { StaffEditor } from '../../pages/admin/StaffRightsTab'
 import { useState } from 'react'
 import { BookOpen, Crown, Gift, Plus, RotateCcw, Send, ShieldCheck, ShieldOff, Trash2, UserCheck, Ban, Wrench } from 'lucide-react'
 import ManageUser from './ManageUser'
@@ -73,6 +74,8 @@ export default function PersonSheet({ user: u, status, onClose, onChanged }: { u
   const isMe = u.user_id === me?.id
   const protectedUser = isMe || u.role === 'admin'
   const [confirm, setConfirm] = useState<Confirm>(null)
+  const [tab, setTab] = useState<'info' | 'coins' | 'rights' | 'account'>('info')
+  const isStaffUser = u.role === 'mod' || u.role === 'alphamod'
   const [manage, setManage] = useState(false)
   const [showBooks, setShowBooks] = useState(false)
   const [busy, setBusy] = useState(false)
@@ -237,6 +240,16 @@ export default function PersonSheet({ user: u, status, onClose, onChanged }: { u
         {message && <Notice tone="ok">{message}</Notice>}
         {error && <ErrorBox message={error} />}
 
+        <div className="flex flex-wrap gap-1" role="tablist" aria-label="Bereich">
+          {([['info', 'Überblick'], ['coins', 'Coins & Plus'], ...(isStaffUser ? [['rights', 'Mod-Rechte']] : []), ...(protectedUser ? [] : [['account', 'Rolle & Konto']])] as Array<[typeof tab, string]>).map(([id, label]) => (
+            <button key={id} type="button" role="tab" aria-selected={tab === id} onClick={() => setTab(id)}
+              className={`min-h-[40px] rounded-xl px-3 text-sm transition ${tab === id ? 'bg-accent-cyan/10 text-accent-cyan shadow-[inset_0_0_0_1px_rgb(var(--c-cyan)/0.25)]' : 'text-slate-400 hover:bg-white/5 hover:text-slate-100'}`}>
+              {label}
+            </button>
+          ))}
+        </div>
+
+        {tab === 'info' && (<>
         <section className="space-y-2">
           <h3 className="label-mono">Anzeigename</h3>
           <div className="flex flex-wrap items-center gap-2">
@@ -285,6 +298,9 @@ export default function PersonSheet({ user: u, status, onClose, onChanged }: { u
           <p className="text-xs text-slate-500">Zuletzt angemeldet {formatDateTime(u.last_sign_in_at)}. Speicherangaben sind Schätzungen; fremde Inhalte siehst du nicht.</p>
         </section>
 
+        </>)}
+
+        {tab === 'coins' && (<>
         <CoinLockSection userId={u.user_id} name={u.display_name} isAdmin={u.role === 'admin'} />
 
         <PlusSection userId={u.user_id} name={u.display_name} />
@@ -300,7 +316,13 @@ export default function PersonSheet({ user: u, status, onClose, onChanged }: { u
           {showBooks && <UserBooks userId={u.user_id} onChanged={onChanged} />}
         </section>
 
-        {!protectedUser && (
+        </>)}
+
+        {tab === 'rights' && isStaffUser && (
+          <StaffEditor person={{ user_id: u.user_id, display_name: u.display_name, role: u.role as 'mod' | 'alphamod', books_mode: null, set_mode: null, shop: null, timeout_max: null, book_count: 0, setting_count: 0 }} onChanged={onChanged} />
+        )}
+
+        {tab === 'account' && !protectedUser && (
           <>
             <section className="space-y-2">
               <h3 className="label-mono">Rolle</h3>

@@ -19,6 +19,30 @@ const LABEL: Record<LockKey, string> = {
   shop: 'Shop',
   quests: 'Quests',
   print: '3D-Druck-Shop',
+  parkour: 'Parkour (Menüpunkt und Seite)',
+  learn: 'Lernen',
+  copy: 'Abschreiben',
+  cards: 'Karteikarten',
+  cram: 'Crashkurs',
+  test: 'Test',
+  practice: 'Multiple Choice',
+  grammar: 'Grammatik',
+  irregular: 'Irreguläre Verben',
+  conjugate: 'Konjugieren',
+  gender: 'le oder la?',
+  books: 'Bücher',
+  search: 'Suche',
+  math: 'Mathe',
+  memorize: 'Auswendig (Pi, Flaggen)',
+  homework: 'Hausaufgaben',
+  advent: 'Adventskalender',
+  ranking: 'Rangliste',
+  stats: 'Statistik',
+  presence: 'Wer ist da?',
+  websites: 'Websites',
+  plus: 'Plus',
+  board: 'Schwarzes Brett',
+  feedback: 'Feedback',
 }
 const DAYS = ['Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa', 'So']
 const QUICK: Array<[string, number | null]> = [['15 Min.', 15], ['1 Std.', 60], ['1 Tag', 1440], ['bis auf Widerruf', null]]
@@ -98,7 +122,7 @@ export default function LocksTab() {
   const { reload } = useLocks()
   return (
     <div className="space-y-3">
-      <Notice tone="info">Abgeschaltete Funktionen verschwinden aus dem Menü und lassen sich auch nicht mehr benutzen. Du als Admin bist immer ausgenommen, so kannst du alles testen.</Notice>
+      <Notice tone="info">Abgeschaltete Funktionen verschwinden aus dem Menü und lassen sich auch nicht mehr benutzen. Du als Admin bist immer ausgenommen, so kannst du alles testen. Die Lern-Seiten werden im Menü und auf der Seite gesperrt, Spiele, Gambling, Shop, Quests, Druck und Chat zusätzlich auf dem Server.</Notice>
       {list.loading && !list.data && <Spinner />}
       {list.error && <ErrorBox message={list.error} onRetry={list.reload} />}
       <div className="grid gap-3 lg:grid-cols-2">

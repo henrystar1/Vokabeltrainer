@@ -2,7 +2,7 @@ import { useSyncExternalStore } from 'react'
 import type { LockKey } from '../../services/koins'
 
 /** Diese Bereiche verschwinden im Panik-Modus (Sprint und Duelle bleiben). Gilt nur auf diesem Gerät. */
-export const PANIC_KEYS: readonly LockKey[] = ['games', 'gambling', 'chat', 'shop']
+export const PANIC_KEYS: readonly LockKey[] = ['games', 'gambling', 'chat', 'shop', 'parkour']
 const STORAGE_KEY = 'vt_panic'
 
 const listeners = new Set<() => void>()
@@ -27,4 +27,6 @@ export function usePanic(): boolean {
 }
 
 /** Seiten, auf denen der rote Knopf sichtbar ist. */
-export const PANIC_PATHS = [/^\/spiele/, /^\/gambling/]
+export const PANIC_PATHS = [/^\/spiele/, /^\/gambling/, /^\/parkour/, /^\/deathrun/, /^\/team\//]
+/** Dort ist Esc nicht Panik (im Spiel wird Esc oft aus Versehen gedrückt), nur der rote Knopf. */
+export const PANIC_NO_ESC = [/^\/parkour/, /^\/deathrun/, /^\/team\//]

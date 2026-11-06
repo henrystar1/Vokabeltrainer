@@ -96,7 +96,7 @@ export default function ModRightsTab() {
   return (
     <div className="space-y-5">
       <Notice tone="info">
-        Das ist der Standard für alle Mods und Alphamods. Für einzelne Personen kannst du ihn im Tab „Einzelne Mods“ überschreiben. Admins dürfen immer alles. Punkte ± und Artikel schenken bleiben immer bei den Admins. Änderungen gelten sofort.
+        Das ist der Standard für alle Mods und Alphamods. Für einzelne Personen kannst du ihn unter „Benutzer“ (Person öffnen, dann „Mod-Rechte“) überschreiben. Admins dürfen immer alles. Punkte ± und Artikel schenken bleiben immer bei den Admins. Änderungen gelten sofort.
       </Notice>
       {(settings.error || editable.error || books.error) && <ErrorBox message={settings.error ?? editable.error ?? books.error ?? ''} />}
       {error && <ErrorBox message={error} />}

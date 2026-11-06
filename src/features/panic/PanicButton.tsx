@@ -1,6 +1,6 @@
 import { useEffect } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
-import { PANIC_PATHS, setPanic, usePanic } from './panic'
+import { PANIC_NO_ESC, PANIC_PATHS, setPanic, usePanic } from './panic'
 
 /**
  * Roter Knopf (oder Esc) auf den Spiele-Seiten: blendet Spiele, Gambling, Chat und Shop aus und springt zur Startseite.
@@ -20,12 +20,12 @@ export default function PanicButton() {
   useEffect(() => {
     if (!visible) return
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape' && !document.querySelector('[role="dialog"]')) trigger()
+      if (e.key === 'Escape' && !PANIC_NO_ESC.some((r) => r.test(pathname)) && !document.querySelector('[role="dialog"]')) trigger()
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [visible])
+  }, [visible, pathname])
 
   if (!visible) return null
   return (

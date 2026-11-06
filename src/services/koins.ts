@@ -119,9 +119,10 @@ export const setTagsHidden = (hidden: boolean) => rpc<void>('set_tags_hidden', {
 
 export type RightMode = 'none' | 'selected' | 'all'
 export interface StaffRow { user_id: string; display_name: string; role: 'mod' | 'alphamod'; books_mode: RightMode | null; set_mode: RightMode | null; shop: boolean | null; timeout_max: number | null; book_count: number; setting_count: number }
-export interface StaffRights { books_mode: RightMode | null; set_mode: RightMode | null; shop: boolean | null; timeout_max: number | null; /** Darf Parkour-Läufe ansehen und als Gast einsteigen */ spectate: boolean; /** Freigegebene Auftritte im Parkour (Migration 0055) */ looks: Array<'hammer' | 'piano' | 'guitar'>; book_ids: string[]; setting_keys: string[] }
+export interface StaffRights { books_mode: RightMode | null; set_mode: RightMode | null; shop: boolean | null; timeout_max: number | null; /** Darf Parkour-Läufe ansehen und als Gast einsteigen */ spectate: boolean; /** Darf im Parkour Herzen auffüllen und sich wiederbeleben (Migration 0069) */ heal: boolean; /** Freigegebene Auftritte im Parkour (Migration 0055) */ looks: Array<'hammer' | 'piano' | 'guitar'>; book_ids: string[]; setting_keys: string[] }
 export const adminListStaff = () => rpc<StaffRow[]>('admin_list_staff')
 export const adminGetStaffRights = (userId: string) => rpc<StaffRights>('admin_get_staff_rights', { p_user: userId })
+export const adminSetStaffHeal = (userId: string, heal: boolean) => rpc<void>('admin_set_staff_heal', { p_user: userId, p_heal: heal })
 export const adminSetStaffRights = (userId: string, r: Pick<StaffRights, 'books_mode' | 'set_mode' | 'shop' | 'timeout_max' | 'spectate' | 'looks'>) =>
   rpc<void>('admin_set_staff_rights', { p_user: userId, p_books_mode: r.books_mode, p_set_mode: r.set_mode, p_shop: r.shop, p_timeout: r.timeout_max, p_spectate: r.spectate, p_looks: r.looks })
 export const adminSetStaffBook = (userId: string, bookId: string, allowed: boolean) => rpc<void>('admin_set_staff_book', { p_user: userId, p_book: bookId, p_allowed: allowed })
@@ -151,6 +152,9 @@ export const setHidePresence = (hidden: boolean) => rpc<void>('set_hide_presence
 
 // --- Funktionen sperren (Admin) ---
 export type LockKey = 'games' | 'gambling' | 'sprint' | 'duels' | 'chat' | 'shop' | 'quests' | 'print'
+  | 'parkour' | 'learn' | 'copy' | 'cards' | 'cram' | 'test' | 'practice' | 'grammar' | 'irregular' | 'conjugate' | 'gender'
+  | 'books' | 'search' | 'math' | 'memorize' | 'homework' | 'advent' | 'ranking' | 'stats' | 'presence' | 'websites' | 'plus'
+  | 'board' | 'feedback'
 export interface LockRule { days: number[]; from: string; to: string }
 export interface FeatureLock { key: LockKey; off_until: string | null; rules: LockRule[]; note: string; locked_now: boolean }
 export const getLockedFeatures = () => rpc<LockKey[]>('get_locked_features')

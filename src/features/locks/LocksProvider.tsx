@@ -24,7 +24,12 @@ export function LocksProvider({ children }: { children: ReactNode }) {
     return () => { window.clearInterval(t); document.removeEventListener('visibilitychange', reload) }
   }, [userId, profileReady, reload])
   const panic = usePanic()
-  const all = useMemo<ReadonlySet<LockKey>>(() => (panic ? new Set([...locked, ...PANIC_KEYS]) : locked), [locked, panic])
+  const all = useMemo<ReadonlySet<LockKey>>(() => {
+    const s = new Set<LockKey>(locked)
+    if (s.has('duels')) s.add('parkour') // Parkour gehört zu den Duellen: wer die sperrt, sperrt Parkour mit
+    if (panic) PANIC_KEYS.forEach((k) => s.add(k))
+    return s
+  }, [locked, panic])
   const value = useMemo(() => ({ locked: all, reload }), [all, reload])
   return <LocksContext.Provider value={value}>{children}</LocksContext.Provider>
 }

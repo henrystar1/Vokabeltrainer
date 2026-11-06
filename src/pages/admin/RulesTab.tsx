@@ -6,7 +6,7 @@ import { ErrorBox, Notice, Spinner } from '../../components/ui/States'
 import { errorMessage } from '../../lib/errors'
 import { useAsync } from '../../lib/useAsync'
 import { getAppSettings, staffSetSetting, type MyPermissions } from '../../services/koins'
-import { SECTIONS } from './ruleDefs'
+import { CATEGORIES, SECTIONS, categoryOf } from './ruleDefs'
 
 /** Zahlen einstellen. Mods sehen nur, was ihnen freigegeben wurde. */
 export default function RulesTab({ perms }: { perms: MyPermissions }) {
@@ -15,6 +15,8 @@ export default function RulesTab({ perms }: { perms: MyPermissions }) {
   const [draft, setDraft] = useState<Record<string, string>>({})
   const [saved, setSaved] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const [cat, setCat] = useState<string>('learn')
+  const [query, setQuery] = useState('')
 
   async function save(key: string) {
     const v = Number.parseInt(draft[key], 10)
@@ -29,15 +31,39 @@ export default function RulesTab({ perms }: { perms: MyPermissions }) {
     }
   }
 
+  const visible = SECTIONS.map((s) => ({ ...s, rules: s.rules.filter((r) => may(r.key)) })).filter((s) => s.rules.length > 0)
+  const q = query.trim().toLowerCase()
+  const firstCat = CATEGORIES.find((c) => visible.some((v) => categoryOf(v.title) === c.id))?.id
+  const activeCat = visible.some((v) => categoryOf(v.title) === cat) ? cat : firstCat
+  const shown = q
+    ? visible.map((s) => ({ ...s, rules: s.rules.filter((r) => `${r.label} ${r.hint ?? ''} ${r.key} ${s.title}`.toLowerCase().includes(q)) })).filter((s) => s.rules.length > 0)
+    : visible.filter((s) => categoryOf(s.title) === activeCat)
+
   return (
     <div className="space-y-5">
       <Notice tone="info">Änderungen gelten sofort für alle – auch rückwirkend für die Ranglisten, weil die Punkte bei jedem Aufruf neu berechnet werden.{!perms.admin && !perms.settings_all && ' Du siehst nur die Zahlen, die ein Admin dir freigegeben hat.'}</Notice>
       {settings.error && <ErrorBox message={settings.error} />}
       {error && <ErrorBox message={error} />}
       {settings.loading && !settings.data && <Spinner />}
+      {settings.data && (
+        <div className="space-y-3">
+          <div className="flex flex-wrap items-center gap-2">
+            {CATEGORIES.map((c) => {
+              const n = visible.filter((v) => categoryOf(v.title) === c.id).length
+              if (n === 0) return null
+              return (
+                <button key={c.id} type="button" aria-pressed={!q && cat === c.id} onClick={() => { setCat(c.id); setQuery('') }}
+                  className={`min-h-[40px] rounded-xl px-3 text-sm transition ${!q && cat === c.id ? 'bg-accent-cyan/10 text-accent-cyan shadow-[inset_0_0_0_1px_rgb(var(--c-cyan)/0.25)]' : 'text-slate-400 hover:bg-white/5 hover:text-slate-100'}`}>
+                  {c.label}
+                </button>
+              )
+            })}
+            <TextInput value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Suchen (z. B. Coins, Parkour, Limit)" aria-label="Einstellung suchen" className="max-w-xs" />
+          </div>
+        </div>
+      )}
       {settings.data &&
-        SECTIONS.map((s) => ({ ...s, rules: s.rules.filter((r) => may(r.key)) }))
-          .filter((s) => s.rules.length > 0)
+        shown
           .map((s) => (
           <Card key={s.title} className="space-y-3">
             <div>

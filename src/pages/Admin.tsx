@@ -1,7 +1,7 @@
 import { useEffect, useState, type ReactNode } from 'react'
 import { matchSubTab } from '../lib/subTabs'
 import { useSearchParams } from 'react-router-dom'
-import { Ban, Box, Sparkles, ListOrdered, Palette, Printer, Calculator, Flag, Gift, KeyRound, UserPlus, Power, MessageSquarePlus, Radio, ShieldCheck, SlidersHorizontal, Store, Ticket, UserCog, Users } from 'lucide-react'
+import { Ban, Box, Sparkles, ListOrdered, Palette, Printer, Calculator, Flag, Gift, KeyRound, UserPlus, Power, MessageSquarePlus, Radio, ShieldCheck, SlidersHorizontal, Store, Ticket, Users } from 'lucide-react'
 import PageHeader from '../components/ui/PageHeader'
 import { ErrorBox, Spinner } from '../components/ui/States'
 import { useAuth } from '../features/auth/AuthProvider'
@@ -68,7 +68,6 @@ export default function Admin() {
           tabs: [
             { id: 'users' as const, label: 'Benutzer', icon: <Users size={15} /> },
             { id: 'accounts' as const, label: 'Konten anlegen', icon: <UserPlus size={15} /> },
-            { id: 'staff' as const, label: 'Einzelne Mods', icon: <UserCog size={15} /> },
             { id: 'modrights' as const, label: 'Standard-Rechte', icon: <KeyRound size={15} /> },
           ],
         }]

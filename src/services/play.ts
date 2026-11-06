@@ -256,7 +256,7 @@ export const teamSpectate = (id: string) => rpc<TeamState>('team_spectate', { p_
 export interface AdminRun { id: string; kind: 'parkour' | 'deathrun'; status: 'lobby' | 'running'; is_open: boolean; bots: number; created_at: string; starts_at: string | null; players: string[] }
 /** Darf ich Läufe ansehen, und mit welchem Auftritt komme ich ins Spiel? (Migration 0054) */
 export type EntranceLook = 'blackhole' | 'hammer' | 'piano' | 'guitar'
-export interface RunPerks { spectate: boolean; look: EntranceLook | null; allowed: EntranceLook[]; entrance: string | null }
+export interface RunPerks { spectate: boolean; heal: boolean; look: EntranceLook | null; allowed: EntranceLook[]; entrance: string | null }
 export const myRunPerks = () => rpc<RunPerks>('my_run_perks')
 /** Auftritt wählen: 'blackhole' | 'hammer' | 'piano' | 'guitar' | 'none' */
 export const parkourSetEntrance = (look: EntranceLook | 'none') => rpc<RunPerks>('parkour_set_entrance', { p_look: look })

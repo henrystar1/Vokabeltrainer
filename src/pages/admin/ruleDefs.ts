@@ -104,8 +104,7 @@ export const SECTIONS: Array<{ title: string; text?: string; rules: Rule[] }> = 
     ],
   },
   {
-    title: 'Coins & Belohnungen',
-    text: 'Was es für Aktionen an Coins gibt.',
+    title: 'Belohnungen: Lernen, Abschreiben, Fehler melden',
     rules: [
       { key: 'book_price_default', label: 'Standardpreis für neu veröffentlichte Bücher' },
       { key: 'copy_reward', label: 'Coins fürs Abschreiben einer Lektion' },
@@ -115,9 +114,13 @@ export const SECTIONS: Array<{ title: string; text?: string; rules: Rule[] }> = 
       { key: 'learn_coin_every', label: 'Lernen: 1 Coin je so viele richtige Antworten', hint: 'Zählt in Online-Büchern, nicht im Test und nicht in der Wiederholung' },
       { key: 'learn_coin_cap', label: 'Lernen: solche Coins pro Tag höchstens', hint: '0 = aus' },
       { key: 'review_reward', label: 'Coins für eine sinnvolle Fehlermeldung' },
-      { key: 'code_default_amount', label: 'Coins pro Code (Standard)' },
-      { key: 'daily_bonus_mod', label: 'Tagesbonus Mods' },
-      { key: 'daily_bonus_admin', label: 'Tagesbonus Admin' },
+      { key: 'irregular_coin_every', label: 'Unregelmäßige Verben: 1 Coin je so viele richtige Antworten' },
+      { key: 'irregular_coin_cap', label: 'Unregelmäßige Verben: Coins pro Tag höchstens' },
+    ],
+  },
+  {
+    title: 'Belohnungen: Quests und Liga',
+    rules: [
       { key: 'quest_reward_answers', label: 'Quest „Fleißig“: Coins' },
       { key: 'quest_reward_perfect', label: 'Quest „Fehlerfrei“: Coins' },
       { key: 'quest_reward_sprint', label: 'Quest „Sprinter“: Coins' },
@@ -126,45 +129,97 @@ export const SECTIONS: Array<{ title: string; text?: string; rules: Rule[] }> = 
       { key: 'league_reward_2', label: 'Liga: Coins für Platz 2' },
       { key: 'league_reward_3', label: 'Liga: Coins für Platz 3' },
       { key: 'league_min_points', label: 'Liga: Mindestpunkte pro Woche (sonst Abstieg)' },
-      { key: 'duel_reward', label: 'Duell-Sieg: Coins', hint: 'Unentschieden: jeder die Hälfte' },
+    ],
+  },
+  {
+    title: 'Belohnungen: Sprint und Duelle',
+    rules: [
       { key: 'sprint_coin_every', label: 'Sprint: 1 Coin je so viele richtige Antworten' },
       { key: 'sprint_coin_cap', label: 'Sprint: Coins pro Tag höchstens' },
-      { key: 'irregular_coin_every', label: 'Unregelmäßige Verben: 1 Coin je so viele richtige Antworten' },
-      { key: 'irregular_coin_cap', label: 'Unregelmäßige Verben: Coins pro Tag höchstens' },
       { key: 'sprint_extra_cost', label: 'Sprint: Coins je zusätzlicher Sekunde' },
       { key: 'sprint_extra_max', label: 'Sprint: höchstens so viele Zusatzsekunden insgesamt (dauerhaft)' },
-      { key: 'pay_max', label: '!pay: Höchstbetrag pro Überweisung (Coins)' },
-      { key: 'pay_daily_cap', label: '!pay: Coins pro Tag und Person höchstens' },
+      { key: 'duel_reward', label: 'Duell-Sieg: Coins', hint: 'Unentschieden: jeder die Hälfte' },
       { key: 'duel_daily_cap', label: 'Duell-Siege mit Coins pro Tag', hint: 'Gilt auch für die Live-Duell- und Klassen-Prämien' },
       { key: 'live_duel_reward', label: 'Live-Duell (bis 4): Siegprämie', hint: 'Nur Platz 1' },
       { key: 'live_class_reward_1', label: 'Klassen-Battle: Prämie Platz 1' },
       { key: 'live_class_reward_2', label: 'Klassen-Battle: Prämie Platz 2' },
       { key: 'live_class_reward_3', label: 'Klassen-Battle: Prämie Platz 3' },
+    ],
+  },
+  {
+    title: 'Team-Parkour und Parcours',
+    rules: [
       { key: 'team_reward', label: 'Vokabel-Parcours (Team): Coins für jeden bei Erfolg' },
+      { key: 'team_daily_cap', label: 'Team-Spiele: Erfolge mit Coins pro Tag' },
+      { key: 'team_lives', label: 'Team-Spiele (Parkour und Parcours): gemeinsame Grund-Herzen', hint: '1 bis 9, gilt für neue Läufe' },
       { key: 'parkour_coins_level', label: 'Team-Parkour: Coins je geschafftem Level (für jeden)' },
       { key: 'parkour_coins_cp', label: 'Team-Parkour: Coins je erreichtem Checkpoint (für jeden)' },
       { key: 'parkour_coins_bonus', label: 'Team-Parkour: Bonus für Level 8 (für jeden)' },
       { key: 'parkour_coins_endless', label: 'Team-Parkour: Extra-Coins je Level ab Level 9 (für jeden)' },
-      { key: 'team_lives', label: 'Team-Spiele (Parkour und Parcours): gemeinsame Grund-Herzen', hint: '1 bis 9, gilt für neue Läufe' },
+    ],
+  },
+  {
+    title: 'Parkour-Shop und Datenbank-Budget',
+    rules: [
       { key: 'parkour_heart_price', label: 'Parkour-Shop: Preis für das erste Extra-Herz', hint: 'Jedes weitere kostet ein Vielfaches (2×, 3× …)' },
       { key: 'parkour_heart_max', label: 'Parkour-Shop: Extra-Herzen pro Person (höchstens)' },
       { key: 'parkour_color_price', label: 'Parkour-Shop: Preis einer Körperfarbe', hint: 'Gold, Neon und Regenbogen kosten das Dreifache' },
       { key: 'parkour_hat_price', label: 'Parkour-Shop: Preis eines Huts', hint: 'Krone und Flamme kosten das Dreifache' },
-      { key: 'signup_approval', label: 'Neue Konten müssen freigeschaltet werden (1 = ja, 0 = nein)', hint: 'Wer sich selbst registriert, wartet dann auf „Aktivieren“ unter Verwaltung → Benutzer. Konten, die ein Admin anlegt, sind sofort frei' },
       { key: 'parkour_msg_month_k', label: 'Parkour: Monatsbudget je Spiel-Datenbank (in Tausend Nachrichten)', hint: 'Das Spiel läuft über zwei fremde Supabase-Projekte (Free: je 2,2 Mio. im Monat). Ist das Budget der ersten voll, wechselt alles zur zweiten. An einem Tag dürfen bis zu 4× der Tagesschnitt der übrigen Tage verbraucht werden. Ist das erreicht, ist Parkour bis Mitternacht bzw. Monatsende gesperrt. 0 = kein Limit' },
-      { key: 'team_daily_cap', label: 'Team-Spiele: Erfolge mit Coins pro Tag' },
+    ],
+  },
+  {
+    title: 'Coins: Überweisungen, Bonus, Codes und Konten',
+    text: '!pay, Tagesbonus, Codes und Anmeldung.',
+    rules: [
+      { key: 'pay_max', label: '!pay: Höchstbetrag pro Überweisung (Coins)' },
+      { key: 'pay_daily_cap', label: '!pay: Coins pro Tag und Person höchstens' },
+      { key: 'daily_bonus_mod', label: 'Tagesbonus Mods' },
+      { key: 'daily_bonus_admin', label: 'Tagesbonus Admin' },
+      { key: 'code_default_amount', label: 'Coins pro Code (Standard)' },
+      { key: 'signup_approval', label: 'Neue Konten müssen freigeschaltet werden (1 = ja, 0 = nein)', hint: 'Wer sich selbst registriert, wartet dann auf „Aktivieren“ unter Verwaltung → Benutzer. Konten, die ein Admin anlegt, sind sofort frei' },
     ],
   },
   {
     title: 'Spiele',
     rules: [
-      { key: 'advent_force_day', label: 'Adventskalender testen: so tun, als wäre heute Türchen …', hint: '0 = echtes Datum (nur 1. bis 24. Dezember). 1 bis 24 = dieser Tag ist heute offen, auch außerhalb des Dezembers. Nach dem Test wieder auf 0 stellen.' },
-      { key: 'memo_pi_coins_per_10', label: 'Pi lernen: Coins je 10 neue Stellen', hint: 'Nur bei neuem Bestwert. 10 = 1 Coin je Stelle, 0 = keine Coins.' },
+      { key: 'game_fee', label: 'Eintritt pro Runde (Coins)' },
+      { key: 'game_record_reward', label: 'Coins für einen neuen Rekord', hint: 'Wer die Bestenliste des Spiels übertrifft' },
+    ],
+  },
+  {
+    title: 'Auswendig (Pi, Flaggen)',
+    text: 'Belohnung gibt es nur, wenn der eigene Bestwert steigt.',
+    rules: [
+      { key: 'memo_pi_coins_per_10', label: 'Pi lernen: Coins je 10 neue Stellen', hint: '10 = 1 Coin je Stelle, 0 = keine Coins.' },
       { key: 'memo_pi_points_per_10', label: 'Pi lernen: Punkte je 10 neue Stellen', hint: '0 = keine Punkte' },
       { key: 'memo_flags_coins_per_10', label: 'Flaggen lernen: Coins je 10 Lernpunkte', hint: 'Lernpunkte = Summe der Fächer aller Länder (bis 5 je Land). 2 = 1 Coin je 5 Lernpunkte, 0 = keine Coins.' },
       { key: 'memo_flags_points_per_100', label: 'Flaggen lernen: Punkte je 100 Lernpunkte', hint: '0 = keine Punkte' },
-      { key: 'game_fee', label: 'Eintritt pro Runde (Coins)' },
-      { key: 'game_record_reward', label: 'Coins für einen neuen Rekord', hint: 'Wer die Bestenliste des Spiels übertrifft' },
+    ],
+  },
+  {
+    title: 'Adventskalender',
+    text: 'Jede Person bekommt beim Öffnen ihre eigene, zufällige Belohnung. Die vier Gewichte bestimmen, wie oft was kommt (nur das Verhältnis zählt, 0 = nie). Türchen 24 ist immer groß.',
+    rules: [
+      { key: 'advent_force_day', label: 'Testen: so tun, als wäre heute Türchen …', hint: '0 = echtes Datum (nur 1. bis 24. Dezember). 1 bis 24 = dieser Tag ist heute offen. Danach wieder auf 0.' },
+      { key: 'advent_w_coins', label: 'Gewicht: Coins' },
+      { key: 'advent_w_points', label: 'Gewicht: Punkte' },
+      { key: 'advent_w_plus', label: 'Gewicht: Plus-Tage' },
+      { key: 'advent_w_item', label: 'Gewicht: Verkleidung / Design', hint: 'Ab Türchen 2' },
+      { key: 'advent_coins_min', label: 'Coins: mindestens' },
+      { key: 'advent_coins_spread', label: 'Coins: Schwankung (zufällig dazu)' },
+      { key: 'advent_coins_per_day', label: 'Coins: zusätzliche Schwankung je Türchen-Nummer', hint: 'Spätere Türchen können mehr bringen' },
+      { key: 'advent_points_min', label: 'Punkte: mindestens' },
+      { key: 'advent_points_spread', label: 'Punkte: Schwankung' },
+      { key: 'advent_points_per_day', label: 'Punkte: zusätzliche Schwankung je Türchen-Nummer' },
+      { key: 'advent_plus_days_min', label: 'Plus-Tage: mindestens' },
+      { key: 'advent_plus_days_per_6', label: 'Plus-Tage: so viele Extra-Tage je 6 Türchen möglich' },
+      { key: 'advent_item_price_base', label: 'Artikel: Preisgrenze am Anfang (Coins)' },
+      { key: 'advent_item_price_per_day', label: 'Artikel: Preisgrenze wächst je Türchen um (Coins)' },
+      { key: 'advent_final_coins', label: 'Türchen 24: Coins mindestens' },
+      { key: 'advent_final_coins_spread', label: 'Türchen 24: Coins Schwankung' },
+      { key: 'advent_final_plus_days', label: 'Türchen 24: Plus-Tage' },
+      { key: 'advent_final_item_price', label: 'Türchen 24: Preisgrenze des Artikels (Coins)' },
     ],
   },
   {
@@ -176,3 +231,15 @@ export const SECTIONS: Array<{ title: string; text?: string; rules: Rule[] }> = 
   },
 ]
 
+
+/** Hauptbereiche des Zahlen-Tabs: Welche Abschnitte gehören wohin. */
+export const CATEGORIES: Array<{ id: string; label: string; titles: Array<string | RegExp> }> = [
+  { id: 'learn', label: 'Lernen & Punkte', titles: ['Rangliste & Punkte', 'Tages-Quests', /^Lernen/, 'Multiple Choice (Übung)', 'Mathe', /^Auswendig/] },
+  { id: 'rewards', label: 'Belohnungen', titles: [/^Belohnungen/, /^Coins:/] },
+  { id: 'games', label: 'Spiele & Parkour', titles: ['Spiele', 'Adventskalender', /^Team-Parkour/, /^Parkour/] },
+  { id: 'gambling', label: 'Gambling', titles: [/^Gambling/] },
+  { id: 'chat', label: 'Chat', titles: ['Chat'] },
+]
+export function categoryOf(title: string): string {
+  return CATEGORIES.find((c) => c.titles.some((t) => (typeof t === 'string' ? t === title : t.test(title))))?.id ?? 'learn'
+}

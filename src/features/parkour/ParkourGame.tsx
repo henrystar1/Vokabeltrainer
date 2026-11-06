@@ -61,7 +61,7 @@ function ParkourGameInner({ st, startLevel = 0, perks }: { st: TeamState; startL
   perksRef.current = perks
   const canvas = useRef<HTMLCanvasElement>(null)
   useFocusMode(true)
-  const { isAdmin, isStaff, displayName } = useAuth()
+  const { isAdmin, displayName } = useAuth()
   const nameRef = useRef(displayName)
   nameRef.current = displayName
   const adminRef = useRef(isAdmin)
@@ -567,13 +567,13 @@ function ParkourGameInner({ st, startLevel = 0, perks }: { st: TeamState; startL
       setGhostUi(true)
     }
     healApi.current = () => {
-      if (isSpec || finished || over) return
+      if (isSpec || finished || over || !perksRef.current.heal) return
       hearts = maxHearts
       healSeq += 1
       toast = { text: 'Herzen aufgefüllt ♥', t: 2 }
     }
     reviveApi.current = () => {
-      if (isSpec || !over || vs !== 0 || !perksRef.current.spectate) return
+      if (isSpec || !over || vs !== 0 || !perksRef.current.heal) return
       reviveSelf()
       reviveSeq += 1
       healSeq += 1
@@ -1332,11 +1332,11 @@ function ParkourGameInner({ st, startLevel = 0, perks }: { st: TeamState; startL
             <Skull size={16} /> Neustart am Checkpoint
           </button>
         )}
-        {perks.spectate && hud.over && !specUi && (
+        {perks.heal && hud.over && !specUi && (
           <button type="button" onClick={() => reviveApi.current?.()}
             className="min-h-[44px] rounded-2xl border border-emerald-300/60 bg-emerald-400/20 px-3 text-xs font-semibold text-emerald-100 active:bg-emerald-400/35">✨ Wiederbeleben</button>
         )}
-        {isStaff && !specUi && (
+        {perks.heal && !specUi && (
           <button type="button" onClick={() => healApi.current?.()}
             className="min-h-[44px] rounded-2xl border border-rose-300/50 bg-rose-400/10 px-3 text-xs font-semibold text-rose-100 active:bg-rose-400/25">♥ Heilen</button>
         )}
