@@ -7,7 +7,7 @@ import Modal from '../ui/Modal'
 import ProgressBar from '../ui/ProgressBar'
 import { ErrorBox, Notice } from '../ui/States'
 import { cleanList, toSavePayload } from '../../features/entry/rows'
-import { scanPage } from '../../features/ocr/pipeline'
+import { rescanRegion, scanPage, type Rect } from '../../features/ocr/pipeline'
 import type { OcrWord, ParsedPage } from '../../features/ocr/types'
 import { errorMessage } from '../../lib/errors'
 import ScanOverlay from './ScanOverlay'
@@ -55,6 +55,9 @@ export default function ScanModal({ bookId, language, defaultUnit, defaultPage, 
   const rowRefs = useRef<Record<number, HTMLDivElement | null>>({})
   const nextKey = useRef(1)
   const fileInput = useRef<HTMLInputElement>(null)
+  const [advanced, setAdvanced] = useState(false)
+  const [regionBusy, setRegionBusy] = useState(false)
+  const [regionInfo, setRegionInfo] = useState<string | null>(null)
 
   function toRows(parsed: ParsedPage): ReviewRow[] {
     return parsed.rows.map((r) => ({
@@ -80,6 +83,7 @@ export default function ScanModal({ bookId, language, defaultUnit, defaultPage, 
           setStatus(s)
         },
         language,
+        advanced,
       )
       setImage(parsed.image)
       setSelected(null)
@@ -94,6 +98,39 @@ export default function ScanModal({ bookId, language, defaultUnit, defaultPage, 
       setPhase('pick')
     }
     if (fileInput.current) fileInput.current.value = ''
+  }
+
+  async function onRegion(rect: Rect) {
+    if (!image) return
+    setRegionBusy(true)
+    setError(null)
+    setRegionInfo(null)
+    try {
+      const parsed = await rescanRegion(image, rect, language)
+      const inRect = (r: ReviewRow) => {
+        const f = r.boxes?.foreign[0]
+        if (!f) return false
+        const cx = (f.x0 + f.x1) / 2
+        const cy = (f.y0 + f.y1) / 2
+        return cx >= rect.x && cx <= rect.x + rect.w && cy >= rect.y && cy <= rect.y + rect.h
+      }
+      const fresh = toRows(parsed)
+      setRows((old) => {
+        const kept = old.filter((r) => !inRect(r))
+        const out = [...kept]
+        for (const n of fresh) {
+          const y = n.boxes?.foreign[0]?.y0 ?? 0
+          const at = out.findIndex((r) => r.boxes?.foreign[0] && r.boxes.foreign[0].y0 > y)
+          out.splice(at === -1 ? out.length : at, 0, n)
+        }
+        return out
+      })
+      setRegionInfo(fresh.length > 0 ? `Bereich neu gelesen: ${fresh.length} Zeile(n) ersetzt.` : 'Im Bereich wurde nichts erkannt – die alten Zeilen wurden entfernt. Ziehe den Bereich evtl. etwas größer auf.')
+    } catch (e) {
+      setError(errorMessage(e))
+    } finally {
+      setRegionBusy(false)
+    }
   }
 
   // Das Foto nur im Arbeitsspeicher halten: beim Schließen oder bei einem neuen Foto freigeben
@@ -175,6 +212,10 @@ export default function ScanModal({ bookId, language, defaultUnit, defaultPage, 
             Das Foto wird nur auf deinem Gerät ausgewertet und <strong>nicht gespeichert oder hochgeladen</strong>. Die Texterkennung ist
             kostenlos und braucht keinen Schlüssel – sie ist aber nicht perfekt, darum prüfst du das Ergebnis vor dem Speichern.
           </Notice>
+          <label className="flex items-start gap-2 text-sm text-slate-300">
+            <input type="checkbox" className="mt-1" checked={advanced} onChange={(e) => setAdvanced(e.target.checked)} />
+            <span><strong>Genau-Modus</strong> – höhere Auflösung und zweiter Durchgang, findet mehr vergessene Wörter. Dauert etwa doppelt so lange.</span>
+          </label>
           {error && <ErrorBox message={error} />}
           <input ref={fileInput} type="file" accept="image/*" className="hidden" onChange={(e) => void onFile(e.target.files?.[0])} />
           <Button className="w-full min-h-[52px]" onClick={() => fileInput.current?.click()}>
@@ -209,7 +250,9 @@ export default function ScanModal({ bookId, language, defaultUnit, defaultPage, 
             </label>
           </div>
 
-          {image && <ScanOverlay image={image} rows={rows} selected={selected} onSelect={pick} />}
+          {image && <ScanOverlay image={image} rows={rows} selected={selected} onSelect={pick} onRegion={(r) => void onRegion(r)} busy={regionBusy || phase === 'saving'} />}
+          {regionBusy && <p className="text-sm text-slate-300">Bereich wird noch einmal gelesen …</p>}
+          {regionInfo && <Notice tone="info">{regionInfo}</Notice>}
 
           <p className="text-xs text-slate-400">
             {rows.length} Zeilen erkannt. Mehrere Lösungen trennst du mit einem Semikolon (<code>;</code>). Gelb markierte Zeilen bitte

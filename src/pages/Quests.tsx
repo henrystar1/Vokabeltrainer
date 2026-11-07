@@ -23,6 +23,11 @@ const INFO: Record<QuestFamily, { title: string; text: (q: Quest, rules: Record<
   sprint: { title: 'Sprinter', text: (q) => `${q.goal} richtige Antworten in einem Sprint`, to: '/sprint', cta: 'Sprint' },
   duel: { title: 'Herausforderer', text: (q) => (q.goal > 1 ? `${q.goal} Duelle abschließen` : 'Ein Duell gegen einen Freund abschließen'), to: '/duell', cta: 'Duell' },
   plus_answers: { title: 'Plus: Vielschreiber', text: (q) => `${q.goal} Vokabeln an einem Tag richtig beantworten`, to: '/lernen', cta: 'Lernen' },
+  pro_answers: { title: 'Pro: Wissensdurst', text: (q) => `${q.goal} Vokabeln an einem Tag richtig beantworten`, to: '/lernen', cta: 'Lernen' },
+  pro_perfect: { title: 'Pro: Perfektionist', text: (q) => `${q.goal} fehlerfreie Runden an einem Tag`, to: '/lernen', cta: 'Lernen' },
+  pro_sprint: { title: 'Pro: Blitz', text: (q) => `${q.goal} richtige Antworten in einem Sprint`, to: '/sprint', cta: 'Sprint' },
+  pro_duel: { title: 'Pro: Duell-Meister', text: (q) => `${q.goal} Duelle an einem Tag abschließen`, to: '/duell', cta: 'Duell' },
+  pro_games: { title: 'Pro: Dauerspieler', text: (q) => `${q.goal} Spiele an einem Tag beenden`, to: '/spiele', cta: 'Spiele' },
   plus_games: { title: 'Plus: Spieler', text: (q) => `${q.goal} Spiele an einem Tag beenden`, to: '/spiele', cta: 'Spiele' },
 }
 
@@ -74,14 +79,15 @@ export default function Quests() {
           const info = INFO[q.family]
           if (!info) return null
           const done = q.progress >= q.goal
-          const locked = q.plus_only && !plus.active
+          const isPro = q.family.startsWith('pro_')
+          const locked = q.plus_only && !(isPro ? plus.pro : plus.active)
           const finished = q.claimed && q.stage >= q.stages
           return (
             <Card key={q.id} className="flex flex-col gap-3">
               <div className="flex items-start justify-between gap-3">
                 <div>
                   <h2 className="flex items-center gap-1.5 text-lg font-semibold">
-                    {q.plus_only && <Crown size={15} className="text-fuchsia-300" aria-label="Plus" />}
+                    {q.plus_only && <Crown size={15} className={isPro ? 'text-amber-300' : 'text-fuchsia-300'} aria-label={isPro ? 'Pro' : 'Plus'} />}
                     {info.title}
                   </h2>
                   {q.stages > 1 && <p className="font-mono text-[11px] text-slate-500">Stufe {q.stage} von {q.stages}</p>}
@@ -96,7 +102,7 @@ export default function Quests() {
                 <ProgressBar value={(q.progress / q.goal) * 100} label={info.title} />
               </div>
               {locked ? (
-                <button type="button" className="text-left text-sm text-fuchsia-200 hover:underline" onClick={plus.openDialog}>Mit Plus freischalten →</button>
+                <button type="button" className="text-left text-sm text-fuchsia-200 hover:underline" onClick={plus.openDialog}>{isPro ? 'Mit Pro freischalten →' : 'Mit Plus freischalten →'}</button>
               ) : finished ? (
                 <p className="flex items-center gap-2 text-sm text-emerald-300"><Check size={16} /> Alle Stufen für heute geschafft</p>
               ) : q.claimed ? (

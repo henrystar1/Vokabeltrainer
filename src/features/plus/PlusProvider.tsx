@@ -7,6 +7,10 @@ interface PlusState {
   status: PlusStatus | null
   /** Plus aktiv (Admins immer). */
   active: boolean
+  /** Pro aktiv (Admins immer). */
+  pro: boolean
+  /** Foto-Scan erlaubt (Pro, oder Plus wenn der Admin es einstellt). */
+  ocrAllowed: boolean
   reload: () => Promise<void>
   /** Öffnet das Fenster „Vokabeltrainer +“ (Anfrage, Tageskauf). */
   openDialog: () => void
@@ -38,7 +42,7 @@ export function PlusProvider({ children }: { children: ReactNode }) {
     return () => window.clearInterval(t)
   }, [user, profileReady, blocked, reload])
 
-  const value = useMemo<PlusState>(() => ({ status, active: !!status?.active, reload, openDialog: () => setOpen(true) }), [status, reload])
+  const value = useMemo<PlusState>(() => ({ status, active: !!status?.active, pro: !!status?.pro, ocrAllowed: !!status?.ocr_allowed, reload, openDialog: () => setOpen(true) }), [status, reload])
   return (
     <PlusContext.Provider value={value}>
       {children}

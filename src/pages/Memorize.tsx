@@ -110,9 +110,24 @@ function PiTrainer() {
     if (phase !== 'quiz') return
     const leave = () => { setLeft(true); setPhase('learn'); setTyped('') }
     const vis = () => { if (document.hidden) leave() }
+    // iPad: Split View, Slide Over und das halbe Hochwischen ändern oft nur die Fenstergröße oder den Fokus, ohne dass die Seite „versteckt“ wird.
+    const w0 = window.innerWidth
+    const h0 = window.innerHeight
+    const resized = () => { if (Math.abs(window.innerWidth - w0) > 40 || Math.abs(window.innerHeight - h0) > 160) leave() }
+    const poll = window.setInterval(() => { if (!document.hasFocus()) leave() }, 400)
     document.addEventListener('visibilitychange', vis)
     window.addEventListener('blur', leave)
-    return () => { document.removeEventListener('visibilitychange', vis); window.removeEventListener('blur', leave) }
+    window.addEventListener('pagehide', leave)
+    window.addEventListener('resize', resized)
+    window.visualViewport?.addEventListener('resize', resized)
+    return () => {
+      window.clearInterval(poll)
+      document.removeEventListener('visibilitychange', vis)
+      window.removeEventListener('blur', leave)
+      window.removeEventListener('pagehide', leave)
+      window.removeEventListener('resize', resized)
+      window.visualViewport?.removeEventListener('resize', resized)
+    }
   }, [phase])
 
   function startQuiz() { setTyped(''); setHints(0); setWrong(null); setFresh(false); setLeft(false); clearRejected(); void memoPiStart().catch(() => undefined); setPhase('quiz') }
@@ -166,7 +181,7 @@ function PiTrainer() {
       ) : (
         <div className="space-y-3">
           <p className="text-lg font-semibold">{wrong ? `Fehler bei Stelle ${typed.length + 1}: richtig wäre ${wrong}.` : 'Alle 500 Stellen geschafft!'}</p>
-          {rejected && <Notice tone="warn">Dein Wert kommt nicht in die Rangliste: Er wurde zu schnell eingegeben, um echt auswendig zu sein. (Der Server prüft die Zeit.)</Notice>}
+          {rejected && <Notice tone="warn">Dein Wert kommt nicht in die Rangliste: Er wurde zu schnell eingegeben, um echt auswendig zu sein. Wenn du wirklich so schnell tippen kannst: Der Admin kann die Mindestzeit pro Stelle einstellen.</Notice>}
           <p className="text-sm text-slate-300">Du kannst {Math.max(0, typed.length - hints)} Stellen ohne Tipp.{fresh && <b className="ml-1 text-emerald-300">Neuer Bestwert!</b>}</p>
           <div className="flex gap-2"><Button onClick={startQuiz}><RotateCcw size={16} /> Nochmal</Button><Button variant="secondary" onClick={() => setPhase('learn')}>Lernen</Button></div>
         </div>

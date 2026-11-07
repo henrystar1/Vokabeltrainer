@@ -12,5 +12,5 @@ export function useRunPerks(): RunPerks & { ready: boolean; apply: (r: RunPerks)
     myRunPerks().then((r) => { if (alive) setP(r) }).catch(() => { if (alive) setP({ spectate: isAdmin, heal: isAdmin, look: isAdmin ? 'blackhole' : null, allowed: isAdmin ? ['blackhole', 'hammer', 'piano', 'guitar'] : [], entrance: null }) })
     return () => { alive = false }
   }, [user?.id, isAdmin]) // eslint-disable-line react-hooks/exhaustive-deps
-  return { spectate: p?.spectate ?? isAdmin, heal: p?.heal ?? isAdmin, look: p?.look ?? (isAdmin ? 'blackhole' : null), allowed: p?.allowed ?? (isAdmin ? ['blackhole', 'hammer', 'piano', 'guitar'] : []), entrance: p?.entrance ?? null, ready: p !== null, apply: setP }
+  return { spectate: p?.spectate ?? isAdmin, heal: p?.heal ?? isAdmin, heal_limit: p ? p.heal_limit : null, look: p?.look ?? (isAdmin ? 'blackhole' : null), allowed: p?.allowed ?? (isAdmin ? ['blackhole', 'hammer', 'piano', 'guitar'] : []), entrance: p?.entrance ?? null, ready: p !== null, apply: setP }
 }

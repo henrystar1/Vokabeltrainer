@@ -27,9 +27,21 @@ export interface PlusStatus {
   ai_message: string
   max_items: number
   test_sentences: number
+  /** Pro (Migration 0073); fehlt bei älteren Servern. */
+  pro?: boolean
+  pro_until?: string | null
+  pro_lifetime?: boolean
+  pro_tiers?: PlusTier[]
+  ocr_allowed?: boolean
+  pro_perks?: {
+    coin_mult: number; points_mult: number; gamble_boost: number; hearts: number; jumps: number; jump_extra: number
+    no_learn: boolean; spectate: boolean; heal_per_run: number; parkour_limit_mult: number; advent_mult: number
+  }
 }
 
 export const getPlusStatus = () => rpc<PlusStatus>('plus_status')
+export const proBuy = (tier: PlusTier['id']) => rpc<PlusStatus>('pro_buy', { p_tier: tier })
+export const adminProGrant = (user: string, days: number) => rpc<void>('admin_pro_grant', { p_user: user, p_days: days })
 export const plusBuy = (tier: PlusTier['id']) => rpc<PlusStatus>('plus_buy', { p_tier: tier })
 /** Stufe 5 → Stufe 4: macht gelernte Vokabeln wieder fällig (optional nur ein Buch). Gibt die Anzahl zurück. */
 export const plusMakeDue = (book: string | null = null) => rpc<number>('plus_make_due', { p_book: book })

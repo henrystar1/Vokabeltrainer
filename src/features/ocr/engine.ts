@@ -20,7 +20,7 @@ export function createTesseractEngine(languageCode: string): OcrEngine {
   const foreign = OCR_LANGUAGES[languageCode] ?? 'fra'
   return {
     id: `tesseract-${foreign}`,
-    async recognize(image, onProgress) {
+    async recognize(image, onProgress, mode = 'auto') {
     const { createWorker, PSM } = await import('tesseract.js')
     const worker = await createWorker([foreign, 'deu'], 1, {
       langPath: `${import.meta.env.BASE_URL}tessdata`,
@@ -28,7 +28,7 @@ export function createTesseractEngine(languageCode: string): OcrEngine {
       logger: (m: { status: string; progress: number }) => onProgress?.(m.progress, STATUS_DE[m.status] ?? m.status),
     })
     try {
-      await worker.setParameters({ tessedit_pageseg_mode: PSM.AUTO, preserve_interword_spaces: '1' })
+      await worker.setParameters({ tessedit_pageseg_mode: mode === 'sparse' ? PSM.SPARSE_TEXT : PSM.AUTO, preserve_interword_spaces: '1' })
       const { data } = await worker.recognize(image, {}, { blocks: true })
       const words: OcrWord[] = []
       for (const block of data.blocks ?? [])
@@ -40,6 +40,25 @@ export function createTesseractEngine(languageCode: string): OcrEngine {
     } finally {
       await worker.terminate()
     }
+    },
+    async recognizeNumber(image) {
+      const { createWorker, PSM } = await import('tesseract.js')
+      const worker = await createWorker('eng', 1, { langPath: `${import.meta.env.BASE_URL}tessdata`, gzip: false })
+      try {
+        await worker.setParameters({ tessedit_pageseg_mode: PSM.SPARSE_TEXT, tessedit_char_whitelist: '0123456789' })
+        const { data } = await worker.recognize(image, {}, { blocks: true })
+        let best: { n: number; conf: number } | null = null
+        for (const block of data.blocks ?? [])
+          for (const para of block.paragraphs)
+            for (const line of para.lines)
+              for (const w of line.words) {
+                const n = /^\d{1,4}$/.test(w.text) ? Number(w.text) : NaN
+                if (Number.isInteger(n) && n >= 1 && w.confidence >= 85 && (!best || w.confidence > best.conf)) best = { n, conf: w.confidence }
+              }
+        return best ? best.n : null
+      } finally {
+        await worker.terminate()
+      }
     },
   }
 }

@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState, type FocusEvent, type FormEvent, type KeyboardEvent } from 'react'
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
-import { AlertCircle, ArrowLeft, Camera, Check, ChevronRight, Loader2, Plus, Trash2 } from 'lucide-react'
+import { AlertCircle, ArrowLeft, Camera, Check, ChevronRight, Crown, Loader2, Plus, Trash2 } from 'lucide-react'
+import { usePlus } from '../features/plus/PlusProvider'
 import ScanModal from '../components/ocr/ScanModal'
 import AccentBar, { accentsFor } from '../components/ui/AccentBar'
 import Button from '../components/ui/Button'
@@ -36,6 +37,7 @@ const fieldName = (side: Side, i: number) => `${side === 'foreign' ? 'fr' : 'de'
 export default function BookEntry() {
   const { bookId = '' } = useParams()
   const navigate = useNavigate()
+  const plusInfo = usePlus()
   const [params, setParams] = useSearchParams()
   const unit = posInt(params.get('unit'), 1, 0)
   const page = posInt(params.get('seite'), 1, 1)
@@ -321,9 +323,15 @@ export default function BookEntry() {
           <Button type="submit" variant="secondary">Gehe zu</Button>
         </form>
         <div className="flex flex-wrap gap-2">
-          <Button variant="secondary" onClick={() => void openScan()}>
-            <Camera size={16} /> Foto einlesen
-          </Button>
+          {plusInfo.ocrAllowed ? (
+            <Button variant="secondary" onClick={() => void openScan()}>
+              <Camera size={16} /> Foto einlesen
+            </Button>
+          ) : (
+            <Button variant="secondary" onClick={() => navigate('/plus')} title="Den Foto-Scan gibt es mit Vokabeltrainer Pro">
+              <Camera size={16} /> Foto einlesen <Crown size={14} className="text-amber-300" aria-hidden /> Pro
+            </Button>
+          )}
           <Button variant="secondary" onClick={() => void go(unit, page + 1)}>
             Nächste Seite <ChevronRight size={16} />
           </Button>

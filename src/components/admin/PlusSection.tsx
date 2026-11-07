@@ -6,12 +6,13 @@ import { ErrorBox, Notice } from '../ui/States'
 import { errorMessage } from '../../lib/errors'
 import { formatDate } from '../../lib/format'
 import { useAsync } from '../../lib/useAsync'
-import { adminPlusGetSettings, adminPlusGrant, adminPlusOverview, adminPlusRevoke } from '../../services/plus'
+import { adminPlusGetSettings, adminPlusGrant, adminPlusOverview, adminPlusRevoke, adminProGrant } from '../../services/plus'
 
 /** Plus für eine Person vergeben oder entziehen (im Personen-Fenster). */
 export default function PlusSection({ userId, name }: { userId: string; name: string }) {
   const overview = useAsync(adminPlusOverview, [])
   const settings = useAsync(adminPlusGetSettings, [])
+  const [proDays, setProDays] = useState('7')
   const [days, setDays] = useState('')
   const [paid, setPaid] = useState('')
   const [busy, setBusy] = useState(false)
@@ -65,6 +66,19 @@ export default function PlusSection({ userId, name }: { userId: string; name: st
         )}
       </div>
       <p className="text-xs text-slate-500">Bei „Bezahlt“ 0 € gilt es als Geschenk und zählt nicht zum Ziel.</p>
+      <div className="flex flex-wrap items-end gap-2 border-t border-white/10 pt-2">
+        <label className="space-y-1 text-xs text-slate-400">Pro: Tage (36500 = für immer)
+          <TextInput className="!min-h-[40px] w-28" inputMode="numeric" value={proDays} onChange={(e) => setProDays(e.target.value)} />
+        </label>
+        <Button variant="secondary" className="!min-h-[40px] !px-3 text-sm" busy={busy} disabled={!(Number.parseInt(proDays, 10) >= 1)}
+          onClick={() => { if (window.confirm(`${name}: ${proDays} Tage Pro schenken?`)) void run(() => adminProGrant(userId, Number.parseInt(proDays, 10)), 'Pro vergeben.') }}>
+          Pro schenken
+        </Button>
+        <Button variant="danger" className="!min-h-[40px] !px-3 text-sm" busy={busy}
+          onClick={() => { if (window.confirm(`Pro von ${name} beenden?`)) void run(() => adminProGrant(userId, 0), 'Pro beendet.') }}>
+          Pro entziehen
+        </Button>
+      </div>
       {msg && <Notice tone="ok">{msg}</Notice>}
       {error && <ErrorBox message={error} />}
     </section>

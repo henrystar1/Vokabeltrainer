@@ -455,7 +455,7 @@ export interface Streak {
   today_done: boolean
 }
 
-export type QuestFamily = 'answers' | 'perfect' | 'sprint' | 'duel' | 'plus_answers' | 'plus_games'
+export type QuestFamily = 'answers' | 'perfect' | 'sprint' | 'duel' | 'plus_answers' | 'plus_games' | 'pro_answers' | 'pro_perfect' | 'pro_sprint' | 'pro_duel' | 'pro_games'
 /** Quest-ID = Familie_Stufe, z. B. „answers_2“. */
 export type QuestId = string
 

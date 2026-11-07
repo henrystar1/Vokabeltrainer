@@ -447,6 +447,7 @@ body {
 
 /* ---------- Vokabeltrainer +: Menü, Hinweisfeld, Tag ---------- */
 .plus-nav { background-image: linear-gradient(90deg, rgb(217 70 239 / 0.14), rgb(34 211 238 / 0.08)); box-shadow: inset 0 0 0 1px rgb(217 70 239 / 0.28); }
+.pro-banner { color: #fef3c7; background: linear-gradient(120deg, rgb(180 83 9 / 0.55), rgb(234 179 8 / 0.35) 55%, rgb(251 146 60 / 0.35)); background-size: 200% 100%; animation: tag-gold 6s linear infinite; box-shadow: 0 0 28px rgb(251 191 36 / 0.3); }
 .plus-banner { color: #fae8ff; background: linear-gradient(120deg, rgb(147 51 234 / 0.45), rgb(219 39 119 / 0.35) 55%, rgb(34 211 238 / 0.3)); background-size: 200% 100%; animation: tag-gold 6s linear infinite; box-shadow: 0 0 24px rgb(217 70 239 / 0.25); }
 .tag-plus { color: #fff; background: linear-gradient(100deg, #a855f7, #ec4899 45%, #22d3ee 90%); background-size: 200% 100%; animation: tag-gold 3s linear infinite; box-shadow: 0 0 12px rgb(217 70 239 / 0.6); }
 
@@ -477,7 +478,7 @@ body {
 /* Plus-Effekt: weicher violetter Glanz, der über den Namen läuft */
 .fx-plus-glanz { filter: drop-shadow(0 0 5px rgb(217 70 239 / 0.75)); animation: fx-plus-glanz 2.6s ease-in-out infinite; }
 @keyframes fx-plus-glanz { 0%, 100% { filter: drop-shadow(0 0 3px rgb(217 70 239 / 0.6)) brightness(1); } 50% { filter: drop-shadow(0 0 9px rgb(34 211 238 / 0.85)) brightness(1.35); } }
-@media (prefers-reduced-motion: reduce) { .fx-plus-glanz, .tag-plus, .plus-banner { animation: none; } }
+@media (prefers-reduced-motion: reduce) { .fx-plus-glanz, .tag-plus, .plus-banner, .pro-banner { animation: none; } }
 
 /* Plus: schönere Spiele-Grafik (Glühen, Farbtiefe) um das Spielfeld */
 .plus-game {

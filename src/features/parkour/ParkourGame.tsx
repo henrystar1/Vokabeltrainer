@@ -194,8 +194,8 @@ function ParkourGameInner({ st, startLevel = 0, perks }: { st: TeamState; startL
     const botSkills = skillList(st.bot_skill, st.bots ?? 0)
     // Gemeinsamer Herzvorrat: Grundwert, +1 je Person ab der dritten, plus die im Shop gekauften Extra-Herzen aller
     let maxHearts = dr
-      ? Math.min(12, Math.max(1, st.lives || 3) + Math.max(0, Math.min(10, st.people.find((p) => p.user_id === st.me)?.pk_hearts ?? 0)))
-      : Math.min(20, Math.max(1, st.lives || 3) + Math.max(0, players.length - 2) + players.reduce((a, p) => a + Math.max(0, Math.min(10, p.pk_hearts ?? 0)), 0))
+      ? Math.min(20, Math.max(1, st.lives || 3) + Math.max(0, Math.min(20, st.people.find((p) => p.user_id === st.me)?.pk_hearts ?? 0)))
+      : Math.min(40, Math.max(1, st.lives || 3) + Math.max(0, players.length - 2) + players.reduce((a, p) => a + Math.max(0, Math.min(20, p.pk_hearts ?? 0)), 0))
     const SEND_MS = players.length <= 2 ? 90 : players.length === 3 ? 100 : players.length === 4 ? 115 : 130 // Realtime-Nachrichten sparen (Supabase-Kontingent)
     if (perksRef.current.spectate && spec) {
       // Gast (Admin oder Mod mit Zuschauer-Recht): eigene Farbe, Hut, Effekt und Herzen aus dem Shop laden
@@ -566,14 +566,22 @@ function ParkourGameInner({ st, startLevel = 0, perks }: { st: TeamState; startL
       setFlyUi(true)
       setGhostUi(true)
     }
+    let healUsed = 0 // Pro: Heilen/Wiederbeleben ist pro Runde begrenzt (Mods/Admins unbegrenzt)
+    const healAllowed = (): boolean => {
+      const lim = perksRef.current.heal_limit
+      if (lim === null || lim === undefined) return true
+      if (healUsed >= lim) { toast = { text: `Heilen aufgebraucht (${lim}× pro Runde)`, t: 2 }; return false }
+      healUsed += 1
+      return true
+    }
     healApi.current = () => {
-      if (isSpec || finished || over || !perksRef.current.heal) return
+      if (isSpec || finished || over || !perksRef.current.heal || !healAllowed()) return
       hearts = maxHearts
       healSeq += 1
       toast = { text: 'Herzen aufgefüllt ♥', t: 2 }
     }
     reviveApi.current = () => {
-      if (isSpec || !over || vs !== 0 || !perksRef.current.heal) return
+      if (isSpec || !over || vs !== 0 || !perksRef.current.heal || !healAllowed()) return
       reviveSelf()
       reviveSeq += 1
       healSeq += 1
@@ -617,7 +625,7 @@ function ParkourGameInner({ st, startLevel = 0, perks }: { st: TeamState; startL
         fxField.clear()
         setJoined(true)
         // Gast-Admin bekommt seine Herzen aus dem Shop
-        if (spec && guestLook && !guestHeartsGiven) { guestHeartsGiven = true; const extra = Math.max(0, Math.min(10, guestLook.pk_hearts ?? 0)); maxHearts += extra; hearts = maxHearts }
+        if (spec && guestLook && !guestHeartsGiven) { guestHeartsGiven = true; const extra = Math.max(0, Math.min(20, guestLook.pk_hearts ?? 0)); maxHearts += extra; hearts = maxHearts }
         // Schwarzes Loch (Admin) bzw. Hammer und Blitz (Mod) an der Stelle, an der die Figur erscheint
         const lookIn = perksRef.current.look
         if (lookIn) { holes.push({ x: px, y: py, t: 0, kind: 'in', lv, face: me.face, look: lookIn }); appearT = LOOKS[lookIn].appear }

@@ -39,5 +39,8 @@ export interface ParsedPage {
 /** Austauschbare Erkennung: Bild → Wörter mit Positionen. */
 export interface OcrEngine {
   readonly id: string
-  recognize(image: HTMLCanvasElement, onProgress?: (fraction: number, status: string) => void): Promise<OcrWord[]>
+  /** `sparse`: zweiter Durchgang für verstreuten Text (findet Wörter, die der normale Durchgang übersieht). */
+  recognize(image: HTMLCanvasElement, onProgress?: (fraction: number, status: string) => void, mode?: 'auto' | 'sparse'): Promise<OcrWord[]>
+  /** Nur Ziffern in einem kleinen Bildstreifen (Seitenzahl); Zahl mit hoher Sicherheit oder null. */
+  recognizeNumber?(image: HTMLCanvasElement): Promise<number | null>
 }
