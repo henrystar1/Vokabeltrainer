@@ -11,7 +11,10 @@ import { SettingRow } from './print/PricesTab'
 
 const GROUPS: { title: string; text?: string; keys: string[] }[] = [
   { title: 'Preise (nur Coins)', text: 'Plus wird nur mit Coins gekauft. Du kannst es weiterhin im Personen-Fenster vergeben.', keys: ['plus_price_d1', 'plus_price_d7', 'plus_price_d30', 'plus_price_d90', 'plus_price_life'] },
-  { title: 'Vorteile', keys: ['plus_coin_mult', 'plus_points_mult', 'plus_gamble_boost_percent', 'plus_revive_price', 'plus_revive_max'] },
+  { title: 'Pro: Preise (nur Coins)', text: 'Pro steht über Plus. Längere Laufzeiten sollten pro Tag etwas günstiger sein.', keys: ['pro_price_d1', 'pro_price_d7', 'pro_price_d30', 'pro_price_d90', 'pro_price_life'] },
+  { title: 'Pro: Vorteile', keys: ['pro_coin_mult', 'pro_points_mult', 'pro_gamble_boost_percent', 'pro_advent_mult', 'pro_advent_plus_days', 'pro_quest_base', 'pro_ocr_plus'] },
+  { title: 'Pro: Parkour', keys: ['pro_hearts', 'pro_jumps', 'pro_jump_extra', 'pro_no_learn', 'pro_spectate', 'pro_heal_per_run', 'pro_parkour_limit_mult'] },
+  { title: 'Plus: Vorteile', keys: ['plus_coin_mult', 'plus_points_mult', 'plus_gamble_boost_percent', 'plus_revive_price', 'plus_revive_max'] },
   { title: 'KI-Grenzen', text: 'Setze zusätzlich im OpenAI-Konto ein Ausgabenlimit. Das hier ist die zweite Sicherung.', keys: ['ai_enabled', 'ai_user_month_eur', 'ai_user_day_gens', 'ai_global_month_eur', 'ai_max_items', 'ai_test_sentences'] },
   { title: 'Modellpreise (für die Kostenberechnung)', keys: ['ai_usd_in', 'ai_usd_out', 'ai_usd_eur'] },
 ]

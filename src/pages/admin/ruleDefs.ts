@@ -229,6 +229,28 @@ export const SECTIONS: Array<{ title: string; text?: string; rules: Rule[] }> = 
     ],
   },
   {
+    title: 'Loot Drop',
+    text: 'Jeden Tag ein Paket für alle (nur die schnellste Person) und ein persönliches Paket für jeden. Gewichte: nur das Verhältnis zählt, 0 = nie. Pro-Mitglieder bekommen Beträge und Artikelwert mal „Pro: Adventskalender-Gewinne“ (Verwaltung → Plus & Pro).',
+    rules: [
+      { key: 'loot_p_w_coins', label: 'Persönlich – Gewicht: Coins' },
+      { key: 'loot_p_w_points', label: 'Persönlich – Gewicht: Punkte' },
+      { key: 'loot_p_w_item', label: 'Persönlich – Gewicht: Verkleidung / Design' },
+      { key: 'loot_p_coins_min', label: 'Persönlich – Coins: mindestens' },
+      { key: 'loot_p_coins_spread', label: 'Persönlich – Coins: Schwankung (zufällig dazu)' },
+      { key: 'loot_p_points_min', label: 'Persönlich – Punkte: mindestens' },
+      { key: 'loot_p_points_spread', label: 'Persönlich – Punkte: Schwankung' },
+      { key: 'loot_p_item_price', label: 'Persönlich – Artikel: Preisgrenze (Coins)' },
+      { key: 'loot_g_w_coins', label: 'Für alle – Gewicht: Coins' },
+      { key: 'loot_g_w_points', label: 'Für alle – Gewicht: Punkte' },
+      { key: 'loot_g_w_item', label: 'Für alle – Gewicht: Verkleidung / Design' },
+      { key: 'loot_g_coins_min', label: 'Für alle – Coins: mindestens' },
+      { key: 'loot_g_coins_spread', label: 'Für alle – Coins: Schwankung' },
+      { key: 'loot_g_points_min', label: 'Für alle – Punkte: mindestens' },
+      { key: 'loot_g_points_spread', label: 'Für alle – Punkte: Schwankung' },
+      { key: 'loot_g_item_price', label: 'Für alle – Artikel: Preisgrenze (Coins)' },
+    ],
+  },
+  {
     title: 'Chat',
     rules: [
       { key: 'chat_per_minute', label: 'Nachrichten pro Minute und Person', hint: 'Gegen Spam' },
@@ -242,7 +264,7 @@ export const SECTIONS: Array<{ title: string; text?: string; rules: Rule[] }> = 
 export const CATEGORIES: Array<{ id: string; label: string; titles: Array<string | RegExp> }> = [
   { id: 'learn', label: 'Lernen & Punkte', titles: ['Rangliste & Punkte', 'Tages-Quests', /^Lernen/, 'Multiple Choice (Übung)', 'Mathe', /^Auswendig/] },
   { id: 'rewards', label: 'Belohnungen', titles: [/^Belohnungen/, /^Coins:/] },
-  { id: 'games', label: 'Spiele & Parkour', titles: ['Spiele', 'Adventskalender', /^Team-Parkour/, /^Parkour/] },
+  { id: 'games', label: 'Spiele & Parkour', titles: ['Spiele', 'Adventskalender', 'Loot Drop', /^Team-Parkour/, /^Parkour/] },
   { id: 'gambling', label: 'Gambling', titles: [/^Gambling/] },
   { id: 'chat', label: 'Chat', titles: ['Chat'] },
 ]

@@ -1,5 +1,5 @@
 import type { LockKey } from '../services/koins'
-import { BookOpen, MessageSquarePlus, ShoppingBag, UserCircle, Brain, ClipboardCheck, Home, Search, Settings, ShieldCheck, Trophy, BarChart3, Gamepad2, MessagesSquare, Target, Swords, Zap, ListChecks, Languages, ArrowLeftRight, Dices, Users, Pin, PenLine, Printer, Sparkles, Crown, Calculator, Timer, Layers, Shuffle, Mountain, Skull, ClipboardList, Globe, Gift, Binary, type LucideIcon } from 'lucide-react'
+import { BookOpen, MessageSquarePlus, ShoppingBag, UserCircle, Brain, ClipboardCheck, Home, Search, Settings, ShieldCheck, Trophy, BarChart3, Gamepad2, MessagesSquare, Target, Swords, Zap, ListChecks, Languages, ArrowLeftRight, Dices, Users, Pin, PenLine, Printer, Sparkles, Crown, Calculator, Timer, Layers, Shuffle, Mountain, Skull, ClipboardList, Globe, Gift, Package, Binary, type LucideIcon } from 'lucide-react'
 
 export interface NavItem {
   to: string
@@ -47,6 +47,7 @@ export const NAV_GROUPS: NavGroup[] = [
     { lock: 'memorize', to: '/auswendig', label: 'Auswendig (Pi, Flaggen)', icon: Binary },
     { lock: 'homework', to: '/hausaufgaben', label: 'Hausaufgaben', icon: ClipboardList },
     { lock: 'advent', to: '/advent', label: 'Adventskalender', icon: Gift },
+    { lock: 'loot', to: '/loot', label: 'Loot Drop', icon: Package },
   ]), langPicker: true },
   g('Wettkampf', [
     { lock: 'quests', to: '/quests', label: 'Quests', icon: Target },
@@ -64,7 +65,7 @@ export const NAV_GROUPS: NavGroup[] = [
     { lock: 'presence', to: '/online', label: 'Wer ist da?', icon: Users },
     { lock: 'websites', to: '/websites', label: 'Websites', icon: Globe },
     { lock: 'shop', to: '/shop', label: 'Shop', icon: ShoppingBag },
-    { lock: 'plus', to: '/plus', label: 'Plus', icon: Crown, brand: true },
+    { lock: 'plus', to: '/plus', label: 'Plus & Pro', icon: Crown, brand: true },
     { lock: 'print', to: '/druckshop', label: '3D-Druck-Shop', icon: Printer },
   ]),
   g('Konto', [

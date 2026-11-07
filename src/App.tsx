@@ -27,6 +27,7 @@ import MathPage from './pages/Math'
 import Memorize from './pages/Memorize'
 import HomeworkPage from './pages/Homework'
 import AdventPage from './pages/Advent'
+import LootPage from './pages/Loot'
 import WebsitesPage from './pages/Websites'
 import Cram from './pages/Cram'
 import Flashcards from './pages/Flashcards'
@@ -119,6 +120,7 @@ export default function App() {
           <Route path="auswendig" element={<Gate k="memorize"><Memorize /></Gate>} />
           <Route path="hausaufgaben" element={<Gate k="homework"><HomeworkPage /></Gate>} />
           <Route path="advent" element={<Gate k="advent"><AdventPage /></Gate>} />
+          <Route path="loot" element={<Gate k="loot"><LootPage /></Gate>} />
           <Route path="websites" element={<Gate k="websites"><WebsitesPage /></Gate>} />
           <Route path="crashkurs" element={<Gate k="cram"><Cram /></Gate>} />
           <Route path="karteikarten" element={<Gate k="cards"><Flashcards /></Gate>} />

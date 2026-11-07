@@ -36,11 +36,12 @@ const LABEL: Record<LockKey, string> = {
   memorize: 'Auswendig (Pi, Flaggen)',
   homework: 'Hausaufgaben',
   advent: 'Adventskalender',
+  loot: 'Loot Drop',
   ranking: 'Rangliste',
   stats: 'Statistik',
   presence: 'Wer ist da?',
   websites: 'Websites',
-  plus: 'Plus',
+  plus: 'Plus & Pro',
   board: 'Schwarzes Brett',
   feedback: 'Feedback',
 }

@@ -33,6 +33,7 @@ const REASONS: Record<string, string> = {
   game_win: 'Spiel-Rekord',
   gambling_bet: 'Gambling-Einsatz',
   gambling_win: 'Gambling-Gewinn',
+  loot: 'Loot Drop',
   choice: 'Multiple Choice',
   math: 'Mathe',
   copy: 'Abschreiben',

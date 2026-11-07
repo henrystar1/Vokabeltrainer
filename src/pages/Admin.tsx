@@ -99,7 +99,7 @@ export default function Admin() {
         },
         {
           id: 'plus',
-          label: plusTodo > 0 ? `Plus (${plusTodo})` : 'Plus',
+          label: plusTodo > 0 ? `Plus & Pro (${plusTodo})` : 'Plus & Pro',
           icon: <Sparkles size={16} />,
           tabs: [
             { id: 'plus' as const, label: plusTodo > 0 ? `Anfragen & KI (${plusTodo})` : 'Anfragen & KI', icon: <Sparkles size={15} /> },

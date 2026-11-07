@@ -43,5 +43,19 @@ export type AdventReward =
   | { type: 'plus'; days: number }
   | { type: 'item'; id: string; kind: 'avatar' | 'color' | 'effect' | 'theme' | 'tag'; name: string; price: number }
 export interface AdventStatus { state: 'before' | 'active' | 'over'; today: number; year: number; opened: Array<{ day: number; rewards: AdventReward[] }> }
+export const adminAdventReset = (all: boolean) => rpc<number>('admin_advent_reset', { p_all: all })
+
+/** Loot Drop (Migration 0074) */
+export interface LootStatus {
+  day: string
+  personal: { opened: boolean; rewards: AdventReward[] }
+  global: { opened: boolean; mine: boolean; by: string | null; rewards: AdventReward[] }
+  gifts: Array<{ id: string; amount: number }>
+}
+export const lootStatus = () => rpc<LootStatus>('loot_status')
+export const lootOpen = (kind: 'global' | 'personal') => rpc<{ kind: string; rewards: AdventReward[] }>('loot_open', { p_kind: kind })
+export const lootGiftsSeen = () => rpc<void>('loot_gifts_seen')
+export const adminLootGift = (count: number, amount: number) => rpc<string[]>('admin_loot_gift', { p_count: count, p_amount: amount })
+export const adminLootReset = (all: boolean) => rpc<number>('admin_loot_reset', { p_all: all })
 export const adventStatus = () => rpc<AdventStatus>('advent_status')
 export const adventOpen = (day: number) => rpc<{ day: number; rewards: AdventReward[] }>('advent_open', { p_day: day })
