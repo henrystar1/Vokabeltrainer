@@ -6,12 +6,13 @@ import { ErrorBox, Notice } from '../ui/States'
 import { errorMessage } from '../../lib/errors'
 import { formatDate } from '../../lib/format'
 import { useAsync } from '../../lib/useAsync'
-import { adminPlusGetSettings, adminPlusGrant, adminPlusOverview, adminPlusRevoke, adminProGrant } from '../../services/plus'
+import { adminPlusGetSettings, adminPlusGrant, adminPlusOverview, adminPlusRevoke, adminProGrant, adminGetOcr, adminSetOcr } from '../../services/plus'
 
 /** Plus für eine Person vergeben oder entziehen (im Personen-Fenster). */
 export default function PlusSection({ userId, name }: { userId: string; name: string }) {
   const overview = useAsync(adminPlusOverview, [])
   const settings = useAsync(adminPlusGetSettings, [])
+  const ocr = useAsync(() => adminGetOcr(userId), [userId])
   const [proDays, setProDays] = useState('7')
   const [days, setDays] = useState('')
   const [paid, setPaid] = useState('')
@@ -77,6 +78,13 @@ export default function PlusSection({ userId, name }: { userId: string; name: st
         <Button variant="danger" className="!min-h-[40px] !px-3 text-sm" busy={busy}
           onClick={() => { if (window.confirm(`Pro von ${name} beenden?`)) void run(() => adminProGrant(userId, 0), 'Pro beendet.') }}>
           Pro entziehen
+        </Button>
+      </div>
+      <div className="flex flex-wrap items-center gap-2 border-t border-white/10 pt-2">
+        <span className="text-sm text-slate-300">Foto-Scan ohne Pro: <b>{ocr.data ? 'freigeschaltet' : 'nicht freigeschaltet'}</b></span>
+        <Button variant="secondary" className="!min-h-[40px] !px-3 text-sm" busy={busy} disabled={ocr.loading}
+          onClick={() => void run(async () => { await adminSetOcr(userId, !ocr.data); ocr.reload() }, ocr.data ? 'Foto-Scan entzogen.' : 'Foto-Scan freigeschaltet.')}>
+          {ocr.data ? 'Foto-Scan entziehen' : 'Foto-Scan freischalten'}
         </Button>
       </div>
       {msg && <Notice tone="ok">{msg}</Notice>}
