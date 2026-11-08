@@ -11,6 +11,7 @@ import { NotifyProvider } from '../../features/notify/NotifyProvider'
 import { PlusProvider } from '../../features/plus/PlusProvider'
 import PushPrompt from '../../features/push/PushPrompt'
 import LiveInviteWatcher from '../../features/duel/LiveInviteWatcher'
+import ProgressWatcher from '../../features/progress/ProgressWatcher'
 import VersionTag from '../ui/VersionTag'
 
 export default function AppShell() {
@@ -39,6 +40,7 @@ export default function AppShell() {
         <PanicButton />
         <PushPrompt />
         <LiveInviteWatcher />
+        <ProgressWatcher />
         {!focus && <MobileNav />}
       </div>
     </FocusProvider>

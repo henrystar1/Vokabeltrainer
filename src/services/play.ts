@@ -9,6 +9,9 @@ export const getSprintBonus = () => rpc<number>('get_sprint_bonus')
 export const getSprintBoard = () => rpc<SprintRow[]>('get_sprint_board')
 
 export const getStreak = () => rpc<Streak>('get_streak')
+export interface WatchRow { rank: number; display_name: string; points: number; is_me: boolean; avatar_id?: string | null; color_id?: string | null }
+export interface WatchProgress { claimable: Array<{ id: QuestId; family: string; stage: number; reward: number }>; rank: number | null; points: number | null; rows: WatchRow[] }
+export const watchProgress = () => rpc<WatchProgress>('watch_progress')
 export const getQuests = () => rpc<Quest[]>('get_quests')
 export const claimQuest = (id: QuestId) => rpc<number>('claim_quest', { p_id: id })
 

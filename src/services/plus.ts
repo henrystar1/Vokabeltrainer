@@ -44,6 +44,10 @@ export const proBuy = (tier: PlusTier['id']) => rpc<PlusStatus>('pro_buy', { p_t
 export const adminProGrant = (user: string, days: number) => rpc<void>('admin_pro_grant', { p_user: user, p_days: days })
 export const adminSetOcr = (user: string, on: boolean) => rpc<void>('admin_set_ocr', { p_user: user, p_on: on })
 export const adminGetOcr = (user: string) => rpc<boolean>('admin_get_ocr', { p_user: user })
+export interface RecentBuy { id: number; name: string; pro: boolean; days: number; coins: number; at: string }
+export const plusRecentBuys = () => rpc<RecentBuy[]>('plus_recent_buys')
+export const adminLeagueMove = (user: string, delta: number) => rpc<number>('admin_league_move', { p_user: user, p_delta: delta })
+export const adminLeagueTier = (user: string) => rpc<number | null>('admin_league_tier', { p_user: user })
 export const plusBuy = (tier: PlusTier['id']) => rpc<PlusStatus>('plus_buy', { p_tier: tier })
 /** Stufe 5 → Stufe 4: macht gelernte Vokabeln wieder fällig (optional nur ein Buch). Gibt die Anzahl zurück. */
 export const plusMakeDue = (book: string | null = null) => rpc<number>('plus_make_due', { p_book: book })

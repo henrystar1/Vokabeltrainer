@@ -333,7 +333,7 @@ begin
   if not exists (select 1 from pg_proc p join pg_namespace ns on ns.oid = p.pronamespace where ns.nspname = 'public' and p.proname = '_advent_plan_base') then
     for r in select p.oid from pg_proc p join pg_namespace ns on ns.oid = p.pronamespace where ns.nspname = 'public' and p.proname = '_advent_plan'
     loop
-      execute replace(pg_get_functiondef(r.oid), 'function public._advent_plan(', 'function public._advent_plan_base(');
+      execute regexp_replace(pg_get_functiondef(r.oid), 'function public\._advent_plan\(', 'function public._advent_plan_base(', 'i');
     end loop;
   end if;
 end;

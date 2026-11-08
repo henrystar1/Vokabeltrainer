@@ -1,8 +1,9 @@
 import { useState } from 'react'
-import { Gift, Package, Zap } from 'lucide-react'
+import { Gift, Zap } from 'lucide-react'
 import Button from '../components/ui/Button'
 import Card from '../components/ui/Card'
 import { TextInput } from '../components/ui/Field'
+import LootBox from '../components/ui/LootBox'
 import PageHeader from '../components/ui/PageHeader'
 import RewardReveal, { type Reward } from '../components/ui/RewardReveal'
 import { ErrorBox, Notice, Spinner } from '../components/ui/States'
@@ -37,7 +38,7 @@ export default function LootPage() {
     setBusy(kind)
     setError(null)
     try {
-      const r = await lootOpen(kind)
+      const [r] = await Promise.all([lootOpen(kind), new Promise((res) => window.setTimeout(res, 2000))])
       setReveal({ title: kind === 'global' ? 'Du warst am schnellsten!' : 'Dein Paket', rewards: toReveal(r.rewards) })
     } catch (e) {
       setError(errorMessage(e))
@@ -85,29 +86,19 @@ export default function LootPage() {
         </Notice>
       )}
       <div className="grid gap-4 md:grid-cols-2">
-        <Card className="space-y-3">
-          <h2 className="flex items-center gap-2 text-lg font-semibold"><Zap size={18} className="text-yellow-300" aria-hidden /> Paket für alle</h2>
-          <p className="text-sm text-slate-300">Nur die schnellste Person am Tag darf es öffnen. Dafür ist mehr drin als im persönlichen Paket.</p>
-          {data.global.opened ? (
-            <p className="rounded-xl border border-white/10 bg-white/5 p-3 text-sm text-slate-200">
-              {data.global.mine ? 'Das Paket von heute hast du geöffnet. Bis morgen!' : `Heute war ${data.global.by ?? 'jemand'} schneller. Morgen ist ein neues Paket da.`}
-            </p>
-          ) : (
-            <Button className="w-full min-h-[52px]" busy={busy === 'global'} onClick={() => void open('global')}>
-              <Package size={18} /> Jetzt schnell öffnen!
-            </Button>
-          )}
+        <Card className="space-y-3 text-center">
+          <h2 className="flex items-center justify-center gap-2 text-lg font-semibold"><Zap size={18} className="text-yellow-300" aria-hidden /> Paket für alle</h2>
+          <LootBox tone="gold" label="Paket für alle öffnen" state={busy === 'global' ? 'opening' : data.global.opened ? (data.global.mine ? 'open' : 'taken') : 'closed'} onOpen={() => void open('global')} />
+          <p className="text-sm text-slate-300">
+            {data.global.opened
+              ? data.global.mine ? 'Das Paket von heute hast du geöffnet. Bis morgen!' : `Heute war ${data.global.by ?? 'jemand'} schneller. Morgen ist ein neues Paket da.`
+              : 'Nur die schnellste Person am Tag darf es öffnen. Dafür ist mehr drin! Tippe aufs Paket, schnell!'}
+          </p>
         </Card>
-        <Card className="space-y-3">
-          <h2 className="flex items-center gap-2 text-lg font-semibold"><Gift size={18} className="text-emerald-300" aria-hidden /> Dein Paket</h2>
-          <p className="text-sm text-slate-300">Jeden Tag ein eigenes Paket, das nur dir gehört.</p>
-          {data.personal.opened ? (
-            <p className="rounded-xl border border-white/10 bg-white/5 p-3 text-sm text-slate-200">Dein Paket für heute hast du schon geöffnet. Bis morgen!</p>
-          ) : (
-            <Button className="w-full min-h-[52px]" busy={busy === 'personal'} onClick={() => void open('personal')}>
-              <Gift size={18} /> Paket öffnen
-            </Button>
-          )}
+        <Card className="space-y-3 text-center">
+          <h2 className="flex items-center justify-center gap-2 text-lg font-semibold"><Gift size={18} className="text-emerald-300" aria-hidden /> Dein Paket</h2>
+          <LootBox tone="green" label="Dein Paket öffnen" state={busy === 'personal' ? 'opening' : data.personal.opened ? 'open' : 'closed'} onOpen={() => void open('personal')} />
+          <p className="text-sm text-slate-300">{data.personal.opened ? 'Dein Paket für heute hast du schon geöffnet. Bis morgen!' : 'Jeden Tag ein eigenes Paket, das nur dir gehört. Tippe drauf!'}</p>
         </Card>
       </div>
 
@@ -143,7 +134,7 @@ export default function LootPage() {
           {msg && <Notice tone="ok">{msg}</Notice>}
         </Card>
       )}
-      {reveal && <RewardReveal title={reveal.title} rewards={reveal.rewards} onClose={() => setReveal(null)} />}
+      {reveal && <RewardReveal gift={false} title={reveal.title} rewards={reveal.rewards} onClose={() => setReveal(null)} />}
     </div>
   )
 }

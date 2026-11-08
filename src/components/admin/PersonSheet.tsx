@@ -3,6 +3,7 @@ import { useState } from 'react'
 import { BookOpen, Crown, Gift, Plus, RotateCcw, Send, ShieldCheck, ShieldOff, Trash2, UserCheck, Ban, Wrench } from 'lucide-react'
 import ManageUser from './ManageUser'
 import PlusSection from './PlusSection'
+import LeagueSection from './LeagueSection'
 import CoinLockSection from './CoinLockSection'
 import { Avatar } from '../profile/PlayerTag'
 import Button from '../ui/Button'
@@ -304,6 +305,8 @@ export default function PersonSheet({ user: u, status, onClose, onChanged }: { u
         <CoinLockSection userId={u.user_id} name={u.display_name} isAdmin={u.role === 'admin'} />
 
         <PlusSection userId={u.user_id} name={u.display_name} />
+
+        <LeagueSection userId={u.user_id} name={u.display_name} />
 
         <section className="space-y-2">
           <h3 className="label-mono">Coins, Punkte, Artikel</h3>

@@ -2,6 +2,7 @@ import { Crown, Sparkles } from 'lucide-react'
 import PageHeader from '../components/ui/PageHeader'
 import { Spinner } from '../components/ui/States'
 import { usePlus } from '../features/plus/PlusProvider'
+import BuyTicker from '../features/plus/BuyTicker'
 import PlusTiers from '../features/plus/PlusTiers'
 import { plusPerks, proPerks } from '../features/plus/perks'
 import { formatDate } from '../lib/format'
@@ -50,6 +51,7 @@ export default function PlusPage() {
           </ul>
         </section>
       )}
+      <BuyTicker />
       <section>
         <h2 className="mb-3 text-lg font-semibold">Das bekommst du mit Plus</h2>
         <ul className="grid gap-3 sm:grid-cols-2">
