@@ -202,6 +202,8 @@ export interface SearchResult {
   page_number: number
 }
 
+export interface LanguageDefault { words_per_round: number; direction_to_foreign: boolean; direction_to_german: boolean }
+
 export interface UserSettings {
   learn_language: string
   direction_to_foreign: boolean
@@ -210,6 +212,8 @@ export interface UserSettings {
   case_sensitive: boolean
   /** Falsche Vokabeln am Ende so oft wiederholen, bis alle richtig sind. */
   repeat_until_correct: boolean
+  /** Pro Sprache gemerkt: Abfragen pro Runde und Richtung (Schlüssel = Sprachcode). */
+  language_defaults?: Record<string, LanguageDefault>
   /** Kleine Hinweise am Rand: bei @-Erwähnung im Chat. */
   notify_mentions: boolean
   /** … bei jeder neuen Chat-Nachricht. */

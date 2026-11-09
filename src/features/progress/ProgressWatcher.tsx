@@ -1,11 +1,12 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { useLocation } from 'react-router-dom'
-import { ArrowUp, Check, Target, X } from 'lucide-react'
+import { Link, useLocation } from 'react-router-dom'
+import { ArrowUp, Check, Puzzle, Target, X } from 'lucide-react'
 import CoinIcon from '../../components/ui/CoinIcon'
 import { useAuth } from '../auth/AuthProvider'
 import { useWallet } from '../koins/WalletProvider'
 import { usePlus } from '../plus/PlusProvider'
 import { claimQuest, watchProgress, type WatchProgress, type WatchRow } from '../../services/play'
+import { OG_NAMES, type OgKind } from '../../services/online'
 import { detectOvertakes, type Snapshot } from './overtakes'
 
 const POLL_MS = 75_000
@@ -32,6 +33,7 @@ export default function ProgressWatcher() {
   const plus = usePlus()
   const loc = useLocation()
   const [claimable, setClaimable] = useState<WatchProgress['claimable']>([])
+  const [invites, setInvites] = useState<NonNullable<WatchProgress['invites']>>([])
   const [busy, setBusy] = useState(false)
   const [dismissed, setDismissed] = useState<Set<string>>(new Set())
   const [passed, setPassed] = useState<{ me: Snapshot; who: WatchRow[]; fromRank: number | null } | null>(null)
@@ -47,6 +49,7 @@ export default function ProgressWatcher() {
     try {
       const w = await watchProgress()
       setClaimable(w.claimable)
+      setInvites(w.invites ?? [])
       const cur: Snapshot = { rank: w.rank, points: w.points, rows: w.rows }
       const who = detectOvertakes(prev.current, cur)
       if (who.length > 0) setPassed({ me: cur, who, fromRank: prev.current?.rank ?? null })
@@ -72,6 +75,8 @@ export default function ProgressWatcher() {
 
   const shown = claimable.filter((q) => !dismissed.has(q.id))
   const q = shown[0]
+  const inv = invites.filter((i) => !dismissed.has(`g${i.id}`))[0]
+  const onGame = loc.pathname.startsWith('/mehrspieler')
 
   async function claim() {
     if (!q || busy) return
@@ -80,7 +85,8 @@ export default function ProgressWatcher() {
       wallet.setBalance(await claimQuest(q.id as never))
       void plus.reload()
     } catch {
-      /* z. B. schon abgeholt */
+      /* z. B. schon abgeholt oder gesperrt: nicht immer wieder anzeigen */
+      setDismissed((d) => new Set(d).add(q.id))
     } finally {
       setBusy(false)
       setClaimable((c) => c.filter((x) => x.id !== q.id))
@@ -103,6 +109,16 @@ export default function ProgressWatcher() {
               <Check size={16} /> Abholen
             </button>
             <button type="button" aria-label="Später" onClick={() => setDismissed((d) => new Set(d).add(q.id))} className="flex min-h-[44px] w-9 items-center justify-center text-slate-500 hover:text-slate-200"><X size={16} /></button>
+          </div>
+        </div>
+      )}
+      {inv && !onGame && !q && (
+        <div className="fixed inset-x-0 bottom-24 z-[55] flex justify-center px-4 md:bottom-6" role="status">
+          <div className="ov-a flex w-full max-w-md items-center gap-3 rounded-2xl border border-cyan-300/40 bg-slate-900/95 p-3 shadow-xl backdrop-blur" style={{ animation: 'ov-in .4s ease-out both' }}>
+            <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-cyan-500/20 text-cyan-300"><Puzzle size={20} aria-hidden /></span>
+            <p className="min-w-0 flex-1 text-sm text-white"><b>{inv.host}</b> lädt dich zu {OG_NAMES[inv.kind as OgKind] ?? 'einem Spiel'} ein.</p>
+            <Link to={`/mehrspieler/${inv.id}`} className="inline-flex min-h-[44px] items-center rounded-xl bg-cyan-400 px-3 text-sm font-semibold text-slate-950 hover:bg-cyan-300">Ansehen</Link>
+            <button type="button" aria-label="Später" onClick={() => setDismissed((d) => new Set(d).add(`g${inv.id}`))} className="flex min-h-[44px] w-9 items-center justify-center text-slate-500 hover:text-slate-200"><X size={16} /></button>
           </div>
         </div>
       )}

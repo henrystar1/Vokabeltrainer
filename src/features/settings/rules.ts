@@ -22,6 +22,23 @@ export function normalizeQuestionCount(n: number, bothDirections: boolean): numb
   return v
 }
 
+/** Gespeicherte Standardwerte einer Sprache über die Einstellungen legen (nur wenn für die Sprache etwas gemerkt ist). */
+export function withLanguageDefaults(s: UserSettings, language: string): UserSettings {
+  const d = s.language_defaults?.[language]
+  return d ? { ...s, learn_language: language, words_per_round: d.words_per_round, direction_to_foreign: d.direction_to_foreign, direction_to_german: d.direction_to_german } : { ...s, learn_language: language }
+}
+
+/** Aktuelle Anzahl und Richtung als Standard der aktuellen Sprache merken. */
+export function rememberLanguageDefaults(s: UserSettings): UserSettings {
+  return {
+    ...s,
+    language_defaults: {
+      ...s.language_defaults,
+      [s.learn_language]: { words_per_round: s.words_per_round, direction_to_foreign: s.direction_to_foreign, direction_to_german: s.direction_to_german },
+    },
+  }
+}
+
 export function normalizeSettings(s: UserSettings): UserSettings {
   const both = s.direction_to_foreign && s.direction_to_german
   const neither = !s.direction_to_foreign && !s.direction_to_german

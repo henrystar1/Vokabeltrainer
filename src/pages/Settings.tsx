@@ -230,7 +230,7 @@ export default function Settings() {
         {tab === 'lernen' && (
           <>
             <Card className="space-y-4">
-              <p className="label-mono">Sprache und Richtung</p>
+              <p className="label-mono">Sprache, Richtung und Anzahl</p>
               <Field label="Lernsprache">
                 <Select value={settings.learn_language} onChange={(e) => void run(() => update({ learn_language: e.target.value }))}>
                   {languages.data?.map((l) => (
@@ -242,9 +242,6 @@ export default function Settings() {
                 <Toggle label="Fremdsprache → Deutsch" checked={settings.direction_to_german} onChange={(v) => setDirection('direction_to_german', v)} />
                 <Toggle label="Deutsch → Fremdsprache" checked={settings.direction_to_foreign} onChange={(v) => setDirection('direction_to_foreign', v)} />
               </div>
-            </Card>
-            <Card className="space-y-4">
-              <p className="label-mono">Runde</p>
               <Field
                 label="Abfragen pro Runde (1–200)"
                 hint={both ? `Bei beiden Richtungen wird jede Vokabel zweimal abgefragt – die Zahl ist gerade (${Math.floor(settings.words_per_round / 2)} Vokabeln).` : undefined}
@@ -257,6 +254,20 @@ export default function Settings() {
                   onKeyDown={(e) => e.key === 'Enter' && commitCount()}
                 />
               </Field>
+              <p className="text-xs text-slate-500">
+                Richtung und Anzahl gelten für die gewählte Lernsprache. Die App merkt sie sich für jede Sprache getrennt und stellt sie beim Wechseln wieder ein.
+                {languages.data && Object.keys(settings.language_defaults ?? {}).length > 0 && (
+                  <span className="mt-1 block">
+                    Gemerkt: {languages.data.filter((l) => settings.language_defaults?.[l.code]).map((l) => {
+                      const d = settings.language_defaults![l.code]
+                      return `${l.name} ${d.words_per_round} Abfragen, ${d.direction_to_german && d.direction_to_foreign ? 'beide Richtungen' : d.direction_to_german ? 'Fremdsprache → Deutsch' : 'Deutsch → Fremdsprache'}`
+                    }).join(' · ')}
+                  </span>
+                )}
+              </p>
+            </Card>
+            <Card className="space-y-4">
+              <p className="label-mono">Runde</p>
               <Toggle label="Groß-/Kleinschreibung beachten" checked={settings.case_sensitive} onChange={(v) => void run(() => update({ case_sensitive: v }))} />
               <Toggle label="Falsche Vokabeln am Ende wiederholen, bis alle richtig sind" checked={settings.repeat_until_correct} onChange={(v) => void run(() => update({ repeat_until_correct: v }))} />
               <p className="text-xs text-slate-500">Nach der Lernrunde kommen alle falsch beantworteten Fragen so lange noch einmal dran, bis du jede richtig hattest. Dein Lernstand ändert sich dadurch nicht.</p>

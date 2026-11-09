@@ -10,7 +10,7 @@ export const getSprintBoard = () => rpc<SprintRow[]>('get_sprint_board')
 
 export const getStreak = () => rpc<Streak>('get_streak')
 export interface WatchRow { rank: number; display_name: string; points: number; is_me: boolean; avatar_id?: string | null; color_id?: string | null }
-export interface WatchProgress { claimable: Array<{ id: QuestId; family: string; stage: number; reward: number }>; rank: number | null; points: number | null; rows: WatchRow[] }
+export interface WatchProgress { claimable: Array<{ id: QuestId; family: string; stage: number; reward: number }>; rank: number | null; points: number | null; rows: WatchRow[]; invites?: Array<{ id: string; kind: string; host: string }> }
 export const watchProgress = () => rpc<WatchProgress>('watch_progress')
 export const getQuests = () => rpc<Quest[]>('get_quests')
 export const claimQuest = (id: QuestId) => rpc<number>('claim_quest', { p_id: id })
@@ -206,6 +206,7 @@ export const teamParkourFinish = (id: string, millis: number, deaths: number, le
 export const teamDeathrunFinish = (id: string, millis: number, deaths: number, levels: number, cps: number) =>
   rpc<void>('team_deathrun_finish', { p_id: id, p_millis: millis, p_deaths: deaths, p_levels: levels, p_cps: cps })
 export interface DeathrunScore { name: string; avatar_id: string | null; color_id: string | null; levels: number; cps: number; millis: number; deaths: number; group_size: number; finished_at: string }
+export const adminParkourDelete = (kind: 'deathrun' | 'team', name: string | null, name2: string | null = null) => rpc<number>('admin_parkour_delete', { p_kind: kind, p_name: name, p_name2: name2 })
 export const deathrunBoard = () => rpc<DeathrunScore[]>('deathrun_board')
 export interface ParkourScore {
   host_name: string; host_avatar_id: string | null; host_color_id: string | null

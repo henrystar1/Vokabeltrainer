@@ -2,7 +2,7 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useState, t
 import type { UserSettings } from '../../types'
 import { DEFAULT_SETTINGS, loadSettings, saveSettings } from '../../services/settings'
 import { useAuth } from '../auth/AuthProvider'
-import { normalizeSettings } from './rules'
+import { normalizeSettings, rememberLanguageDefaults, withLanguageDefaults } from './rules'
 import { setAnswerLanguage } from '../learning/answer'
 
 interface SettingsState {
@@ -42,7 +42,13 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
   const update = useCallback(
     async (patch: Partial<UserSettings>) => {
       if (!userId) return
-      const next = normalizeSettings({ ...settings, ...patch })
+      let next = { ...settings, ...patch }
+      // Sprache gewechselt: Anzahl und Richtung dieser Sprache laden (falls gemerkt); sonst Werte merken, die geändert wurden.
+      if (patch.learn_language && patch.learn_language !== settings.learn_language) next = withLanguageDefaults(next, patch.learn_language)
+      next = normalizeSettings(next)
+      if (patch.words_per_round !== undefined || patch.direction_to_foreign !== undefined || patch.direction_to_german !== undefined || !next.language_defaults?.[next.learn_language]) {
+        next = rememberLanguageDefaults(next)
+      }
       setSettings(next)
       await saveSettings(userId, next)
     },

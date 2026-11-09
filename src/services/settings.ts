@@ -15,18 +15,28 @@ export const DEFAULT_SETTINGS: UserSettings = {
   notify_dm: 'window',
 }
 
+const BASE_COLS = 'learn_language,direction_to_foreign,direction_to_german,words_per_round,case_sensitive,repeat_until_correct,notify_mentions,notify_chat,notify_print,notify_online,notify_dm'
+/** Gibt es die Spalte language_defaults (Migration 0081)? Wird beim ersten Fehler ausgeschaltet, damit alte Datenbanken weiter laufen. */
+let hasLanguageCol = true
+
 export async function loadSettings(userId: string): Promise<UserSettings> {
-  const { data, error } = await supabase
-    .from('user_settings')
-    .select('learn_language,direction_to_foreign,direction_to_german,words_per_round,case_sensitive,repeat_until_correct,notify_mentions,notify_chat,notify_print,notify_online,notify_dm')
-    .eq('user_id', userId)
-    .maybeSingle()
-  if (error) throw error
-  return (data as UserSettings | null) ?? DEFAULT_SETTINGS
+  const run = (cols: string) => supabase.from('user_settings').select(cols).eq('user_id', userId).maybeSingle()
+  let res = await run(hasLanguageCol ? `${BASE_COLS},language_defaults` : BASE_COLS)
+  if (res.error && hasLanguageCol) {
+    hasLanguageCol = false
+    res = await run(BASE_COLS)
+  }
+  if (res.error) throw res.error
+  return (res.data as unknown as UserSettings | null) ?? DEFAULT_SETTINGS
 }
 
 export async function saveSettings(userId: string, s: UserSettings): Promise<void> {
-  const { error } = await supabase.from('user_settings').upsert({ user_id: userId, ...s })
+  const { language_defaults, ...base } = s
+  let { error } = await supabase.from('user_settings').upsert(hasLanguageCol ? { user_id: userId, ...base, language_defaults: language_defaults ?? {} } : { user_id: userId, ...base })
+  if (error && hasLanguageCol) {
+    hasLanguageCol = false
+    ;({ error } = await supabase.from('user_settings').upsert({ user_id: userId, ...base }))
+  }
   if (error) throw error
 }
 
