@@ -10,6 +10,7 @@ import { useAsync } from '../../lib/useAsync'
 import PersonSheet from '../../components/admin/PersonSheet'
 import { activityLabel } from '../../lib/activity'
 import { adminListUsers, adminUserStatus } from '../../services/admin'
+import { useAuth } from '../../features/auth/AuthProvider'
 import { adminListMessages, adminListOnline, adminSendMessage } from '../../services/koins'
 
 function secondsAgo(iso: string): string {
@@ -19,9 +20,10 @@ function secondsAgo(iso: string): string {
 
 /** Nur für Admins: wer ist gerade online, und Nachrichten an einzelne Nutzer oder alle. */
 export default function OnlineTab() {
+  const { isAdmin } = useAuth()
   const online = useAsync(adminListOnline, [])
-  const users = useAsync(adminListUsers, [])
-  const sent = useAsync(adminListMessages, [])
+  const users = useAsync(() => (isAdmin ? adminListUsers() : Promise.resolve([])), [isAdmin])
+  const sent = useAsync(() => (isAdmin ? adminListMessages() : Promise.resolve([])), [isAdmin])
   const status = useAsync(adminUserStatus, [])
   const [selected, setSelected] = useState<string | null>(null)
   const [to, setTo] = useState('')
@@ -61,14 +63,14 @@ export default function OnlineTab() {
           </h2>
           <Button variant="ghost" onClick={() => { online.reload(); status.reload() }}>Aktualisieren</Button>
         </div>
-        <p className="text-xs text-slate-500">Als online gilt, wer in den letzten 3 Minuten die App geöffnet hatte. Nur Admins sehen diese Liste. Tippe auf eine Person für Details und Nachricht.</p>
+        <p className="text-xs text-slate-500">Als online gilt, wer in den letzten 3 Minuten die App geöffnet hatte. Nur Admins und freigegebene Mods sehen diese Liste – auch Personen, die sich versteckt haben.{isAdmin ? ' Tippe auf eine Person für Details und Nachricht.' : ''}</p>
         {online.loading && !online.data && <Spinner />}
         {online.error && <ErrorBox message={online.error} onRetry={online.reload} />}
         {online.data?.length === 0 && <p className="text-sm text-slate-500">Gerade ist niemand online.</p>}
         <ul className="grid gap-2 sm:grid-cols-2">
           {online.data?.map((u) => (
             <li key={u.user_id}>
-              <button type="button" onClick={() => setSelected(u.user_id)} className="flex min-h-[48px] w-full items-center justify-between gap-2 rounded-lg bg-white/5 px-3 text-left hover:bg-white/10">
+              <button type="button" onClick={() => isAdmin && setSelected(u.user_id)} className="flex min-h-[48px] w-full items-center justify-between gap-2 rounded-lg bg-white/5 px-3 text-left hover:bg-white/10">
                 <span className="flex min-w-0 items-center gap-2">
                   <span className="h-2 w-2 shrink-0 rounded-full bg-emerald-400 shadow-[0_0_6px_#34d399]" />
                   <PlayerTag name={u.display_name} cosmetics={{ avatar_id: u.avatar_id, color_id: u.color_id, effect_id: u.effect_id, role: u.role }} size={28} />
@@ -92,6 +94,7 @@ export default function OnlineTab() {
         />
       )}
 
+      {isAdmin && <>
       <section className="glass space-y-4 rounded-2xl p-5">
         <h2 className="text-lg font-semibold">Nachricht an alle oder eine Person</h2>
         <p className="text-sm text-slate-400">Der Empfänger sieht die Nachricht beim nächsten Öffnen der App (spätestens nach einer Minute) als Fenster, bis er sie bestätigt.</p>
@@ -128,6 +131,7 @@ export default function OnlineTab() {
           ))}
         </ul>
       </section>
+      </>}
     </div>
   )
 }

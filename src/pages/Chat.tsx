@@ -16,6 +16,8 @@ import { siteLinksList } from '../services/tasks'
 import { mentionsName } from '../lib/mentions'
 import { deleteChatMessage, getChat, postChat, searchPlayers, timeoutChatUser } from '../services/play'
 import { getMyPermissions } from '../services/koins'
+import { getPresence } from '../services/social'
+import { useAsync } from '../lib/useAsync'
 import type { ChatMessage } from '../types'
 
 const POLL_MS = 10_000
@@ -106,7 +108,7 @@ const GroupRow = memo(function GroupRow({ g, live, isStaff, me, onDelete, onTime
             return (
               <li key={m.id} className={`group flex items-start gap-2 ${pinged ? '-mx-2 rounded-lg bg-amber-300/15 px-2 py-1 ring-1 ring-amber-300/30' : ''}`} data-pinged={pinged || undefined}>
                 {(() => {
-                  const st = m.kind === 'text' ? parseSticker(m.body) : null
+                  const st = m.kind !== 'pay' ? parseSticker(m.body) : null
                   return st
                     ? <div className="min-w-0 flex-1"><Sticker def={st} size={112} /></div>
                     : <p className="min-w-0 flex-1 whitespace-pre-wrap break-words text-sm text-slate-100"><ChatText body={m.body} /></p>
@@ -152,6 +154,8 @@ export default function Chat() {
   const [hashTag, setHashTag] = useState<{ query: string; start: number } | null>(null)
   const [siteNames, setSiteNames] = useState<string[] | null>(null)
   const [remote, setRemote] = useState<string[]>([])
+  const [stickerTo, setStickerTo] = useState('')
+  const people = useAsync(() => (stickers ? getPresence() : Promise.resolve([])), [stickers])
   const inputRef = useRef<HTMLInputElement>(null)
   const listRef = useRef<HTMLDivElement>(null)
   const stick = useRef(true)
@@ -447,7 +451,19 @@ export default function Chat() {
             <li className="self-center text-xs text-slate-500">Tab zum Übernehmen</li>
           </ul>
         )}
-        {stickers && <div className="mb-3"><StickerPicker onPick={(id) => void send({ preventDefault() { /* kein Formular */ } } as FormEvent, stickerBody(id))} /></div>}
+        {stickers && (
+          <div className="mb-3 space-y-2">
+            <label className="flex flex-wrap items-center gap-2 text-xs text-slate-400">
+              <EyeOff size={13} /> Privat senden an
+              <select value={stickerTo} onChange={(e) => setStickerTo(e.target.value)} aria-label="Sticker privat senden an" className="min-h-[36px] rounded-lg border border-white/10 bg-space-900/70 px-2 text-sm text-slate-200">
+                <option value="">Alle im Chat</option>
+                {(people.data ?? []).filter((x) => x.display_name !== displayName).map((x) => <option key={x.user_id} value={x.display_name}>{x.display_name}</option>)}
+              </select>
+              {stickerTo && <span className="text-violet-300">nur {stickerTo} sieht ihn</span>}
+            </label>
+            <StickerPicker onPick={(id) => void send({ preventDefault() { /* kein Formular */ } } as FormEvent, stickerTo ? `!whisper @${stickerTo} ${stickerBody(id)}` : stickerBody(id))} />
+          </div>
+        )}
         <form onSubmit={(e) => void send(e)} className="flex gap-2">
           <input
             ref={inputRef}

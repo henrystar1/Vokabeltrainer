@@ -6,7 +6,7 @@ import PageHeader from '../components/ui/PageHeader'
 import { ErrorBox, Spinner } from '../components/ui/States'
 import { useAuth } from '../features/auth/AuthProvider'
 import { useAsync } from '../lib/useAsync'
-import { getMyPermissions } from '../services/koins'
+import { getMyPermissions, staffCanSeeOnline } from '../services/koins'
 import FeedbackTab from './admin/FeedbackTab'
 import { CodesSection, GrantSection, ItemsSection } from './admin/KoinsTab'
 import AccountsTab from './admin/AccountsTab'
@@ -40,6 +40,7 @@ export default function Admin() {
   const { isAdmin, role } = useAuth()
   const perms = useAsync(getMyPermissions, [])
   const p = perms.data
+  const seeOnline = useAsync(() => (isAdmin ? Promise.resolve(true) : staffCanSeeOnline().catch(() => false)), [isAdmin])
   const todo = usePrintTodo()
   const [params] = useSearchParams()
   const plusCounts = useAsync(() => (isAdmin ? adminPlusCounts() : Promise.resolve({ requests: 0, ai_problem: false })), [isAdmin])
@@ -57,7 +58,7 @@ export default function Admin() {
       tabs: [
         { id: 'reviews', label: 'Prüfanfragen', icon: <Flag size={15} /> },
         { id: 'feedback', label: 'Feedback', icon: <MessageSquarePlus size={15} /> },
-        ...(isAdmin ? [{ id: 'online' as const, label: 'Online & Nachrichten', icon: <Radio size={15} /> }] : []),
+        ...(isAdmin || seeOnline.data ? [{ id: 'online' as const, label: isAdmin ? 'Online & Nachrichten' : 'Live-Sicht', icon: <Radio size={15} /> }] : []),
       ],
     },
     ...(isAdmin
@@ -142,7 +143,7 @@ export default function Admin() {
       {group.tabs.length === 1 && <div className="mb-5" />}
       {active === 'reviews' && <ReviewsTab />}
       {active === 'feedback' && <FeedbackTab />}
-      {active === 'online' && isAdmin && <OnlineTab />}
+      {active === 'online' && (isAdmin || seeOnline.data) && <OnlineTab />}
       {active === 'users' && isAdmin && <UsersTab />}
       {active === 'accounts' && isAdmin && <AccountsTab />}
       {active === 'staff' && isAdmin && <StaffRightsTab />}

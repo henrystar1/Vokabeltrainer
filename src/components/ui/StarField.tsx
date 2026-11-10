@@ -5,6 +5,7 @@ import { BlackHoleBackdrop, BlackHoleBeams } from './BlackHole'
 import { MountainBackdrop } from './Mountains'
 import { FootballBackdrop } from './Football'
 import { FoodBackdrop } from './Food'
+import { BalloonBackdrop, FireworksBackdrop } from './Update100'
 
 interface Particle {
   id: number
@@ -27,7 +28,7 @@ function makeParticles(decor: Decor, colors: string[]): Particle[] {
     seed = (seed * 16807) % 2147483647
     return seed / 2147483647
   }
-  const count = { stars: 60, bubbles: 22, petals: 22, confetti: 40, fireflies: 24, code: 26, sparkles: 34, blackhole: 0, mountains: 0, football: 0, food: 0 }[decor]
+  const count = { stars: 60, bubbles: 22, petals: 22, confetti: 40, fireflies: 24, code: 26, sparkles: 34, blackhole: 0, mountains: 0, football: 0, food: 0, balloons: 0, fireworks: 0 }[decor]
   return Array.from({ length: count }, (_, i) => ({
     id: i,
     left: rnd() * 100,
@@ -52,6 +53,8 @@ export default function StarField() {
   if (decor === 'mountains') return <MountainBackdrop />
   if (decor === 'football') return <FootballBackdrop />
   if (decor === 'food') return <FoodBackdrop />
+  if (decor === 'balloons') return <BalloonBackdrop />
+  if (decor === 'fireworks') return <FireworksBackdrop />
   if (decor === 'blackhole') {
     return (
       <>

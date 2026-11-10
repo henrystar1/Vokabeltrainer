@@ -26,6 +26,9 @@ import { addRepeatAnswers, getLearningPool, submitSession } from '../services/le
 import PlusHint from '../features/plus/PlusHint'
 import { usePlus } from '../features/plus/PlusProvider'
 import { plusMakeDue } from '../services/plus'
+import CardBoxPanel from '../features/learning/CardBoxPanel'
+import { previewReward } from '../features/learning/cardBox'
+import { displayLevel } from '../features/learning/algorithm'
 import PageRules from '../components/admin/PageRules'
 
 type Phase = 'setup' | 'loading' | 'main' | 'result' | 'repeat' | 'repeat-result'
@@ -56,6 +59,8 @@ export default function Learn() {
   /** Wie viele automatische Wiederholungsrunden waren nötig (0 = Funktion aus oder keine Fehler). */
   const [autoRounds, setAutoRounds] = useState(0)
   const [mainTotal, setMainTotal] = useState(0)
+  const [fach, setFach] = useState<number | null>(null)
+  const rulesQ = useAsync(() => getAppSettings().catch(() => ({}) as Record<string, number>), [])
 
   const directions = useMemo(() => activeDirections(settings), [settings])
   const language = bookId ? (books.data?.find((b) => b.id === bookId)?.language ?? settings.learn_language) : settings.learn_language
@@ -95,16 +100,17 @@ export default function Learn() {
     try {
       balanceAtStart.current = wallet.balance
       setEarned(0)
-      const pool = mistakeMode
+      let pool = mistakeMode
         ? await getMistakePool(bookId || null)
         : await getLearningPool(bookId ? null : settings.learn_language, bookId || null)
+      if (fach !== null && !mistakeMode) pool = pool.filter((v) => displayLevel(v.level) === fach)
       levels.current = Object.fromEntries(pool.map((v) => [v.vocabulary_id, v.level]))
       const build = mistakeMode ? buildMistakeQuestions : buildLearningQuestions
       const rules = await getAppSettings().catch(() => ({}) as Record<string, number>)
       const gapMinutes = [rules.learn_gap_l1 ?? 0, rules.learn_gap_l2 ?? 0, rules.learn_gap_l3 ?? 0, rules.learn_gap_l4 ?? 0]
       const qs = build(pool, { directions, questionCount: settings.words_per_round, gapMinutes })
       if (qs.length === 0) {
-        setError(mistakeMode ? 'Keine Fehler in den letzten 30 Tagen – es gibt nichts zu trainieren. Starke Leistung!' : pool.length === 0 ? 'Hier gibt es keine aktiven Vokabeln. Aktiviere im Buch zuerst Vokabeln (Seite „Buch“ → „Vokabeln aktivieren“) oder trage welche ein.' : (pool.some((v) => v.level < 5) ? 'Alle fälligen Vokabeln sind noch in der Wartezeit – komm später wieder, dann sitzen sie besser. (Die Wartezeiten stellt ein Admin ein.)' : 'Alle Vokabeln sind schon auf Stufe 5 – es gibt gerade nichts zu lernen. Stark!'))
+        setError(mistakeMode ? 'Keine Fehler in den letzten 30 Tagen – es gibt nichts zu trainieren. Starke Leistung!' : fach !== null && pool.length === 0 ? `Fach ${fach} ist leer – such dir ein anderes Fach oder lerne alle Fächer.` : pool.length === 0 ? 'Hier gibt es keine aktiven Vokabeln. Aktiviere im Buch zuerst Vokabeln (Seite „Buch“ → „Vokabeln aktivieren“) oder trage welche ein.' : (pool.some((v) => v.level < 5) ? 'Alle fälligen Vokabeln sind noch in der Wartezeit – komm später wieder, dann sitzen sie besser. (Die Wartezeiten stellt ein Admin ein.)' : 'Alle Vokabeln sind schon auf Stufe 5 – es gibt gerade nichts zu lernen. Stark!'))
         setPhase('setup')
         return
       }
@@ -363,6 +369,37 @@ export default function Learn() {
             ))}
           </Select>
         </Field>
+        {!mistakeMode && <CardBoxPanel language={bookId ? null : settings.learn_language} bookId={bookId || null} fach={fach} onFach={setFach} />}
+        {(() => {
+          const st = plus.status
+          const proP = plus.pro ? st?.pro_perks : undefined
+          const pm = Math.max(plus.active ? (st?.points_mult ?? 1) : 1, proP?.points_mult ?? 1, 1)
+          const cm = Math.max(plus.active ? (st?.coin_mult ?? 1) : 1, proP?.coin_mult ?? 1, 1)
+          const pub = bookId ? (selected?.is_public ?? false) : true
+          const r = previewReward(rulesQ.data ?? {}, settings.words_per_round, pub, pm, cm)
+          const boosted = pm > 1 || cm > 1
+          return (
+            <div className="relative overflow-hidden rounded-2xl border border-amber-300/25 bg-gradient-to-br from-amber-300/10 via-transparent to-fuchsia-400/10 p-4" aria-label="Belohnung dieser Runde">
+              <p className="label-mono mb-2">Das bringt dir eine Runde</p>
+              <div className="flex flex-wrap items-end gap-x-6 gap-y-2">
+                <div>
+                  <span className="text-3xl font-black tabular-nums text-cyan-200">{r.boosted.points}</span>
+                  <span className="ml-1 text-sm text-slate-300">Punkte</span>
+                  {pm > 1 && <span className="ml-2 rounded-full bg-amber-300/20 px-2 py-0.5 text-[11px] font-semibold text-amber-200">×{pm.toLocaleString('de-DE')}{plus.pro ? ' Pro' : ' Plus'}</span>}
+                </div>
+                <div>
+                  <span className="text-3xl font-black tabular-nums text-amber-200">{r.boosted.coins}</span>
+                  <span className="ml-1 text-sm text-slate-300">Coins</span>
+                  {cm > 1 && <span className="ml-2 rounded-full bg-amber-300/20 px-2 py-0.5 text-[11px] font-semibold text-amber-200">×{cm.toLocaleString('de-DE')}{plus.pro ? ' Pro' : ' Plus'}</span>}
+                </div>
+              </div>
+              <p className="mt-2 text-xs text-slate-400">
+                Bei lauter richtigen Antworten{boosted ? ` (ohne Bonus: ${r.base.points} Punkte, ${r.base.coins} Coins)` : ''}. {pub ? '' : 'Coins gibt es nur in Online-Büchern. '}Dazu kommen Bonus für neu gelernte Vokabeln und Tages-Limits.
+              </p>
+              {!boosted && <button type="button" onClick={plus.openDialog} className="mt-1 text-xs text-accent-cyan hover:underline">Mit Plus mehr Punkte und Coins →</button>}
+            </div>
+          )
+        })()}
         <div className="rounded-xl border border-white/10 bg-space-900/50 p-4 text-sm text-slate-300">
           <p>
             <span className="font-mono text-accent-cyan">{settings.words_per_round}</span> Abfragen
@@ -401,9 +438,11 @@ export default function Learn() {
           </Button>
           {dueMsg && <p className="mt-2 text-xs text-emerald-300">{dueMsg}</p>}
         </div>
-        <Button className="w-full min-h-[52px]" onClick={() => void start()}>
-          <Play size={18} /> {mistakeMode ? 'Fehler-Training starten' : 'Runde starten'}
-        </Button>
+        <button type="button" onClick={() => void start()}
+          className="group relative w-full min-h-[60px] overflow-hidden rounded-2xl bg-gradient-to-r from-cyan-400 via-sky-400 to-fuchsia-500 px-6 text-lg font-extrabold text-space-950 shadow-[0_0_28px_rgb(34_211_238/0.35)] transition hover:scale-[1.01] hover:shadow-[0_0_40px_rgb(217_70_239/0.45)] active:scale-[0.99]">
+          <span className="relative z-10 inline-flex items-center justify-center gap-2"><Play size={20} className="transition group-hover:translate-x-0.5" /> {mistakeMode ? 'Fehler-Training starten' : fach ? `Fach ${fach} lernen` : 'Runde starten'}</span>
+          <span aria-hidden className="pointer-events-none absolute inset-y-0 -left-1/3 w-1/3 -skew-x-12 bg-white/40 opacity-0 blur-md transition group-hover:left-full group-hover:opacity-100 group-hover:duration-700" />
+        </button>
       </Card>
       <PageRules title="Lernen" info="Richtige Antworten beim Lernen geben Ranglistenpunkte und, in Online-Büchern, Coins (je N richtige Antworten und für neu gelernte Vokabeln). Dazu kommt die Wartezeit, nach der eine Vokabel wieder dran ist." keys={['points_per_answer', 'points_daily_cap', 'points_active_day', 'points_accuracy_bonus', 'points_accuracy_min', 'learn_reward', 'learn_daily_cap', 'learn_coin_every', 'learn_coin_cap', 'learn_gap_l1', 'learn_gap_l2', 'learn_gap_l3', 'learn_gap_l4']} />
       <PlusHint ctx="learn" />

@@ -99,6 +99,8 @@ export const TAGS: Record<string, { label: string; className: string }> = {
   tag_mvp: { label: 'MVP', className: 'tag-mvp' },
   tag_elite: { label: 'ELITE', className: 'tag-elite' },
   tag_plus: { label: '+', className: 'tag-plus' },
+  // Update 100 (begrenzt: die ersten 10)
+  tag_u100: { label: '100', className: 'tag-u100' },
 }
 
 /** Automatische Rollen-Tags (nicht kaufbar). */
@@ -132,7 +134,7 @@ export function nameColorStyle(colorId: string | null | undefined): { className:
   return { className: '', style: { color: c.solid } }
 }
 
-export type Decor = 'stars' | 'bubbles' | 'petals' | 'confetti' | 'fireflies' | 'code' | 'sparkles' | 'blackhole' | 'mountains' | 'football' | 'food'
+export type Decor = 'stars' | 'bubbles' | 'petals' | 'confetti' | 'fireflies' | 'code' | 'sparkles' | 'blackhole' | 'mountains' | 'football' | 'food' | 'balloons' | 'fireworks'
 
 export interface ThemePalette {
   /** Hex-Werte der Hintergrundtöne (dunkel → heller). */
@@ -296,6 +298,17 @@ export const THEMES: Record<string, ThemePalette> = {
     s950: '#120804', s900: '#1a0d07', s800: '#2a160c', s700: '#3d2113', s600: '#57301a',
     cyan: '#fbbf24', violet: '#ef4444', blue: '#fde68a', fx: 'tavern',
     decor: 'food', decorColors: ['#fbbf24', '#ef4444', '#fde68a'], preview: 'repeating-linear-gradient(90deg,rgba(190,24,40,.55) 0 12px,rgba(255,255,255,.1) 12px 24px),linear-gradient(180deg,#3d1a0c,#1a0d07)',
+  },
+  // Update 100: für alle (Luftballons) und begrenzt (goldenes Feuerwerk)
+  theme_u100: {
+    s950: '#07091f', s900: '#0c1030', s800: '#141a48', s700: '#202a66', s600: '#2d3a88',
+    cyan: '#fbbf24', violet: '#f472b6', blue: '#22d3ee', fx: 'shine',
+    decor: 'balloons', decorColors: ['#f43f5e', '#f59e0b', '#22d3ee'], preview: 'radial-gradient(circle at 25% 70%,#f43f5e 0 9%,transparent 10%),radial-gradient(circle at 55% 45%,#22d3ee 0 10%,transparent 11%),radial-gradient(circle at 80% 68%,#f59e0b 0 9%,transparent 10%),linear-gradient(180deg,#0c1030,#2d3a88)',
+  },
+  theme_u100_gold: {
+    s950: '#0a0703', s900: '#120c04', s800: '#1c1306', s700: '#2d1f09', s600: '#45300d',
+    cyan: '#fde047', violet: '#f97316', blue: '#fff7ed', fx: 'shine',
+    decor: 'fireworks', decorColors: ['#fde047', '#f97316', '#fff7ed'], preview: 'radial-gradient(circle at 30% 35%,#fde047 0 3%,transparent 4%),radial-gradient(circle at 72% 28%,#f97316 0 3%,transparent 4%),radial-gradient(circle at 58% 62%,#fff7ed 0 2.5%,transparent 3.5%),linear-gradient(100deg,#1c1306 20%,#a16207 48%,#fde047 52%,#1c1306 80%)',
   },
   theme_rainbow: {
     s950: '#07060f', s900: '#0d0b1c', s800: '#161230', s700: '#231d4d', s600: '#322a70',

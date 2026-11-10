@@ -1,5 +1,5 @@
 import { useState, type ReactNode } from 'react'
-import { BookOpen, Coins, Hash, Timer } from 'lucide-react'
+import { BookOpen, Coins, Eye, Hash, Timer } from 'lucide-react'
 import Button from '../../components/ui/Button'
 import Card from '../../components/ui/Card'
 import { Field, TextInput } from '../../components/ui/Field'
@@ -172,6 +172,13 @@ export default function ModRightsTab() {
             <div className="grid gap-2 sm:grid-cols-2">
               <Choice checked={(s.mod_shop_prices ?? 0) === 0} onSelect={() => void run(() => staffSetSetting('mod_shop_prices', 0))} title="Nein" />
               <Choice checked={(s.mod_shop_prices ?? 0) === 1} onSelect={() => void run(() => staffSetSetting('mod_shop_prices', 1))} title="Ja" />
+            </div>
+          </Block>
+
+          <Block icon={<Eye size={18} />} title="Live-Sicht" text="Dürfen Mods sehen, wer gerade online ist und was die Person macht – auch Leute, die sich versteckt haben?">
+            <div className="grid gap-2 sm:grid-cols-2">
+              <Choice checked={(s.mod_see_online ?? 0) === 0} onSelect={() => void run(() => staffSetSetting('mod_see_online', 0))} title="Nein" />
+              <Choice checked={(s.mod_see_online ?? 0) === 1} onSelect={() => void run(() => staffSetSetting('mod_see_online', 1))} title="Ja" />
             </div>
           </Block>
 

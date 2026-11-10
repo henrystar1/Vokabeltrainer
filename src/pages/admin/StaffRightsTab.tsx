@@ -7,6 +7,8 @@ import { ErrorBox, Notice, Spinner } from '../../components/ui/States'
 import { errorMessage } from '../../lib/errors'
 import { useAsync } from '../../lib/useAsync'
 import {
+  adminGetStaffExtra,
+  adminSetStaffExtra,
   adminGetStaffRights,
   adminListPublicBooks,
   adminListStaff,
@@ -70,6 +72,7 @@ export function StaffEditor({ person, onChanged }: { person: StaffRow; onChanged
   const rights = useAsync(() => adminGetStaffRights(person.user_id), [person.user_id])
   const books = useAsync(adminListPublicBooks, [])
   const settings = useAsync(getAppSettings, [])
+  const extra = useAsync(() => adminGetStaffExtra(person.user_id), [person.user_id])
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [minutes, setMinutes] = useState<string | null>(null)
@@ -166,6 +169,14 @@ export function StaffEditor({ person, onChanged }: { person: StaffRow; onChanged
               <Choice checked={r.shop === null} onSelect={() => void patch({ shop: null })} title="Standard" />
               <Choice checked={r.shop === false} onSelect={() => void patch({ shop: false })} title="Nein" />
               <Choice checked={r.shop === true} onSelect={() => void patch({ shop: true })} title="Ja" />
+            </div>
+          </Block>
+
+          <Block icon={<Eye size={18} />} title="Live-Sicht (wer ist online, was tut er)" text="Sieht die Person die Online-Liste mit der aktuellen Tätigkeit und auch versteckte Personen?">
+            <div className="grid gap-2 sm:grid-cols-3">
+              {([[null, 'Standard'], [false, 'Nein'], [true, 'Ja']] as const).map(([v, t]) => (
+                <Choice key={String(v)} checked={(extra.data?.see_online ?? null) === v} onSelect={() => void run(async () => { await adminSetStaffExtra(person.user_id, v); extra.reload() })} title={t} />
+              ))}
             </div>
           </Block>
 

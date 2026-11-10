@@ -14,6 +14,8 @@ import type { PublicBook } from '../types'
 import { useAsync } from '../lib/useAsync'
 import { createBook, listBooks, listLanguages } from '../services/books'
 import { addToLibrary, listPublicBooks, removeFromLibrary } from '../services/community'
+import BookBoxMini from '../features/learning/BookBoxMini'
+import { getBookBoxes } from '../services/learning'
 import { useWallet } from '../features/koins/WalletProvider'
 import { useSettings } from '../features/settings/SettingsProvider'
 
@@ -24,6 +26,7 @@ export default function Books() {
   const tab: Tab = params.get('tab') === 'online' ? 'online' : 'mine'
   const books = useAsync(listBooks, [])
   const online = useAsync(listPublicBooks, [])
+  const boxes = useAsync(() => getBookBoxes().catch(() => []), [])
   const languages = useAsync(listLanguages, [])
   const [creating, setCreating] = useState(false)
   const [busyId, setBusyId] = useState<string | null>(null)
@@ -123,6 +126,7 @@ export default function Books() {
                     {b.active_count} von {b.vocab_count} Vokabeln aktiv
                     {b.active_count === 0 && b.vocab_count > 0 && ' – im Buch aktivieren, um zu lernen'}
                   </p>
+                  <BookBoxMini fach={boxes.data?.find((x) => x.book_id === b.id)?.fach ?? []} />
                   <div className="mt-4 space-y-1.5">
                     <div className="flex justify-between text-xs text-slate-400">
                       <span>Gelernt</span>

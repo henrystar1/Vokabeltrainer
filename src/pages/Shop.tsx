@@ -18,7 +18,7 @@ import { AVATARS, KIND_LABEL } from '../features/shop/catalog'
 import { refreshCustomItems, useCustomVersion } from '../features/shop/custom'
 import { errorMessage } from '../lib/errors'
 import { useAsync } from '../lib/useAsync'
-import { adminSetItem, buyItem, equipItem, getCoinLockStatus, getMyPermissions, getShop, unequipItem } from '../services/koins'
+import { adminSetItem, buyItem, equipItem, getCoinLockStatus, getMyPermissions, getShop, u100Claim, u100Status, unequipItem } from '../services/koins'
 import type { ShopItem, ShopKind } from '../types'
 import PlusHint from '../features/plus/PlusHint'
 import ParkourShopPanel from '../features/parkour/ParkourShopPanel'
@@ -39,6 +39,7 @@ export default function Shop() {
   const plus = usePlus()
   const coinLock = useAsync(getCoinLockStatus, [])
   const shop = useAsync(getShop, [])
+  const u100 = useAsync(u100Status, [])
   const [params] = useSearchParams()
   const subT = matchSubTab('/shop', params.get('t'))
   const [kind, setKind] = useState<ShopKind>(subT && subT !== 'parkour' ? (subT as ShopKind) : 'avatar')
@@ -50,7 +51,9 @@ export default function Shop() {
   const [message, setMessage] = useState<string | null>(null)
   const name = displayName ?? 'Du'
 
-  const items = useMemo(() => (shop.data ?? []).filter((i) => i.kind === kind), [shop.data, kind])
+  const U100_IDS = ['tag_u100', 'theme_u100_gold', 'theme_u100']
+  const items = useMemo(() => (shop.data ?? []).filter((i) => i.kind === kind && !U100_IDS.includes(i.id)), [shop.data, kind])
+  const u100Items = (shop.data ?? []).filter((i) => U100_IDS.includes(i.id))
 
   async function act(fn: () => Promise<void>, ok?: string) {
     setBusy(true)
@@ -58,7 +61,7 @@ export default function Shop() {
     setMessage(null)
     try {
       await fn()
-      await Promise.all([shop.reload(), refreshProfile(), wallet.refresh()])
+      await Promise.all([shop.reload(), u100.reload(), refreshProfile(), wallet.refresh()])
       if (ok) setMessage(ok)
     } catch (e) {
       setError(errorMessage(e))
@@ -122,6 +125,41 @@ export default function Shop() {
 
       {!parkourTab && shop.data && (
         <>
+          {u100Items.length > 0 && !parkourTab && (
+            <div className="mb-6 rounded-2xl border border-amber-300/30 bg-gradient-to-br from-amber-400/10 via-transparent to-pink-500/10 p-4">
+              <h2 className="mb-1 text-lg font-bold text-amber-200">🎈 Update 100 – Jubiläum</h2>
+              <p className="mb-3 text-sm text-slate-400">Zum 100. Update: zwei Artikel nur für die ersten 10 (die Schnellsten, gratis) und ein Design für alle.</p>
+              <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                {u100Items.map((item) => {
+                  const st = u100.data?.find((s) => s.item_id === item.id)
+                  const left = st?.limited != null ? Math.max(0, st.limited - st.taken) : null
+                  const gone = left === 0 && !item.owned
+                  const equipped = item.equipped
+                  return (
+                    <Card key={item.id} className="flex flex-col gap-3">
+                      <div className="flex min-h-[64px] items-center justify-center"><Preview item={item} name={name} cosmetics={cosmetics} /></div>
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="font-medium">{item.name}</span>
+                        {left != null && <span className="rounded-full border border-amber-300/40 px-2 py-0.5 text-[10px] text-amber-200">{gone ? 'Vergeben' : `Noch ${left} von ${st?.limited}`}</span>}
+                        {left == null && <span className="rounded-full border border-white/15 px-2 py-0.5 text-[10px] text-slate-300">Für alle · gratis</span>}
+                      </div>
+                      {equipped ? (
+                        <span className="inline-flex min-h-[44px] items-center justify-center gap-2 rounded-xl bg-accent-cyan/10 text-sm text-accent-cyan"><Check size={16} /> Ausgewählt</span>
+                      ) : item.owned ? (
+                        <Button variant="secondary" disabled={busy} onClick={() => void act(() => equipItem(item.id), 'Ausgewählt.')}>Verwenden</Button>
+                      ) : (
+                        <Button disabled={busy || gone} onClick={() => void act(async () => {
+                          const r = await u100Claim(item.id)
+                          if (r === 'gone') throw new Error('Zu spät – alle 10 sind schon vergeben.')
+                          await equipItem(item.id)
+                        }, 'Geholt und ausgewählt! 🎉')}>{gone ? 'Leider zu spät' : 'Gratis holen'}</Button>
+                      )}
+                    </Card>
+                  )
+                })}
+              </div>
+            </div>
+          )}
           {equippedIn(kind) && kind !== 'theme' && (
             <div className="mb-3">
               <Button variant="ghost" disabled={busy} onClick={() => void act(() => unequipItem(kind), 'Abgelegt.')}>

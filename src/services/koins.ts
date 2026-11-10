@@ -171,3 +171,12 @@ export interface CoinLockRow { user_id: string; locked_at: string; note: string 
 export const getCoinLockStatus = () => rpc<CoinLockStatus>('coin_lock_status')
 export const adminSetCoinLock = (user: string, locked: boolean, note: string) => rpc<void>('admin_set_coin_lock', { p_user: user, p_locked: locked, p_note: note })
 export const adminCoinLocks = () => rpc<CoinLockRow[]>('admin_coin_locks')
+
+export const staffCanSeeOnline = () => rpc<boolean>('staff_can_see_online')
+export const adminGetStaffExtra = (userId: string) => rpc<{ see_online: boolean | null }>('admin_get_staff_extra', { p_user: userId })
+export const adminSetStaffExtra = (userId: string, seeOnline: boolean | null) => rpc<void>('admin_set_staff_extra', { p_user: userId, p_see_online: seeOnline })
+
+// Update 100: begrenzte Jubiläums-Artikel
+export type U100Status = { item_id: string; limited: number | null; taken: number; mine: boolean }
+export const u100Status = () => rpc<U100Status[]>('u100_status')
+export const u100Claim = (id: string) => rpc<'ok' | 'owned' | 'gone'>('u100_claim', { p_item_id: id })
