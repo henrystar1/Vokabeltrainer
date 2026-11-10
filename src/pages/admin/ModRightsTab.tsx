@@ -182,6 +182,13 @@ export default function ModRightsTab() {
             </div>
           </Block>
 
+          <Block icon={<Eye size={18} />} title="Spiele ansehen" text="Dürfen Mods bei laufenden Online-Spielen zuschauen und dabei auch die Schiffe des Gegners sehen?">
+            <div className="grid gap-2 sm:grid-cols-2">
+              <Choice checked={(s.mod_see_games ?? 0) === 0} onSelect={() => void run(() => staffSetSetting('mod_see_games', 0))} title="Nein" />
+              <Choice checked={(s.mod_see_games ?? 0) === 1} onSelect={() => void run(() => staffSetSetting('mod_see_games', 1))} title="Ja" />
+            </div>
+          </Block>
+
           <Block icon={<Timer size={18} />} title="Stummschalten im Chat" text="Wie lange dürfen Mods jemanden höchstens stummschalten (in Minuten, mindestens 1)?">
             <div className="flex items-end gap-2">
               <div className="w-40">

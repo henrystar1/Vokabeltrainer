@@ -175,7 +175,15 @@ export function StaffEditor({ person, onChanged }: { person: StaffRow; onChanged
           <Block icon={<Eye size={18} />} title="Live-Sicht (wer ist online, was tut er)" text="Sieht die Person die Online-Liste mit der aktuellen Tätigkeit und auch versteckte Personen?">
             <div className="grid gap-2 sm:grid-cols-3">
               {([[null, 'Standard'], [false, 'Nein'], [true, 'Ja']] as const).map(([v, t]) => (
-                <Choice key={String(v)} checked={(extra.data?.see_online ?? null) === v} onSelect={() => void run(async () => { await adminSetStaffExtra(person.user_id, v); extra.reload() })} title={t} />
+                <Choice key={String(v)} checked={(extra.data?.see_online ?? null) === v} onSelect={() => void run(async () => { await adminSetStaffExtra(person.user_id, 'see_online', v); extra.reload() })} title={t} />
+              ))}
+            </div>
+          </Block>
+
+          <Block icon={<Eye size={18} />} title="Spiele ansehen (Schiffe, Züge, Online-Spiele)" text="Darf die Person laufende Online-Spiele ansehen – auch die Schiffe des Gegners?">
+            <div className="grid gap-2 sm:grid-cols-3">
+              {([[null, 'Standard'], [false, 'Nein'], [true, 'Ja']] as const).map(([v, t]) => (
+                <Choice key={String(v)} checked={(extra.data?.see_games ?? null) === v} onSelect={() => void run(async () => { await adminSetStaffExtra(person.user_id, 'see_games', v); extra.reload() })} title={t} />
               ))}
             </div>
           </Block>

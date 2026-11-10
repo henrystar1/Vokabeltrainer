@@ -1,7 +1,7 @@
 import { rpc } from './rpc'
 
-export type OgKind = 'rps' | 'ludo' | 'ships'
-export const OG_NAMES: Record<OgKind, string> = { rps: 'Schnick Schnack Schnuck', ludo: 'Mensch ärgere dich nicht', ships: 'Schiffe versenken' }
+export type OgKind = 'rps' | 'ludo' | 'ships' | 'shooter'
+export const OG_NAMES: Record<OgKind, string> = { rps: 'Schnick Schnack Schnuck', ludo: 'Mensch ärgere dich nicht', ships: 'Schiffe versenken', shooter: '3D-Shooter' }
 
 export interface OgListItem {
   id: string
@@ -41,7 +41,8 @@ export interface OgView {
 export const ogCreate = (kind: OgKind, opponents: string[]) => rpc<string>('og_create', { p_kind: kind, p_opponents: opponents })
 export const ogList = () => rpc<OgListItem[]>('og_list')
 export const ogGet = (id: string) => rpc<OgView>('og_get', { p_id: id })
-export const ogRespond = (id: string, accept: boolean) => rpc<OgView>('og_respond', { p_id: id, p_accept: accept })
+/** Bei Ablehnung gibt der Server nichts zurück (null). */
+export const ogRespond = (id: string, accept: boolean) => rpc<OgView | null>('og_respond', { p_id: id, p_accept: accept })
 export const ogStart = (id: string) => rpc<OgView>('og_start', { p_id: id })
 export const ogLeave = (id: string) => rpc<OgView>('og_leave', { p_id: id })
 export const ogRpsPick = (id: string, pick: string) => rpc<OgView>('og_rps_pick', { p_id: id, p_pick: pick })
@@ -49,3 +50,15 @@ export const ogLudoRoll = (id: string) => rpc<OgView>('og_ludo_roll', { p_id: id
 export const ogLudoMove = (id: string, piece: number) => rpc<OgView>('og_ludo_move', { p_id: id, p_piece: piece })
 export const ogShipsPlace = (id: string, ships: Ship[]) => rpc<OgView>('og_ships_place', { p_id: id, p_ships: ships })
 export const ogShipsShoot = (id: string, r: number, c: number) => rpc<OgView>('og_ships_shoot', { p_id: id, p_r: r, p_c: c })
+
+export interface SpectateGame { id: string; kind: OgKind; status: string; updated_at: string; players: string[] | null }
+export interface SpectateView {
+  id: string; kind: OgKind; status: string; version: number; host_id: string; turn_seat: number | null; winner_seat: number | null
+  state: RpsState & ShipsState & LudoState
+  players: { user_id: string; name: string; seat: number | null; join_state: string; secret: { ships?: Ship[]; pick?: string } }[]
+}
+export const ogSpectateList = () => rpc<SpectateGame[]>('og_spectate_list')
+export const ogSpectateView = (id: string) => rpc<SpectateView>('og_spectate_view', { p_id: id })
+
+export const ogShooterReport = (id: string, scores: Record<string, number>, final: boolean) => rpc<OgView>('og_shooter_report', { p_id: id, p_scores: scores, p_final: final })
+export const ogShooterLeave = (id: string) => rpc<OgView>('og_shooter_leave', { p_id: id })

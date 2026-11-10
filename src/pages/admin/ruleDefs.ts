@@ -212,6 +212,7 @@ export const SECTIONS: Array<{ title: string; text?: string; rules: Rule[] }> = 
       { key: 'advent_w_points', label: 'Gewicht: Punkte' },
       { key: 'advent_w_plus', label: 'Gewicht: Plus-Tage' },
       { key: 'advent_w_item', label: 'Gewicht: Verkleidung / Design', hint: 'Ab Türchen 2' },
+      { key: 'advent_limited_chance', label: 'Chance auf einen limitierten Artikel (zusätzlich)', hint: 'In Prozent pro Türchen. Nur solange noch welche übrig sind (je 4 Stück).' },
       { key: 'advent_coins_min', label: 'Coins: mindestens' },
       { key: 'advent_coins_spread', label: 'Coins: Schwankung (zufällig dazu)' },
       { key: 'advent_coins_per_day', label: 'Coins: zusätzliche Schwankung je Türchen-Nummer', hint: 'Spätere Türchen können mehr bringen' },

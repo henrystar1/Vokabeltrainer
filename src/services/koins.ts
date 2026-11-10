@@ -173,10 +173,26 @@ export const adminSetCoinLock = (user: string, locked: boolean, note: string) =>
 export const adminCoinLocks = () => rpc<CoinLockRow[]>('admin_coin_locks')
 
 export const staffCanSeeOnline = () => rpc<boolean>('staff_can_see_online')
-export const adminGetStaffExtra = (userId: string) => rpc<{ see_online: boolean | null }>('admin_get_staff_extra', { p_user: userId })
-export const adminSetStaffExtra = (userId: string, seeOnline: boolean | null) => rpc<void>('admin_set_staff_extra', { p_user: userId, p_see_online: seeOnline })
+export const adminGetStaffExtra = (userId: string) => rpc<{ see_online: boolean | null; see_games: boolean | null }>('admin_get_staff_extra', { p_user: userId })
+export const adminSetStaffExtra = (userId: string, key: 'see_online' | 'see_games', value: boolean | null) => rpc<void>('admin_set_staff_extra', { p_user: userId, p_key: key, p_value: value })
 
 // Update 100: begrenzte Jubiläums-Artikel
 export type U100Status = { item_id: string; limited: number | null; taken: number; mine: boolean }
 export const u100Status = () => rpc<U100Status[]>('u100_status')
 export const u100Claim = (id: string) => rpc<'ok' | 'owned' | 'gone'>('u100_claim', { p_item_id: id })
+
+// Handel & limitierte Artikel (Migration 0084)
+export interface TradeBid { id: string; name: string; price: number }
+export interface TradeOffer { id: string; item_id: string; name: string; kind: ShopKind; price: number; seller: string; mine: boolean; since: string; my_bid: number | null; my_bid_id: string | null; bid_count: number; bids: TradeBid[]; owned: boolean }
+export interface TradeMarket { offers: TradeOffer[]; history: { name: string; price: number; at: string }[]; mine: { item_id: string; name: string; kind: ShopKind; listed: boolean }[] }
+export const tradeMarket = () => rpc<TradeMarket>('trade_market')
+export const tradeList = (item: string, price: number) => rpc<string>('trade_list', { p_item: item, p_price: price })
+export const tradeCancel = (offer: string) => rpc<void>('trade_cancel', { p_offer: offer })
+export const tradeBuy = (offer: string) => rpc<void>('trade_buy', { p_offer: offer })
+export const tradeBid = (offer: string, price: number) => rpc<void>('trade_bid', { p_offer: offer, p_price: price })
+export const tradeBidCancel = (bid: string) => rpc<void>('trade_bid_cancel', { p_bid: bid })
+export const tradeAccept = (bid: string) => rpc<void>('trade_accept', { p_bid: bid })
+export const tradeDecline = (bid: string) => rpc<void>('trade_decline', { p_bid: bid })
+export interface LimitedOverview { item_id: string; name: string; kind: string; limited: number; source: string; price: number; holders: { user_id: string; name: string; at: string; listed_price: number | null }[] }
+export const adminLimitedOverview = () => rpc<LimitedOverview[]>('admin_limited_overview')
+export const staffCanSeeGames = () => rpc<boolean>('staff_can_see_games')

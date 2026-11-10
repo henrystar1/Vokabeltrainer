@@ -176,6 +176,11 @@ body {
 @keyframes tag-u100-pulse { 0%, 100% { box-shadow: 0 0 8px rgb(250 204 21 / 0.55); } 50% { box-shadow: 0 0 18px 2px rgb(253 224 71 / 0.95); } }
 @keyframes tag-u100-sweep { 0% { left: -60%; } 60%, 100% { left: 130%; } }
 @media (prefers-reduced-motion: reduce) { .tag-u100, .tag-u100::after { animation: none; } }
+.tag-phoenix { color: #fff7ed; font-weight: 800; letter-spacing: .05em; background: linear-gradient(90deg,#7f1d1d,#ef4444,#f97316,#fde047,#f97316,#ef4444,#7f1d1d); background-size: 300% 100%; animation: tag-phoenix 2.2s linear infinite; box-shadow: 0 0 14px rgb(249 115 22 / 0.85), 0 -4px 12px rgb(253 224 71 / 0.5); text-shadow: 0 0 6px rgb(127 29 29 / 0.9); }
+@keyframes tag-phoenix { 0% { background-position: 0% 50%; } 100% { background-position: 300% 50%; } }
+.tag-glitch { color: #a5f3fc; font-weight: 800; font-family: ui-monospace, monospace; background: #020617; border: 1px solid #22d3ee; text-shadow: 2px 0 #f43f5e, -2px 0 #22d3ee; animation: tag-glitch 1.6s steps(2, end) infinite; }
+@keyframes tag-glitch { 0%, 88%, 100% { transform: none; filter: none; } 90% { transform: translateX(-2px) skewX(8deg); filter: hue-rotate(90deg); } 94% { transform: translateX(2px) skewX(-8deg); filter: hue-rotate(-90deg); } 97% { transform: translateY(1px); } }
+@media (prefers-reduced-motion: reduce) { .tag-phoenix, .tag-glitch { animation: none; } }
 .tag-elite { color: #1a1000; background: linear-gradient(100deg, #94a3b8, #f8fafc 35%, #cbd5e1 55%, #f8fafc 75%, #94a3b8); background-size: 200% 100%; animation: tag-gold 3.2s linear infinite; box-shadow: 0 0 12px rgb(226 232 240 / 0.6); }
 
 /* ---------- Eigene Tags, Farben und Effekte (vom Admin im Shop angelegt) ---------- */

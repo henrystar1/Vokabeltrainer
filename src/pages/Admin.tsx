@@ -6,7 +6,9 @@ import PageHeader from '../components/ui/PageHeader'
 import { ErrorBox, Spinner } from '../components/ui/States'
 import { useAuth } from '../features/auth/AuthProvider'
 import { useAsync } from '../lib/useAsync'
-import { getMyPermissions, staffCanSeeOnline } from '../services/koins'
+import LimitedTab from './admin/LimitedTab'
+import SpectateTab from './admin/SpectateTab'
+import { getMyPermissions, staffCanSeeGames, staffCanSeeOnline } from '../services/koins'
 import FeedbackTab from './admin/FeedbackTab'
 import { CodesSection, GrantSection, ItemsSection } from './admin/KoinsTab'
 import AccountsTab from './admin/AccountsTab'
@@ -28,7 +30,7 @@ import GameDbsTab from './admin/GameDbsTab'
 import { adminPlusCounts } from '../services/plus'
 import { usePrintTodo } from '../features/print/hooks'
 
-type Tab = 'reviews' | 'feedback' | 'online' | 'users' | 'staff' | 'modrights' | 'rules' | 'shop' | 'codes' | 'grant' | 'locks' | 'accounts' | 'pqueue' | 'pcatalog' | 'pcolors' | 'pprices' | 'gamedbs' | 'pbans' | 'plus' | 'plusmoney'
+type Tab = 'reviews' | 'feedback' | 'online' | 'users' | 'staff' | 'modrights' | 'rules' | 'shop' | 'codes' | 'grant' | 'locks' | 'accounts' | 'pqueue' | 'pcatalog' | 'pcolors' | 'pprices' | 'gamedbs' | 'pbans' | 'plus' | 'plusmoney' | 'limited' | 'spectate'
 
 /** Adresse ?bereich=… → Startseite der Verwaltung. */
 const DEEP_LINKS: Record<string, Tab> = { druck: 'pqueue', 'druck-katalog': 'pcatalog', 'druck-preise': 'pprices' }
@@ -40,6 +42,7 @@ export default function Admin() {
   const { isAdmin, role } = useAuth()
   const perms = useAsync(getMyPermissions, [])
   const p = perms.data
+  const seeGames = useAsync(() => (isAdmin ? Promise.resolve(true) : staffCanSeeGames().catch(() => false)), [isAdmin])
   const seeOnline = useAsync(() => (isAdmin ? Promise.resolve(true) : staffCanSeeOnline().catch(() => false)), [isAdmin])
   const todo = usePrintTodo()
   const [params] = useSearchParams()
@@ -58,6 +61,8 @@ export default function Admin() {
       tabs: [
         { id: 'reviews', label: 'Prüfanfragen', icon: <Flag size={15} /> },
         { id: 'feedback', label: 'Feedback', icon: <MessageSquarePlus size={15} /> },
+        ...(isAdmin ? [{ id: 'limited' as const, label: 'Limitierte Artikel', icon: <Sparkles size={15} /> }] : []),
+        ...(isAdmin || seeGames.data ? [{ id: 'spectate' as const, label: 'Spiele ansehen', icon: <Radio size={15} /> }] : []),
         ...(isAdmin || seeOnline.data ? [{ id: 'online' as const, label: isAdmin ? 'Online & Nachrichten' : 'Live-Sicht', icon: <Radio size={15} /> }] : []),
       ],
     },
@@ -144,6 +149,8 @@ export default function Admin() {
       {active === 'reviews' && <ReviewsTab />}
       {active === 'feedback' && <FeedbackTab />}
       {active === 'online' && (isAdmin || seeOnline.data) && <OnlineTab />}
+      {active === 'limited' && isAdmin && <LimitedTab />}
+      {active === 'spectate' && (isAdmin || seeGames.data) && <SpectateTab />}
       {active === 'users' && isAdmin && <UsersTab />}
       {active === 'accounts' && isAdmin && <AccountsTab />}
       {active === 'staff' && isAdmin && <StaffRightsTab />}

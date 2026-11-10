@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
-import { Anchor, Dices, Hand, Search, X } from 'lucide-react'
+import { Anchor, Crosshair, Dices, Hand, Search, X } from 'lucide-react'
 import PlayerTag from '../components/profile/PlayerTag'
 import Button from '../components/ui/Button'
 import Card from '../components/ui/Card'
@@ -18,6 +18,7 @@ const GAMES: Array<{ kind: OgKind; text: string; players: string; icon: typeof H
   { kind: 'rps', text: 'Stein, Papier, Schere: wer zuerst 2 Runden gewinnt.', players: '2 Personen', icon: Hand },
   { kind: 'ludo', text: 'Würfeln, ziehen, rauswerfen – wer bringt zuerst alle Figuren ins Ziel?', players: '2 bis 4 Personen', icon: Dices },
   { kind: 'ships', text: 'Setze deine Flotte und versenke die Schiffe des Gegners.', players: '2 Personen', icon: Anchor },
+  { kind: 'shooter', text: '3D-Arena mit Maus und Tastatur: wer zuerst 10 Treffer hat (oder die meisten nach 5 Minuten), gewinnt. Mit Panik-Knopf.', players: '2 bis 4 Personen · kostet den Ersteller beim Start 50 Coins', icon: Crosshair },
 ]
 
 function statusText(g: OgListItem): string {
@@ -42,7 +43,7 @@ export default function OnlineGames() {
   return (
     <div className="space-y-6">
       <PageHeader eyebrow="Gegeneinander spielen" title="Online-Spiele" />
-      <div className="grid gap-3 md:grid-cols-3">
+      <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
         {GAMES.map((g) => (
           <Card key={g.kind} className="space-y-2">
             <g.icon size={28} className="text-accent-cyan" aria-hidden />
@@ -90,7 +91,7 @@ export default function OnlineGames() {
 
 function NewGame({ kind, onClose }: { kind: OgKind; onClose: () => void }) {
   const nav = useNavigate()
-  const max = kind === 'ludo' ? 3 : 1
+  const max = kind === 'ludo' || kind === 'shooter' ? 3 : 1
   const [q, setQ] = useState('')
   const [hits, setHits] = useState<PlayerHit[] | null>(null)
   const [chosen, setChosen] = useState<PlayerHit[]>([])

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { Link, useParams } from 'react-router-dom'
+import { Link, useNavigate, useParams } from 'react-router-dom'
 import { Trophy } from 'lucide-react'
 import { Avatar } from '../components/profile/PlayerTag'
 import Button from '../components/ui/Button'
@@ -9,13 +9,15 @@ import { ErrorBox, Notice, Spinner } from '../components/ui/States'
 import LudoBoard from '../features/online/LudoBoard'
 import RpsBoard from '../features/online/RpsBoard'
 import ShipsBoard from '../features/online/ShipsBoard'
+import ShooterGame from '../features/online/shooter/ShooterGame'
 import { useGameSync } from '../features/online/useGameSync'
 import { errorMessage } from '../lib/errors'
-import { OG_NAMES, ogGet, ogLeave, ogLudoMove, ogLudoRoll, ogRespond, ogRpsPick, ogShipsPlace, ogShipsShoot, ogStart, type OgView } from '../services/online'
+import { OG_NAMES, ogGet, ogLeave, ogLudoMove, ogLudoRoll, ogRespond, ogRpsPick, ogShipsPlace, ogShipsShoot, ogShooterLeave, ogShooterReport, ogStart, type OgView } from '../services/online'
 
 /** Ein Online-Spiel: Einladung/Lobby, Spielfeld je Spiel, Ergebnis. Der Server prüft alle Regeln. */
 export default function OnlineGame() {
   const { id } = useParams()
+  const nav = useNavigate()
   const [view, setView] = useState<OgView | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
@@ -38,6 +40,13 @@ export default function OnlineGame() {
     setBusy(true)
     setError(null)
     try { apply(await fn()); ping() } catch (e) { setError(errorMessage(e)); void load() } finally { setBusy(false) }
+  }
+
+  async function decline() {
+    if (!id) return
+    setBusy(true)
+    setError(null)
+    try { await ogRespond(id, false); ping(); nav('/mehrspieler') } catch (e) { setError(errorMessage(e)); setBusy(false) }
   }
 
   if (!id) return null
@@ -63,8 +72,8 @@ export default function OnlineGame() {
         <Card className="space-y-3">
           <p>{host?.name ?? 'Jemand'} lädt dich zu <b>{OG_NAMES[view.kind]}</b> ein.</p>
           <div className="flex gap-2">
-            <Button busy={busy} onClick={() => void act(() => ogRespond(id, true))}>Mitspielen</Button>
-            <Button variant="secondary" busy={busy} onClick={() => void act(() => ogRespond(id, false))}>Ablehnen</Button>
+            <Button busy={busy} onClick={() => void act(async () => (await ogRespond(id, true)) as OgView)}>Mitspielen</Button>
+            <Button variant="secondary" busy={busy} onClick={() => void decline()}>Ablehnen</Button>
           </div>
         </Card>
       )}
@@ -72,12 +81,12 @@ export default function OnlineGame() {
       {view.status === 'lobby' && !invited && (
         <Card className="space-y-3">
           <p className="text-sm text-slate-300">
-            {view.kind === 'ludo'
+            {view.kind === 'ludo' || view.kind === 'shooter'
               ? `${view.players.filter((p) => p.join_state === 'joined').length} von ${view.players.filter((p) => p.join_state !== 'declined' && p.join_state !== 'left').length} haben zugesagt. ${me.user_id === view.host_id ? 'Starte, sobald alle da sind (mindestens 2).' : `Warte, bis ${host?.name ?? 'der Gastgeber'} startet.`}`
               : 'Warte, bis die Einladung angenommen wird …'}
           </p>
-          {view.kind === 'ludo' && me.user_id === view.host_id && (
-            <Button busy={busy} disabled={view.players.filter((p) => p.join_state === 'joined').length < 2} onClick={() => void act(() => ogStart(id))}>Spiel starten</Button>
+          {(view.kind === 'ludo' || view.kind === 'shooter') && me.user_id === view.host_id && (
+            <Button busy={busy} disabled={view.players.filter((p) => p.join_state === 'joined').length < 2} onClick={() => void act(() => ogStart(id))}>Spiel starten{view.kind === 'shooter' ? ' (kostet dich 50 Coins)' : ''}</Button>
           )}
         </Card>
       )}
@@ -87,21 +96,25 @@ export default function OnlineGame() {
           <Trophy className="shrink-0 text-amber-300" size={32} aria-hidden />
           <div>
             <p className="text-lg font-semibold">{winner ? (winner.user_id === me.user_id ? 'Du hast gewonnen!' : `${winner.name} hat gewonnen.`) : 'Spiel beendet.'}</p>
+            {view.kind === 'shooter' && (
+              <p className="text-sm text-slate-300">{view.players.filter((p) => p.seat !== null).map((p) => `${p.name}: ${(view.state as unknown as { scores?: Record<string, number> }).scores?.[String(p.seat)] ?? 0}`).join(' · ')}</p>
+            )}
             <Link to="/mehrspieler" className="text-sm text-accent-cyan hover:underline">Zurück zu den Online-Spielen</Link>
           </div>
         </Card>
       )}
 
-      {(view.status === 'running' || view.status === 'finished') && me.seat !== null && (
+      {(view.status === 'running' || (view.status === 'finished' && view.kind !== 'shooter')) && me.seat !== null && (
         <Card>
           {view.kind === 'rps' && <RpsBoard view={view} busy={busy} onPick={(p) => void act(() => ogRpsPick(id, p))} />}
           {view.kind === 'ludo' && <LudoBoard view={view} busy={busy} onRoll={() => void act(() => ogLudoRoll(id))} onMove={(i) => void act(() => ogLudoMove(id, i))} />}
+          {view.kind === 'shooter' && <ShooterGame view={view} onReport={(scores, final) => void act(() => ogShooterReport(id, scores, final))} />}
           {view.kind === 'ships' && <ShipsBoard view={view} busy={busy} onPlace={(s) => void act(() => ogShipsPlace(id, s))} onShoot={(r, c) => void act(() => ogShipsShoot(id, r, c))} />}
         </Card>
       )}
 
       {(view.status === 'running' || (view.status === 'lobby' && !invited)) && (
-        <Button variant="danger" className="!min-h-[40px] text-sm" busy={busy} onClick={() => { if (window.confirm(view.status === 'running' ? 'Wirklich aufgeben?' : 'Spiel verlassen?')) void act(() => ogLeave(id)) }}>
+        <Button variant="danger" className="!min-h-[40px] text-sm" busy={busy} onClick={() => { if (window.confirm(view.status === 'running' ? 'Wirklich aufgeben?' : 'Spiel verlassen?')) void act(() => (view.kind === 'shooter' && view.status === 'running' ? ogShooterLeave(id) : ogLeave(id))) }}>
           {view.status === 'running' ? 'Aufgeben' : 'Verlassen'}
         </Button>
       )}

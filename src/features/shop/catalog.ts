@@ -101,6 +101,9 @@ export const TAGS: Record<string, { label: string; className: string }> = {
   tag_plus: { label: '+', className: 'tag-plus' },
   // Update 100 (begrenzt: die ersten 10)
   tag_u100: { label: '100', className: 'tag-u100' },
+  // Limitiert (je 4 Stück)
+  tag_ltd_phoenix: { label: 'PHÖNIX', className: 'tag-phoenix' },
+  tag_ltd_glitch: { label: 'GL1TCH', className: 'tag-glitch' },
 }
 
 /** Automatische Rollen-Tags (nicht kaufbar). */
@@ -309,6 +312,17 @@ export const THEMES: Record<string, ThemePalette> = {
     s950: '#0a0703', s900: '#120c04', s800: '#1c1306', s700: '#2d1f09', s600: '#45300d',
     cyan: '#fde047', violet: '#f97316', blue: '#fff7ed', fx: 'shine',
     decor: 'fireworks', decorColors: ['#fde047', '#f97316', '#fff7ed'], preview: 'radial-gradient(circle at 30% 35%,#fde047 0 3%,transparent 4%),radial-gradient(circle at 72% 28%,#f97316 0 3%,transparent 4%),radial-gradient(circle at 58% 62%,#fff7ed 0 2.5%,transparent 3.5%),linear-gradient(100deg,#1c1306 20%,#a16207 48%,#fde047 52%,#1c1306 80%)',
+  },
+  // Limitiert (je 4 Stück)
+  theme_ltd_polar: {
+    s950: '#020c14', s900: '#04141f', s800: '#08293a', s700: '#0f4a5c', s600: '#17707a',
+    cyan: '#5eead4', violet: '#c084fc', blue: '#7dd3fc', fx: 'rainbow',
+    decor: 'sparkles', decorColors: ['#5eead4', '#c084fc', '#a5f3fc'], preview: 'linear-gradient(160deg,#020c14 10%,#0f766e 40%,#5eead4 55%,#a855f7 75%,#020c14)',
+  },
+  theme_ltd_void: {
+    s950: '#000000', s900: '#050308', s800: '#0c0714', s700: '#1a0f2e', s600: '#2b1850',
+    cyan: '#e9d5ff', violet: '#a855f7', blue: '#6366f1', fx: 'shine',
+    decor: 'blackhole', decorColors: ['#f5f3ff', '#a855f7', '#4338ca'], preview: 'radial-gradient(circle at 50% 50%,#000 0 20%,#f5f3ff 22%,#a855f7 32%,#2b1850 55%,#000 80%)',
   },
   theme_rainbow: {
     s950: '#07060f', s900: '#0d0b1c', s800: '#161230', s700: '#231d4d', s600: '#322a70',

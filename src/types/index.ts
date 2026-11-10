@@ -314,6 +314,11 @@ export interface ShopItem {
   svg?: string | null
   /** Nur mit Vokabeltrainer + nutzbar (Preis 0, nicht kaufbar). */
   plus_only?: boolean
+  /** Limitiert: so viele Stück gibt es insgesamt (Migration 0084). */
+  limited?: number | null
+  taken?: number | null
+  claim_only?: boolean
+  source?: 'shop' | 'advent' | 'both'
 }
 
 /** Eigener Artikel, wie ihn alle Nutzer zum Darstellen brauchen. */

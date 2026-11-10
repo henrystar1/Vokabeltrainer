@@ -22,6 +22,7 @@ import { adminSetItem, buyItem, equipItem, getCoinLockStatus, getMyPermissions, 
 import type { ShopItem, ShopKind } from '../types'
 import PlusHint from '../features/plus/PlusHint'
 import ParkourShopPanel from '../features/parkour/ParkourShopPanel'
+import TradePanel from '../features/shop/TradePanel'
 import { useSearchParams } from 'react-router-dom'
 
 const KINDS: ShopKind[] = ['avatar', 'color', 'effect', 'tag', 'theme']
@@ -44,6 +45,7 @@ export default function Shop() {
   const subT = matchSubTab('/shop', params.get('t'))
   const [kind, setKind] = useState<ShopKind>(subT && subT !== 'parkour' ? (subT as ShopKind) : 'avatar')
   const [parkourTab, setParkourTab] = useState(params.get('tab') === 'parkour' || subT === 'parkour')
+  const [tradeTab, setTradeTab] = useState(params.get('tab') === 'handel')
   const [confirm, setConfirm] = useState<ShopItem | null>(null)
   const [bought, setBought] = useState<ShopItem | null>(null)
   const [busy, setBusy] = useState(false)
@@ -52,7 +54,8 @@ export default function Shop() {
   const name = displayName ?? 'Du'
 
   const U100_IDS = ['tag_u100', 'theme_u100_gold', 'theme_u100']
-  const items = useMemo(() => (shop.data ?? []).filter((i) => i.kind === kind && !U100_IDS.includes(i.id)), [shop.data, kind])
+  const items = useMemo(() => (shop.data ?? []).filter((i) => i.kind === kind && !U100_IDS.includes(i.id) && i.limited == null), [shop.data, kind])
+  const limitedItems = (shop.data ?? []).filter((i) => i.limited != null && !U100_IDS.includes(i.id))
   const u100Items = (shop.data ?? []).filter((i) => U100_IDS.includes(i.id))
 
   async function act(fn: () => Promise<void>, ok?: string) {
@@ -76,6 +79,61 @@ export default function Shop() {
     if (!Number.isInteger(v) || v < 0) { setError('Bitte einen Preis ab 0 eingeben.'); return }
     await act(() => adminSetItem(item.id, v, item.active !== false), `Preis von „${item.name}“: ${v.toLocaleString('de-DE')} Coins.`)
     setPriceEdit(null)
+  }
+
+  function renderItem(item: ShopItem) {
+              const affordable = wallet.balance >= item.price
+              const isDefaultTheme = item.kind === 'theme' && item.id === 'theme_space'
+              const equipped = item.equipped || (isDefaultTheme && !themeId)
+              return (
+                <Card key={item.id} className={`flex flex-col gap-3 ${equipped ? 'ring-1 ring-accent-cyan/50' : ''}`}>
+                  <div className="flex min-h-[64px] items-center justify-center">
+                    <Preview item={item} name={name} cosmetics={cosmetics} />
+                  </div>
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="font-medium">{item.name}</span>
+                    {item.kind === 'avatar' && AVATARS[item.id] && <span className="text-lg">{AVATARS[item.id]}</span>}
+                    {item.active === false && <span className="rounded-full border border-white/15 px-2 py-0.5 text-[10px] text-slate-400">Nicht mehr im Shop</span>}
+                    {item.plus_only && <span className="tag tag-plus !text-[10px]">PLUS</span>}
+                    {item.limited != null && <span className="rounded-full border border-amber-300/40 px-2 py-0.5 text-[10px] text-amber-200">{(item.taken ?? 0) >= item.limited ? 'Vergriffen' : `Noch ${item.limited - (item.taken ?? 0)} von ${item.limited}`}</span>}
+                    {item.required_role && <span className="tag tag-admin">{item.required_role === 'admin' ? 'Nur Admin' : 'Nur Mods'}</span>}
+                    {isAdmin && item.custom && (
+                      <button type="button" aria-label="Artikel bearbeiten" title="Bearbeiten" onClick={() => setEditing(item)} className="flex min-h-[36px] w-9 items-center justify-center rounded-lg text-slate-400 hover:text-white">
+                        <Pencil size={15} />
+                      </button>
+                    )}
+                  </div>
+                  {canPrice && (
+                    priceEdit?.id === item.id ? (
+                      <div className="flex items-center gap-2">
+                        <input autoFocus inputMode="numeric" value={priceEdit.value} onChange={(e) => setPriceEdit({ id: item.id, value: e.target.value.replace(/[^\d]/g, '') })}
+                          onKeyDown={(e) => { if (e.key === 'Enter') void savePrice(item); if (e.key === 'Escape') setPriceEdit(null) }}
+                          className="min-h-[40px] w-full min-w-0 rounded-lg border border-white/10 bg-space-900/70 px-3 text-sm" aria-label="Neuer Preis" />
+                        <Button variant="secondary" disabled={busy} onClick={() => void savePrice(item)}>OK</Button>
+                      </div>
+                    ) : (
+                      <button type="button" onClick={() => setPriceEdit({ id: item.id, value: String(item.price) })} className="self-start text-xs text-accent-cyan hover:underline">Preis ändern</button>
+                    )
+                  )}
+                  {item.price > 0 && item.kind !== 'theme' && <p className="-mt-1 text-xs text-slate-500">{item.price >= 4000 ? 'Sehr selten' : item.price >= 1000 ? 'Selten' : ''}</p>}
+                  {equipped ? (
+                    <span className="inline-flex min-h-[44px] items-center justify-center gap-2 rounded-xl bg-accent-cyan/10 text-sm text-accent-cyan">
+                      <Check size={16} /> Ausgewählt
+                    </span>
+                  ) : item.owned ? (
+                    <Button variant="secondary" disabled={busy} onClick={() => void act(() => equipItem(item.id), 'Ausgewählt.')}>
+                      Verwenden
+                    </Button>
+                  ) : item.plus_only ? (
+                    <Button variant="secondary" onClick={plus.openDialog}><Lock size={16} /> Mit Plus freischalten</Button>
+                  ) : (
+                    <Button disabled={busy || !affordable || (item.limited != null && (item.taken ?? 0) >= item.limited)} onClick={() => setConfirm(item)}>
+                      <CoinIcon size={16} /> {item.price.toLocaleString('de-DE')} Coins
+                    </Button>
+                  )}
+                  {!item.owned && !item.plus_only && !affordable && <p className="text-xs text-slate-500">Dir fehlen {item.price - wallet.balance} Coins.</p>}
+                </Card>
+              )
   }
 
   const equippedIn = (k: ShopKind) => (shop.data ?? []).find((i) => i.kind === k && i.equipped)
@@ -102,29 +160,41 @@ export default function Shop() {
           <button
             key={k}
             role="tab"
-            aria-selected={!parkourTab && kind === k}
-            onClick={() => { setKind(k); setParkourTab(false) }}
-            className={`min-h-[40px] rounded-lg px-4 text-sm font-medium transition ${!parkourTab && kind === k ? 'bg-accent-cyan/15 text-accent-cyan' : 'text-slate-400 hover:text-white'}`}
+            aria-selected={!parkourTab && !tradeTab && kind === k}
+            onClick={() => { setKind(k); setParkourTab(false); setTradeTab(false) }}
+            className={`min-h-[40px] rounded-lg px-4 text-sm font-medium transition ${!parkourTab && !tradeTab && kind === k ? 'bg-accent-cyan/15 text-accent-cyan' : 'text-slate-400 hover:text-white'}`}
           >
             {KIND_LABEL[k]}
           </button>
         ))}
-        <button role="tab" aria-selected={parkourTab} onClick={() => setParkourTab(true)}
+        <button role="tab" aria-selected={tradeTab} onClick={() => { setTradeTab(true); setParkourTab(false) }}
+          className={`min-h-[40px] rounded-lg px-4 text-sm font-medium transition ${tradeTab ? 'bg-accent-cyan/15 text-accent-cyan' : 'text-slate-400 hover:text-white'}`}>
+          Handel
+        </button>
+        <button role="tab" aria-selected={parkourTab} onClick={() => { setParkourTab(true); setTradeTab(false) }}
           className={`min-h-[40px] rounded-lg px-4 text-sm font-medium transition ${parkourTab ? 'bg-accent-cyan/15 text-accent-cyan' : 'text-slate-400 hover:text-white'}`}>
           Parkour
         </button>
       </div>
 
       {parkourTab && <ParkourShopPanel />}
+      {tradeTab && <TradePanel onChanged={() => { void shop.reload(); void wallet.refresh(); void refreshProfile() }} />}
 
       {coinLock.data?.locked && <div className="mb-4"><Notice tone="warn">Dein Guthaben ist vom Admin gesperrt{coinLock.data.note ? `: ${coinLock.data.note}` : '.'} Du kannst gerade nichts kaufen, aber weiter spielen und gamblen.</Notice></div>}
       {message && <div className="mb-4"><Notice tone="ok">{message}</Notice></div>}
       {error && <div className="mb-4"><ErrorBox message={error} /></div>}
-      {!parkourTab && shop.loading && !shop.data && <Spinner />}
+      {!parkourTab && !tradeTab && shop.loading && !shop.data && <Spinner />}
       {!parkourTab && shop.error && <ErrorBox message={shop.error} onRetry={shop.reload} />}
 
-      {!parkourTab && shop.data && (
+      {!parkourTab && !tradeTab && shop.data && (
         <>
+          {limitedItems.filter((i) => i.kind === kind).length > 0 && (
+            <div className="mb-6 rounded-2xl border border-fuchsia-300/25 bg-gradient-to-br from-fuchsia-400/10 via-transparent to-cyan-400/10 p-4">
+              <h2 className="mb-1 text-lg font-bold text-fuchsia-200">💎 Limitiert – nur 4 Stück</h2>
+              <p className="mb-3 text-sm text-slate-400">Wenn sie weg sind, gibt es sie nur noch im Handel zwischen Spielern.</p>
+              <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">{limitedItems.filter((i) => i.kind === kind).map(renderItem)}</div>
+            </div>
+          )}
           {u100Items.length > 0 && !parkourTab && (
             <div className="mb-6 rounded-2xl border border-amber-300/30 bg-gradient-to-br from-amber-400/10 via-transparent to-pink-500/10 p-4">
               <h2 className="mb-1 text-lg font-bold text-amber-200">🎈 Update 100 – Jubiläum</h2>
@@ -168,59 +238,7 @@ export default function Shop() {
             </div>
           )}
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-            {items.map((item) => {
-              const affordable = wallet.balance >= item.price
-              const isDefaultTheme = item.kind === 'theme' && item.id === 'theme_space'
-              const equipped = item.equipped || (isDefaultTheme && !themeId)
-              return (
-                <Card key={item.id} className={`flex flex-col gap-3 ${equipped ? 'ring-1 ring-accent-cyan/50' : ''}`}>
-                  <div className="flex min-h-[64px] items-center justify-center">
-                    <Preview item={item} name={name} cosmetics={cosmetics} />
-                  </div>
-                  <div className="flex items-center justify-between gap-2">
-                    <span className="font-medium">{item.name}</span>
-                    {item.kind === 'avatar' && AVATARS[item.id] && <span className="text-lg">{AVATARS[item.id]}</span>}
-                    {item.active === false && <span className="rounded-full border border-white/15 px-2 py-0.5 text-[10px] text-slate-400">Nicht mehr im Shop</span>}
-                    {item.plus_only && <span className="tag tag-plus !text-[10px]">PLUS</span>}
-                    {item.required_role && <span className="tag tag-admin">{item.required_role === 'admin' ? 'Nur Admin' : 'Nur Mods'}</span>}
-                    {isAdmin && item.custom && (
-                      <button type="button" aria-label="Artikel bearbeiten" title="Bearbeiten" onClick={() => setEditing(item)} className="flex min-h-[36px] w-9 items-center justify-center rounded-lg text-slate-400 hover:text-white">
-                        <Pencil size={15} />
-                      </button>
-                    )}
-                  </div>
-                  {canPrice && (
-                    priceEdit?.id === item.id ? (
-                      <div className="flex items-center gap-2">
-                        <input autoFocus inputMode="numeric" value={priceEdit.value} onChange={(e) => setPriceEdit({ id: item.id, value: e.target.value.replace(/[^\d]/g, '') })}
-                          onKeyDown={(e) => { if (e.key === 'Enter') void savePrice(item); if (e.key === 'Escape') setPriceEdit(null) }}
-                          className="min-h-[40px] w-full min-w-0 rounded-lg border border-white/10 bg-space-900/70 px-3 text-sm" aria-label="Neuer Preis" />
-                        <Button variant="secondary" disabled={busy} onClick={() => void savePrice(item)}>OK</Button>
-                      </div>
-                    ) : (
-                      <button type="button" onClick={() => setPriceEdit({ id: item.id, value: String(item.price) })} className="self-start text-xs text-accent-cyan hover:underline">Preis ändern</button>
-                    )
-                  )}
-                  {item.price > 0 && item.kind !== 'theme' && <p className="-mt-1 text-xs text-slate-500">{item.price >= 4000 ? 'Sehr selten' : item.price >= 1000 ? 'Selten' : ''}</p>}
-                  {equipped ? (
-                    <span className="inline-flex min-h-[44px] items-center justify-center gap-2 rounded-xl bg-accent-cyan/10 text-sm text-accent-cyan">
-                      <Check size={16} /> Ausgewählt
-                    </span>
-                  ) : item.owned ? (
-                    <Button variant="secondary" disabled={busy} onClick={() => void act(() => equipItem(item.id), 'Ausgewählt.')}>
-                      Verwenden
-                    </Button>
-                  ) : item.plus_only ? (
-                    <Button variant="secondary" onClick={plus.openDialog}><Lock size={16} /> Mit Plus freischalten</Button>
-                  ) : (
-                    <Button disabled={busy || !affordable} onClick={() => setConfirm(item)}>
-                      <CoinIcon size={16} /> {item.price.toLocaleString('de-DE')} Coins
-                    </Button>
-                  )}
-                  {!item.owned && !item.plus_only && !affordable && <p className="text-xs text-slate-500">Dir fehlen {item.price - wallet.balance} Coins.</p>}
-                </Card>
-              )
-            })}
+            {items.map(renderItem)}
           </div>
         </>
       )}
