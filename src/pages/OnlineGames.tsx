@@ -20,7 +20,7 @@ const GAMES: Array<{ kind: OgKind; text: string; players: string; icon: typeof H
   { kind: 'ships', text: 'Setze deine Flotte und versenke die Schiffe des Gegners.', players: '2 Personen', icon: Anchor },
   { kind: 'chess', text: 'Klassisches Schach mit allen Regeln (Rochade, en passant, Umwandlung). Remis anbieten oder aufgeben jederzeit möglich.', players: '2 Personen', icon: Castle },
   { kind: 'checkers', text: 'Dame nach deutschen Regeln: Schlagzwang, fliegende Damen, Steine schlagen auch rückwärts.', players: '2 Personen', icon: Circle },
-  { kind: 'shooter', text: '3D-Arena mit Maus und Tastatur: wer zuerst 10 Treffer hat (oder die meisten nach 5 Minuten), gewinnt. Mit Panik-Knopf.', players: '2 bis 4 Personen · kostet den Ersteller beim Start 50 Coins', icon: Crosshair },
+  { kind: 'shooter', text: '3D-Arena (Maus und Tastatur oder Touch-Steuerung am iPad): wer zuerst 10 Treffer hat (oder die meisten nach 5 Minuten), gewinnt. Mit Panik-Knopf.', players: '2 bis 4 Personen · kostet den Ersteller beim Start 50 Coins', icon: Crosshair },
 ]
 
 function statusText(g: OgListItem): string {

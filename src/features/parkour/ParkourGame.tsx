@@ -146,6 +146,7 @@ function ParkourGameInner({ st, startLevel = 0, perks }: { st: TeamState; startL
     const cv = canvas.current
     const ctx = cv?.getContext('2d')
     if (!cv || !ctx) return
+    let tainted = spec // wer zugeschaut hat (oder übers Zuschauen hereinkam), bekommt weder Münzen noch Rekorde
     let isSpec = spec // Zuschauer-Geist: von der Seite aus oder von einem Admin mitten im Spiel eingeschaltet
     let hideSend = false
     const dpr = Math.min(2, window.devicePixelRatio || 1)
@@ -477,6 +478,7 @@ function ParkourGameInner({ st, startLevel = 0, perks }: { st: TeamState; startL
       finished = true
       reported = true
       try { window.localStorage.removeItem(saveKey) } catch { /* ignorieren */ }
+      if (tainted) return // kein Ergebnis an den Server: keine Münzen, kein Rekord
       const ms = Math.round(performance.now() - startPerf)
       if (dr) void teamDeathrunFinish(st.id, ms, deaths, levels, cpTotal).catch(() => undefined)
       else void teamParkourFinish(st.id, ms, deaths + [...dcSeen.values()].reduce((x, y) => x + y, 0), levels, cpTotal).catch(() => undefined)
@@ -553,6 +555,7 @@ function ParkourGameInner({ st, startLevel = 0, perks }: { st: TeamState; startL
     /** Ende der Verschwinde-Animation: jetzt wird der Admin zum unsichtbaren Zuschauer-Geist. */
     const finishOut = () => {
       isSpec = true
+      tainted = true
       hideSend = true
       forceEl = false
       quiet = false

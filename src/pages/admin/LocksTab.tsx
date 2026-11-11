@@ -39,6 +39,7 @@ const LABEL: Record<LockKey, string> = {
   loot: 'Loot Drop',
   online: 'Online-Spiele',
   stocks: 'Börse',
+  cars: 'Autohaus',
   ranking: 'Rangliste',
   stats: 'Statistik',
   presence: 'Wer ist da?',

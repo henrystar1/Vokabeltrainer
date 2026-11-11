@@ -154,7 +154,7 @@ export const setHidePresence = (hidden: boolean) => rpc<void>('set_hide_presence
 export type LockKey = 'games' | 'gambling' | 'sprint' | 'duels' | 'chat' | 'shop' | 'quests' | 'print'
   | 'parkour' | 'learn' | 'copy' | 'cards' | 'cram' | 'test' | 'practice' | 'grammar' | 'irregular' | 'conjugate' | 'gender'
   | 'books' | 'search' | 'math' | 'memorize' | 'homework' | 'advent' | 'ranking' | 'stats' | 'presence' | 'websites' | 'plus'
-  | 'board' | 'feedback' | 'loot' | 'online' | 'stocks'
+  | 'board' | 'feedback' | 'loot' | 'online' | 'stocks' | 'cars'
 export interface LockRule { days: number[]; from: string; to: string }
 export interface FeatureLock { key: LockKey; off_until: string | null; rules: LockRule[]; note: string; locked_now: boolean }
 export const getLockedFeatures = () => rpc<LockKey[]>('get_locked_features')

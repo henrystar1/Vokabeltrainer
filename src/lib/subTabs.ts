@@ -17,7 +17,7 @@ export const SUB_TABS: Record<string, SubTab[]> = {
   '/verwaltung': [
     { id: 'reviews', label: 'Prüfanfragen' }, { id: 'feedback', label: 'Feedback' }, { id: 'online', label: 'Online & Nachrichten' }, { id: 'users', label: 'Benutzer' },
     { id: 'accounts', label: 'Konten anlegen' }, { id: 'modrights', label: 'Standard-Rechte' }, { id: 'rules', label: 'Zahlen' },
-    { id: 'shop', label: 'Shop-Preise' }, { id: 'codes', label: 'Codes' }, { id: 'grant', label: 'Coins schenken' }, { id: 'locks', label: 'Sperren' }, { id: 'stocks', label: 'Börse' }, { id: 'gamedbs', label: 'Spiel-Datenbanken' },
+    { id: 'shop', label: 'Shop-Preise' }, { id: 'codes', label: 'Codes' }, { id: 'grant', label: 'Coins schenken' }, { id: 'locks', label: 'Sperren' }, { id: 'stocks', label: 'Börse' }, { id: 'cars', label: 'Autos' }, { id: 'gamedbs', label: 'Spiel-Datenbanken' },
     { id: 'pcatalog', label: 'Katalog' }, { id: 'pcolors', label: 'Farben' }, { id: 'pprices', label: 'Preise & Werte' }, { id: 'pbans', label: 'Gesperrt' }, { id: 'plusmoney', label: 'Preise & Verdienst' },
   ],
 }

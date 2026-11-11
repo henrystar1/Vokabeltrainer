@@ -14,12 +14,10 @@ export const SECTIONS: Array<{ title: string; text?: string; rules: Rule[] }> = 
   },
   {
     title: 'Börse',
-    text: 'Aktien werden mit Coins gehandelt. Kurse kommen von Finnhub (Schlüssel unter „Börse“).',
+    text: 'Spiel-Aktien mit Coins. Die Aktien selbst legst du unter „Börse“ an.',
     rules: [
-      { key: 'stock_koin_per_usd', label: 'Coins pro US-Dollar', hint: 'Eine Aktie zu 200 $ kostet bei 10 dann 2000 Coins' },
+      { key: 'stock_volatility_permille', label: 'Schwankung pro Minute in ‰ (15 = rund 1,5 %)', hint: 'Höher = wilderer Kurs' },
       { key: 'stock_fee_permille', label: 'Gebühr in ‰ (10 = 1 %)', hint: 'Bei Kauf und Verkauf' },
-      { key: 'stock_max_age_min', label: 'Kurs gilt so viele Minuten', hint: 'Danach ist der Handel gesperrt, bis ein neuer Kurs bestätigt ist' },
-      { key: 'stock_min_reporters', label: 'Personen, die einen Kurs bestätigen müssen', hint: 'Schützt vor gefälschten Kursen' },
     ],
   },
   {

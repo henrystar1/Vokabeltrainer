@@ -11,7 +11,7 @@ export function normKey(s: string): string {
 }
 
 const ITEMS = [...NAV_ITEMS, STAFF_NAV_ITEM]
-const ALIAS: Record<string, string> = { startseite: '/', home: '/', brett: '/brett', hausaufgabe: '/hausaufgaben', flaggen: '/auswendig', pi: '/auswendig', hochzahlen: '/auswendig', website: '/websites', advent: '/advent', loot: '/loot', online: '/mehrspieler', boerse: '/boerse', aktien: '/boerse', kalender: '/advent', admin: '/verwaltung' }
+const ALIAS: Record<string, string> = { startseite: '/', home: '/', brett: '/brett', hausaufgabe: '/hausaufgaben', flaggen: '/auswendig', pi: '/auswendig', hochzahlen: '/auswendig', website: '/websites', advent: '/advent', loot: '/loot', online: '/mehrspieler', boerse: '/boerse', autohaus: '/autohaus', schnelllesen: '/schnelllesen', aktien: '/boerse', kalender: '/advent', admin: '/verwaltung' }
 
 /** Welche Seite meint #Name? Passt auf Menünamen (ohne Klammerzusatz) und auf den Pfad. */
 export function menuTarget(name: string): { to: string; label: string } | null {

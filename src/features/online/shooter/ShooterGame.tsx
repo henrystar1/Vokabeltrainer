@@ -43,6 +43,9 @@ function FakePage({ onBack }: { onBack: () => void }) {
 export default function ShooterGame({ view, onReport }: Props) {
   const mount = useRef<HTMLDivElement>(null)
   const panicRef = useRef(false)
+  const joy = useRef({ x: 0, y: 0 })
+  const look = useRef({ dx: 0, dy: 0 })
+  const fireHeld = useRef(false)
   const [panic, setPanic] = useState(false)
   const [hud, setHud] = useState({ hp: 100, alive: true, left: 0, scores: {} as Record<string, number>, locked: false, respawn: 0 })
   const report = useRef(onReport)
@@ -200,7 +203,7 @@ export default function ShooterGame({ view, onReport }: Props) {
 
       const el = renderer.domElement
       const onDown = (e: MouseEvent) => {
-        if (panicRef.current) return
+        if (panicRef.current || touch) return
         if (document.pointerLockElement !== el) { void el.requestPointerLock?.(); return }
         if (e.button === 0) fire()
       }
@@ -236,6 +239,12 @@ export default function ShooterGame({ view, onReport }: Props) {
         const now = Date.now()
         const paused = panicRef.current
         if (!paused) {
+          if (look.current.dx || look.current.dy) {
+            st.yaw -= look.current.dx * 0.006
+            st.pitch = Math.max(-1.4, Math.min(1.4, st.pitch - look.current.dy * 0.006))
+            look.current.dx = 0; look.current.dy = 0
+          }
+          if (fireHeld.current) fire()
           if (!st.alive && now >= st.respawnAt) {
             const s = SPAWNS[(mySeat + Math.floor(Math.random() * 3)) % 4]
             st.x = s[0]; st.z = s[1]; st.hp = 100; st.alive = true; st.invuln = now + 2000
@@ -246,7 +255,8 @@ export default function ShooterGame({ view, onReport }: Props) {
             if (keys.has('KeyS') || keys.has('ArrowDown')) fz += 1
             if (keys.has('KeyA') || keys.has('ArrowLeft')) fx -= 1
             if (keys.has('KeyD') || keys.has('ArrowRight')) fx += 1
-            const len = Math.hypot(fx, fz) || 1
+            fx += joy.current.x; fz += joy.current.y
+            const len = Math.max(1, Math.hypot(fx, fz))
             const sp = SPEED * (keys.has('ShiftLeft') ? 1.4 : 1) * dt
             const dx = (fx * Math.cos(st.yaw) + fz * Math.sin(st.yaw)) / len * sp
             const dz = (-fx * Math.sin(st.yaw) + fz * Math.cos(st.yaw)) / len * sp
@@ -268,7 +278,7 @@ export default function ShooterGame({ view, onReport }: Props) {
         if (hudAcc > 0.2) {
           hudAcc = 0
           const left = timeLeft(t0, minutes, now)
-          setHud({ hp: st.hp, alive: st.alive, left, scores: { ...scores }, locked: document.pointerLockElement === el, respawn: st.alive ? 0 : Math.max(0, Math.ceil((st.respawnAt - now) / 1000)) })
+          setHud({ hp: st.hp, alive: st.alive, left, scores: { ...scores }, locked: touch || document.pointerLockElement === el, respawn: st.alive ? 0 : Math.max(0, Math.ceil((st.respawnAt - now) / 1000)) })
           const top = Math.max(0, ...Object.values(scores))
           if (!st.ended && (top >= toWin || left === 0)) {
             st.ended = true
@@ -295,8 +305,6 @@ export default function ShooterGame({ view, onReport }: Props) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [view.id, touch])
 
-  if (touch) return <p className="text-center text-sm text-slate-300">Der Shooter braucht Maus und Tastatur. Spiel ihn am Computer.</p>
-
   return (
     <div className="relative">
       <div ref={mount} className="relative h-[70vh] min-h-[360px] w-full overflow-hidden rounded-2xl border border-white/10 bg-black" />
@@ -316,10 +324,76 @@ export default function ShooterGame({ view, onReport }: Props) {
             <p className="mt-0.5 text-xs text-white">{hud.alive ? `${hud.hp} Leben` : `Du bist raus – zurück in ${hud.respawn} s`}</p>
           </div>
           {!hud.locked && <div className="pointer-events-none absolute inset-0 flex items-center justify-center bg-black/40 text-center text-white"><p className="max-w-xs text-sm">Klicke ins Bild, um zu spielen.<br />WASD bewegen · Maus zielen · Klick schießen · Shift rennen · <b>P</b> = Panik</p></div>}
+          {touch && hud.alive && <TouchControls joy={joy} look={look} fireHeld={fireHeld} />}
           <button type="button" onClick={() => togglePanic(true)} className="absolute right-3 top-3 min-h-[40px] rounded-lg bg-rose-600 px-3 text-sm font-bold text-white shadow hover:bg-rose-500" aria-label="Panik-Knopf: Spiel sofort verstecken">PANIK (P)</button>
         </>
       )}
       {panic && <FakePage onBack={() => togglePanic(false)} />}
     </div>
+  )
+}
+
+type XY = { current: { x: number; y: number } }
+
+/** Touch-Steuerung (iPad/Tablet): links Joystick, rechts wischen zum Zielen, großer Feuer-Knopf. */
+function TouchControls({ joy, look, fireHeld }: { joy: XY; look: { current: { dx: number; dy: number } }; fireHeld: { current: boolean } }) {
+  const [knob, setKnob] = useState<{ x: number; y: number; ox: number; oy: number } | null>(null)
+  const joyId = useRef<number | null>(null)
+  const lookId = useRef<{ id: number; x: number; y: number } | null>(null)
+  const R = 55
+  return (
+    <>
+      <div
+        className="absolute bottom-0 left-0 top-1/3 w-1/2 touch-none select-none"
+        onPointerDown={(e) => { if (joyId.current !== null) return; joyId.current = e.pointerId; e.currentTarget.setPointerCapture(e.pointerId); setKnob({ x: 0, y: 0, ox: e.clientX, oy: e.clientY }) }}
+        onPointerMove={(e) => {
+          if (e.pointerId !== joyId.current) return
+          setKnob((k) => {
+            if (!k) return k
+            let dx = e.clientX - k.ox; let dy = e.clientY - k.oy
+            const m = Math.hypot(dx, dy)
+            if (m > R) { dx = (dx / m) * R; dy = (dy / m) * R }
+            joy.current.x = dx / R; joy.current.y = dy / R
+            return { ...k, x: dx, y: dy }
+          })
+        }}
+        onPointerUp={(e) => { if (e.pointerId !== joyId.current) return; joyId.current = null; joy.current.x = 0; joy.current.y = 0; setKnob(null) }}
+        onPointerCancel={() => { joyId.current = null; joy.current.x = 0; joy.current.y = 0; setKnob(null) }}
+        aria-label="Joystick zum Laufen"
+      >
+        {knob && (
+          <div className="pointer-events-none fixed h-[110px] w-[110px] rounded-full border-2 border-white/40 bg-white/10" style={{ left: knob.ox - R, top: knob.oy - R }}>
+            <div className="absolute h-12 w-12 rounded-full bg-white/60" style={{ left: R - 24 + knob.x, top: R - 24 + knob.y }} />
+          </div>
+        )}
+        {!knob && <p className="pointer-events-none absolute bottom-16 left-4 text-xs text-white/60">Laufen: Finger links ziehen</p>}
+      </div>
+      <div
+        className="absolute right-0 top-14 h-[55%] w-1/2 touch-none select-none"
+        onPointerDown={(e) => { if (lookId.current) return; lookId.current = { id: e.pointerId, x: e.clientX, y: e.clientY }; e.currentTarget.setPointerCapture(e.pointerId) }}
+        onPointerMove={(e) => {
+          const l = lookId.current
+          if (!l || e.pointerId !== l.id) return
+          look.current.dx += e.clientX - l.x; look.current.dy += e.clientY - l.y
+          l.x = e.clientX; l.y = e.clientY
+        }}
+        onPointerUp={(e) => { if (lookId.current?.id === e.pointerId) lookId.current = null }}
+        onPointerCancel={() => { lookId.current = null }}
+        aria-label="Zielen: Finger bewegen"
+      >
+        <p className="pointer-events-none absolute right-4 top-2 text-xs text-white/60">Zielen: Finger rechts bewegen</p>
+      </div>
+      <button
+        type="button"
+        className="absolute bottom-6 right-6 h-24 w-24 touch-none select-none rounded-full border-4 border-white/60 bg-rose-600/80 text-lg font-extrabold text-white active:bg-rose-500"
+        onPointerDown={(e) => { e.currentTarget.setPointerCapture(e.pointerId); fireHeld.current = true }}
+        onPointerUp={() => { fireHeld.current = false }}
+        onPointerCancel={() => { fireHeld.current = false }}
+        onContextMenu={(e) => e.preventDefault()}
+        aria-label="Schießen"
+      >
+        FEUER
+      </button>
+    </>
   )
 }

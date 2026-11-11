@@ -30,6 +30,8 @@ import AdventPage from './pages/Advent'
 import LootPage from './pages/Loot'
 import OnlineGamesPage from './pages/OnlineGames'
 import Stocks from './pages/Stocks'
+import SpeedRead from './pages/SpeedRead'
+import Cars from './pages/Cars'
 import OnlineGamePage from './pages/OnlineGame'
 import WebsitesPage from './pages/Websites'
 import Cram from './pages/Cram'
@@ -123,6 +125,8 @@ export default function App() {
           <Route path="auswendig" element={<Gate k="memorize"><Memorize /></Gate>} />
           <Route path="hausaufgaben" element={<Gate k="homework"><HomeworkPage /></Gate>} />
           <Route path="advent" element={<Gate k="advent"><AdventPage /></Gate>} />
+          <Route path="schnelllesen" element={<SpeedRead />} />
+          <Route path="autohaus" element={<Gate k="cars"><Cars /></Gate>} />
           <Route path="boerse" element={<Gate k="stocks"><Stocks /></Gate>} />
           <Route path="mehrspieler" element={<Gate k="online"><OnlineGamesPage /></Gate>} />
           <Route path="mehrspieler/:id" element={<Gate k="online"><OnlineGamePage /></Gate>} />
