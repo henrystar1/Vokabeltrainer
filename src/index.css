@@ -181,6 +181,12 @@ body {
 .tag-glitch { color: #a5f3fc; font-weight: 800; font-family: ui-monospace, monospace; background: #020617; border: 1px solid #22d3ee; text-shadow: 2px 0 #f43f5e, -2px 0 #22d3ee; animation: tag-glitch 1.6s steps(2, end) infinite; }
 @keyframes tag-glitch { 0%, 88%, 100% { transform: none; filter: none; } 90% { transform: translateX(-2px) skewX(8deg); filter: hue-rotate(90deg); } 94% { transform: translateX(2px) skewX(-8deg); filter: hue-rotate(-90deg); } 97% { transform: translateY(1px); } }
 @media (prefers-reduced-motion: reduce) { .tag-phoenix, .tag-glitch { animation: none; } }
+.tag-frost { color: #082f49; font-weight: 800; letter-spacing: .05em; background: linear-gradient(110deg,#e0f2fe,#7dd3fc 35%,#f0f9ff 50%,#38bdf8 70%,#e0f2fe); background-size: 250% 100%; animation: tag-frost 3s linear infinite; box-shadow: 0 0 12px rgb(125 211 252 / .8); }
+@keyframes tag-frost { 0% { background-position: 0% 50%; } 100% { background-position: 250% 50%; } }
+.tag-royal { color: #3b0764; font-weight: 800; background: linear-gradient(100deg,#a16207,#fde047 30%,#fffbeb 50%,#eab308 70%,#a16207); background-size: 250% 100%; animation: tag-frost 2.6s linear infinite; border: 1px solid #fde047; box-shadow: 0 0 14px rgb(234 179 8 / .85), inset 0 0 6px rgb(255 255 255 / .6); }
+.tag-neon { color: #fdf4ff; font-weight: 800; letter-spacing: .08em; background: #0b0220; border: 1px solid #e879f9; animation: tag-neon 1.8s ease-in-out infinite; }
+@keyframes tag-neon { 0%, 100% { box-shadow: 0 0 5px #e879f9, 0 0 12px #a855f7; text-shadow: 0 0 6px #e879f9; } 50% { box-shadow: 0 0 10px #22d3ee, 0 0 22px #22d3ee; text-shadow: 0 0 10px #22d3ee; } }
+@media (prefers-reduced-motion: reduce) { .tag-frost, .tag-royal, .tag-neon { animation: none; } }
 .tag-elite { color: #1a1000; background: linear-gradient(100deg, #94a3b8, #f8fafc 35%, #cbd5e1 55%, #f8fafc 75%, #94a3b8); background-size: 200% 100%; animation: tag-gold 3.2s linear infinite; box-shadow: 0 0 12px rgb(226 232 240 / 0.6); }
 
 /* ---------- Eigene Tags, Farben und Effekte (vom Admin im Shop angelegt) ---------- */

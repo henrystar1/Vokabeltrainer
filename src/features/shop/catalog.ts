@@ -104,6 +104,9 @@ export const TAGS: Record<string, { label: string; className: string }> = {
   // Limitiert (je 4 Stück)
   tag_ltd_phoenix: { label: 'PHÖNIX', className: 'tag-phoenix' },
   tag_ltd_glitch: { label: 'GL1TCH', className: 'tag-glitch' },
+  tag_ltd_frost: { label: 'FROST', className: 'tag-frost' },
+  tag_ltd_royal: { label: '♛ KRONE', className: 'tag-royal' },
+  tag_ltd_neon: { label: 'NEON', className: 'tag-neon' },
 }
 
 /** Automatische Rollen-Tags (nicht kaufbar). */
@@ -323,6 +326,21 @@ export const THEMES: Record<string, ThemePalette> = {
     s950: '#000000', s900: '#050308', s800: '#0c0714', s700: '#1a0f2e', s600: '#2b1850',
     cyan: '#e9d5ff', violet: '#a855f7', blue: '#6366f1', fx: 'shine',
     decor: 'blackhole', decorColors: ['#f5f3ff', '#a855f7', '#4338ca'], preview: 'radial-gradient(circle at 50% 50%,#000 0 20%,#f5f3ff 22%,#a855f7 32%,#2b1850 55%,#000 80%)',
+  },
+  theme_ltd_sakura: {
+    s950: '#14070d', s900: '#1f0b14', s800: '#3a1424', s700: '#5c2038', s600: '#862f52',
+    cyan: '#fbcfe8', violet: '#f472b6', blue: '#fda4af', fx: 'shine',
+    decor: 'petals', decorColors: ['#fbcfe8', '#f9a8d4', '#fff1f2'], preview: 'radial-gradient(circle at 30% 40%,#fbcfe8 0 5%,transparent 6%),radial-gradient(circle at 70% 65%,#f9a8d4 0 4%,transparent 5%),linear-gradient(160deg,#1f0b14,#862f52)',
+  },
+  theme_ltd_lava: {
+    s950: '#120503', s900: '#1c0805', s800: '#34100a', s700: '#5a1a0d', s600: '#8a2a10',
+    cyan: '#fdba74', violet: '#ef4444', blue: '#facc15', fx: 'shine',
+    decor: 'fireflies', decorColors: ['#f97316', '#ef4444', '#fde047'], preview: 'radial-gradient(circle at 50% 100%,#fde047 0 12%,#f97316 28%,#7f1d1d 60%,#120503 90%)',
+  },
+  theme_ltd_matrix: {
+    s950: '#000a03', s900: '#00140a', s800: '#02240f', s700: '#053d19', s600: '#0a5c26',
+    cyan: '#4ade80', violet: '#86efac', blue: '#22c55e', fx: 'rainbow',
+    decor: 'code', decorColors: ['#4ade80', '#22c55e', '#bbf7d0'], preview: 'repeating-linear-gradient(90deg,#00140a 0 6px,#0a5c26 6px 7px),linear-gradient(180deg,#000a03,#053d19)',
   },
   theme_rainbow: {
     s950: '#07060f', s900: '#0d0b1c', s800: '#161230', s700: '#231d4d', s600: '#322a70',

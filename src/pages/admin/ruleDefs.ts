@@ -13,6 +13,24 @@ export const SECTIONS: Array<{ title: string; text?: string; rules: Rule[] }> = 
     ],
   },
   {
+    title: 'Börse',
+    text: 'Aktien werden mit Coins gehandelt. Kurse kommen von Finnhub (Schlüssel unter „Börse“).',
+    rules: [
+      { key: 'stock_koin_per_usd', label: 'Coins pro US-Dollar', hint: 'Eine Aktie zu 200 $ kostet bei 10 dann 2000 Coins' },
+      { key: 'stock_fee_permille', label: 'Gebühr in ‰ (10 = 1 %)', hint: 'Bei Kauf und Verkauf' },
+      { key: 'stock_max_age_min', label: 'Kurs gilt so viele Minuten', hint: 'Danach ist der Handel gesperrt, bis ein neuer Kurs bestätigt ist' },
+      { key: 'stock_min_reporters', label: 'Personen, die einen Kurs bestätigen müssen', hint: 'Schützt vor gefälschten Kursen' },
+    ],
+  },
+  {
+    title: '3D-Shooter',
+    rules: [
+      { key: 'shooter_fee', label: 'Kosten pro Spiel für die Lobby-Erstellung (Coins)' },
+      { key: 'shooter_to_win', label: 'Treffer bis zum Sieg' },
+      { key: 'shooter_minutes', label: 'Maximale Spieldauer (Minuten)' },
+    ],
+  },
+  {
     title: 'Tages-Quests',
     text: 'Wie viel man für die Quests schaffen muss. Die Coins-Belohnungen stehen unter „Coins & Belohnungen“.',
     rules: [

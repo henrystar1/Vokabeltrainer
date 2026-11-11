@@ -1,12 +1,15 @@
 import { useEffect, useState } from 'react'
 import { ErrorBox, Spinner } from '../../components/ui/States'
 import { useAsync } from '../../lib/useAsync'
+import { startState } from '../../features/online/board/checkers'
+import { ChessSquares, CheckersSquares } from '../../features/online/board/BoardGames'
 import { SIZE, shipCells } from '../../features/online/ships'
 import { SEAT_COLORS, SEAT_NAMES } from '../../features/online/ludoBoard'
 import { ogSpectateList, ogSpectateView, type Ship, type ShipsShot, type SpectateView } from '../../services/online'
 import { errorMessage } from '../../lib/errors'
 
-const KIND: Record<string, string> = { rps: 'Schnick Schnack Schnuck', ludo: 'Mensch ärgere dich nicht', ships: 'Schiffe versenken', shooter: '3D-Shooter' }
+const startBoard = () => startState().board
+const KIND: Record<string, string> = { rps: 'Schnick Schnack Schnuck', ludo: 'Mensch ärgere dich nicht', ships: 'Schiffe versenken', shooter: '3D-Shooter', chess: 'Schach', checkers: 'Dame' }
 
 function ShipGrid({ title, ships, shots }: { title: string; ships: Ship[]; shots: ShipsShot[] }) {
   const mine = new Set(ships.flatMap(shipCells))
@@ -63,6 +66,8 @@ function Viewer({ id }: { id: string }) {
           ))}
         </div>
       )}
+      {v.kind === 'chess' && <ChessSquares fen={(v.state as { fen?: string }).fen ?? 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1'} last={(v.state as { last?: number[] }).last} />}
+      {v.kind === 'checkers' && <CheckersSquares board={(v.state as unknown as { board?: string[] }).board ?? startBoard()} last={(v.state as unknown as { last?: number[] }).last} />}
       {v.kind === 'shooter' && <pre className="overflow-x-auto rounded-lg bg-black/30 p-3 text-xs text-slate-300">{JSON.stringify(v.state, null, 1)}</pre>}
     </div>
   )

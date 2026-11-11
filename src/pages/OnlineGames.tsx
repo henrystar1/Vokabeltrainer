@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
-import { Anchor, Crosshair, Dices, Hand, Search, X } from 'lucide-react'
+import { Anchor, Castle, Circle, Crosshair, Dices, Hand, Search, X } from 'lucide-react'
 import PlayerTag from '../components/profile/PlayerTag'
 import Button from '../components/ui/Button'
 import Card from '../components/ui/Card'
@@ -18,6 +18,8 @@ const GAMES: Array<{ kind: OgKind; text: string; players: string; icon: typeof H
   { kind: 'rps', text: 'Stein, Papier, Schere: wer zuerst 2 Runden gewinnt.', players: '2 Personen', icon: Hand },
   { kind: 'ludo', text: 'Würfeln, ziehen, rauswerfen – wer bringt zuerst alle Figuren ins Ziel?', players: '2 bis 4 Personen', icon: Dices },
   { kind: 'ships', text: 'Setze deine Flotte und versenke die Schiffe des Gegners.', players: '2 Personen', icon: Anchor },
+  { kind: 'chess', text: 'Klassisches Schach mit allen Regeln (Rochade, en passant, Umwandlung). Remis anbieten oder aufgeben jederzeit möglich.', players: '2 Personen', icon: Castle },
+  { kind: 'checkers', text: 'Dame nach deutschen Regeln: Schlagzwang, fliegende Damen, Steine schlagen auch rückwärts.', players: '2 Personen', icon: Circle },
   { kind: 'shooter', text: '3D-Arena mit Maus und Tastatur: wer zuerst 10 Treffer hat (oder die meisten nach 5 Minuten), gewinnt. Mit Panik-Knopf.', players: '2 bis 4 Personen · kostet den Ersteller beim Start 50 Coins', icon: Crosshair },
 ]
 

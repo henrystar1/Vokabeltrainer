@@ -38,6 +38,7 @@ const LABEL: Record<LockKey, string> = {
   advent: 'Adventskalender',
   loot: 'Loot Drop',
   online: 'Online-Spiele',
+  stocks: 'Börse',
   ranking: 'Rangliste',
   stats: 'Statistik',
   presence: 'Wer ist da?',

@@ -10,6 +10,7 @@ export interface ReportEntry { vocabulary_id: string; german: string; german_alt
 
 /** Meldet eine Vokabel eines Online-Buchs zur Prüfung (aus der Seitenansicht und aus der Suche). */
 export default function ReportModal({ entry, onClose, onSent }: { entry: ReportEntry; onClose: () => void; onSent: () => void }) {
+  const [reveal, setReveal] = useState(false)
   const [message, setMessage] = useState('')
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -29,11 +30,20 @@ export default function ReportModal({ entry, onClose, onSent }: { entry: ReportE
   return (
     <Modal title="Überprüfung anfordern" onClose={onClose}>
       <div className="space-y-4">
-        <p className="rounded-xl border border-white/10 bg-space-900/60 p-3 text-sm">
-          <strong>{entry.translations.join(' · ')}</strong>
-          <span className="text-slate-400"> = </span>
-          {[entry.german, ...entry.german_alts].join(' · ')}
-        </p>
+        <div className="rounded-xl border border-white/10 bg-space-900/60 p-3 text-sm">
+          {reveal ? (
+            <p>
+              <strong>{entry.translations.join(' · ')}</strong>
+              <span className="text-slate-400"> = </span>
+              {[entry.german, ...entry.german_alts].join(' · ')}
+            </p>
+          ) : (
+            <p className="flex flex-wrap items-center gap-2 text-slate-300">
+              Diese Vokabel wird gemeldet. Die Lösung bleibt verdeckt.
+              <button type="button" onClick={() => setReveal(true)} className="text-xs text-accent-cyan underline">Lösung trotzdem zeigen</button>
+            </p>
+          )}
+        </div>
         <label className="block space-y-1.5">
           <span className="label-mono">Was stimmt nicht? (optional)</span>
           <TextArea maxLength={500} value={message} onChange={(e) => setMessage(e.target.value)} placeholder="z. B. Tippfehler, falsche Übersetzung, fehlende Lösung …" />

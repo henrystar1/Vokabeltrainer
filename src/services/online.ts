@@ -1,7 +1,7 @@
 import { rpc } from './rpc'
 
-export type OgKind = 'rps' | 'ludo' | 'ships' | 'shooter'
-export const OG_NAMES: Record<OgKind, string> = { rps: 'Schnick Schnack Schnuck', ludo: 'Mensch ärgere dich nicht', ships: 'Schiffe versenken', shooter: '3D-Shooter' }
+export type OgKind = 'rps' | 'ludo' | 'ships' | 'shooter' | 'chess' | 'checkers'
+export const OG_NAMES: Record<OgKind, string> = { rps: 'Schnick Schnack Schnuck', ludo: 'Mensch ärgere dich nicht', ships: 'Schiffe versenken', shooter: '3D-Shooter', chess: 'Schach', checkers: 'Dame' }
 
 export interface OgListItem {
   id: string
@@ -62,3 +62,7 @@ export const ogSpectateView = (id: string) => rpc<SpectateView>('og_spectate_vie
 
 export const ogShooterReport = (id: string, scores: Record<string, number>, final: boolean) => rpc<OgView>('og_shooter_report', { p_id: id, p_scores: scores, p_final: final })
 export const ogShooterLeave = (id: string) => rpc<OgView>('og_shooter_leave', { p_id: id })
+
+export const ogBoardMove = (id: string, state: Record<string, unknown>, result: 'ongoing' | 'win' | 'draw') => rpc<OgView>('og_board_move', { p_id: id, p_state: state, p_result: result })
+export const ogBoardResign = (id: string) => rpc<OgView>('og_board_resign', { p_id: id })
+export const ogBoardDraw = (id: string, action: 'offer' | 'accept' | 'decline' | 'withdraw') => rpc<OgView>('og_board_draw', { p_id: id, p_action: action })

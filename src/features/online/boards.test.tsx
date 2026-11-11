@@ -4,6 +4,7 @@ import type { OgView } from '../../services/online'
 import LudoBoard from './LudoBoard'
 import RpsBoard from './RpsBoard'
 import ShipsBoard from './ShipsBoard'
+import { CheckersBoard, ChessBoard } from './board/BoardGames'
 
 const players = [
   { user_id: 'a', name: 'Anna', seat: 0, join_state: 'joined' as const, avatar_id: null, color_id: null },
@@ -39,5 +40,19 @@ describe('Online-Spiel-Oberflächen', () => {
     const html = renderToString(<ShipsBoard view={fight} busy={false} onPlace={() => undefined} onShoot={() => undefined} />)
     expect(html).toContain('Du bist dran')
     expect(html).toContain('Deine Flotte')
+  })
+  it('Schach zeigt Brett, Zugtext und Remis-Angebot', () => {
+    const v = { ...base, kind: 'chess', status: 'running', turn_seat: 0, mine: {}, me: { user_id: 'a', seat: 0, join_state: 'joined' }, state: { moves: 0, draw_offer: 1 } } as unknown as OgView
+    const html = renderToString(<ChessBoard view={v} busy={false} onMove={() => undefined} onDraw={() => undefined} />).replace(/<!-- -->/g, '')
+    expect(html).toContain('Schachbrett')
+    expect(html).toContain('Anna (Weiß) ist am Zug')
+    expect(html).toContain('Remis-Angebot vom Gegner')
+  })
+  it('Dame zeigt Brett und Schlagzwang-Hinweis nur bei Zwang', () => {
+    const v = { ...base, kind: 'checkers', status: 'running', turn_seat: 0, mine: {}, state: { moves: 0, draw_offer: null } } as unknown as OgView
+    const html = renderToString(<CheckersBoard view={v} busy={false} onMove={() => undefined} onDraw={() => undefined} />).replace(/<!-- -->/g, '')
+    expect(html).toContain('Damebrett')
+    expect(html).toContain('Remis anbieten')
+    expect(html).not.toContain('Schlagzwang!')
   })
 })

@@ -1,3 +1,4 @@
+import { useEffect } from 'react'
 import type { OgView } from '../../services/online'
 import { HOME_LANE, HOUSE, SEAT_COLORS, SEAT_NAMES, TRACK, cellOf } from './ludoBoard'
 
@@ -17,6 +18,20 @@ export default function LudoBoard({ view, busy, onRoll, onMove }: { view: OgView
       : last.nomove ? `${name(last.seat)}: ${last.dice} – kein Zug möglich${last.again ? ', nochmal würfeln' : ''}.`
       : `${name(last.seat)} zieht mit der ${last.dice}${last.caps && last.caps.length > 0 ? ` und wirft ${last.caps.map((c) => name(c.seat)).join(', ')} raus!` : '.'}`
     : null
+
+  const needRoll = myTurn && !st.dice
+  // Tastatur: Leertaste/Enter/W würfeln, Ziffern 1–4 ziehen die Figur mit dieser Nummer (wenn erlaubt)
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      const t = e.target as HTMLElement | null
+      if (busy || !myTurn || (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.isContentEditable))) return
+      if (needRoll && (e.code === 'Space' || e.code === 'Enter' || e.code === 'KeyW' || e.code === 'KeyR')) { e.preventDefault(); onRoll(); return }
+      const n = /^(?:Digit|Numpad)([1-4])$/.exec(e.code)
+      if (n && st.dice && legal.has(Number(n[1]) - 1)) { e.preventDefault(); onMove(Number(n[1]) - 1) }
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  })
 
   const pieces: Array<{ seat: number; i: number; rel: number }> = []
   for (const s of st.seats) (st.pieces[String(s)] ?? []).forEach((rel, i) => pieces.push({ seat: s, i, rel }))
@@ -51,9 +66,9 @@ export default function LudoBoard({ view, busy, onRoll, onMove }: { view: OgView
         {st.dice ? <span className="text-5xl" aria-label={`Würfel ${st.dice}`} style={{ animation: 'ludo-roll .5s ease-out' }}>{DIE[st.dice]}</span> : <span className="text-5xl opacity-30" aria-hidden>🎲</span>}
         {view.status === 'running' && (
           myTurn ? (
-            st.dice ? <span className="text-sm font-semibold text-emerald-300">Tippe auf eine leuchtende Figur.</span>
+            st.dice ? <span className="text-sm font-semibold text-emerald-300">Tippe auf eine leuchtende Figur oder drücke ihre Zahl ({[...legal].sort().map((i) => i + 1).join(', ')}).</span>
               : <button type="button" disabled={busy} onClick={onRoll} className="min-h-[48px] rounded-xl bg-emerald-500 px-5 font-semibold text-slate-950 hover:bg-emerald-400 disabled:opacity-60">
-                  Würfeln{st.tries > 1 ? ` (${st.tries} Versuche für eine 6)` : ''}
+                  Würfeln (Leertaste){st.tries > 1 ? ` (${st.tries} Versuche für eine 6)` : ''}
                 </button>
           ) : <span className="text-sm text-slate-300">{name(view.turn_seat ?? 0)} ist dran …</span>
         )}

@@ -9,10 +9,11 @@ import { ErrorBox, Notice, Spinner } from '../components/ui/States'
 import LudoBoard from '../features/online/LudoBoard'
 import RpsBoard from '../features/online/RpsBoard'
 import ShipsBoard from '../features/online/ShipsBoard'
+import { ChessBoard, CheckersBoard } from '../features/online/board/BoardGames'
 import ShooterGame from '../features/online/shooter/ShooterGame'
 import { useGameSync } from '../features/online/useGameSync'
 import { errorMessage } from '../lib/errors'
-import { OG_NAMES, ogGet, ogLeave, ogLudoMove, ogLudoRoll, ogRespond, ogRpsPick, ogShipsPlace, ogShipsShoot, ogShooterLeave, ogShooterReport, ogStart, type OgView } from '../services/online'
+import { OG_NAMES, ogBoardDraw, ogBoardMove, ogBoardResign, ogGet, ogLeave, ogLudoMove, ogLudoRoll, ogRespond, ogRpsPick, ogShipsPlace, ogShipsShoot, ogShooterLeave, ogShooterReport, ogStart, type OgView } from '../services/online'
 
 /** Ein Online-Spiel: Einladung/Lobby, Spielfeld je Spiel, Ergebnis. Der Server prüft alle Regeln. */
 export default function OnlineGame() {
@@ -109,12 +110,14 @@ export default function OnlineGame() {
           {view.kind === 'rps' && <RpsBoard view={view} busy={busy} onPick={(p) => void act(() => ogRpsPick(id, p))} />}
           {view.kind === 'ludo' && <LudoBoard view={view} busy={busy} onRoll={() => void act(() => ogLudoRoll(id))} onMove={(i) => void act(() => ogLudoMove(id, i))} />}
           {view.kind === 'shooter' && <ShooterGame view={view} onReport={(scores, final) => void act(() => ogShooterReport(id, scores, final))} />}
+          {view.kind === 'chess' && <ChessBoard view={view} busy={busy} onMove={(s, r) => void act(() => ogBoardMove(id, s, r))} onDraw={(a) => void act(() => ogBoardDraw(id, a))} />}
+          {view.kind === 'checkers' && <CheckersBoard view={view} busy={busy} onMove={(s, r) => void act(() => ogBoardMove(id, s, r))} onDraw={(a) => void act(() => ogBoardDraw(id, a))} />}
           {view.kind === 'ships' && <ShipsBoard view={view} busy={busy} onPlace={(s) => void act(() => ogShipsPlace(id, s))} onShoot={(r, c) => void act(() => ogShipsShoot(id, r, c))} />}
         </Card>
       )}
 
       {(view.status === 'running' || (view.status === 'lobby' && !invited)) && (
-        <Button variant="danger" className="!min-h-[40px] text-sm" busy={busy} onClick={() => { if (window.confirm(view.status === 'running' ? 'Wirklich aufgeben?' : 'Spiel verlassen?')) void act(() => (view.kind === 'shooter' && view.status === 'running' ? ogShooterLeave(id) : ogLeave(id))) }}>
+        <Button variant="danger" className="!min-h-[40px] text-sm" busy={busy} onClick={() => { if (window.confirm(view.status === 'running' ? 'Wirklich aufgeben?' : 'Spiel verlassen?')) void act(() => (view.kind === 'shooter' && view.status === 'running' ? ogShooterLeave(id) : (view.kind === 'chess' || view.kind === 'checkers') && view.status === 'running' ? ogBoardResign(id) : ogLeave(id))) }}>
           {view.status === 'running' ? 'Aufgeben' : 'Verlassen'}
         </Button>
       )}
