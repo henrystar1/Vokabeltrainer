@@ -4,6 +4,7 @@ export const ARENA = 30 // halbe Kantenlänge
 export const EYE = 1.6
 export const BODY_H = 1.8
 export const BODY_R = 0.5
+export const HIT_R = 0.8 // Treffer-Radius etwas großzügiger als der Körper (Netzwerk-Verzögerung)
 export const SPEED = 7
 export const SHOT_DAMAGE = 25
 export const SHOT_COOLDOWN = 0.35
@@ -80,7 +81,7 @@ export function rayHitPlayer(o: Vec3, d: Vec3, cx: number, cz: number): number |
   const a = d.x * d.x + d.z * d.z
   if (a < 1e-9) return null
   const bq = 2 * (ox * d.x + oz * d.z)
-  const c = ox * ox + oz * oz - BODY_R * BODY_R
+  const c = ox * ox + oz * oz - HIT_R * HIT_R
   const disc = bq * bq - 4 * a * c
   if (disc < 0) return null
   const t = (-bq - Math.sqrt(disc)) / (2 * a)

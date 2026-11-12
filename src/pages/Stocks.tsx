@@ -6,6 +6,7 @@ import { ErrorBox, Notice, Spinner } from '../components/ui/States'
 import { useAsync } from '../lib/useAsync'
 import { errorMessage } from '../lib/errors'
 import { useWallet } from '../features/koins/WalletProvider'
+import StockChart from '../features/stocks/StockChart'
 import { stockHistory, stockList, stockTrade, type StockRow } from '../services/stocks'
 
 const REFRESH_MS = 30_000
@@ -16,12 +17,13 @@ export default function Stocks() {
   const wallet = useWallet()
   const list = useAsync(stockList, [])
   const hist = useAsync(stockHistory, [])
+  const [tick, setTick] = useState(0)
   const [sel, setSel] = useState<string | null>(null)
   const [qty, setQty] = useState('1')
   const [busy, setBusy] = useState(false)
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null)
   useEffect(() => {
-    const t = window.setInterval(() => { if (document.visibilityState === 'visible') void list.reload() }, REFRESH_MS)
+    const t = window.setInterval(() => { if (document.visibilityState === 'visible') void list.reload(); setTick((n) => n + 1) }, REFRESH_MS)
     return () => window.clearInterval(t)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
@@ -66,7 +68,7 @@ export default function Stocks() {
                     </span>
                     <span className="text-right">
                       <span className="block text-sm font-semibold">{r.unit_koins ?? '–'} Coins</span>
-                      <span className="block text-xs text-slate-500">Grundpreis {r.base_koins}</span>
+                      <span className="block text-xs text-slate-500">Startpreis {r.base_koins}</span>
                     </span>
                     {diff !== null && (
                       <span className={`flex w-20 items-center justify-end gap-1 text-xs ${diff >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
@@ -84,6 +86,7 @@ export default function Stocks() {
             <Card>
               <h2 className="font-semibold">{cur.name} ({cur.symbol})</h2>
               <p className="text-sm text-slate-400">{cur.unit_koins ?? '–'} Coins pro Aktie</p>
+              <div className="mt-3"><StockChart symbol={cur.symbol} reloadKey={tick} /></div>
               <label className="mt-3 block space-y-1">
                 <span className="label-mono">Anzahl</span>
                 <input type="number" inputMode="numeric" min={1} value={qty} onChange={(e) => setQty(e.target.value)} className="min-h-[44px] w-full rounded-lg border border-white/15 bg-space-900/60 px-3" />

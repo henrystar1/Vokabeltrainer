@@ -16,7 +16,8 @@ export const SECTIONS: Array<{ title: string; text?: string; rules: Rule[] }> = 
     title: 'Börse',
     text: 'Spiel-Aktien mit Coins. Die Aktien selbst legst du unter „Börse“ an.',
     rules: [
-      { key: 'stock_volatility_permille', label: 'Schwankung pro Minute in ‰ (15 = rund 1,5 %)', hint: 'Höher = wilderer Kurs' },
+      { key: 'stock_weekly_growth_percent', label: 'Durchschnittlicher Anstieg pro Woche in %', hint: 'Standard 50. Die Kurse steigen im Schnitt so stark und schwanken zufällig darum' },
+      { key: 'stock_volatility_permille', label: 'Schwankung pro Minute in ‰ (2 = rund 0,2 %)', hint: 'Höher = wilderer Kurs' },
       { key: 'stock_fee_permille', label: 'Gebühr in ‰ (10 = 1 %)', hint: 'Bei Kauf und Verkauf' },
     ],
   },

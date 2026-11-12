@@ -43,14 +43,15 @@ function FakePage({ onBack }: { onBack: () => void }) {
 export default function ShooterGame({ view, onReport }: Props) {
   const mount = useRef<HTMLDivElement>(null)
   const panicRef = useRef(false)
+  const [hitFlash, setHitFlash] = useState(0)
   const joy = useRef({ x: 0, y: 0 })
   const look = useRef({ dx: 0, dy: 0 })
   const fireHeld = useRef(false)
+  const touch = typeof window !== 'undefined' && window.matchMedia?.('(pointer: coarse)').matches
   const [panic, setPanic] = useState(false)
-  const [hud, setHud] = useState({ hp: 100, alive: true, left: 0, scores: {} as Record<string, number>, locked: false, respawn: 0 })
+  const [hud, setHud] = useState({ hp: 100, alive: true, left: 0, scores: {} as Record<string, number>, locked: !!touch, respawn: 0 })
   const report = useRef(onReport)
   report.current = onReport
-  const touch = typeof window !== 'undefined' && window.matchMedia?.('(pointer: coarse)').matches
 
   const me = view.me
   const mySeat = me.seat ?? 0
@@ -64,7 +65,7 @@ export default function ShooterGame({ view, onReport }: Props) {
   }
 
   useEffect(() => {
-    if (touch || !mount.current) return
+    if (!mount.current) return
     const host = mount.current
     let dead = false
     let raf = 0
@@ -134,7 +135,9 @@ export default function ShooterGame({ view, onReport }: Props) {
         const grp = new THREE.Group()
         const body = new THREE.Mesh(new THREE.CapsuleGeometry(0.4, 0.95, 4, 10), new THREE.MeshStandardMaterial({ color: SEAT_COLORS[seat] }))
         body.position.y = 0.9
-        grp.add(body, label(p.name, SEAT_COLORS[seat]))
+        const bar = new THREE.Sprite(new THREE.SpriteMaterial({ color: 0x34d399, depthTest: false }))
+        bar.position.y = BODY_H + 0.25; bar.scale.set(1.2, 0.12, 1); bar.name = 'hpbar'
+        grp.add(body, label(p.name, SEAT_COLORS[seat]), bar)
         const sp = SPAWNS[seat % 4]
         grp.position.set(sp[0], 0, sp[1])
         scene.add(grp)
@@ -198,7 +201,7 @@ export default function ShooterGame({ view, onReport }: Props) {
         const end = [o.x + d.x * t, o.y + d.y * t, o.z + d.z * t]
         addTracer([o.x, o.y, o.z], end, 0xffffff)
         send('s', { o: [o.x, o.y, o.z], e: end })
-        if (hit) send('h', { to: hit.id, from: me.user_id, dmg: SHOT_DAMAGE })
+        if (hit) { send('h', { to: hit.id, from: me.user_id, dmg: SHOT_DAMAGE }); setHitFlash((n) => n + 1) }
       }
 
       const el = renderer.domElement
@@ -267,6 +270,8 @@ export default function ShooterGame({ view, onReport }: Props) {
         camera.rotation.set(st.alive ? st.pitch : -0.9, st.yaw, 0)
         for (const r of remotes.values()) {
           r.x += (r.tx - r.x) * Math.min(1, dt * 14); r.z += (r.tz - r.z) * Math.min(1, dt * 14)
+          const bar = r.mesh?.getObjectByName('hpbar') as import('three').Sprite | undefined
+          if (bar) { const f = Math.max(0.02, Math.min(1, r.hp / 100)); bar.scale.x = 1.2 * f; (bar.material as import('three').SpriteMaterial).color.set(f > 0.5 ? 0x34d399 : f > 0.25 ? 0xfbbf24 : 0xef4444) }
           if (r.mesh) { r.mesh.position.set(r.x, 0, r.z); r.mesh.rotation.y = r.yaw; r.mesh.visible = r.alive && !r.hidden }
         }
         for (let i = tracers.length - 1; i >= 0; i--) if (performance.now() > tracers[i].until) { scene.remove(tracers[i].line); tracers[i].line.geometry.dispose(); tracers.splice(i, 1) }
@@ -307,7 +312,8 @@ export default function ShooterGame({ view, onReport }: Props) {
 
   return (
     <div className="relative">
-      <div ref={mount} className="relative h-[70vh] min-h-[360px] w-full overflow-hidden rounded-2xl border border-white/10 bg-black" />
+      <div ref={mount} className={`relative min-h-[300px] w-full overflow-hidden rounded-2xl border border-white/10 bg-black ${touch ? 'touch-none overscroll-none' : ''}`} style={{ height: touch ? 'calc(100dvh - 260px)' : '70vh' }} />
+      {hitFlash > 0 && <HitMarker key={hitFlash} />}
       {!panic && (
         <>
           <div className="pointer-events-none absolute left-1/2 top-1/2 h-4 w-4 -translate-x-1/2 -translate-y-1/2" aria-hidden>
@@ -396,4 +402,12 @@ function TouchControls({ joy, look, fireHeld }: { joy: XY; look: { current: { dx
       </button>
     </>
   )
+}
+
+/** Kurzes rotes „X“ in der Bildmitte, wenn ein Schuss trifft. */
+function HitMarker() {
+  const [on, setOn] = useState(true)
+  useEffect(() => { const t = window.setTimeout(() => setOn(false), 220); return () => window.clearTimeout(t) }, [])
+  if (!on) return null
+  return <div className="pointer-events-none absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 text-2xl font-black text-rose-500" aria-hidden>✕</div>
 }
