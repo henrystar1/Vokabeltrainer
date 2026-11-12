@@ -34,7 +34,7 @@ export default function Presence() {
   /** Nur Admins: was macht die Person gerade? */
   const status = useAsync(() => (isAdmin ? adminUserStatus() : Promise.resolve([])), [isAdmin])
   useEffect(() => {
-    const t = window.setInterval(() => { if (document.visibilityState === 'visible') { list.reload(); if (isAdmin) status.reload() } }, 15_000)
+    const t = window.setInterval(() => { if (document.visibilityState === 'visible') { list.reload(); if (isAdmin) status.reload() } }, 30_000)
     return () => window.clearInterval(t)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])

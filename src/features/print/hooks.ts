@@ -32,7 +32,7 @@ export function usePrintTodo(): PrintCounts | null {
       adminPrintCounts().then((c) => alive && setCounts(c), () => undefined)
     }
     load()
-    const t = window.setInterval(load, 30_000)
+    const t = window.setInterval(load, 60_000)
     document.addEventListener('visibilitychange', load)
     return () => { alive = false; window.clearInterval(t); document.removeEventListener('visibilitychange', load) }
   }, [isAdmin, userId, profileReady])

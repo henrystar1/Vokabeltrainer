@@ -12,7 +12,7 @@ export default function RequireAuth() {
   // Wartet das Konto auf die Freischaltung, regelmäßig nachsehen, ob ein Admin es aktiviert hat.
   useEffect(() => {
     if (!waiting) return
-    const t = window.setInterval(() => { void refreshProfile().catch(() => undefined) }, 15_000)
+    const t = window.setInterval(() => { void refreshProfile().catch(() => undefined) }, 30_000)
     return () => window.clearInterval(t)
   }, [waiting, refreshProfile])
   if (loading) return <Spinner label="Wird geladen …" />

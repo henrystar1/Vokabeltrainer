@@ -19,7 +19,7 @@ export function LocksProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (!userId || !profileReady) { setLocked(new Set()); return }
     reload()
-    const t = window.setInterval(() => { if (document.visibilityState === 'visible') reload() }, 60_000)
+    const t = window.setInterval(() => { if (document.visibilityState === 'visible') reload() }, 180_000)
     document.addEventListener('visibilitychange', reload)
     return () => { window.clearInterval(t); document.removeEventListener('visibilitychange', reload) }
   }, [userId, profileReady, reload])

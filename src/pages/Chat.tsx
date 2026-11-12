@@ -20,7 +20,7 @@ import { getPresence } from '../services/social'
 import { useAsync } from '../lib/useAsync'
 import type { ChatMessage } from '../types'
 
-const POLL_MS = 10_000
+const POLL_MS = 15_000
 const PAGE = 60
 /** Nur die neuesten Beiträge zeigen animierte Avatare/Namen – ältere stehen still (spart Rechenleistung). */
 const LIVE_GROUPS = 10

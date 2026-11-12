@@ -5,8 +5,9 @@ import Button from '../../components/ui/Button'
 import { Avatar } from '../../components/profile/PlayerTag'
 import { liveMyInvites, liveRespond, teamMyInvites, teamRespond } from '../../services/play'
 import { useAuth } from '../auth/AuthProvider'
+import { every } from '../../lib/poll'
 
-const POLL_MS = 15_000
+const POLL_MS = 45_000
 
 interface Invite { kind: 'live' | 'team'; id: string; host_name: string; host_avatar_id: string | null; host_color_id: string | null; text: string }
 
@@ -33,7 +34,7 @@ export default function LiveInviteWatcher() {
       ])
     }
     void load()
-    const t = window.setInterval(() => void load(), POLL_MS)
+    const t = every(() => void load(), POLL_MS)
     document.addEventListener('visibilitychange', load)
     return () => { alive = false; window.clearInterval(t); document.removeEventListener('visibilitychange', load) }
   }, [userId, profileReady, blocked])

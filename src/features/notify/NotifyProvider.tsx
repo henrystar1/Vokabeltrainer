@@ -5,15 +5,16 @@ import { notifyPoll } from '../../services/notify'
 import { getUnreadMessages, markMessagesRead } from '../../services/koins'
 import { useAuth } from '../auth/AuthProvider'
 import { useSettings } from '../settings/SettingsProvider'
+import { every } from '../../lib/poll'
 
 type Kind = 'mention' | 'chat' | 'print' | 'online' | 'dm'
 /** `to` = null: kein Ziel (Nachricht vom Team); `until` = Infinity: bleibt, bis man sie wegklickt. */
 interface Toast { key: string; kind: Kind; title: string; text: string; to: string | null; until: number; messageId?: string }
 
-const POLL_MS = 30_000
+const POLL_MS = 60_000
 const MAX_TOASTS = 3
 const LIFETIME: Record<Kind, number> = { mention: 10_000, chat: 6_000, print: 12_000, online: 5_000, dm: Infinity }
-const DM_MS = 20_000
+const DM_MS = 45_000
 
 const LOOK: Record<Kind, { icon: LucideIcon; box: string; icon_: string }> = {
   mention: { icon: AtSign, box: 'border-amber-300/40 bg-amber-300/15', icon_: 'text-amber-300' },
@@ -101,7 +102,7 @@ export function NotifyProvider({ children }: { children: ReactNode }) {
       }
     }
     void poll()
-    const timer = window.setInterval(() => void poll(), POLL_MS)
+    const timer = every(() => void poll(), POLL_MS)
     const onVisible = () => void poll()
     document.addEventListener('visibilitychange', onVisible)
     return () => {
@@ -122,7 +123,7 @@ export function NotifyProvider({ children }: { children: ReactNode }) {
       push(m.map((x) => ({ key: `m${x.id}`, kind: 'dm' as const, title: `Nachricht von ${x.from_name}`, text: x.body.replace(/\bKoins\b/g, 'Coins'), to: null, messageId: x.id })))
     }
     void fetchDm()
-    const timer = window.setInterval(() => void fetchDm(), DM_MS)
+    const timer = every(() => void fetchDm(), DM_MS)
     return () => {
       alive = false
       window.clearInterval(timer)

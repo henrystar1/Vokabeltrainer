@@ -21,6 +21,7 @@ import RulesTab from './admin/RulesTab'
 import UsersTab from './admin/UsersTab'
 import StocksTab from './admin/StocksTab'
 import CarsTab from './admin/CarsTab'
+import BackupTab from './admin/BackupTab'
 import QueueTab from './admin/print/QueueTab'
 import CatalogTab from './admin/print/CatalogTab'
 import ColorsTab from './admin/print/ColorsTab'
@@ -32,7 +33,7 @@ import GameDbsTab from './admin/GameDbsTab'
 import { adminPlusCounts } from '../services/plus'
 import { usePrintTodo } from '../features/print/hooks'
 
-type Tab = 'reviews' | 'feedback' | 'online' | 'users' | 'staff' | 'modrights' | 'rules' | 'shop' | 'codes' | 'grant' | 'locks' | 'accounts' | 'pqueue' | 'pcatalog' | 'pcolors' | 'pprices' | 'gamedbs' | 'pbans' | 'plus' | 'plusmoney' | 'limited' | 'spectate' | 'stocks' | 'cars'
+type Tab = 'reviews' | 'feedback' | 'online' | 'users' | 'staff' | 'modrights' | 'rules' | 'shop' | 'codes' | 'grant' | 'locks' | 'accounts' | 'pqueue' | 'pcatalog' | 'pcolors' | 'pprices' | 'gamedbs' | 'pbans' | 'plus' | 'plusmoney' | 'limited' | 'spectate' | 'stocks' | 'cars' | 'backup'
 
 /** Adresse ?bereich=… → Startseite der Verwaltung. */
 const DEEP_LINKS: Record<string, Tab> = { druck: 'pqueue', 'druck-katalog': 'pcatalog', 'druck-preise': 'pprices' }
@@ -88,7 +89,7 @@ export default function Admin() {
           tabs: [
             ...(p.settings ? [{ id: 'rules' as const, label: 'Zahlen', icon: <SlidersHorizontal size={15} /> }] : []),
             ...(p.shop ? [{ id: 'shop' as const, label: 'Shop-Preise', icon: <Store size={15} /> }] : []),
-            ...(isAdmin ? [{ id: 'codes' as const, label: 'Codes', icon: <Ticket size={15} /> }, { id: 'grant' as const, label: 'Coins schenken', icon: <Gift size={15} /> }, { id: 'gamedbs' as const, label: 'Spiel-Datenbanken', icon: <Radio size={15} /> }, { id: 'locks' as const, label: 'Sperren', icon: <Power size={15} /> }, { id: 'stocks' as const, label: 'Börse', icon: <Store size={15} /> }, { id: 'cars' as const, label: 'Autos', icon: <Store size={15} /> }] : []),
+            ...(isAdmin ? [{ id: 'codes' as const, label: 'Codes', icon: <Ticket size={15} /> }, { id: 'grant' as const, label: 'Coins schenken', icon: <Gift size={15} /> }, { id: 'gamedbs' as const, label: 'Spiel-Datenbanken', icon: <Radio size={15} /> }, { id: 'locks' as const, label: 'Sperren', icon: <Power size={15} /> }, { id: 'stocks' as const, label: 'Börse', icon: <Store size={15} /> }, { id: 'cars' as const, label: 'Autos', icon: <Store size={15} /> }, { id: 'backup' as const, label: 'Backup', icon: <Power size={15} /> }] : []),
           ],
         }]
       : []),
@@ -152,6 +153,7 @@ export default function Admin() {
       {active === 'feedback' && <FeedbackTab />}
       {active === 'stocks' && isAdmin && <StocksTab />}
       {active === 'cars' && isAdmin && <CarsTab />}
+      {active === 'backup' && isAdmin && <BackupTab />}
       {active === 'online' && (isAdmin || seeOnline.data) && <OnlineTab />}
       {active === 'limited' && isAdmin && <LimitedTab />}
       {active === 'spectate' && (isAdmin || seeGames.data) && <SpectateTab />}

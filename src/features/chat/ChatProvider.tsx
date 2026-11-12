@@ -15,7 +15,7 @@ interface ChatState {
 }
 
 const ChatContext = createContext<ChatState | null>(null)
-const POLL_MS = 45_000
+const POLL_MS = 90_000
 
 /**
  * Hält die Echtzeit-Verbindung des Chats und zählt ungelesene Nachrichten – auch außerhalb der Chat-Seite,

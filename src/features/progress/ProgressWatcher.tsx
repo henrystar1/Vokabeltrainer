@@ -8,8 +8,9 @@ import { usePlus } from '../plus/PlusProvider'
 import { claimQuest, watchProgress, type WatchProgress, type WatchRow } from '../../services/play'
 import { OG_NAMES, type OgKind } from '../../services/online'
 import { detectOvertakes, type Snapshot } from './overtakes'
+import { every } from '../../lib/poll'
 
-const POLL_MS = 75_000
+const POLL_MS = 150_000
 const MIN_GAP_MS = 20_000
 
 const TITLE: Record<string, string> = {
@@ -62,7 +63,7 @@ export default function ProgressWatcher() {
   useEffect(() => { void run(true) }, [run])
   useEffect(() => { void run() }, [loc.pathname, run])
   useEffect(() => {
-    const t = window.setInterval(() => void run(), POLL_MS)
+    const t = every(() => void run(), POLL_MS)
     const v = () => void run()
     document.addEventListener('visibilitychange', v)
     return () => { window.clearInterval(t); document.removeEventListener('visibilitychange', v) }

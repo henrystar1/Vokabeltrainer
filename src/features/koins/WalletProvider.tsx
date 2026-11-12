@@ -19,7 +19,7 @@ interface WalletState {
 const WalletContext = createContext<WalletState | null>(null)
 
 /** Wie oft das Guthaben zusätzlich zur Live-Verbindung nachgeladen wird. */
-const POLL_MS = 90_000
+const POLL_MS = 180_000
 
 export function WalletProvider({ children }: { children: ReactNode }) {
   const { user, profileReady, isStaff, blocked } = useAuth()

@@ -9,10 +9,11 @@ import { useAuth } from '../auth/AuthProvider'
 import { formatDateTime } from '../../lib/format'
 import { activityFor } from '../../lib/activity'
 import { useSettings } from '../settings/SettingsProvider'
+import { every } from '../../lib/poll'
 
-const INTERVAL_MS = 45_000
+const INTERVAL_MS = 90_000
 /** Nachrichten vom Admin werden schneller abgeholt als der Online-Status gemeldet wird. */
-const MESSAGE_MS = 20_000
+const MESSAGE_MS = 45_000
 /** Während dieser Seiten wird nichts eingeblendet (Sprint, Spiele, Duelle, Lernrunden); danach erscheint die Nachricht. */
 const BUSY_PATHS = [/^\/sprint/, /^\/spiele/, /^\/gambling/, /^\/duell\/.+/, /^\/live-duell/, /^\/team\//, /^\/lernen/, /^\/test/, /^\/ueben/, /^\/konjugieren/, /^\/genus/]
 
@@ -51,8 +52,8 @@ export default function PresenceProvider({ children }: { children: ReactNode }) 
       return
     }
     void tick()
-    const timer = window.setInterval(() => void tick(), INTERVAL_MS)
-    const fast = window.setInterval(() => void fetchMessages(), MESSAGE_MS)
+    const timer = every(() => void tick(), INTERVAL_MS)
+    const fast = every(() => void fetchMessages(), MESSAGE_MS)
     document.addEventListener('visibilitychange', tick)
     return () => {
       window.clearInterval(timer)

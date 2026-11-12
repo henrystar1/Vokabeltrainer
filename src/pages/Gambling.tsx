@@ -52,7 +52,7 @@ export default function Gambling() {
   const [params] = useSearchParams()
   const [tab, setTab] = useState<Tab>((matchSubTab('/gambling', params.get('t')) as Tab | null) ?? 'slots')
   useEffect(() => {
-    const t = window.setInterval(() => { if (document.visibilityState === 'visible') feed.reload() }, 15_000)
+    const t = window.setInterval(() => { if (document.visibilityState === 'visible') feed.reload() }, 30_000)
     return () => window.clearInterval(t)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
