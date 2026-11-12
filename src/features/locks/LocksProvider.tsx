@@ -2,6 +2,7 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useState, t
 import { getLockedFeatures, type LockKey } from '../../services/koins'
 import { useAuth } from '../auth/AuthProvider'
 import { PANIC_KEYS, usePanic } from '../panic/panic'
+import { every } from '../../lib/poll'
 
 interface Ctx { locked: ReadonlySet<LockKey>; reload: () => void }
 const LocksContext = createContext<Ctx>({ locked: new Set(), reload: () => undefined })
@@ -19,7 +20,7 @@ export function LocksProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (!userId || !profileReady) { setLocked(new Set()); return }
     reload()
-    const t = window.setInterval(() => { if (document.visibilityState === 'visible') reload() }, 180_000)
+    const t = every(() => reload(), 180_000)
     document.addEventListener('visibilitychange', reload)
     return () => { window.clearInterval(t); document.removeEventListener('visibilitychange', reload) }
   }, [userId, profileReady, reload])

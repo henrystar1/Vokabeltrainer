@@ -1,9 +1,9 @@
 import { useEffect, useRef, useState } from 'react'
 import type { RealtimeChannel, SupabaseClient } from '@supabase/supabase-js'
-import { gameClientFor, getGameSlot, whenGameDbsReady } from '../../../lib/gameRealtime'
+import { gameClientFor, slotForKey, whenGameDbsReady } from '../../../lib/gameRealtime'
 import type { OgView } from '../../../services/online'
 import { SEAT_COLORS } from '../ludoBoard'
-import { BODY_H, EYE, RESPAWN_S, SHOT_COOLDOWN, SHOT_DAMAGE, SPAWNS, SPEED, collide, lookDir, makeBoxes, shoot, timeLeft } from './engine'
+import { BODY_H, EYE, MAX_HIT_DMG, RESPAWN_S, SHOT_DAMAGE, SPAWNS, SPEED, WEAPONS, collide, lookDir, makeBoxes, pelletDirs, shoot, timeLeft } from './engine'
 
 interface Props {
   view: OgView
@@ -11,7 +11,7 @@ interface Props {
   onReport: (scores: Record<string, number>, final: boolean) => void
 }
 
-interface Remote { id: string; name: string; seat: number; x: number; z: number; yaw: number; hp: number; alive: boolean; hidden: boolean; tx: number; tz: number; mesh?: import('three').Object3D }
+interface Remote { id: string; name: string; seat: number; x: number; z: number; yaw: number; hp: number; alive: boolean; hidden: boolean; tx: number; tz: number; vx: number; vz: number; pt: number; mesh?: import('three').Object3D }
 
 const mmss = (s: number) => `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`
 
@@ -44,6 +44,10 @@ export default function ShooterGame({ view, onReport }: Props) {
   const mount = useRef<HTMLDivElement>(null)
   const panicRef = useRef(false)
   const [hitFlash, setHitFlash] = useState(0)
+  const [weapon, setWeapon] = useState(0)
+  const weaponRef = useRef(0)
+  const cycleWeapon = useRef<(d: number) => void>(() => undefined)
+  const mouseHeld = useRef(false)
   const joy = useRef({ x: 0, y: 0 })
   const look = useRef({ dx: 0, dy: 0 })
   const fireHeld = useRef(false)
@@ -141,7 +145,7 @@ export default function ShooterGame({ view, onReport }: Props) {
         const sp = SPAWNS[seat % 4]
         grp.position.set(sp[0], 0, sp[1])
         scene.add(grp)
-        remotes.set(p.user_id, { id: p.user_id, name: p.name, seat, x: sp[0], z: sp[1], yaw: 0, hp: 100, alive: true, hidden: false, tx: sp[0], tz: sp[1], mesh: grp })
+        remotes.set(p.user_id, { id: p.user_id, name: p.name, seat, x: sp[0], z: sp[1], yaw: 0, hp: 100, alive: true, hidden: false, tx: sp[0], tz: sp[1], vx: 0, vz: 0, pt: performance.now(), mesh: grp })
       }
       const seatOf = new Map(players.map((p) => [p.user_id, p.seat ?? 0]))
       const scores: Record<string, number> = {}
@@ -156,16 +160,20 @@ export default function ShooterGame({ view, onReport }: Props) {
       // Netz
       void whenGameDbsReady().then(() => {
         if (dead) return
-        client = gameClientFor(getGameSlot())
+        client = gameClientFor(slotForKey(view.id))
         ch = client.channel(`sh-${view.id}`, { config: { broadcast: { self: false } } })
         ch.on('broadcast', { event: 'p' }, ({ payload }) => {
           const r = remotes.get(payload.u as string)
           if (!r) return
+          const nowT = performance.now()
+          const dtp = (nowT - r.pt) / 1000
+          if (dtp > 0.01 && dtp < 0.5) { r.vx = Math.max(-12, Math.min(12, (payload.x - r.tx) / dtp)); r.vz = Math.max(-12, Math.min(12, (payload.z - r.tz) / dtp)) } else { r.vx = 0; r.vz = 0 }
+          r.pt = nowT
           r.tx = payload.x; r.tz = payload.z; r.yaw = payload.yaw; r.hp = payload.hp; r.alive = payload.alive; r.hidden = !!payload.hidden
         })
         ch.on('broadcast', { event: 'h' }, ({ payload }) => {
           if (payload.to !== me.user_id || !st.alive || panicRef.current || Date.now() < st.invuln) return
-          st.hp -= Number(payload.dmg) || SHOT_DAMAGE
+          st.hp -= Math.min(Number(payload.dmg) || SHOT_DAMAGE, MAX_HIT_DMG)
           if (st.hp <= 0) {
             st.hp = 0; st.alive = false; st.respawnAt = Date.now() + RESPAWN_S * 1000
             const killerSeat = seatOf.get(payload.from as string)
@@ -177,10 +185,12 @@ export default function ShooterGame({ view, onReport }: Props) {
           const s = seatOf.get(payload.killer as string)
           if (s !== undefined) scores[String(s)] = (scores[String(s)] ?? 0) + 1
         })
-        ch.on('broadcast', { event: 's' }, ({ payload }) => addTracer(payload.o, payload.e, 0xfff1a8))
-        ch.subscribe()
+        ch.on('broadcast', { event: 's' }, ({ payload }) => { for (const e of (payload.es as number[][] | undefined) ?? [payload.e as number[]]) if (e) addTracer(payload.o, e, 0xfff1a8) })
+        ch.subscribe((status) => { if (status === 'SUBSCRIBED') { ready = true; sendPos() } })
       })
-      const send = (event: string, payload: Record<string, unknown>) => { void ch?.send({ type: 'broadcast', event, payload }).catch(() => undefined) }
+      let ready = false
+      const send = (event: string, payload: Record<string, unknown>) => { if (!ready) return; void ch?.send({ type: 'broadcast', event, payload }).catch(() => undefined) }
+      const sendPos = () => send('p', { u: me.user_id, x: st.x, z: st.z, yaw: st.yaw, hp: st.hp, alive: st.alive, hidden: panicRef.current })
 
       function addTracer(o: number[], e: number[], color: number) {
         const geo = new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(o[0], o[1] - 0.15, o[2]), new THREE.Vector3(e[0], e[1], e[2])])
@@ -192,24 +202,32 @@ export default function ShooterGame({ view, onReport }: Props) {
       function fire() {
         const now = performance.now() / 1000
         if (!st.alive || panicRef.current || now < st.cool || st.ended) return
-        st.cool = now + SHOT_COOLDOWN
+        const w = WEAPONS[weaponRef.current]
+        st.cool = now + w.cooldown
         const o = { x: st.x, y: EYE, z: st.z }
         const d = lookDir(st.yaw, st.pitch)
         const targets = [...remotes.values()].filter((r) => r.alive && !r.hidden).map((r) => ({ id: r.id, x: r.x, z: r.z }))
-        const hit = shoot(o, d, boxes, targets)
-        const t = hit ? hit.t : 60
-        const end = [o.x + d.x * t, o.y + d.y * t, o.z + d.z * t]
-        addTracer([o.x, o.y, o.z], end, 0xffffff)
-        send('s', { o: [o.x, o.y, o.z], e: end })
-        if (hit) { send('h', { to: hit.id, from: me.user_id, dmg: SHOT_DAMAGE }); setHitFlash((n) => n + 1) }
+        const dmgTo = new Map<string, number>()
+        const ends: number[][] = []
+        for (const dir of pelletDirs(d, w)) {
+          const hit = shoot(o, dir, boxes, targets)
+          const t = hit ? hit.t : 60
+          const end = [o.x + dir.x * t, o.y + dir.y * t, o.z + dir.z * t]
+          ends.push(end)
+          addTracer([o.x, o.y, o.z], end, w.pellets > 1 ? 0xffd27f : 0xffffff)
+          if (hit) dmgTo.set(hit.id, (dmgTo.get(hit.id) ?? 0) + w.dmg)
+        }
+        send('s', { o: [o.x, o.y, o.z], es: ends })
+        for (const [id, dmg] of dmgTo) { send('h', { to: id, from: me.user_id, dmg }); setHitFlash((n) => n + 1) }
       }
 
       const el = renderer.domElement
       const onDown = (e: MouseEvent) => {
         if (panicRef.current || touch) return
         if (document.pointerLockElement !== el) { void el.requestPointerLock?.(); return }
-        if (e.button === 0) fire()
+        if (e.button === 0) { mouseHeld.current = true; fire() }
       }
+      const onUp = (e: MouseEvent) => { if (e.button === 0) mouseHeld.current = false }
       const onMove = (e: MouseEvent) => {
         if (document.pointerLockElement !== el || panicRef.current) return
         st.yaw -= e.movementX * 0.0025
@@ -217,16 +235,26 @@ export default function ShooterGame({ view, onReport }: Props) {
       }
       const onKey = (e: KeyboardEvent) => {
         if (e.code === 'KeyP' || e.code === 'Backquote') { e.preventDefault(); if (e.type === 'keydown' && !e.repeat) togglePanic(!panicRef.current); return }
+        if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Space'].includes(e.code)) e.preventDefault()
+        if (e.type === 'keydown' && !e.repeat) {
+          const m = /^Digit([1-4])$/.exec(e.code)
+          if (m) selectWeapon(Number(m[1]) - 1)
+          else if (e.code === 'KeyQ') selectWeapon((weaponRef.current + WEAPONS.length - 1) % WEAPONS.length)
+          else if (e.code === 'KeyE') selectWeapon((weaponRef.current + 1) % WEAPONS.length)
+        }
         if (e.type === 'keydown') keys.add(e.code); else keys.delete(e.code)
       }
+      const selectWeapon = (i: number) => { weaponRef.current = i; setWeapon(i) }
+      cycleWeapon.current = (dlt) => selectWeapon((weaponRef.current + dlt + WEAPONS.length) % WEAPONS.length)
       const onLock = () => { /* HUD liest den Lock-Zustand im Tick */ }
       el.addEventListener('mousedown', onDown)
+      window.addEventListener('mouseup', onUp)
       document.addEventListener('mousemove', onMove)
       window.addEventListener('keydown', onKey)
       window.addEventListener('keyup', onKey)
       document.addEventListener('pointerlockchange', onLock)
       cleanups.push(() => {
-        el.removeEventListener('mousedown', onDown); document.removeEventListener('mousemove', onMove)
+        el.removeEventListener('mousedown', onDown); window.removeEventListener('mouseup', onUp); document.removeEventListener('mousemove', onMove)
         window.removeEventListener('keydown', onKey); window.removeEventListener('keyup', onKey)
         document.removeEventListener('pointerlockchange', onLock)
       })
@@ -247,17 +275,21 @@ export default function ShooterGame({ view, onReport }: Props) {
             st.pitch = Math.max(-1.4, Math.min(1.4, st.pitch - look.current.dy * 0.006))
             look.current.dx = 0; look.current.dy = 0
           }
-          if (fireHeld.current) fire()
+          if (fireHeld.current || mouseHeld.current || keys.has('Space')) fire()
+          if (keys.has('ArrowLeft')) st.yaw += 2.4 * dt
+          if (keys.has('ArrowRight')) st.yaw -= 2.4 * dt
+          if (keys.has('ArrowUp')) st.pitch = Math.min(1.4, st.pitch + 1.6 * dt)
+          if (keys.has('ArrowDown')) st.pitch = Math.max(-1.4, st.pitch - 1.6 * dt)
           if (!st.alive && now >= st.respawnAt) {
             const s = SPAWNS[(mySeat + Math.floor(Math.random() * 3)) % 4]
             st.x = s[0]; st.z = s[1]; st.hp = 100; st.alive = true; st.invuln = now + 2000
           }
           if (st.alive) {
             let fx = 0; let fz = 0
-            if (keys.has('KeyW') || keys.has('ArrowUp')) fz -= 1
-            if (keys.has('KeyS') || keys.has('ArrowDown')) fz += 1
-            if (keys.has('KeyA') || keys.has('ArrowLeft')) fx -= 1
-            if (keys.has('KeyD') || keys.has('ArrowRight')) fx += 1
+            if (keys.has('KeyW')) fz -= 1
+            if (keys.has('KeyS')) fz += 1
+            if (keys.has('KeyA')) fx -= 1
+            if (keys.has('KeyD')) fx += 1
             fx += joy.current.x; fz += joy.current.y
             const len = Math.max(1, Math.hypot(fx, fz))
             const sp = SPEED * (keys.has('ShiftLeft') ? 1.4 : 1) * dt
@@ -269,7 +301,9 @@ export default function ShooterGame({ view, onReport }: Props) {
         camera.position.set(st.x, st.alive ? EYE : 0.5, st.z)
         camera.rotation.set(st.alive ? st.pitch : -0.9, st.yaw, 0)
         for (const r of remotes.values()) {
-          r.x += (r.tx - r.x) * Math.min(1, dt * 14); r.z += (r.tz - r.z) * Math.min(1, dt * 14)
+          const age = Math.min((performance.now() - r.pt) / 1000, 0.12)
+          const gx = r.tx + r.vx * age; const gz = r.tz + r.vz * age
+          r.x += (gx - r.x) * Math.min(1, dt * 22); r.z += (gz - r.z) * Math.min(1, dt * 22)
           const bar = r.mesh?.getObjectByName('hpbar') as import('three').Sprite | undefined
           if (bar) { const f = Math.max(0.02, Math.min(1, r.hp / 100)); bar.scale.x = 1.2 * f; (bar.material as import('three').SpriteMaterial).color.set(f > 0.5 ? 0x34d399 : f > 0.25 ? 0xfbbf24 : 0xef4444) }
           if (r.mesh) { r.mesh.position.set(r.x, 0, r.z); r.mesh.rotation.y = r.yaw; r.mesh.visible = r.alive && !r.hidden }
@@ -278,7 +312,7 @@ export default function ShooterGame({ view, onReport }: Props) {
         if (!paused) renderer.render(scene, camera)
 
         sendAcc += dt
-        if (sendAcc > 0.08) { sendAcc = 0; send('p', { u: me.user_id, x: st.x, z: st.z, yaw: st.yaw, hp: st.hp, alive: st.alive, hidden: paused }) }
+        if (sendAcc > 0.05) { sendAcc = 0; sendPos() }
         hudAcc += dt
         if (hudAcc > 0.2) {
           hudAcc = 0
@@ -329,8 +363,11 @@ export default function ShooterGame({ view, onReport }: Props) {
             <div className="h-3 overflow-hidden rounded bg-black/60"><div className="h-full bg-emerald-400 transition-[width]" style={{ width: `${hud.hp}%`, background: hud.hp > 50 ? '#34d399' : hud.hp > 25 ? '#fbbf24' : '#ef4444' }} /></div>
             <p className="mt-0.5 text-xs text-white">{hud.alive ? `${hud.hp} Leben` : `Du bist raus – zurück in ${hud.respawn} s`}</p>
           </div>
-          {!hud.locked && <div className="pointer-events-none absolute inset-0 flex items-center justify-center bg-black/40 text-center text-white"><p className="max-w-xs text-sm">Klicke ins Bild, um zu spielen.<br />WASD bewegen · Maus zielen · Klick schießen · Shift rennen · <b>P</b> = Panik</p></div>}
-          {touch && hud.alive && <TouchControls joy={joy} look={look} fireHeld={fireHeld} />}
+          {!hud.locked && <div className="pointer-events-none absolute inset-0 flex items-center justify-center bg-black/40 text-center text-white"><p className="max-w-xs text-sm">Klicke ins Bild, um zu spielen.<br />WASD bewegen · Maus oder Pfeiltasten zielen · Klick oder Leertaste schießen<br />1–4 oder Q/E Waffe wechseln · Shift rennen · P = Panik</p></div>}
+          <div className="pointer-events-none absolute bottom-3 left-1/2 flex -translate-x-1/2 gap-1 text-xs" aria-label="Waffen">
+            {WEAPONS.map((w, i) => <span key={w.id} className={`rounded-md px-2 py-1 ${i === weapon ? 'bg-white text-slate-900 font-bold' : 'bg-black/50 text-white/80'}`}>{i + 1} {w.name}</span>)}
+          </div>
+          {touch && hud.alive && <TouchControls joy={joy} look={look} fireHeld={fireHeld} onWeapon={() => cycleWeapon.current(1)} weaponName={WEAPONS[weapon].name} />}
           <button type="button" onClick={() => togglePanic(true)} className="absolute right-3 top-3 min-h-[40px] rounded-lg bg-rose-600 px-3 text-sm font-bold text-white shadow hover:bg-rose-500" aria-label="Panik-Knopf: Spiel sofort verstecken">PANIK (P)</button>
         </>
       )}
@@ -341,34 +378,41 @@ export default function ShooterGame({ view, onReport }: Props) {
 
 type XY = { current: { x: number; y: number } }
 
-/** Touch-Steuerung (iPad/Tablet): links Joystick, rechts wischen zum Zielen, großer Feuer-Knopf. */
-function TouchControls({ joy, look, fireHeld }: { joy: XY; look: { current: { dx: number; dy: number } }; fireHeld: { current: boolean } }) {
+/** Touch-Steuerung (iPad/Tablet): links Joystick (erscheint dort, wo der Finger aufsetzt), rechts wischen zum Zielen, FEUER und Waffenwechsel. */
+function TouchControls({ joy, look, fireHeld, onWeapon, weaponName }: { joy: XY; look: { current: { dx: number; dy: number } }; fireHeld: { current: boolean }; onWeapon: () => void; weaponName: string }) {
   const [knob, setKnob] = useState<{ x: number; y: number; ox: number; oy: number } | null>(null)
   const joyId = useRef<number | null>(null)
+  const joyOrigin = useRef<{ x: number; y: number }>({ x: 0, y: 0 })
   const lookId = useRef<{ id: number; x: number; y: number } | null>(null)
   const R = 55
+  const stopJoy = () => { joyId.current = null; joy.current.x = 0; joy.current.y = 0; setKnob(null) }
   return (
     <>
       <div
         className="absolute bottom-0 left-0 top-1/3 w-1/2 touch-none select-none"
-        onPointerDown={(e) => { if (joyId.current !== null) return; joyId.current = e.pointerId; e.currentTarget.setPointerCapture(e.pointerId); setKnob({ x: 0, y: 0, ox: e.clientX, oy: e.clientY }) }}
+        onPointerDown={(e) => {
+          if (joyId.current !== null) return
+          joyId.current = e.pointerId
+          e.currentTarget.setPointerCapture(e.pointerId)
+          const r = e.currentTarget.getBoundingClientRect()
+          joyOrigin.current = { x: e.clientX, y: e.clientY }
+          setKnob({ x: 0, y: 0, ox: e.clientX - r.left, oy: e.clientY - r.top })
+        }}
         onPointerMove={(e) => {
           if (e.pointerId !== joyId.current) return
-          setKnob((k) => {
-            if (!k) return k
-            let dx = e.clientX - k.ox; let dy = e.clientY - k.oy
-            const m = Math.hypot(dx, dy)
-            if (m > R) { dx = (dx / m) * R; dy = (dy / m) * R }
-            joy.current.x = dx / R; joy.current.y = dy / R
-            return { ...k, x: dx, y: dy }
-          })
+          let dx = e.clientX - joyOrigin.current.x
+          let dy = e.clientY - joyOrigin.current.y
+          const m = Math.hypot(dx, dy)
+          if (m > R) { dx = (dx / m) * R; dy = (dy / m) * R }
+          joy.current.x = dx / R; joy.current.y = dy / R
+          setKnob((k) => (k ? { ...k, x: dx, y: dy } : k))
         }}
-        onPointerUp={(e) => { if (e.pointerId !== joyId.current) return; joyId.current = null; joy.current.x = 0; joy.current.y = 0; setKnob(null) }}
-        onPointerCancel={() => { joyId.current = null; joy.current.x = 0; joy.current.y = 0; setKnob(null) }}
+        onPointerUp={(e) => { if (e.pointerId === joyId.current) stopJoy() }}
+        onPointerCancel={stopJoy}
         aria-label="Joystick zum Laufen"
       >
         {knob && (
-          <div className="pointer-events-none fixed h-[110px] w-[110px] rounded-full border-2 border-white/40 bg-white/10" style={{ left: knob.ox - R, top: knob.oy - R }}>
+          <div className="pointer-events-none absolute h-[110px] w-[110px] rounded-full border-2 border-white/40 bg-white/10" style={{ left: knob.ox - R, top: knob.oy - R }}>
             <div className="absolute h-12 w-12 rounded-full bg-white/60" style={{ left: R - 24 + knob.x, top: R - 24 + knob.y }} />
           </div>
         )}
@@ -389,6 +433,7 @@ function TouchControls({ joy, look, fireHeld }: { joy: XY; look: { current: { dx
       >
         <p className="pointer-events-none absolute right-4 top-2 text-xs text-white/60">Zielen: Finger rechts bewegen</p>
       </div>
+      <button type="button" onClick={onWeapon} className="absolute bottom-6 right-36 min-h-[56px] touch-none select-none rounded-xl border-2 border-white/50 bg-slate-800/80 px-3 text-sm font-bold text-white active:bg-slate-700" aria-label="Waffe wechseln">{weaponName}<span className="block text-[10px] font-normal text-white/60">tippen = wechseln</span></button>
       <button
         type="button"
         className="absolute bottom-6 right-6 h-24 w-24 touch-none select-none rounded-full border-4 border-white/60 bg-rose-600/80 text-lg font-extrabold text-white active:bg-rose-500"

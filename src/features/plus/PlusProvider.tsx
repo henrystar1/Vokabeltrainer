@@ -2,6 +2,7 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useState, t
 import { useAuth } from '../auth/AuthProvider'
 import { getPlusStatus, type PlusStatus } from '../../services/plus'
 import PlusDialog from './PlusDialog'
+import { every } from '../../lib/poll'
 
 interface PlusState {
   status: PlusStatus | null
@@ -38,7 +39,7 @@ export function PlusProvider({ children }: { children: ReactNode }) {
     }
     void reload()
     // Gelegentlich nachladen, damit Menü und Schloss nach dem Vergeben durch den Admin verschwinden.
-    const t = window.setInterval(() => { if (document.visibilityState === 'visible') void reload() }, 180_000)
+    const t = every(() => void reload(), 180_000)
     return () => window.clearInterval(t)
   }, [user, profileReady, blocked, reload])
 

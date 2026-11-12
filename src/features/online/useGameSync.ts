@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef } from 'react'
 import type { RealtimeChannel, SupabaseClient } from '@supabase/supabase-js'
-import { gameClientFor, getGameSlot, whenGameDbsReady } from '../../lib/gameRealtime'
+import { gameClientFor, slotForKey, whenGameDbsReady } from '../../lib/gameRealtime'
 
 /**
  * Echtzeit-Hinweis „es gibt etwas Neues“ für ein Online-Spiel. Der Spielstand selbst liegt in der Haupt-Datenbank
@@ -18,7 +18,7 @@ export function useGameSync(id: string | undefined, onChange: () => void, active
     let dead = false
     void whenGameDbsReady().then(() => {
       if (dead) return
-      const client = gameClientFor(getGameSlot())
+      const client = gameClientFor(slotForKey(id))
       const ch = client.channel(`og-${id}`, { config: { broadcast: { self: false } } })
       ch.on('broadcast', { event: 'u' }, () => cb.current()).subscribe()
       chan.current = { ch, client }

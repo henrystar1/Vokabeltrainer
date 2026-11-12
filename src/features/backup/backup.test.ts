@@ -70,3 +70,20 @@ describe('Backup', () => {
     expect(chunkRows([{ s: 'x'.repeat(500) }, { s: 'y'.repeat(500) }], 600)).toHaveLength(2)
   })
 })
+
+describe('Backup mit Konten', () => {
+  it('schreibt _auth ans Ende und parseBackup liest es', async () => {
+    const db = { a: [{ id: 1 }] }
+    const auth = { users: [{ id: 'u1', email: 'a@b.de' }], identities: [], admins: ['u1'] }
+    const { parts, counts } = await exportAll(fakeApi(db), 107, () => undefined, async () => auth)
+    const f = parseBackup(parts.join(''))
+    expect(f._auth).toEqual(auth)
+    expect(f.tables.a).toHaveLength(1)
+    expect(counts._konten).toBe(1)
+  })
+  it('ohne Konten bleibt _auth leer; kaputter Konten-Teil wird abgelehnt', async () => {
+    const { parts } = await exportAll(fakeApi({ a: [] }), 107, () => undefined)
+    expect(parseBackup(parts.join(''))._auth).toBeUndefined()
+    expect(() => parseBackup('{"format":"vt-backup-1","tables":{},"_auth":{"users":1}}')).toThrow()
+  })
+})

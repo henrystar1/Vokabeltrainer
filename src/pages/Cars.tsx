@@ -6,6 +6,7 @@ import { useAsync } from '../lib/useAsync'
 import { errorMessage } from '../lib/errors'
 import { useWallet } from '../features/koins/WalletProvider'
 import CarArt from '../features/cars/CarArt'
+import CarRun from '../features/cars/CarRun'
 import { carBuy, carList } from '../services/cars'
 
 /** Autohaus: Autos kaufen und in der Garage sammeln. */
@@ -13,9 +14,12 @@ export default function Cars() {
   const wallet = useWallet()
   const list = useAsync(carList, [])
   const [busy, setBusy] = useState<string | null>(null)
+  const [tab, setTab] = useState<'shop' | 'drive'>('shop')
+  const [pick, setPick] = useState<string | null>(null)
   const [msg, setMsg] = useState<string | null>(null)
   const cars = list.data ?? []
   const owned = cars.filter((c) => c.owned)
+  const drive = owned.find((c) => c.id === pick) ?? owned[0]
 
   async function buy(id: string, name: string) {
     setBusy(id); setMsg(null)
@@ -27,8 +31,21 @@ export default function Cars() {
       <PageHeader eyebrow="Kaufe Autos mit deinen Coins und sammle sie in deiner Garage" title="Autohaus" />
       {list.error && <ErrorBox message={list.error} onRetry={list.reload} />}
       {list.loading && !list.data && <Spinner />}
+      <div className="flex gap-2" role="tablist" aria-label="Bereich">
+        {([['shop', 'Kaufen'], ['drive', 'Fahren']] as const).map(([k, l]) => <button key={k} type="button" role="tab" aria-selected={tab === k} onClick={() => setTab(k)} className={`min-h-[44px] rounded-lg border px-4 ${tab === k ? 'border-accent-cyan bg-accent-cyan/20' : 'border-white/15 hover:bg-white/10'}`}>{l}</button>)}
+      </div>
+      {tab === 'drive' && (
+        <Card>
+          {!drive ? <p className="text-sm text-slate-300">Du brauchst erst ein Auto. Kaufe eins unter „Kaufen“.</p> : (
+            <div className="space-y-3">
+              <div className="flex flex-wrap gap-2">{owned.map((c) => <button key={c.id} type="button" onClick={() => setPick(c.id)} aria-pressed={drive.id === c.id} className={`w-24 rounded-xl border p-1 text-center text-xs ${drive.id === c.id ? 'border-accent-cyan bg-white/10' : 'border-white/10'}`}><CarArt kind={c.kind} color={c.color} label={c.name} className="w-full" />{c.name}</button>)}</div>
+              <CarRun car={drive} />
+            </div>
+          )}
+        </Card>
+      )}
       {msg && <p className="text-sm text-slate-200" role="status">{msg}</p>}
-      {owned.length > 0 && (
+      {tab === 'shop' && owned.length > 0 && (
         <Card>
           <h2 className="mb-2 font-semibold">Meine Garage ({owned.length})</h2>
           <ul className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
@@ -36,7 +53,7 @@ export default function Cars() {
           </ul>
         </Card>
       )}
-      <ul className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+      {tab === 'shop' && <ul className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
         {cars.map((c) => (
           <li key={c.id}>
             <Card>
@@ -50,7 +67,7 @@ export default function Cars() {
             </Card>
           </li>
         ))}
-      </ul>
+      </ul>}
     </div>
   )
 }

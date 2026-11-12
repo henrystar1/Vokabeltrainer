@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { ARENA, collide, lookDir, makeBoxes, shoot, SPAWNS, timeLeft, winnerSeat } from './engine'
+import { ARENA, collide, lookDir, makeBoxes, shoot, SPAWNS, timeLeft, winnerSeat, MAX_HIT_DMG, WEAPONS, pelletDirs } from './engine'
 
 describe('Shooter-Engine', () => {
   it('Hindernisse sind pro Spiel gleich und lassen die Startecken frei', () => {
@@ -27,5 +27,16 @@ describe('Shooter-Engine', () => {
     expect(timeLeft(0, 5, 999_999)).toBe(0)
     expect(winnerSeat({ 0: 3, 1: 7 })).toBe(1)
     expect(winnerSeat({ 0: 5, 1: 5 })).toBeNull()
+  })
+  it('Waffen: sinnvolle Werte, Streuung normiert, Schaden pro Schuss begrenzt', () => {
+    for (const w of WEAPONS) {
+      expect(w.cooldown).toBeGreaterThan(0.05)
+      expect(w.dmg * w.pellets).toBeLessThanOrEqual(MAX_HIT_DMG)
+    }
+    const d = { x: 0, y: 0, z: -1 }
+    expect(pelletDirs(d, WEAPONS[0], () => 0.9)).toEqual([d])
+    const sg = pelletDirs(d, WEAPONS[2])
+    expect(sg).toHaveLength(6)
+    for (const v of sg) expect(Math.hypot(v.x, v.y, v.z)).toBeCloseTo(1)
   })
 })

@@ -1,14 +1,13 @@
 import { createClient } from '@supabase/supabase-js'
+import { resolveBackend } from './backendConfig'
 
-// Öffentliche Projektwerte als Rückfall, falls beim Build keine Variablen gesetzt sind
-// (leere Werte zählen wie "nicht gesetzt"). Der Publishable Key ist für den Browser bestimmt;
-// die Daten schützen die Row-Level-Security-Regeln.
-const DEFAULT_URL = 'https://xdvaivcwxugluoctrvnj.supabase.co'
-const DEFAULT_KEY = 'sb_publishable_vLaQQWmGWSx7D3qwe6iAYQ_ftZxh_5Z'
+// Projekt-Zugang: Browser-Einstellung > public/backend.json > Build-Variablen (siehe backendConfig.ts).
+// Der Publishable Key ist für den Browser bestimmt; die Daten schützen die Row-Level-Security-Regeln.
+const backend = resolveBackend()
+const url = backend.url
+const key = backend.key
 
-const url = (import.meta.env.VITE_SUPABASE_URL as string | undefined)?.trim() || DEFAULT_URL
-const key = (import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY as string | undefined)?.trim() || DEFAULT_KEY
-
+export const backendSource = backend.source
 export const isSupabaseConfigured = Boolean(url && key)
 
 /**

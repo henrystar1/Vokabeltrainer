@@ -4,6 +4,7 @@ import CoinIcon from '../../components/ui/CoinIcon'
 import { supabase } from '../../lib/supabaseClient'
 import { useAuth } from '../auth/AuthProvider'
 import { claimDailyBonus, getWallet } from '../../services/koins'
+import { every } from '../../lib/poll'
 
 interface WalletState {
   balance: number
@@ -102,7 +103,7 @@ export function WalletProvider({ children }: { children: ReactNode }) {
     const poll = () => {
       if (document.visibilityState === 'visible') void getWallet().then((b) => active && setBalance(b)).catch(() => undefined)
     }
-    const timer = window.setInterval(poll, POLL_MS)
+    const timer = every(poll, POLL_MS)
     document.addEventListener('visibilitychange', poll)
     return () => {
       active = false

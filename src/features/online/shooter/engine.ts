@@ -9,6 +9,28 @@ export const SPEED = 7
 export const SHOT_DAMAGE = 25
 export const SHOT_COOLDOWN = 0.35
 export const RESPAWN_S = 3
+export const MAX_HIT_DMG = 80 // mehr Schaden pro Treffer-Meldung nimmt der Empfänger nicht an
+
+export interface Weapon { id: string; name: string; dmg: number; cooldown: number; pellets: number; spread: number }
+export const WEAPONS: Weapon[] = [
+  { id: 'pistol', name: 'Pistole', dmg: 25, cooldown: 0.35, pellets: 1, spread: 0 },
+  { id: 'rifle', name: 'Schnellfeuer', dmg: 10, cooldown: 0.11, pellets: 1, spread: 0.025 },
+  { id: 'shotgun', name: 'Schrotflinte', dmg: 9, cooldown: 0.9, pellets: 6, spread: 0.09 },
+  { id: 'sniper', name: 'Scharfschütze', dmg: 75, cooldown: 1.5, pellets: 1, spread: 0 },
+]
+
+/** Schussrichtungen einer Waffe (bei Streuung leicht abgelenkt, immer normiert). */
+export function pelletDirs(d: Vec3, w: Weapon, rand: () => number = Math.random): Vec3[] {
+  const out: Vec3[] = []
+  for (let i = 0; i < w.pellets; i++) {
+    const x = d.x + (rand() * 2 - 1) * w.spread
+    const y = d.y + (rand() * 2 - 1) * w.spread
+    const z = d.z + (rand() * 2 - 1) * w.spread
+    const m = Math.hypot(x, y, z) || 1
+    out.push({ x: x / m, y: y / m, z: z / m })
+  }
+  return out
+}
 export const SPAWNS: Array<[number, number]> = [[-24, -24], [24, -24], [24, 24], [-24, 24]]
 
 export interface Box { x: number; z: number; w: number; d: number; h: number }

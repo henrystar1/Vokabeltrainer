@@ -57,6 +57,7 @@ import Profile from './pages/Profile'
 import Shop from './pages/Shop'
 // three.js ist groß: der 3D-Druck-Shop wird erst beim Öffnen geladen.
 const PrintShop = lazy(() => import('./pages/PrintShop'))
+const Umzug = lazy(() => import('./pages/Umzug'))
 import Search from './pages/Search'
 import Settings from './pages/Settings'
 import Stats from './pages/Stats'
@@ -102,6 +103,7 @@ export default function App() {
     <Routes>
       <Route path="impressum" element={<Impressum />} />
       <Route path="datenschutz" element={<Datenschutz />} />
+      <Route path="umzug" element={<Suspense fallback={<Spinner />}><Umzug /></Suspense>} />
       <Route path="anmelden" element={<Login />} />
       <Route path="registrieren" element={<Register />} />
       <Route path="passwort-vergessen" element={<ForgotPassword />} />

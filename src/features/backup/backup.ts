@@ -10,11 +10,12 @@ export interface BackupApi {
   clear: (table: string) => Promise<void>
   write: (table: string, rows: Record<string, unknown>[]) => Promise<WriteResult>
 }
-export interface BackupFile { format: string; created: string; app_update?: number; tables: Record<string, Record<string, unknown>[]> }
+export interface AuthExport { users: Record<string, unknown>[]; identities: Record<string, unknown>[]; admins: string[] }
+export interface BackupFile { format: string; created: string; app_update?: number; tables: Record<string, Record<string, unknown>[]>; _auth?: AuthExport }
 export type Progress = (text: string, done: number, total: number) => void
 
 /** Liest alle Tabellen seitenweise und baut daraus die Backup-Datei (als Blob-Teile, damit nichts riesig im Speicher liegt). */
-export async function exportAll(api: BackupApi, appUpdate: number, onProgress: Progress): Promise<{ parts: string[]; counts: Record<string, number> }> {
+export async function exportAll(api: BackupApi, appUpdate: number, onProgress: Progress, auth?: () => Promise<AuthExport>): Promise<{ parts: string[]; counts: Record<string, number> }> {
   const tables = await api.tables()
   const total = tables.reduce((a, t) => a + t.rows, 0)
   let done = 0
@@ -37,7 +38,9 @@ export async function exportAll(api: BackupApi, appUpdate: number, onProgress: P
     counts[t.name] = n
     parts.push(']')
   }
-  parts.push('}}')
+  parts.push('}')
+  if (auth) { const a = await auth(); parts.push(`,"_auth":${JSON.stringify(a)}`); counts._konten = a.users.length }
+  parts.push('}')
   return { parts, counts }
 }
 
@@ -47,6 +50,8 @@ export function parseBackup(text: string): BackupFile {
   const f = j as Partial<BackupFile> | null
   if (!f || f.format !== BACKUP_FORMAT || typeof f.tables !== 'object' || f.tables === null) throw new Error('Das ist keine Backup-Datei des Vokabeltrainers.')
   for (const [k, v] of Object.entries(f.tables)) if (!Array.isArray(v)) throw new Error(`Tabelle „${k}“ in der Datei ist beschädigt.`)
+  const a = (f as BackupFile)._auth
+  if (a !== undefined && (!a || !Array.isArray(a.users) || !Array.isArray(a.identities))) throw new Error('Der Konten-Teil der Datei ist beschädigt.')
   return f as BackupFile
 }
 

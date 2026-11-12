@@ -3,6 +3,7 @@ import type { RealtimeChannel } from '@supabase/supabase-js'
 import { supabase } from '../../lib/supabaseClient'
 import { getChatUnread, markChatRead } from '../../services/play'
 import { useAuth } from '../auth/AuthProvider'
+import { every } from '../../lib/poll'
 
 type Handler = (payload: Record<string, unknown>) => void
 
@@ -15,7 +16,7 @@ interface ChatState {
 }
 
 const ChatContext = createContext<ChatState | null>(null)
-const POLL_MS = 90_000
+const POLL_MS = 120_000
 
 /**
  * Hält die Echtzeit-Verbindung des Chats und zählt ungelesene Nachrichten – auch außerhalb der Chat-Seite,
@@ -43,9 +44,7 @@ export function ChatProvider({ children }: { children: ReactNode }) {
       return
     }
     void refresh()
-    const poll = window.setInterval(() => {
-      if (document.visibilityState === 'visible') void refresh()
-    }, POLL_MS)
+    const poll = every(() => void refresh(), POLL_MS)
     const ch = supabase
       .channel('vokabeltrainer-chat')
       .on('broadcast', { event: 'typing' }, ({ payload }) => handlers.current.typing.forEach((h) => h(payload ?? {})))

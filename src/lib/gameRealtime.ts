@@ -49,6 +49,16 @@ export function setGameSlot(slot: number): boolean {
   return changed
 }
 export const getGameSlot = () => current
+/**
+ * Feste Datenbank für ein Spiel (aus der Spiel-ID): alle Mitspielenden landen sicher auf demselben Projekt, auch wenn ihre
+ * „aktuelle“ Datenbank (Monatsbudget) gerade verschieden ist. Sonst sehen sie sich gegenseitig nicht.
+ */
+export function slotForKey(key: string): number {
+  if (list.length <= 1) return 0
+  let h = 2166136261
+  for (let i = 0; i < key.length; i++) { h ^= key.charCodeAt(i); h = Math.imul(h, 16777619) }
+  return (h >>> 0) % list.length
+}
 /** Der Client der gerade geltenden Spiel-Datenbank. */
 export const gameRealtime = (): SupabaseClient => (list.length ? clientFor(list[Math.min(current, list.length - 1)]) : supabase)
 /** Client einer bestimmten Datenbank (zum sauberen Abbauen eines Kanals). */

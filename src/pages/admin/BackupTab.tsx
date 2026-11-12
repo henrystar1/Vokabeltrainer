@@ -2,7 +2,7 @@ import { useRef, useState } from 'react'
 import { Download, Upload } from 'lucide-react'
 import { errorMessage } from '../../lib/errors'
 import { APP_UPDATE } from '../../version'
-import { backupClear, backupRead, backupTables, backupWrite } from '../../services/backup'
+import { accountsExport, backupClear, backupRead, backupTables, backupWrite } from '../../services/backup'
 import { exportAll, importAll, parseBackup, type BackupApi, type BackupFile, type ImportReport } from '../../features/backup/backup'
 
 const api: BackupApi = { tables: backupTables, read: backupRead, clear: backupClear, write: backupWrite }
@@ -14,6 +14,7 @@ export default function BackupTab() {
   const [msg, setMsg] = useState<string | null>(null)
   const [file, setFile] = useState<{ name: string; data: BackupFile } | null>(null)
   const [replace, setReplace] = useState(false)
+  const [withAccounts, setWithAccounts] = useState(false)
   const [confirm, setConfirm] = useState('')
   const [report, setReport] = useState<ImportReport[] | null>(null)
   const input = useRef<HTMLInputElement>(null)
@@ -21,7 +22,7 @@ export default function BackupTab() {
   async function download() {
     setBusy(true); setMsg(null); setReport(null)
     try {
-      const { parts, counts } = await exportAll(api, APP_UPDATE, (text, done, total) => setProg({ text, done, total }))
+      const { parts, counts } = await exportAll(api, APP_UPDATE, (text, done, total) => setProg({ text, done, total }), withAccounts ? accountsExport : undefined)
       const blob = new Blob(parts, { type: 'application/json' })
       const a = document.createElement('a')
       const day = new Date().toISOString().slice(0, 16).replace('T', '_').replace(':', '-')
@@ -56,7 +57,8 @@ export default function BackupTab() {
     <div className="max-w-2xl space-y-5">
       <section className="glass space-y-2 rounded-2xl p-4">
         <h2 className="font-semibold">Backup herunterladen</h2>
-        <p className="text-sm text-slate-400">Eine Datei mit allem, was in der Datenbank steht: Bücher, Vokabeln, Fortschritt, Coins, Shop, Chat, Einstellungen, Online-Spiele und mehr (neue Tabellen sind automatisch dabei). Nicht enthalten sind die Anmeldedaten (E-Mail und Passwort), die bleiben bei Supabase. Hebe die Datei zusätzlich außerhalb des Browsers auf, z. B. in der Cloud.</p>
+        <p className="text-sm text-slate-400">Eine Datei mit allem, was in der Datenbank steht: Bücher, Vokabeln, Fortschritt, Coins, Shop, Chat, Einstellungen, Online-Spiele und mehr (neue Tabellen sind automatisch dabei). Anmeldedaten sind nur enthalten, wenn du das Häkchen setzt (für einen Umzug, siehe Tab Umzug). Hebe die Datei zusätzlich außerhalb des Browsers auf, z. B. in der Cloud.</p>
+        <label className="flex min-h-[44px] items-start gap-2 text-sm"><input type="checkbox" checked={withAccounts} onChange={(e) => setWithAccounts(e.target.checked)} className="mt-1 h-5 w-5" /><span>Konten mitnehmen (E-Mail-Adressen und Passwort-Hashes) – nur für den Umzug in ein neues Projekt. Die Datei ist dann sensibel: nicht teilen, nicht ins Repository legen.</span></label>
         <button type="button" disabled={busy} onClick={() => void download()} className="inline-flex min-h-[44px] items-center gap-2 rounded-lg bg-accent-cyan px-4 font-semibold text-slate-950 disabled:opacity-40"><Download size={16} />Backup jetzt herunterladen</button>
       </section>
       <section className="glass space-y-3 rounded-2xl p-4">
