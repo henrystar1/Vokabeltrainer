@@ -40,7 +40,7 @@ begin
   end if;
 
   -- Der Trigger hat Profile angelegt (noch nicht freigeschaltet): jetzt alle freischalten, Admins wieder zu Admins machen.
-  update public.profiles set approved = true;
+  update public.profiles set approved = true where true;
   if p_admins is not null and jsonb_typeof(p_admins) = 'array' then
     update public.profiles set role = 'admin' where id::text in (select jsonb_array_elements_text(p_admins));
   end if;

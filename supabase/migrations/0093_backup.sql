@@ -66,7 +66,7 @@ returns void language plpgsql security definer set search_path = public as $$
 begin
   perform public._backup_check(p_table);
   execute format('alter table public.%I disable trigger user', p_table);
-  execute format('delete from public.%I', p_table);
+  execute format('delete from public.%I where true', p_table);
   execute format('alter table public.%I enable trigger user', p_table);
 end;
 $$;

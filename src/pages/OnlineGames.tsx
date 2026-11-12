@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
-import { Anchor, Castle, Circle, Crosshair, Dices, Hand, Search, X } from 'lucide-react'
+import { Anchor, Car, Castle, Circle, Crosshair, Dices, Hand, Search, X } from 'lucide-react'
 import PlayerTag from '../components/profile/PlayerTag'
 import Button from '../components/ui/Button'
 import Card from '../components/ui/Card'
@@ -20,6 +20,7 @@ const GAMES: Array<{ kind: OgKind; text: string; players: string; icon: typeof H
   { kind: 'ships', text: 'Setze deine Flotte und versenke die Schiffe des Gegners.', players: '2 Personen', icon: Anchor },
   { kind: 'chess', text: 'Klassisches Schach mit allen Regeln (Rochade, en passant, Umwandlung). Remis anbieten oder aufgeben jederzeit möglich.', players: '2 Personen', icon: Castle },
   { kind: 'checkers', text: 'Dame nach deutschen Regeln: Schlagzwang, fliegende Damen, Steine schlagen auch rückwärts.', players: '2 Personen', icon: Circle },
+  { kind: 'race', text: '3D-Rennen mit deinen Autos: 6 Strecken, 2 bis 4 Personen. Der Ersteller lädt ein, wählt Strecke und Runden. Gas, Bremse und Lenken per Tasten oder Touch.', players: '2 bis 4 Personen', icon: Car },
   { kind: 'shooter', text: '3D-Arena (Maus und Tastatur oder Touch-Steuerung am iPad): wer zuerst 10 Treffer hat (oder die meisten nach 5 Minuten), gewinnt. Mit Panik-Knopf.', players: '2 bis 4 Personen · kostet den Ersteller beim Start 50 Coins', icon: Crosshair },
 ]
 
@@ -93,7 +94,7 @@ export default function OnlineGames() {
 
 function NewGame({ kind, onClose }: { kind: OgKind; onClose: () => void }) {
   const nav = useNavigate()
-  const max = kind === 'ludo' || kind === 'shooter' ? 3 : 1
+  const max = kind === 'ludo' || kind === 'shooter' || kind === 'race' ? 3 : 1
   const [q, setQ] = useState('')
   const [hits, setHits] = useState<PlayerHit[] | null>(null)
   const [chosen, setChosen] = useState<PlayerHit[]>([])

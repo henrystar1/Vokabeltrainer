@@ -7,7 +7,7 @@ begin
     alter table public.stock_symbols add column base_cents bigint;
     -- bisherige Dollar-Kurse werden zu Coins (Faktor wie bisher eingestellt)
     update public.stock_symbols s set base_cents = greatest(coalesce((select q.price_cents from public.stock_quotes q where q.symbol = s.symbol), 10000) * greatest(public.setting('stock_koin_per_usd'), 1), 100);
-    update public.stock_quotes q set price_cents = greatest(price_cents * greatest(public.setting('stock_koin_per_usd'), 1), 100), prev_close_cents = greatest(prev_close_cents * greatest(public.setting('stock_koin_per_usd'), 1), 100);
+    update public.stock_quotes q set price_cents = greatest(price_cents * greatest(public.setting('stock_koin_per_usd'), 1), 100), prev_close_cents = greatest(prev_close_cents * greatest(public.setting('stock_koin_per_usd'), 1), 100) where true;
   end if;
 end $$;
 alter table public.stock_symbols alter column base_cents set default 100000;

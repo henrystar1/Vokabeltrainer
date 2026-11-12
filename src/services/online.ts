@@ -1,7 +1,7 @@
 import { rpc } from './rpc'
 
-export type OgKind = 'rps' | 'ludo' | 'ships' | 'shooter' | 'chess' | 'checkers'
-export const OG_NAMES: Record<OgKind, string> = { rps: 'Schnick Schnack Schnuck', ludo: 'Mensch ärgere dich nicht', ships: 'Schiffe versenken', shooter: '3D-Shooter', chess: 'Schach', checkers: 'Dame' }
+export type OgKind = 'rps' | 'ludo' | 'ships' | 'shooter' | 'chess' | 'checkers' | 'race'
+export const OG_NAMES: Record<OgKind, string> = { rps: 'Schnick Schnack Schnuck', ludo: 'Mensch ärgere dich nicht', ships: 'Schiffe versenken', shooter: '3D-Shooter', chess: 'Schach', checkers: 'Dame', race: '3D-Rennen' }
 
 export interface OgListItem {
   id: string
@@ -24,6 +24,8 @@ export interface ShipsState { phase: 'placing' | 'running'; shots: Record<string
 export interface LudoLast { seat: number; dice: number; piece?: number; from?: number; to?: number; caps?: Array<{ seat: number; piece: number }>; rolled?: boolean; nomove?: boolean; again?: boolean }
 export interface LudoState { seats: number[]; pieces: Record<string, number[]>; turn: number; dice?: number; tries: number; out: number[]; last?: LudoLast; winner?: number }
 
+export interface RaceState { track?: number; laps?: number; t0?: number; first_at?: number; results?: Record<string, number> }
+
 export interface OgView {
   id: string
   kind: OgKind
@@ -33,7 +35,7 @@ export interface OgView {
   me: { user_id: string; seat: number | null; join_state: string }
   turn_seat: number | null
   winner_seat: number | null
-  state: RpsState & ShipsState & LudoState
+  state: RpsState & ShipsState & LudoState & RaceState
   players: OgPlayer[]
   mine: { pick?: string; opp_picked?: boolean; ships?: Ship[]; placed?: boolean; opp_placed?: boolean; opp_ships?: Ship[]; legal?: number[] }
 }
@@ -66,3 +68,7 @@ export const ogShooterLeave = (id: string) => rpc<OgView>('og_shooter_leave', { 
 export const ogBoardMove = (id: string, state: Record<string, unknown>, result: 'ongoing' | 'win' | 'draw') => rpc<OgView>('og_board_move', { p_id: id, p_state: state, p_result: result })
 export const ogBoardResign = (id: string) => rpc<OgView>('og_board_resign', { p_id: id })
 export const ogBoardDraw = (id: string, action: 'offer' | 'accept' | 'decline' | 'withdraw') => rpc<OgView>('og_board_draw', { p_id: id, p_action: action })
+
+export const ogRaceSet = (id: string, track: number, laps: number) => rpc<OgView>('og_race_set', { p_id: id, p_track: track, p_laps: laps })
+export const ogRaceReport = (id: string, ms: number | null) => rpc<OgView>('og_race_report', { p_id: id, p_ms: ms })
+export const ogRaceLeave = (id: string) => rpc<OgView>('og_race_leave', { p_id: id })
