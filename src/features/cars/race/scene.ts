@@ -203,7 +203,7 @@ export function buildScene(THREE: THREE, t: Track): RaceScene {
   return { scene, sun, theme: th, makeCar }
 }
 
-interface Body { len: number; wid: number; hgt: number; cabLen: number; cabH: number; cabZ: number; wheelR: number; spoiler?: boolean; bed?: boolean; open?: boolean; tall?: boolean }
+interface Body { len: number; wid: number; hgt: number; cabLen: number; cabH: number; cabZ: number; wheelR: number; spoiler?: boolean; bed?: boolean; open?: boolean; tall?: boolean; cage?: boolean; scoop?: boolean; formula?: boolean; track?: number; wheelW?: number; stripe?: boolean }
 const BODIES: Record<string, Body> = {
   kleinwagen: { len: 3.9, wid: 1.8, hgt: 0.75, cabLen: 2.1, cabH: 0.7, cabZ: -0.1, wheelR: 0.36 },
   limousine: { len: 4.8, wid: 1.9, hgt: 0.72, cabLen: 2.5, cabH: 0.62, cabZ: -0.2, wheelR: 0.38 },
@@ -213,6 +213,14 @@ const BODIES: Record<string, Body> = {
   cabrio: { len: 4.3, wid: 1.85, hgt: 0.65, cabLen: 1.4, cabH: 0.4, cabZ: 0.1, wheelR: 0.38, open: true },
   sportwagen: { len: 4.5, wid: 1.95, hgt: 0.55, cabLen: 1.9, cabH: 0.5, cabZ: -0.1, wheelR: 0.37, spoiler: true },
   bus: { len: 6.6, wid: 2.2, hgt: 1.7, cabLen: 6.2, cabH: 0.3, cabZ: 0, wheelR: 0.5, tall: true },
+  oldtimer: { len: 4.4, wid: 1.8, hgt: 0.85, cabLen: 1.8, cabH: 0.8, cabZ: -0.2, wheelR: 0.42, tall: true },
+  buggy: { len: 3.4, wid: 1.9, hgt: 0.4, cabLen: 1.2, cabH: 0, cabZ: -0.1, wheelR: 0.55, open: true, cage: true },
+  monstertruck: { len: 4.8, wid: 2.4, hgt: 1.15, cabLen: 2.1, cabH: 0.85, cabZ: -0.3, wheelR: 1.15, tall: true },
+  muscle: { len: 4.9, wid: 1.95, hgt: 0.68, cabLen: 1.9, cabH: 0.5, cabZ: -0.55, wheelR: 0.41, scoop: true, stripe: true },
+  rallye: { len: 4.1, wid: 1.85, hgt: 0.82, cabLen: 2.2, cabH: 0.6, cabZ: -0.2, wheelR: 0.41, spoiler: true, scoop: true },
+  gt: { len: 4.7, wid: 2.0, hgt: 0.5, cabLen: 1.8, cabH: 0.45, cabZ: -0.1, wheelR: 0.39, spoiler: true, stripe: true },
+  hypercar: { len: 4.6, wid: 2.05, hgt: 0.42, cabLen: 1.6, cabH: 0.4, cabZ: 0, wheelR: 0.39, spoiler: true, stripe: true },
+  rennwagen: { len: 5.0, wid: 0.9, hgt: 0.42, cabLen: 0.8, cabH: 0.35, cabZ: -0.2, wheelR: 0.42, formula: true, track: 1.85, wheelW: 0.55 },
 }
 
 function nameSprite(THREE: THREE, name: string, y: number): T.Sprite {
@@ -256,8 +264,30 @@ function buildCar(THREE: THREE, kind: string, color: string, name: string, isMe:
     for (const sx of [-0.7, 0.7]) { const p = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.45, 0.14), dark); p.position.set(sx, clearance + b.hgt + 0.3, -b.len / 2 + 0.3); g.add(p) }
     g.add(w)
   }
+  if (b.cage) {
+    const bar = new THREE.MeshStandardMaterial({ color: 0xe2e8f0, metalness: 0.7, roughness: 0.3 })
+    for (const sx of [-0.8, 0.8]) for (const [z0, z1] of [[-0.7, -0.3], [0.5, 0.2]]) {
+      const p = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.05, 1.1, 6), bar); p.position.set(sx, clearance + b.hgt + 0.5, (z0 + z1) / 2); p.rotation.x = (z1 - z0) * 0.9; g.add(p)
+    }
+    for (const z of [-0.5, 0.35]) { const t = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.05, 1.7, 6), bar); t.rotation.z = Math.PI / 2; t.position.set(0, clearance + b.hgt + 1.05, z); g.add(t) }
+    const seat = new THREE.Mesh(new RoundedBoxGeometry(0.8, 0.5, 0.7, 2, 0.1), dark); seat.position.set(0, clearance + b.hgt + 0.25, -0.15); g.add(seat)
+  }
+  if (b.scoop) {
+    const sc = new THREE.Mesh(new RoundedBoxGeometry(0.7, 0.2, 0.9, 2, 0.08), dark)
+    sc.position.set(0, clearance + b.hgt + 0.1, b.len * 0.22)
+    g.add(sc)
+  }
+  if (b.formula) {
+    const nose = new THREE.Mesh(new RoundedBoxGeometry(0.5, 0.3, 1.6, 3, 0.14), paint); nose.position.set(0, clearance + 0.38, b.len / 2 - 0.5); g.add(nose)
+    const fw = new THREE.Mesh(new RoundedBoxGeometry(2.0, 0.07, 0.45, 2, 0.03), dark); fw.position.set(0, 0.2, b.len / 2 + 0.1); g.add(fw)
+    for (const sx of [-0.55, 0.55]) { const pod = new THREE.Mesh(new RoundedBoxGeometry(0.5, 0.42, 1.8, 3, 0.15), paint); pod.position.set(sx, clearance + 0.3, -0.2); g.add(pod) }
+    const rw = new THREE.Mesh(new RoundedBoxGeometry(1.5, 0.07, 0.5, 2, 0.03), dark); rw.position.set(0, clearance + 1.05, -b.len / 2 + 0.2); g.add(rw)
+    for (const sx of [-0.4, 0.4]) { const p = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.6, 0.2), dark); p.position.set(sx, clearance + 0.75, -b.len / 2 + 0.25); g.add(p) }
+    const helmet = new THREE.Mesh(new THREE.SphereGeometry(0.22, 12, 10), new THREE.MeshStandardMaterial({ color: 0xfacc15, roughness: 0.3 })); helmet.position.set(0, clearance + 0.78, -0.1); g.add(helmet)
+    const halo = new THREE.Mesh(new THREE.TorusGeometry(0.3, 0.035, 6, 14, Math.PI), dark); halo.rotation.set(0, Math.PI / 2, 0); halo.position.set(0, clearance + 0.7, 0.05); g.add(halo)
+  }
   // Rennstreifen
-  if (kind === 'sportwagen' || kind === 'cabrio') {
+  if (b.stripe || kind === 'sportwagen' || kind === 'cabrio') {
     const st = new THREE.Mesh(new THREE.BoxGeometry(0.34, 0.02, b.len * 0.98), new THREE.MeshStandardMaterial({ color: 0xf8fafc, roughness: 0.4 }))
     st.position.set(0, clearance + b.hgt + 0.115, 0); g.add(st)
   }
@@ -267,10 +297,11 @@ function buildCar(THREE: THREE, kind: string, color: string, name: string, isMe:
   const wheels: T.Group[] = []
   for (const [sx, sz] of [[-1, 1], [1, 1], [-1, -1], [1, -1]] as const) {
     const w = new THREE.Group()
-    const tr = new THREE.Mesh(new THREE.CylinderGeometry(b.wheelR, b.wheelR, 0.34, 20), tyre); tr.rotation.z = Math.PI / 2
-    const rm = new THREE.Mesh(new THREE.CylinderGeometry(b.wheelR * 0.62, b.wheelR * 0.62, 0.36, 12), rim); rm.rotation.z = Math.PI / 2
+    const ww = b.wheelW ?? 0.34
+    const tr = new THREE.Mesh(new THREE.CylinderGeometry(b.wheelR, b.wheelR, ww, 20), tyre); tr.rotation.z = Math.PI / 2
+    const rm = new THREE.Mesh(new THREE.CylinderGeometry(b.wheelR * 0.62, b.wheelR * 0.62, ww + 0.02, 12), rim); rm.rotation.z = Math.PI / 2
     w.add(tr, rm)
-    w.position.set(sx * (b.wid / 2 - 0.05), b.wheelR, sz * (b.len / 2 - b.wheelR * 1.5))
+    w.position.set(sx * ((b.track ?? b.wid) / 2 - 0.05), b.wheelR, sz * (b.len / 2 - b.wheelR * 1.5))
     w.name = sz > 0 ? 'front' : 'rear'
     g.add(w); wheels.push(w)
   }

@@ -1,18 +1,15 @@
 import { advance, curveAhead, pointAt, project, type Track } from './track'
+import { carKmh, kindStats } from '../stats'
 
-/** Fahrwerte je Fahrzeugart: Höchstgeschwindigkeit (m/s), Beschleunigung, Lenkung, Bremse. */
+/** Fahrwerte eines Autos: Höchstgeschwindigkeit (m/s), Beschleunigung, Lenkung, Bremse. */
 export interface CarStats { top: number; acc: number; turn: number; brake: number }
-export const STATS: Record<string, CarStats> = {
-  kleinwagen: { top: 44, acc: 15, turn: 1.9, brake: 34 },
-  limousine: { top: 52, acc: 16, turn: 1.7, brake: 34 },
-  kombi: { top: 50, acc: 15, turn: 1.7, brake: 33 },
-  suv: { top: 48, acc: 15, turn: 1.55, brake: 32 },
-  pickup: { top: 46, acc: 14, turn: 1.5, brake: 30 },
-  cabrio: { top: 58, acc: 18, turn: 1.85, brake: 36 },
-  sportwagen: { top: 68, acc: 22, turn: 2.0, brake: 40 },
-  bus: { top: 38, acc: 10, turn: 1.25, brake: 26 },
+/** Werte je Art; mit `kmh` (eigener Höchstwert des Autos) wird Tempo und Beschleunigung entsprechend skaliert. */
+export const statsFor = (kind: string, kmh?: number | null): CarStats => {
+  const k = kindStats(kind)
+  const f = carKmh(kind, kmh) / k.kmh
+  return { top: (k.kmh * f) / 3.6, acc: k.acc * Math.pow(f, 0.8), turn: k.turn, brake: k.brake * Math.pow(f, 0.5) }
 }
-export const statsFor = (kind: string): CarStats => STATS[kind] ?? STATS.kleinwagen
+export const STATS: Record<string, CarStats> = Object.fromEntries(['kleinwagen', 'limousine', 'kombi', 'suv', 'pickup', 'cabrio', 'sportwagen', 'bus', 'oldtimer', 'buggy', 'monstertruck', 'muscle', 'rallye', 'gt', 'hypercar', 'rennwagen'].map((k) => [k, statsFor(k)]))
 
 export interface Input { gas: boolean; brake: boolean; left: boolean; right: boolean }
 export interface Car {
@@ -56,7 +53,7 @@ export function stepCar(c: Car, inp: Input, dt: number, t: Track, st: CarStats, 
   // Lenkung läuft sanft auf den Zielwert (weniger Zappeln mit Tasten)
   const steer = c.steer + (target - c.steer) * Math.min(1, 7 * dt)
   const grip = Math.min(1, Math.abs(v) / 9)
-  const speedFactor = 1 / (1 + Math.abs(v) * 0.028)
+  const speedFactor = 1 / (1 + Math.abs(v) * 0.022)
   let h = c.h + steer * st.turn * grip * speedFactor * Math.sign(v || 1) * dt * 1.35
   // Seitenrutschen in schnellen Kurven: Tempo geht verloren
   v -= Math.abs(steer) * Math.abs(v) * 0.16 * dt * (Math.abs(v) / st.top)

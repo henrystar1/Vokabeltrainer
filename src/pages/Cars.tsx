@@ -10,6 +10,19 @@ import CarRun from '../features/cars/CarRun'
 import RaceMenu from '../features/cars/race/RaceMenu'
 import { Link } from 'react-router-dom'
 import { carBuy, carList } from '../services/cars'
+import { carKmh } from '../features/cars/stats'
+
+const MAX_KMH = 320
+/** Höchstgeschwindigkeit als Zahl und Balken. */
+function Speed({ kind, kmh }: { kind: string; kmh: number | null }) {
+  const v = carKmh(kind, kmh)
+  return (
+    <div className="mt-1" title="Höchstgeschwindigkeit im Rennen">
+      <div className="flex justify-between text-xs text-slate-300"><span>Höchstgeschwindigkeit</span><span className="font-semibold">{v} km/h</span></div>
+      <div className="mt-0.5 h-1.5 overflow-hidden rounded-full bg-white/10"><div className="h-full rounded-full bg-gradient-to-r from-emerald-400 via-amber-300 to-rose-500" style={{ width: `${Math.min(100, (v / MAX_KMH) * 100)}%` }} /></div>
+    </div>
+  )
+}
 
 /** Autohaus: Autos kaufen und in der Garage sammeln. */
 export default function Cars() {
@@ -41,7 +54,8 @@ export default function Cars() {
           {!drive ? <p className="text-sm text-slate-300">Du brauchst erst ein Auto. Kaufe eins unter „Kaufen“.</p> : (
             <div className="space-y-3">
               <div className="flex flex-wrap gap-2">{owned.map((c) => <button key={c.id} type="button" onClick={() => setPick(c.id)} aria-pressed={drive.id === c.id} className={`w-24 rounded-xl border p-1 text-center text-xs ${drive.id === c.id ? 'border-accent-cyan bg-white/10' : 'border-white/10'}`}><CarArt kind={c.kind} color={c.color} label={c.name} className="w-full" />{c.name}</button>)}</div>
-              <RaceMenu key={drive.id} car={{ name: 'Du', kind: drive.kind, color: drive.color }} />
+              <p className="text-sm text-slate-300">Dein Auto: <b>{drive.name}</b> · {carKmh(drive.kind, drive.top_kmh)} km/h</p>
+              <RaceMenu key={drive.id} car={{ name: 'Du', kind: drive.kind, color: drive.color, top: drive.top_kmh }} />
               <p className="text-sm"><Link to="/mehrspieler" className="text-accent-cyan hover:underline">Online-Rennen mit Freunden starten →</Link></p>
             </div>
           )}
@@ -62,7 +76,7 @@ export default function Cars() {
         <Card>
           <h2 className="mb-2 font-semibold">Meine Garage ({owned.length})</h2>
           <ul className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
-            {owned.map((c) => <li key={c.id} className="rounded-xl bg-white/5 p-2 text-center"><CarArt kind={c.kind} color={c.color} label={c.name} className="w-full" /><p className="text-xs">{c.name}</p></li>)}
+            {owned.map((c) => <li key={c.id} className="rounded-xl bg-white/5 p-2 text-center"><CarArt kind={c.kind} color={c.color} label={c.name} className="w-full" /><p className="text-xs">{c.name}</p><p className="text-[11px] text-slate-400">{carKmh(c.kind, c.top_kmh)} km/h</p></li>)}
           </ul>
         </Card>
       )}
@@ -72,11 +86,12 @@ export default function Cars() {
             <Card>
               <CarArt kind={c.kind} color={c.color} label={c.name} className="w-full rounded-xl bg-gradient-to-b from-slate-700/40 to-slate-900/60" />
               <div className="mt-2 flex items-center justify-between gap-2">
-                <div><p className="font-semibold">{c.name}</p><p className="text-sm text-slate-400">{c.price.toLocaleString('de-DE')} Coins</p></div>
+                <div className="min-w-0 flex-1"><p className="font-semibold">{c.name}</p><p className="text-sm text-slate-400">{c.price.toLocaleString('de-DE')} Coins</p></div>
                 {c.owned
                   ? <span className="rounded-lg bg-emerald-500/20 px-3 py-2 text-sm text-emerald-300">In der Garage</span>
                   : <button type="button" disabled={busy !== null} onClick={() => void buy(c.id, c.name)} className="min-h-[44px] rounded-lg bg-accent-cyan px-4 font-semibold text-slate-950 disabled:opacity-40">{busy === c.id ? '…' : 'Kaufen'}</button>}
               </div>
+              <Speed kind={c.kind} kmh={c.top_kmh} />
             </Card>
           </li>
         ))}

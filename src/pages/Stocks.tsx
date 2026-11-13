@@ -12,6 +12,11 @@ import { stockHistory, stockList, stockTrade, type StockRow } from '../services/
 const REFRESH_MS = 30_000
 const FEE_PERMILLE_FALLBACK = 10
 
+const DRIVER_HINT: Record<string, string> = {
+  BANK: 'Diese Aktie hängt an der Spielbank: Gewinnt die Bank beim Gambling viel, steigt der Kurs. Gewinnen Spieler viel, fällt er.',
+  SHOPX: 'Diese Aktie hängt am Shop: Werden im Vokabeltrainer viele Coins ausgegeben (Shop, Autos, Plus), steigt der Kurs.',
+}
+
 /** Börse: Spiel-Aktien, deren Kurse der Server simuliert; Handel mit Coins. */
 export default function Stocks() {
   const wallet = useWallet()
@@ -85,6 +90,7 @@ export default function Stocks() {
           {cur && (
             <Card>
               <h2 className="font-semibold">{cur.name} ({cur.symbol})</h2>
+              {DRIVER_HINT[cur.symbol] && <p className="mt-1 rounded-lg bg-amber-400/10 px-3 py-1.5 text-xs text-amber-200">{DRIVER_HINT[cur.symbol]}</p>}
               <p className="text-sm text-slate-400">{cur.unit_koins ?? '–'} Coins pro Aktie</p>
               <div className="mt-3"><StockChart symbol={cur.symbol} reloadKey={tick} /></div>
               <label className="mt-3 block space-y-1">

@@ -69,7 +69,7 @@ describe('Fahren', () => {
   })
 
   it('unbekannte Autoart fährt wie ein Kleinwagen', () => {
-    expect(statsFor('xyz')).toBe(STATS.kleinwagen)
+    expect(statsFor('xyz')).toEqual(STATS.kleinwagen)
   })
 })
 
@@ -87,5 +87,32 @@ describe('Bots', () => {
     expect(bot.car.total).toBeGreaterThanOrEqual(total)
     expect(time).toBeLessThan(300)
     expect(worst).toBeLessThan(def.width / 2 + 2.5)
+  })
+})
+
+describe('Autos und Tempo', () => {
+  it('eigene Höchstgeschwindigkeit skaliert das Fahrwerk', () => {
+    expect(statsFor('sportwagen').top * 3.6).toBeCloseTo(240, 3)
+    expect(statsFor('sportwagen', 260).top * 3.6).toBeCloseTo(260, 3)
+    expect(statsFor('sportwagen', 260).acc).toBeGreaterThan(statsFor('sportwagen').acc)
+    expect(statsFor('xyz', null).top * 3.6).toBeCloseTo(150, 3)
+  })
+  it('Rennwagen sind schneller als Kleinwagen', () => {
+    const k = (kind: string) => { const tr = buildTrack(TRACKS[0]); let c = startCar(tr, 0); for (let i = 0; i < 60 * 2.5; i++) c = stepCar(c, { gas: true, brake: false, left: false, right: false }, 1 / 60, tr, statsFor(kind), true); return c.v }
+    expect(k('rennwagen')).toBeGreaterThan(k('kleinwagen') + 12)
+  })
+  it.each(['rennwagen', 'hypercar', 'monstertruck', 'oldtimer'])('Bot mit %s schafft alle Strecken ohne an die Leitplanke zu gehen', (kind) => {
+    for (const def of TRACKS) {
+      const tr = buildTrack(def)
+      const bot: Bot = { car: startCar(tr, 0), kind, color: '#fff', name: 'B', skill: 0.9, lane: 0, wobble: 0, finished: null }
+      let time = 0, worst = 0
+      while (bot.car.total < 2 * tr.length && time < 400) {
+        bot.car = stepCar(bot.car, botInput(bot, tr, time), 1 / 60, tr, statsFor(kind), true)
+        worst = Math.max(worst, project(tr, bot.car.x, bot.car.z, bot.car.idx).dist)
+        time += 1 / 60
+      }
+      expect(bot.car.total, `${kind} auf ${def.name}`).toBeGreaterThanOrEqual(2 * tr.length)
+      expect(worst, `${kind} auf ${def.name}`).toBeLessThan(def.width / 2 + 3.5)
+    }
   })
 })

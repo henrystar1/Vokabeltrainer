@@ -15,7 +15,7 @@ export function useRaceCar(): { cars: CarRow[]; car: RaceCarInfo; pick: string |
   const [pick, setPickState] = useState<string | null>(() => { try { return localStorage.getItem(KEY) } catch { return null } })
   useEffect(() => { let on = true; void carList().then((l) => { if (on) setCars(l.filter((c) => c.owned)) }).catch(() => undefined); return () => { on = false } }, [])
   const sel = cars.find((c) => c.id === pick) ?? cars[0]
-  const car = useMemo<RaceCarInfo>(() => (sel ? { name: sel.name, kind: sel.kind, color: sel.color } : LOAN), [sel])
+  const car = useMemo<RaceCarInfo>(() => (sel ? { name: sel.name, kind: sel.kind, color: sel.color, top: sel.top_kmh } : LOAN), [sel])
   return { cars, car, pick: sel?.id ?? null, setPick: (id) => { setPickState(id); try { localStorage.setItem(KEY, id) } catch { /* ignorieren */ } } }
 }
 

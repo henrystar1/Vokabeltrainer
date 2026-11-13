@@ -20,7 +20,7 @@ export default function CarsTab() {
         {list.data?.map((c) => (
           <li key={c.id} className="flex flex-wrap items-center gap-3 py-2">
             <CarArt kind={c.kind} color={c.color} label={c.name} className="w-20" />
-            <span className="min-w-0 flex-1 truncate font-semibold">{c.name}</span>
+            <span className="min-w-0 flex-1 truncate font-semibold">{c.name} <span className="text-xs font-normal text-slate-400">{c.top_kmh ?? ''} km/h</span></span>
             <input aria-label={`Preis ${c.name}`} inputMode="numeric" value={edit[c.id] ?? String(c.price)} onChange={(e) => setEdit({ ...edit, [c.id]: e.target.value })} className="min-h-[44px] w-28 rounded-lg border border-white/15 bg-space-900/60 px-3" />
             <button type="button" onClick={() => void save(c.id, Math.max(0, Math.floor(Number(edit[c.id] ?? c.price) || 0)), c.active)} className="min-h-[44px] rounded-lg bg-accent-cyan px-3 font-semibold text-slate-950">Preis speichern</button>
             <label className="flex items-center gap-1.5 text-sm"><input type="checkbox" checked={c.active} onChange={(e) => void save(c.id, c.price, e.target.checked)} className="h-5 w-5" />im Angebot</label>

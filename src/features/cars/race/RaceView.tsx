@@ -4,7 +4,7 @@ import { gameClientFor, slotForKey, whenGameDbsReady } from '../../../lib/gameRe
 import { botInput, pushApart, startCar, statsFor, stepCar, type Bot, type Car, type Input } from './physics'
 import { TRACKS, buildTrack, curveAhead, pointAt, project } from './track'
 
-export interface RaceCarInfo { name: string; kind: string; color: string }
+export interface RaceCarInfo { name: string; kind: string; color: string; /** eigene Höchstgeschwindigkeit des Autos (km/h) */ top?: number | null }
 export interface RaceStanding { name: string; ms: number | null; me?: boolean }
 interface Props {
   trackId: number
@@ -30,6 +30,12 @@ export default function RaceView({ trackId, laps, me, bots = [], online, onFinis
   const mini = useRef<HTMLCanvasElement>(null)
   const inp = useRef<Input>({ gas: false, brake: false, left: false, right: false })
   const resetReq = useRef(false)
+  const camRef = useRef<0 | 1>((() => { try { return localStorage.getItem('vt-race-cam') === '1' ? 1 : 0 } catch { return 0 } })())
+  const [cockpit, setCockpit] = useState(camRef.current === 1)
+  const wheelEl = useRef<HTMLDivElement>(null)
+  const toggleCam = () => { camRef.current = camRef.current === 1 ? 0 : 1; setCockpit(camRef.current === 1); try { localStorage.setItem('vt-race-cam', String(camRef.current)) } catch { /* ignorieren */ } }
+  const toggleRef = useRef(toggleCam)
+  toggleRef.current = toggleCam
   const finishCb = useRef(onFinish)
   finishCb.current = onFinish
   const def = TRACKS[Math.max(0, Math.min(TRACKS.length - 1, trackId))]
@@ -71,7 +77,7 @@ export default function RaceView({ trackId, laps, me, bots = [], online, onFinis
       cleanups.push(() => { ro.disconnect(); renderer.dispose(); renderer.domElement.remove() })
 
       // Fahrzeuge
-      const myStats = statsFor(me.kind)
+      const myStats = statsFor(me.kind, me.top)
       let slot = 0
       const mySlot = online ? Math.max(0, online.players.findIndex((p) => p.id === online.userId)) : bots.length
       let car: Car = startCar(track, mySlot)
@@ -87,7 +93,7 @@ export default function RaceView({ trackId, laps, me, bots = [], online, onFinis
 
       // Tastatur
       const keyMap: Record<string, keyof Input> = { ArrowLeft: 'left', a: 'left', A: 'left', ArrowRight: 'right', d: 'right', D: 'right', ArrowUp: 'gas', w: 'gas', W: 'gas', ArrowDown: 'brake', s: 'brake', S: 'brake', ' ': 'brake' }
-      const kd = (e: KeyboardEvent) => { const k = keyMap[e.key]; if (k) { inp.current[k] = true; e.preventDefault() } else if (e.key === 'r' || e.key === 'R') resetReq.current = true }
+      const kd = (e: KeyboardEvent) => { const k = keyMap[e.key]; if (k) { inp.current[k] = true; e.preventDefault() } else if (e.key === 'r' || e.key === 'R') resetReq.current = true; else if (e.key === 'c' || e.key === 'C') toggleRef.current() }
       const ku = (e: KeyboardEvent) => { const k = keyMap[e.key]; if (k) { inp.current[k] = false; e.preventDefault() } }
       window.addEventListener('keydown', kd); window.addEventListener('keyup', ku)
       cleanups.push(() => { window.removeEventListener('keydown', kd); window.removeEventListener('keyup', ku) })
@@ -218,14 +224,27 @@ export default function RaceView({ trackId, laps, me, bots = [], online, onFinis
           place(r.mesh, r.x, r.z, r.h, r.v, 0)
         }
 
-        // Kamera: folgt von hinten, etwas höher, schaut voraus
-        let dh = car.h - camH; while (dh > Math.PI) dh -= Math.PI * 2; while (dh < -Math.PI) dh += Math.PI * 2
-        camH += dh * Math.min(1, dt * 4.5)
+        // Kamera: Verfolger von hinten oder Cockpit (Blick aus dem Fenster)
         const sp = Math.max(0, car.v)
-        const back = 9.5 + sp * 0.07, up = 4.3 + sp * 0.02
-        camera.position.set(car.x - Math.sin(camH) * back, up, car.z - Math.cos(camH) * back)
-        camera.lookAt(car.x + Math.sin(camH) * 22, 1.4, car.z + Math.cos(camH) * 22)
-        camera.fov += ((62 + Math.min(18, sp * 0.28)) - camera.fov) * Math.min(1, dt * 3)
+        if (camRef.current === 1) {
+          myMesh.visible = false
+          camH = car.h
+          const bx = Math.sin(car.h), bz = Math.cos(car.h)
+          camera.position.set(car.x + bx * 0.25 - bz * 0.35, 1.18, car.z + bz * 0.25 + bx * 0.35)
+          const look = car.h + car.steer * 0.05
+          camera.lookAt(car.x + Math.sin(look) * 40, 1.0, car.z + Math.cos(look) * 40)
+          camera.rotateZ(-car.steer * 0.03 * Math.min(1, sp / 40))
+          camera.fov += ((74 + Math.min(16, sp * 0.2)) - camera.fov) * Math.min(1, dt * 3)
+          if (wheelEl.current) wheelEl.current.style.transform = `rotate(${(-car.steer * 95).toFixed(1)}deg)`
+        } else {
+          myMesh.visible = true
+          let dh = car.h - camH; while (dh > Math.PI) dh -= Math.PI * 2; while (dh < -Math.PI) dh += Math.PI * 2
+          camH += dh * Math.min(1, dt * 4.5)
+          const back = 9.5 + sp * 0.06, up = 4.3 + sp * 0.018
+          camera.position.set(car.x - Math.sin(camH) * back, up, car.z - Math.cos(camH) * back)
+          camera.lookAt(car.x + Math.sin(camH) * 22, 1.4, car.z + Math.cos(camH) * 22)
+          camera.fov += ((62 + Math.min(18, sp * 0.22)) - camera.fov) * Math.min(1, dt * 3)
+        }
         camera.updateProjectionMatrix()
         if (car.bump > 0.2 || bumped) camera.position.y += (Math.random() - 0.5) * 0.25
         rs.sun.position.set(car.x + 120, 220, car.z + 80); rs.sun.target.position.set(car.x, 0, car.z); rs.sun.target.updateMatrixWorld()
@@ -275,6 +294,22 @@ export default function RaceView({ trackId, laps, me, bots = [], online, onFinis
     <div className="relative select-none overflow-hidden rounded-2xl bg-slate-900" style={{ height: 'min(72vh, 640px)', touchAction: 'none' }}>
       <div ref={mount} className="absolute inset-0" />
       {loadErr && <p className="absolute inset-0 grid place-items-center p-6 text-center text-sm text-rose-200">{loadErr}</p>}
+      {cockpit && (
+        <div className="pointer-events-none absolute inset-x-0 bottom-0 h-[46%]" aria-hidden>
+          <svg viewBox="0 0 400 180" preserveAspectRatio="none" className="absolute inset-0 h-full w-full">
+            <defs><linearGradient id="dash" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stopColor="#1f2937" /><stop offset="1" stopColor="#030712" /></linearGradient></defs>
+            <path d="M0 180 L0 70 Q60 40 140 52 Q200 58 260 52 Q340 40 400 70 L400 180 Z" fill="url(#dash)" />
+            <path d="M0 70 Q60 40 140 52 Q200 58 260 52 Q340 40 400 70" fill="none" stroke="#475569" strokeWidth="2" />
+            <path d="M0 0 L26 0 L70 56 L0 66 Z" fill="#0b1220" /><path d="M400 0 L374 0 L330 56 L400 66 Z" fill="#0b1220" />
+          </svg>
+          <div className="absolute bottom-1 left-1/2 flex -translate-x-1/2 flex-col items-center">
+            <div className="rounded-lg bg-black/70 px-3 py-0.5 font-mono text-lg font-bold text-cyan-300">{hud.speed} <span className="text-xs">km/h</span></div>
+            <div ref={wheelEl} className="relative mt-1 h-24 w-24 rounded-full border-[7px] border-slate-900 shadow-[inset_0_0_0_2px_#334155]">
+              <div className="absolute left-1/2 top-[34px] h-[7px] w-24 -translate-x-1/2 bg-slate-900" /><div className="absolute left-1/2 top-[34px] h-[40px] w-[7px] -translate-x-1/2 bg-slate-900" />
+            </div>
+          </div>
+        </div>
+      )}
       {/* Anzeigen */}
       <div className="pointer-events-none absolute left-3 top-3 space-y-1 text-white [text-shadow:0_1px_3px_#000]">
         <p className="text-3xl font-black leading-none">{hud.pos}<span className="text-lg font-bold">/{hud.of}</span></p>
@@ -292,10 +327,13 @@ export default function RaceView({ trackId, laps, me, bots = [], online, onFinis
         </div>
       )}
       {hud.wrong && <p className="pointer-events-none absolute top-14 left-1/2 -translate-x-1/2 rounded-lg bg-rose-600 px-3 py-1 text-sm font-bold text-white">Falsche Richtung! (R = zurücksetzen)</p>}
-      {hud.offroad && <p className="pointer-events-none absolute bottom-28 left-1/2 -translate-x-1/2 rounded bg-black/50 px-2 py-0.5 text-xs text-amber-200">Neben der Strecke – langsamer</p>}
+      {hud.offroad && <p className="pointer-events-none absolute top-24 left-1/2 -translate-x-1/2 rounded bg-black/50 px-2 py-0.5 text-xs text-amber-200">Neben der Strecke – langsamer</p>}
       {hud.count > 0 && <p className="pointer-events-none absolute inset-0 grid place-items-center text-8xl font-black text-white [text-shadow:0_3px_12px_#000]">{hud.count > 3 ? '' : hud.count}</p>}
       {hud.count === 0 && hud.ms < 1200 && <p className="pointer-events-none absolute inset-0 grid place-items-center text-7xl font-black text-emerald-300 [text-shadow:0_3px_12px_#000]">LOS!</p>}
-      <button type="button" onClick={() => { resetReq.current = true }} className="absolute left-3 bottom-[122px] rounded-lg bg-black/40 px-3 py-1.5 text-xs text-white sm:bottom-3 sm:left-auto sm:right-3">Zurücksetzen (R)</button>
+      <div className="absolute left-3 top-[118px] flex flex-col items-start gap-1.5">
+        <button type="button" onClick={toggleCam} className="rounded-lg bg-black/45 px-3 py-1.5 text-xs text-white">{cockpit ? 'Außenansicht' : 'Cockpit'} (C)</button>
+        <button type="button" onClick={() => { resetReq.current = true }} className="rounded-lg bg-black/45 px-3 py-1.5 text-xs text-white">Zurücksetzen (R)</button>
+      </div>
       {/* Bedienung: links Lenken, rechts Gas und Bremse */}
       <div className="absolute bottom-3 left-3 flex gap-3">
         <button type="button" aria-label="Nach links" {...hold('left')} className={`${btn} h-24 w-24 text-4xl`}>◀</button>
@@ -320,7 +358,7 @@ export default function RaceView({ trackId, laps, me, bots = [], online, onFinis
           </div>
         </div>
       )}
-      <p className="pointer-events-none sr-only">Steuerung: Pfeiltasten oder WASD, R setzt das Auto zurück.</p>
+      <p className="pointer-events-none sr-only">Steuerung: Pfeiltasten oder WASD, R setzt das Auto zurück, C wechselt die Kamera.</p>
     </div>
   )
 }
