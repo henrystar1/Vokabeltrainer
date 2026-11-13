@@ -6,7 +6,9 @@ import Card from '../components/ui/Card'
 import PageHeader from '../components/ui/PageHeader'
 import { Notice } from '../components/ui/States'
 import { useAsync } from '../lib/useAsync'
-import { useWallet } from '../features/koins/WalletProvider'
+import { ChipsProvider, useChips } from '../features/gambling/ChipsProvider'
+import ChipsPanel from '../features/gambling/ChipsPanel'
+import ChipPurse from '../features/gambling/ChipPurse'
 import { getAppSettings } from '../services/koins'
 import { getGamblingFeed } from '../services/social'
 import { lastSeenText } from './Presence'
@@ -29,9 +31,9 @@ const TABS = [
 type Tab = (typeof TABS)[number]['id']
 
 /** Gambling: Automat, Roulette, Würfeln, Glücksrad und Black Jack. Alle Ausgänge werden auf dem Server gewürfelt; der Admin legt Höchsteinsätze und Chancen fest. */
-export default function Gambling() {
+function GamblingInner() {
   const settings = useAsync(getAppSettings, [])
-  const wallet = useWallet()
+  const wallet = useChips()
   const baseMax = settings.data?.gambling_max_bet ?? 200
   const allIn = (settings.data?.gambling_all_in ?? 1) !== 0
   const maxBet = allIn ? Math.max(baseMax, wallet.balance) : baseMax
@@ -61,13 +63,15 @@ export default function Gambling() {
   const info = win !== null && jack !== null && (
     <Notice tone="info">
       <span className="block">
-        Chancen: drei gleiche Symbole <b>{win} %</b> (Einsatz ×{settings.data?.gambling_mult_win}), dreimal die 7 <b>{jack} %</b> (×{settings.data?.gambling_mult_jackpot}). {allIn ? 'Du kannst bis zu deinem ganzen Guthaben setzen.' : `Höchsteinsatz ${maxBet.toLocaleString('de-DE')} Coins.`}
+        Chancen: drei gleiche Symbole <b>{win} %</b> (Einsatz ×{settings.data?.gambling_mult_win}), dreimal die 7 <b>{jack} %</b> (×{settings.data?.gambling_mult_jackpot}). {allIn ? 'Du kannst bis zu deinem ganzen Guthaben setzen.' : `Höchsteinsatz ${maxBet.toLocaleString('de-DE')} Chips.`}
       </span>
     </Notice>
   )
   return (
     <div className="mx-auto max-w-xl">
       <PageHeader eyebrow="Glück gehabt?" title="Gambling" />
+      <Card className="mb-4"><ChipsPanel /></Card>
+      <ChipPurse />
       <div className="mb-4 grid grid-cols-5 gap-1.5" role="tablist" aria-label="Spiel wählen">
         {TABS.map((t) => (
           <button
@@ -94,7 +98,7 @@ export default function Gambling() {
         {tab === 'wheel' && <Wheel maxBet={maxBet} chances={wheelChances} />}
         {tab === 'blackjack' && <Blackjack maxBet={maxBet} blackjackPays={bjX} dealerHitsSoft17={bjHit17} />}
       </Card>
-      <p className="mt-3 text-center text-xs text-slate-500">Glücksspiel kostet im Schnitt Coins. Spiel nur, was du verschmerzen kannst.</p>
+      <p className="mt-3 text-center text-xs text-slate-500">Glücksspiel kostet im Schnitt Chips. Spiel nur, was du verschmerzen kannst.</p>
 
       <Card className="mt-5 space-y-2">
         <p className="label-mono">Letzte Runden</p>
@@ -105,9 +109,9 @@ export default function Gambling() {
             return (
               <li key={w.id} className={`flex flex-wrap items-center justify-between gap-2 rounded-lg px-3 py-2 text-sm ${lost ? 'bg-white/[0.03] text-slate-500' : w.jackpot ? 'bg-amber-400/15 text-amber-200 ring-1 ring-amber-300/40' : 'bg-white/5 text-slate-200'}`}>
                 {lost ? (
-                  <span className="inline-flex items-center gap-1.5"><TrendingDown size={14} /> <b>{w.display_name}</b> verliert <b>{w.bet.toLocaleString('de-DE')}</b> Coins</span>
+                  <span className="inline-flex items-center gap-1.5"><TrendingDown size={14} /> <b>{w.display_name}</b> verliert <b>{w.bet.toLocaleString('de-DE')}</b> Chips</span>
                 ) : (
-                  <span className="inline-flex flex-wrap items-center gap-1.5">{w.jackpot ? <Sparkles size={14} /> : <Trophy size={14} />}{w.jackpot ? 'JACKPOT! ' : ''}<b>{w.display_name}</b> gewinnt <b>{w.payout.toLocaleString('de-DE')}</b> Coins <span className="text-xs opacity-70">(Einsatz {w.bet})</span></span>
+                  <span className="inline-flex flex-wrap items-center gap-1.5">{w.jackpot ? <Sparkles size={14} /> : <Trophy size={14} />}{w.jackpot ? 'JACKPOT! ' : ''}<b>{w.display_name}</b> gewinnt <b>{w.payout.toLocaleString('de-DE')}</b> Chips <span className="text-xs opacity-70">(Einsatz {w.bet})</span></span>
                 )}
                 <span className="text-xs opacity-70">{lastSeenText(w.created_at)}</span>
               </li>
@@ -122,5 +126,13 @@ export default function Gambling() {
       </div>
       <PlusHint ctx="gambling" />
     </div>
+  )
+}
+
+export default function Gambling() {
+  return (
+    <ChipsProvider>
+      <GamblingInner />
+    </ChipsProvider>
   )
 }

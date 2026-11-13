@@ -1,8 +1,8 @@
 import { useState } from 'react'
 import Button from '../../components/ui/Button'
-import CoinIcon from '../../components/ui/CoinIcon'
+import CoinIcon from '../../components/ui/ChipIcon'
 import { ErrorBox } from '../../components/ui/States'
-import { useWallet } from '../koins/WalletProvider'
+import { useChips as useWallet } from './ChipsProvider'
 import { errorMessage } from '../../lib/errors'
 import { gamblingDice } from '../../services/play'
 import BetBox from './BetBox'
@@ -66,7 +66,7 @@ export default function Dice({ maxBet, rtp = 85, maxChance = 50 }: { maxBet: num
         <div className="mt-1 flex justify-between font-mono text-[10px] text-slate-500"><span>1</span><span>50</span><span>100</span></div>
       </div>
       <div className="min-h-[28px] text-center" aria-live="polite">
-        {res && (res.win ? <p className="text-lg font-semibold text-amber-300">Gewonnen! +{res.payout} Coins</p> : <p className="text-slate-400">Leider nichts – −{res.bet} Coins.</p>)}
+        {res && (res.win ? <p className="text-lg font-semibold text-amber-300">Gewonnen! +{res.payout} Chips</p> : <p className="text-slate-400">Leider nichts – −{res.bet} Chips.</p>)}
       </div>
       <div className="grid grid-cols-2 gap-2">
         {[true, false].map((o) => (

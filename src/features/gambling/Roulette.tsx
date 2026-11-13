@@ -1,9 +1,9 @@
 import { useMemo, useRef, useState } from 'react'
 import { RotateCcw } from 'lucide-react'
 import Button from '../../components/ui/Button'
-import CoinIcon from '../../components/ui/CoinIcon'
+import CoinIcon from '../../components/ui/ChipIcon'
 import { ErrorBox } from '../../components/ui/States'
-import { useWallet } from '../koins/WalletProvider'
+import { useChips as useWallet } from './ChipsProvider'
 import { errorMessage } from '../../lib/errors'
 import { gamblingRoulette, type RouletteBet, type RouletteResult } from '../../services/play'
 import { useSkipAnim } from './skipAnim'
@@ -138,7 +138,7 @@ export default function Roulette({ maxBet }: { maxBet: number }) {
           <>
             <p className="text-lg font-semibold">
               <span className="mr-2 inline-flex h-9 w-9 items-center justify-center rounded-full text-white" style={{ background: COLORS[result.color] }}>{result.number}</span>
-              {result.payout > 0 ? <span className="text-amber-300">+{result.payout} Coins {result.payout > result.bet ? '' : '(zurück)'}</span> : <span className="text-slate-400">Leider nichts (−{result.bet})</span>}
+              {result.payout > 0 ? <span className="text-amber-300">+{result.payout} Chips {result.payout > result.bet ? '' : '(zurück)'}</span> : <span className="text-slate-400">Leider nichts (−{result.bet})</span>}
             </p>
             {result.payout > 0 && <p className="text-xs text-slate-400">Einsatz {result.bet} · Gewinn netto {result.payout - result.bet >= 0 ? '+' : ''}{result.payout - result.bet}</p>}
           </>
@@ -203,12 +203,12 @@ export default function Roulette({ maxBet }: { maxBet: number }) {
           <RotateCcw size={14} /> Löschen
         </button>
       </div>
-      <p className="text-center text-xs text-slate-500">Tippe auf Felder, um Chips zu setzen (mehrfach = mehr Einsatz). Höchstens {maxBet.toLocaleString('de-DE')} Coins pro Feld, {limit.toLocaleString('de-DE')} Coins insgesamt, 10 Felder.</p>
+      <p className="text-center text-xs text-slate-500">Tippe auf Felder, um Chips zu setzen (mehrfach = mehr Einsatz). Höchstens {maxBet.toLocaleString('de-DE')} Chips pro Feld, {limit.toLocaleString('de-DE')} Chips insgesamt, 10 Felder.</p>
       <Button onClick={() => void spin()} busy={spinning} disabled={bets.length === 0 || wallet.balance < total || spinning} className="w-full">
         <CoinIcon size={16} /> Drehen · {total}
       </Button>
       {error && <ErrorBox message={error} />}
-      {wallet.balance < total && total > 0 && <p className="text-sm text-amber-200">Dafür fehlen dir Coins.</p>}
+      {wallet.balance < total && total > 0 && <p className="text-sm text-amber-200">Dafür fehlen dir Chips. Du kannst oben welche kaufen.</p>}
     </div>
   )
 }

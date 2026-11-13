@@ -14,7 +14,7 @@ import { adminGamblingReset, getGamblingBank, getGamblingBoard } from '../servic
 const MEDAL = ['text-amber-300', 'text-slate-300', 'text-orange-400']
 const fmt = (n: number) => `${n > 0 ? '+' : ''}${n.toLocaleString('de-DE')}`
 
-/** Gambling-Bilanz: wer hat unterm Strich wie viele Coins gewonnen oder verloren? */
+/** Gambling-Bilanz: wer hat unterm Strich wie viele Chips gewonnen oder verloren? */
 export default function GamblingBoard({ limit }: { limit?: number }) {
   const { isAdmin } = useAuth()
   const board = useAsync(getGamblingBoard, [])
@@ -34,9 +34,9 @@ export default function GamblingBoard({ limit }: { limit?: number }) {
       {bank.data && bank.data.plays > 0 && (
         <Card className="mb-3 space-y-1">
           <p className="text-sm text-slate-400">Die Bank (alle Spieler zusammen)</p>
-          <p className={`font-mono text-2xl ${bank.data.bank >= 0 ? 'text-emerald-300' : 'text-rose-400'}`}>{fmt(bank.data.bank)} Coins</p>
+          <p className={`font-mono text-2xl ${bank.data.bank >= 0 ? 'text-emerald-300' : 'text-rose-400'}`}>{fmt(bank.data.bank)} Chips</p>
           <p className="text-sm text-slate-300">
-            Im Schnitt {bank.data.avg_per_play >= 0 ? 'verdient die Bank' : 'verliert die Bank'} <b className={bank.data.avg_per_play >= 0 ? 'text-emerald-300' : 'text-rose-400'}>{Math.abs(bank.data.avg_per_play).toLocaleString('de-DE')}</b> Coins pro Spiel
+            Im Schnitt {bank.data.avg_per_play >= 0 ? 'verdient die Bank' : 'verliert die Bank'} <b className={bank.data.avg_per_play >= 0 ? 'text-emerald-300' : 'text-rose-400'}>{Math.abs(bank.data.avg_per_play).toLocaleString('de-DE')}</b> Chips pro Spiel
             {' '}({bank.data.plays.toLocaleString('de-DE')} Spiele, {bank.data.players.toLocaleString('de-DE')} Spieler, {bank.data.payout_percent.toLocaleString('de-DE')} % wieder ausgezahlt).
           </p>
           <p className="text-xs text-slate-500">Plus = die Spieler haben insgesamt verloren, Minus = die Spieler haben insgesamt gewonnen.</p>
@@ -78,7 +78,7 @@ export default function GamblingBoard({ limit }: { limit?: number }) {
       {confirm && (
         <Modal title="Statistik zurücksetzen?" onClose={() => setConfirm(null)}>
           <p className="text-sm text-slate-300">
-            {confirm.user ? `Die Gambling-Statistik von ${confirm.name} wird gelöscht.` : 'Die Gambling-Statistik aller Spieler wird gelöscht, auch die Bank beginnt bei 0.'} Coins bleiben unverändert. Das lässt sich nicht rückgängig machen.
+            {confirm.user ? `Die Gambling-Statistik von ${confirm.name} wird gelöscht.` : 'Die Gambling-Statistik aller Spieler wird gelöscht, auch die Bank beginnt bei 0.'} Chips bleiben unverändert. Das lässt sich nicht rückgängig machen.
           </p>
           {err && <p className="mt-2 text-sm text-rose-300">{err}</p>}
           <div className="mt-5 flex justify-end gap-2">

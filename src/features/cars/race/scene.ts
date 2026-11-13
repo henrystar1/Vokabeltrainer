@@ -60,13 +60,19 @@ export interface RaceScene {
   theme: Theme
   /** Auto-Modell (Blickrichtung +z). */
   makeCar: (kind: string, color: string, name: string, isMe: boolean) => T.Group
+  /** Himmel, Boden und Berge: wandert jedes Bild mit der Kamera mit (große Strecken). */
+  follow: T.Group
+  /** Schaden (0–100), Driftwinkel und Zeit sichtbar machen: dunkler, verbeult, Rauch, Reifenqualm. */
+  damageCar: (g: T.Group, dmg: number, slip: number, v: number, time: number) => void
 }
 
 export function buildScene(THREE: THREE, t: Track): RaceScene {
   const th = THEMES[t.def.theme] ?? THEMES.gras
   const scene = new THREE.Scene()
   scene.background = new THREE.Color(th.sky)
-  scene.fog = new THREE.Fog(th.fog, 140, 620)
+  scene.fog = new THREE.Fog(th.fog, 200, 1100)
+  const follow = new THREE.Group()
+  scene.add(follow)
   scene.add(new THREE.HemisphereLight(th.night ? 0x4a5a9a : 0xdfeeff, th.ground, th.night ? 0.55 : 1.0))
   const sun = new THREE.DirectionalLight(th.night ? 0x8fa6ff : 0xfff2d6, th.sun)
   sun.position.set(120, 220, 80)
@@ -80,14 +86,14 @@ export function buildScene(THREE: THREE, t: Track): RaceScene {
   sg.fillStyle = gr; sg.fillRect(0, 0, 4, 256)
   const skyTex = new THREE.CanvasTexture(sc); skyTex.colorSpace = THREE.SRGBColorSpace
   const dome = new THREE.Mesh(new THREE.SphereGeometry(900, 24, 16), new THREE.MeshBasicMaterial({ map: skyTex, side: THREE.BackSide, fog: false, depthWrite: false }))
-  scene.add(dome)
+  follow.add(dome)
   const orb = new THREE.Mesh(new THREE.SphereGeometry(th.night ? 26 : 34, 16, 12), new THREE.MeshBasicMaterial({ color: th.night ? 0xeaf0ff : 0xfff3c4, fog: false }))
   orb.position.set(420, 330, 520)
-  scene.add(orb)
+  follow.add(orb)
 
-  const ground = new THREE.Mesh(new THREE.PlaneGeometry(3000, 3000), new THREE.MeshStandardMaterial({ color: th.ground, roughness: 1 }))
+  const ground = new THREE.Mesh(new THREE.PlaneGeometry(9000, 9000), new THREE.MeshStandardMaterial({ color: th.ground, roughness: 1 }))
   ground.rotation.x = -Math.PI / 2; ground.position.y = -0.05
-  scene.add(ground)
+  follow.add(ground)
 
   // Straße, Randsteine, Leitplanken
   const half = t.def.width / 2
@@ -153,32 +159,50 @@ export function buildScene(THREE: THREE, t: Track): RaceScene {
   // Landschaft: Bäume/Felsen/Häuser abseits der Strecke, Berge am Horizont
   const rnd = (() => { let a = 1234 + t.def.id * 977; return () => { a = (a * 1664525 + 1013904223) >>> 0; return a / 4294967296 } })()
   const trunk = new THREE.MeshStandardMaterial({ color: 0x6b4a2b, roughness: 1 })
-  const treeMats = th.tree.map((c) => new THREE.MeshStandardMaterial({ color: c, roughness: 0.9 }))
   const coneGeo = new THREE.ConeGeometry(3.2, 9, 7), trunkGeo = new THREE.CylinderGeometry(0.5, 0.7, 3, 6)
   const rockGeo = new THREE.DodecahedronGeometry(3, 0), rockMat = new THREE.MeshStandardMaterial({ color: th.hill, roughness: 1, flatShading: true })
   const houseGeo = new RoundedBoxGeometry(12, 14, 12, 2, 0.6)
   const cityMats = [0x9aa5b4, 0xb7a58f, 0x8896ab].map((c) => new THREE.MeshStandardMaterial({ color: c, roughness: 0.85 }))
-  const placed: Array<[number, number]> = []
-  for (let k = 0, tries = 0; k < 360 && tries < 2600; tries++) {
-    const x = (rnd() - 0.5) * 760, z = (rnd() - 0.5) * 760
-    const p = project(t, x, z)
-    if (p.dist < half + 14) continue
-    if (placed.some(([a, b]) => (a - x) ** 2 + (b - z) ** 2 < 36)) continue
-    placed.push([x, z]); k++
-    if (t.def.theme === 'stadt' && p.dist < half + 90) {
-      const h = new THREE.Mesh(houseGeo, cityMats[Math.floor(rnd() * 3)])
-      const sc2 = 0.8 + rnd() * 1.6
-      h.scale.set(1, sc2, 1); h.position.set(x, 7 * sc2, z); h.rotation.y = Math.atan2(t.tx[p.i], t.tz[p.i])
-      scene.add(h); continue
-    }
-    if (t.def.theme === 'wueste' && rnd() < 0.5) { const r = new THREE.Mesh(rockGeo, rockMat); const s2 = 0.6 + rnd() * 2; r.scale.set(s2, s2 * (0.7 + rnd()), s2); r.position.set(x, s2, z); r.rotation.y = rnd() * 6; scene.add(r); continue }
-    const g = new THREE.Group()
-    const cone = new THREE.Mesh(coneGeo, treeMats[Math.floor(rnd() * treeMats.length)]); cone.position.y = 7.5
-    const tr = new THREE.Mesh(trunkGeo, trunk); tr.position.y = 1.5
-    g.add(tr, cone)
-    const s3 = 0.7 + rnd() * 0.9
-    g.scale.setScalar(s3); g.position.set(x, 0, z)
-    scene.add(g)
+  // Bäume, Felsen, Häuser entlang der Strecke (als Instanzen: wenige Zeichenaufrufe, auch bei 15 km)
+  const spacing = Math.max(14, t.length / 700)
+  const slots: Array<{ x: number; z: number; i: number }> = []
+  for (let s0 = 0; s0 < t.length; s0 += spacing) {
+    const i = Math.min(t.n - 1, Math.floor((s0 / t.length) * t.n))
+    const side = rnd() < 0.5 ? -1 : 1
+    const lat = side * (half + 14 + rnd() * (t.def.theme === 'stadt' ? 70 : 150))
+    const x = t.x[i] - t.tz[i] * lat, z = t.z[i] + t.tx[i] * lat
+    if (project(t, x, z, i).dist < half + 12) continue
+    slots.push({ x, z, i })
+  }
+  const dummy = new THREE.Object3D()
+  const place = (mesh: T.InstancedMesh, k: number, x: number, y: number, z: number, sx: number, sy: number, sz: number, ry: number) => {
+    dummy.position.set(x, y, z); dummy.scale.set(sx, sy, sz); dummy.rotation.set(0, ry, 0); dummy.updateMatrix(); mesh.setMatrixAt(k, dummy.matrix)
+  }
+  const trees: typeof slots = [], rocks: typeof slots = [], houses: typeof slots = []
+  for (const sl of slots) {
+    if (t.def.theme === 'stadt' && project(t, sl.x, sl.z, sl.i).dist < half + 90) houses.push(sl)
+    else if (t.def.theme === 'wueste' && rnd() < 0.5) rocks.push(sl)
+    else trees.push(sl)
+  }
+  if (trees.length) {
+    const cones = new THREE.InstancedMesh(coneGeo, new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.9 }), trees.length)
+    const trunks = new THREE.InstancedMesh(trunkGeo, trunk, trees.length)
+    trees.forEach((tr, k) => {
+      const s3 = 0.7 + rnd() * 0.9
+      place(cones, k, tr.x, 7.5 * s3, tr.z, s3, s3, s3, 0); place(trunks, k, tr.x, 1.5 * s3, tr.z, s3, s3, s3, 0)
+      cones.setColorAt(k, new THREE.Color(th.tree[Math.floor(rnd() * th.tree.length)]))
+    })
+    scene.add(cones, trunks)
+  }
+  if (rocks.length) {
+    const im = new THREE.InstancedMesh(rockGeo, rockMat, rocks.length)
+    rocks.forEach((r, k) => { const s2 = 0.6 + rnd() * 2; place(im, k, r.x, s2, r.z, s2, s2 * (0.7 + rnd()), s2, rnd() * 6) })
+    scene.add(im)
+  }
+  if (houses.length) {
+    const im = new THREE.InstancedMesh(houseGeo, cityMats[0], houses.length)
+    houses.forEach((h, k) => { const s2 = 0.8 + rnd() * 1.6; place(im, k, h.x, 7 * s2, h.z, 1, s2, 1, Math.atan2(t.tx[h.i], t.tz[h.i])); im.setColorAt(k, new THREE.Color(cityMats[Math.floor(rnd() * 3)].color)) })
+    scene.add(im)
   }
   const hillMat = new THREE.MeshStandardMaterial({ color: th.hill, roughness: 1, flatShading: true })
   for (let i = 0; i < 26; i++) {
@@ -186,21 +210,23 @@ export function buildScene(THREE: THREE, t: Track): RaceScene {
     const h = 90 + rnd() * 160
     const m = new THREE.Mesh(new THREE.ConeGeometry(120 + rnd() * 90, h, 7), hillMat)
     m.position.set(Math.cos(a) * d, h / 2 - 4, Math.sin(a) * d)
-    scene.add(m)
+    follow.add(m)
   }
   if (th.night) {
     // Leuchtstreifen am Rand
-    const glow = new THREE.MeshBasicMaterial({ color: 0x38f8ff })
+    const glowGeo = new THREE.BoxGeometry(0.5, 0.5, 1.8)
+    const cnt = Math.ceil(t.n / 3) * 2
+    const gl = new THREE.InstancedMesh(glowGeo, new THREE.MeshBasicMaterial({ color: 0x38f8ff }), cnt)
+    let q = 0
     for (let i = 0; i < t.n; i += 3) for (const sgn of [-1, 1]) {
-      const m = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.5, 1.8), glow)
-      m.position.set(t.x[i] - t.tz[i] * sgn * (half + 1.9), 0.4, t.z[i] + t.tx[i] * sgn * (half + 1.9))
-      m.rotation.y = Math.atan2(t.tx[i], t.tz[i])
-      scene.add(m)
+      place(gl, q++, t.x[i] - t.tz[i] * sgn * (half + 1.9), 0.4, t.z[i] + t.tx[i] * sgn * (half + 1.9), 1, 1, 1, Math.atan2(t.tx[i], t.tz[i]))
     }
+    gl.count = q
+    scene.add(gl)
   }
 
   const makeCar = (kind: string, color: string, name: string, isMe: boolean) => buildCar(THREE, kind, color, name, isMe)
-  return { scene, sun, theme: th, makeCar }
+  return { scene, sun, theme: th, makeCar, follow, damageCar: (g, dmg, slip, v, time) => damageCar(THREE, g, dmg, slip, v, time) }
 }
 
 interface Body { len: number; wid: number; hgt: number; cabLen: number; cabH: number; cabZ: number; wheelR: number; spoiler?: boolean; bed?: boolean; open?: boolean; tall?: boolean; cage?: boolean; scoop?: boolean; formula?: boolean; track?: number; wheelW?: number; stripe?: boolean }
@@ -318,6 +344,55 @@ function buildCar(THREE: THREE, kind: string, color: string, name: string, isMe:
   g.add(sh)
   if (!isMe) g.add(nameSprite(THREE, name, b.hgt + b.cabH + 2.2))
   g.userData.wheels = wheels
+  g.userData.paint = paint
+  g.userData.paint0 = new THREE.Color(color)
+  g.userData.body = body
+  g.userData.len = b.len
+  g.userData.wid = b.wid
   g.userData.wheelR = b.wheelR
   return g
+}
+
+/** Zeigt Beschädigung (dunkler Lack, schiefe Karosserie, Rauch, Feuer) und Reifenqualm beim Driften. */
+function damageCar(THREE: THREE, g: T.Group, dmg: number, slip: number, v: number, time: number): void {
+  const d = Math.min(1, dmg / 100)
+  const paint = g.userData.paint as T.MeshStandardMaterial | undefined
+  const body = g.userData.body as T.Mesh | undefined
+  if (paint && body) {
+    paint.color.copy(g.userData.paint0 as T.Color).lerp(new THREE.Color(0x1c1c1c), d * 0.7)
+    body.rotation.z = Math.sin(g.id * 12.9) * d * 0.09
+    body.rotation.x = d * 0.05
+    body.scale.set(1 - d * 0.06, 1 - d * 0.1, 1 - d * 0.08)
+  }
+  type Puff = T.Mesh & { userData: { ph: number } }
+  let puffs = g.userData.puffs as Puff[] | undefined
+  if (!puffs) {
+    const geo = new THREE.SphereGeometry(0.45, 8, 6)
+    puffs = Array.from({ length: 14 }, (_, k) => {
+      const m = new THREE.Mesh(geo, new THREE.MeshBasicMaterial({ color: 0x888888, transparent: true, opacity: 0, depthWrite: false })) as unknown as Puff
+      m.userData.ph = k / 14; m.visible = false; g.add(m); return m
+    })
+    g.userData.puffs = puffs
+  }
+  const len = (g.userData.len as number) ?? 4.5, wid = (g.userData.wid as number) ?? 1.9
+  const smoke = d > 0.4, fire = d > 0.85, tyre = Math.abs(slip) > 0.2 && v > 10
+  puffs.forEach((m, k) => {
+    const on = smoke || tyre
+    m.visible = on
+    if (!on) return
+    const ph = (time * (fire ? 1.6 : 1) + m.userData.ph) % 1
+    const mat = m.material as T.MeshBasicMaterial
+    if (smoke && (k % 2 === 0 || !tyre)) {
+      m.position.set((Math.sin(k * 3.1) * 0.3), 0.8 + ph * 2.6, len / 2 - 0.4 - ph * 1.2)
+      m.scale.setScalar(0.6 + ph * 1.8)
+      mat.color.set(fire ? (ph < 0.4 ? 0xff7a1a : 0x2a2a2a) : 0x555555)
+      mat.opacity = (1 - ph) * (fire ? 0.85 : 0.55)
+    } else {
+      const side = k % 4 < 2 ? -1 : 1
+      m.position.set(side * wid * 0.45, 0.25 + ph * 0.5, -len / 2 + 0.3 - ph * 1.4)
+      m.scale.setScalar(0.5 + ph * 1.6)
+      mat.color.set(0xdddddd)
+      mat.opacity = (1 - ph) * 0.5
+    }
+  })
 }

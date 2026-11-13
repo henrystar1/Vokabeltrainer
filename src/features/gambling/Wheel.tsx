@@ -1,8 +1,8 @@
 import { useMemo, useState } from 'react'
 import Button from '../../components/ui/Button'
-import CoinIcon from '../../components/ui/CoinIcon'
+import CoinIcon from '../../components/ui/ChipIcon'
 import { ErrorBox } from '../../components/ui/States'
-import { useWallet } from '../koins/WalletProvider'
+import { useChips as useWallet } from './ChipsProvider'
 import { errorMessage } from '../../lib/errors'
 import { gamblingWheel } from '../../services/play'
 import BetBox from './BetBox'
@@ -100,8 +100,8 @@ export default function Wheel({ maxBet, chances }: { maxBet: number; chances?: A
       </div>
       <div className="min-h-[28px] text-center" aria-live="polite">
         {res && (res.payout > 0 ? (
-          <p className="text-lg font-semibold text-amber-300">×{res.tenths / 10}: +{res.payout} Coins {res.payout < res.bet ? '(Teilbetrag zurück)' : ''}</p>
-        ) : <p className="text-slate-400">Leider nichts – −{res.bet} Coins.</p>)}
+          <p className="text-lg font-semibold text-amber-300">×{res.tenths / 10}: +{res.payout} Chips {res.payout < res.bet ? '(Teilbetrag zurück)' : ''}</p>
+        ) : <p className="text-slate-400">Leider nichts – −{res.bet} Chips.</p>)}
       </div>
       <BetBox bet={bet} setBet={setBet} maxBet={maxBet} balance={wallet.balance} id="wheel-bet" />
       <Button onClick={() => void spin()} busy={spinning} disabled={wallet.balance < stake || stake < 1} className="w-full">

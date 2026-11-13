@@ -1,8 +1,8 @@
 import { useEffect, useRef, useState } from 'react'
 import Button from '../../components/ui/Button'
-import CoinIcon from '../../components/ui/CoinIcon'
+import CoinIcon from '../../components/ui/ChipIcon'
 import { ErrorBox } from '../../components/ui/States'
-import { useWallet } from '../koins/WalletProvider'
+import { useChips as useWallet } from './ChipsProvider'
 import { errorMessage } from '../../lib/errors'
 import { blackjackAction, blackjackCurrent, blackjackStart, type BlackjackState } from '../../services/play'
 import BetBox from './BetBox'
@@ -125,7 +125,7 @@ export default function Blackjack({ maxBet, blackjackPays = 1.2, dealerHitsSoft1
               {res && st && shown && (
                 <div key={`r${round}-${st.result}`} className={`bj-pop rounded-2xl bg-emerald-950/85 px-5 py-2 text-center ring-2 ring-white/20 ${res.tone}`} aria-live="polite">
                   <p className="font-mono text-xl font-black tracking-widest">{res.text}</p>
-                  <p className="font-mono text-sm font-bold">{net > 0 ? `+${net.toLocaleString('de-DE')} Coins` : net === 0 ? 'Einsatz zurück' : `−${st.bet.toLocaleString('de-DE')} Coins`}</p>
+                  <p className="font-mono text-sm font-bold">{net > 0 ? `+${net.toLocaleString('de-DE')} Chips` : net === 0 ? 'Einsatz zurück' : `−${st.bet.toLocaleString('de-DE')} Chips`}</p>
                 </div>
               )}
               {st && (

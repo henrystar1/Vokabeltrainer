@@ -25818,3 +25818,614 @@ begin
 end;
 $$;
 
+
+-- ===== 0097_chips.sql =====
+-- 0097: Chips fürs Gambling. Gespielt wird nur noch mit Chips (1 Chip = 10 Coins), nicht mehr mit Coins.
+-- Chips kauft man mit Coins (höchstens 1.000 pro Tag), dazu gibt es jeden Tag 100 Chips geschenkt, Chips lassen sich zurücktauschen.
+-- Nach 3 Verlusten hintereinander sind Einsätze 10 Sekunden gesperrt (das Portemonnaie wird leer geschüttelt). Wiederholbar.
+-- Die Spiele selbst (Automat, Roulette, Würfeln, Glücksrad, Black Jack) bleiben, rechnen aber mit Chips.
+
+create table if not exists public.chip_wallets (
+  user_id uuid primary key references auth.users(id) on delete cascade,
+  chips bigint not null default 0 check (chips >= 0 and chips <= 9000000000000000),
+  loss_streak integer not null default 0,
+  locked_until timestamptz,
+  bought_day date,
+  bought bigint not null default 0,
+  bonus_day date
+);
+alter table public.chip_wallets enable row level security;
+revoke all on public.chip_wallets from anon, authenticated;
+
+create table if not exists public.chip_ledger (
+  id bigint generated always as identity primary key,
+  user_id uuid not null references auth.users(id) on delete cascade,
+  amount bigint not null check (amount <> 0),
+  reason text not null,
+  created_at timestamptz not null default now()
+);
+create index if not exists chip_ledger_user_idx on public.chip_ledger (user_id, created_at desc);
+alter table public.chip_ledger enable row level security;
+revoke all on public.chip_ledger from anon, authenticated;
+
+insert into public.app_settings (key, value, mod_editable) values
+  ('chip_rate', 10, false), ('chip_daily_bonus', 100, false), ('chip_daily_buy_limit', 1000, false),
+  ('chip_lock_losses', 3, false), ('chip_lock_seconds', 10, false)
+on conflict (key) do nothing;
+
+create or replace function public._chip_balance(p_user uuid)
+returns bigint language sql stable security definer set search_path = public as $$
+  select coalesce((select chips from public.chip_wallets where user_id = p_user), 0)
+$$;
+
+-- Einzige Stelle, an der Chips bewegt werden. Einsätze sind während der Sperre nach drei Verlusten nicht möglich.
+create or replace function public._chip_grant(p_user uuid, p_amount bigint, p_reason text)
+returns bigint language plpgsql security definer set search_path = public as $$
+declare v_chips bigint; v_lock timestamptz;
+begin
+  if p_amount = 0 then return public._chip_balance(p_user); end if;
+  insert into public.chip_wallets (user_id) values (p_user) on conflict do nothing;
+  if p_reason = 'gambling_bet' then
+    select locked_until into v_lock from public.chip_wallets where user_id = p_user;
+    if v_lock is not null and v_lock > now() then
+      raise exception 'Dein Portemonnaie ist leer geschüttelt. Warte einen Moment.' using errcode = '55000';
+    end if;
+  end if;
+  update public.chip_wallets set chips = chips + p_amount
+   where user_id = p_user and chips + p_amount >= 0 and chips + p_amount <= 9000000000000000
+   returning chips into v_chips;
+  if v_chips is null then
+    if p_amount > 0 then raise exception 'So viele Chips kannst du nicht haben.' using errcode = '22023'; end if;
+    raise exception 'Nicht genug Chips.' using errcode = '23514';
+  end if;
+  insert into public.chip_ledger (user_id, amount, reason) values (p_user, p_amount, p_reason);
+  return v_chips;
+end;
+$$;
+
+-- Verlustserie: bei weniger Auszahlung als Einsatz zählt eine Runde als Verlust; nach 3 in Folge gibt es die Sperre.
+create or replace function public._chip_streak(p_user uuid, p_bet bigint, p_payout bigint)
+returns void language plpgsql security definer set search_path = public as $$
+declare v integer;
+begin
+  update public.chip_wallets set loss_streak = case when p_payout < p_bet then least(loss_streak + 1, 1000) else 0 end
+   where user_id = p_user returning loss_streak into v;
+  if v is not null and v >= greatest(public.setting('chip_lock_losses'), 1) then
+    update public.chip_wallets set loss_streak = 0, locked_until = now() + make_interval(secs => greatest(public.setting('chip_lock_seconds'), 1)) where user_id = p_user;
+  end if;
+end;
+$$;
+
+-- Abrechnung einer Runde (wie bisher, aber in Chips) und Verlustserie
+create or replace function public._gamble_settle(p_user uuid, p_bet bigint, p_payout bigint, p_jackpot boolean)
+returns bigint language plpgsql security definer set search_path = public as $$
+declare v_balance bigint;
+begin
+  v_balance := public._chip_grant(p_user, -p_bet, 'gambling_bet');
+  if p_payout > 0 then
+    v_balance := public._chip_grant(p_user, p_payout, 'gambling_win');
+  end if;
+  perform public._chip_streak(p_user, p_bet, p_payout);
+  insert into public.gambling_feed (user_id, bet, payout, jackpot) values (p_user, p_bet, p_payout, p_jackpot);
+  delete from public.gambling_feed where created_at < now() - interval '3 days';
+  insert into public.gambling_stats (user_id, plays, wagered, won, best_win)
+  values (p_user, 1, p_bet, p_payout, p_payout)
+  on conflict (user_id) do update
+    set plays = least(public.gambling_stats.plays::bigint + 1, 2000000000)::integer,
+        wagered = least(public.gambling_stats.wagered::numeric + p_bet, 4000000000000000000)::bigint,
+        won = least(public.gambling_stats.won::numeric + p_payout, 4000000000000000000)::bigint,
+        best_win = greatest(public.gambling_stats.best_win, p_payout);
+  return v_balance;
+end;
+$$;
+
+create or replace function public._bj_finish(p_user uuid, p_bet bigint, p_payout bigint)
+returns bigint language plpgsql security definer set search_path = public as $$
+declare v_balance bigint;
+begin
+  delete from public.blackjack_hands where user_id = p_user;
+  if p_payout > 0 then
+    v_balance := public._chip_grant(p_user, p_payout, 'gambling_win');
+  else
+    v_balance := public._chip_balance(p_user);
+  end if;
+  perform public._chip_streak(p_user, p_bet, p_payout);
+  insert into public.gambling_feed (user_id, bet, payout, jackpot) values (p_user, p_bet, p_payout, false);
+  delete from public.gambling_feed where created_at < now() - interval '3 days';
+  insert into public.gambling_stats (user_id, plays, wagered, won, best_win)
+  values (p_user, 1, p_bet, p_payout, p_payout)
+  on conflict (user_id) do update
+    set plays = least(public.gambling_stats.plays::bigint + 1, 2000000000)::integer,
+        wagered = least(public.gambling_stats.wagered::numeric + p_bet, 4000000000000000000)::bigint,
+        won = least(public.gambling_stats.won::numeric + p_payout, 4000000000000000000)::bigint,
+        best_win = greatest(public.gambling_stats.best_win, p_payout);
+  return v_balance;
+end;
+$$;
+
+-- Die Spiele lesen und ändern jetzt Chips statt Coins (gezielter Austausch im Funktionstext, wiederholbar)
+do $$
+declare
+  r record;
+  v_def text;
+  v_new text;
+  k text;
+begin
+  for r in
+    select p.oid, p.proname from pg_proc p
+     where p.pronamespace = 'public'::regnamespace
+       and p.proname in ('gambling_play', 'gambling_roulette', 'gambling_dice', 'gambling_wheel', 'blackjack_start', 'blackjack_action', 'blackjack_current')
+  loop
+    v_def := replace(pg_get_functiondef(r.oid), chr(13), '');
+    v_new := v_def;
+    foreach k in array array['v_me', 'p_user', '(select auth.uid())'] loop
+      v_new := replace(v_new, 'coalesce((select balance from public.koin_wallets where user_id = ' || k || '), 0)', 'public._chip_balance(' || k || ')');
+    end loop;
+    v_new := regexp_replace(v_new, 'public\._grant_koins\(([^()]*?), ''gambling_(bet|win)'', null\)', 'public._chip_grant(\1, ''gambling_\2'')', 'g');
+    if v_new <> v_def then
+      if v_new ~ 'koin_wallets|_grant_koins' then raise exception 'Funktion %: Es sind noch Coin-Zugriffe übrig.', r.proname; end if;
+      execute v_new;
+    end if;
+  end loop;
+end $$;
+
+-- Status: Chips, Tagesgeschenk (wird beim ersten Aufruf des Tages gutgeschrieben), Kauflimit, Sperre
+drop function if exists public.chip_status();
+create or replace function public.chip_status()
+returns jsonb language plpgsql security definer set search_path = public as $$
+declare
+  v_me uuid := public._og_check();
+  v_today date := (now() at time zone 'Europe/Berlin')::date;
+  v_gift bigint := 0;
+  w public.chip_wallets;
+  v_limit bigint := greatest(public.setting('chip_daily_buy_limit'), 0);
+begin
+  perform public._feature_guard('gambling');
+  insert into public.chip_wallets (user_id) values (v_me) on conflict do nothing;
+  select * into w from public.chip_wallets where user_id = v_me for update;
+  if w.bought_day is distinct from v_today then
+    update public.chip_wallets set bought_day = v_today, bought = 0 where user_id = v_me;
+    w.bought := 0;
+  end if;
+  if w.bonus_day is distinct from v_today then
+    v_gift := greatest(public.setting('chip_daily_bonus'), 0);
+    update public.chip_wallets set bonus_day = v_today where user_id = v_me;
+    if v_gift > 0 then perform public._chip_grant(v_me, v_gift, 'daily'); end if;
+  end if;
+  select * into w from public.chip_wallets where user_id = v_me;
+  return jsonb_build_object(
+    'chips', w.chips, 'gift', v_gift, 'bought_today', w.bought, 'buy_left', greatest(v_limit - w.bought, 0),
+    'limit', v_limit, 'rate', greatest(public.setting('chip_rate'), 1), 'daily', greatest(public.setting('chip_daily_bonus'), 0),
+    'lock_ms', case when w.locked_until is not null and w.locked_until > now() then ceil(extract(epoch from (w.locked_until - now())) * 1000)::bigint else 0 end);
+end;
+$$;
+
+drop function if exists public.chip_buy(bigint);
+create or replace function public.chip_buy(p_chips bigint)
+returns jsonb language plpgsql security definer set search_path = public as $$
+declare
+  v_me uuid := public._og_check();
+  v_today date := (now() at time zone 'Europe/Berlin')::date;
+  v_rate bigint := greatest(public.setting('chip_rate'), 1);
+  v_limit bigint := greatest(public.setting('chip_daily_buy_limit'), 0);
+  v_bought bigint; v_koins bigint; st jsonb;
+begin
+  perform public._feature_guard('gambling');
+  perform pg_advisory_xact_lock(hashtext('chips:' || v_me::text));
+  if p_chips is null or p_chips < 1 or p_chips > 1000000 then raise exception 'Gib eine Anzahl Chips an.' using errcode = '22023'; end if;
+  perform public.chip_status();
+  select bought into v_bought from public.chip_wallets where user_id = v_me;
+  if v_bought + p_chips > v_limit then
+    raise exception 'Du kannst heute nur noch % Chips kaufen.', greatest(v_limit - v_bought, 0) using errcode = '22023';
+  end if;
+  v_koins := public._grant_koins(v_me, -(p_chips * v_rate), 'chip_buy', 'chips:' || p_chips);
+  perform public._chip_grant(v_me, p_chips, 'buy');
+  update public.chip_wallets set bought = bought + p_chips, bought_day = v_today where user_id = v_me;
+  st := public.chip_status();
+  return st || jsonb_build_object('koins', v_koins);
+end;
+$$;
+
+drop function if exists public.chip_sell(bigint);
+create or replace function public.chip_sell(p_chips bigint)
+returns jsonb language plpgsql security definer set search_path = public as $$
+declare
+  v_me uuid := public._og_check();
+  v_rate bigint := greatest(public.setting('chip_rate'), 1);
+  v_koins bigint; st jsonb;
+begin
+  perform public._feature_guard('gambling');
+  perform pg_advisory_xact_lock(hashtext('chips:' || v_me::text));
+  if p_chips is null or p_chips < 1 or p_chips > 9000000000000000 / v_rate then raise exception 'Gib eine Anzahl Chips an.' using errcode = '22023'; end if;
+  perform public._chip_grant(v_me, -p_chips, 'sell');
+  v_koins := public._grant_koins(v_me, p_chips * v_rate, 'pay_in', 'chip_sell');
+  st := public.chip_status();
+  return st || jsonb_build_object('koins', v_koins);
+end;
+$$;
+
+-- BANK-Aktie folgt jetzt dem Chip-Gewinn der Spielbank
+update public.stock_driver set last_id = least(last_id, coalesce((select max(id) from public.chip_ledger), 0)) where driver = 'gambling';
+drop function if exists public._stock_tick();
+create or replace function public._stock_tick()
+returns void language plpgsql security definer set search_path = public as $$
+declare
+  s record; q public.stock_quotes; v_steps integer; v_n integer; v_k numeric; v_p numeric; i integer;
+  v_vol numeric := greatest(public.setting('stock_volatility_permille'), 0) / 1000.0;
+  v_g numeric := greatest(public.setting('stock_weekly_growth_percent'), -90);
+  v_d numeric;            -- Trend pro Minute (logarithmisch)
+  v_t timestamptz; v_prev_h timestamptz; v_h timestamptz;
+  v_today date := (now() at time zone 'Europe/Berlin')::date;
+  v_gd numeric := 0; v_sd numeric := 0; v_gl bigint; v_sl bigint; v_max bigint; v_cmax bigint;
+  v_gdone boolean := false; v_sdone boolean := false;
+  v_str numeric := greatest(public.setting('stock_driver_strength_permille'), 0) / 1000.0;
+  v_scale numeric := greatest(public.setting('stock_driver_scale'), 1);
+  v_jump numeric;
+begin
+  perform pg_advisory_xact_lock(hashtext('stock_tick'));
+  v_d := ln(1 + v_g / 100.0) / 10080.0;
+  -- Treiber: Gewinn der Spielbank (Einsätze minus Gewinne) und Ausgaben im Shop seit dem letzten Mal
+  select last_id into v_gl from public.stock_driver where driver = 'gambling';
+  select last_id into v_sl from public.stock_driver where driver = 'shop';
+  select coalesce(max(id), 0) into v_max from public.koin_ledger;
+  select coalesce(max(id), 0) into v_cmax from public.chip_ledger;
+  if v_gl is not null then
+    select coalesce(-sum(amount), 0) * greatest(public.setting('chip_rate'), 1) into v_gd from public.chip_ledger where id > v_gl and id <= v_cmax and reason in ('gambling_bet', 'gambling_win');
+  end if;
+  if v_sl is not null then
+    select coalesce(-sum(amount), 0) into v_sd from public.koin_ledger where id > v_sl and id <= v_max and amount < 0 and reason in ('shop', 'plus_buy', 'pro_buy', 'trade_buy');
+  end if;
+  for s in select symbol, base_cents, driver from public.stock_symbols loop
+    select * into q from public.stock_quotes where symbol = s.symbol;
+    if q.symbol is null then
+      insert into public.stock_quotes (symbol, price_cents, prev_close_cents, updated_at) values (s.symbol, s.base_cents, s.base_cents, now());
+      insert into public.stock_history (symbol, at, price_cents) values (s.symbol, date_trunc('hour', now()), s.base_cents) on conflict do nothing;
+      continue;
+    end if;
+    v_steps := least(40320, floor(extract(epoch from now() - q.updated_at) / 60)::integer);   -- höchstens 4 Wochen nachrechnen
+    if v_steps < 1 then continue; end if;
+    v_n := least(v_steps, 120);
+    v_k := v_steps::numeric / v_n;                                                           -- Minuten pro Rechenschritt
+    v_p := q.price_cents;
+    v_prev_h := date_trunc('hour', q.updated_at);
+    for i in 1..v_n loop
+      v_p := v_p * exp(v_d * v_k + (random() + random() + random() - 1.5) * 2 * v_vol * sqrt(v_k));
+      v_p := least(greatest(v_p, s.base_cents * 0.2, 100), 1000000000000);
+      v_t := q.updated_at + (i * v_k) * interval '1 minute';
+      v_h := date_trunc('hour', v_t);
+      if v_h > v_prev_h then
+        insert into public.stock_history (symbol, at, price_cents) values (s.symbol, v_h, round(v_p)) on conflict do nothing;
+        v_prev_h := v_h;
+      end if;
+    end loop;
+    if s.driver = 'gambling' then
+      v_jump := exp(v_str * tanh(v_gd / v_scale)); v_gdone := true;
+      v_p := least(greatest(v_p * v_jump, s.base_cents * 0.2, 100), 1000000000000);
+    elsif s.driver = 'shop' then
+      v_jump := exp(v_str * tanh(v_sd / v_scale)); v_sdone := true;
+      v_p := least(greatest(v_p * v_jump, s.base_cents * 0.2, 100), 1000000000000);
+    end if;
+    update public.stock_quotes
+       set price_cents = round(v_p),
+           prev_close_cents = case when (q.updated_at at time zone 'Europe/Berlin')::date < v_today then q.price_cents else q.prev_close_cents end,
+           updated_at = case when v_steps >= 40320 then now() else q.updated_at + v_steps * interval '1 minute' end
+     where symbol = s.symbol;
+  end loop;
+  if v_gdone and v_gl is not null then update public.stock_driver set last_id = v_cmax where driver = 'gambling'; end if;
+  if v_sdone and v_sl is not null then update public.stock_driver set last_id = v_max where driver = 'shop'; end if;
+  if random() < 0.02 then delete from public.stock_history where at < now() - interval '120 days'; end if;
+end;
+$$;
+
+do $$
+declare r record;
+begin
+  for r in
+    select p.oid::regprocedure as sig, p.proname from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+     where n.nspname = 'public' and p.proname in ('chip_status', 'chip_buy', 'chip_sell', '_chip_balance', '_chip_grant', '_chip_streak', '_gamble_settle', '_bj_finish', '_stock_tick')
+  loop
+    execute format('revoke all on function %s from public, anon, authenticated', r.sig);
+    if left(r.proname, 1) <> '_' then
+      execute format('grant execute on function %s to authenticated', r.sig);
+    end if;
+  end loop;
+end;
+$$;
+
+-- ===== 0098_race_plus.sql =====
+-- 0098: Rennspiel Teil 2. Eigene Strecken (malen und speichern), Rangliste (Bestzeiten je Strecke und je Auto), Autos im Online-Lobby-Bild,
+-- mehr Autos, Admin-Supercar (Admin immer, Mods nur auf Freigabe). Wiederholbar. Nach 0097 ausführen.
+
+-- ===== Strecken =====
+create table if not exists public.race_tracks (
+  id uuid primary key default gen_random_uuid(),
+  owner uuid not null references auth.users(id) on delete cascade,
+  name text not null check (char_length(name) between 2 and 40),
+  pts jsonb not null,
+  width integer not null default 16 check (width between 10 and 30),
+  is_public boolean not null default true,
+  created_at timestamptz not null default now()
+);
+create index if not exists race_tracks_owner_idx on public.race_tracks (owner, created_at desc);
+alter table public.race_tracks enable row level security;
+revoke all on public.race_tracks from anon, authenticated;
+
+-- Prüft Stützpunkte [[x,z],...]: 8 bis 120 Punkte, Betrag der Koordinaten höchstens 3000, Länge 600 bis 40000 m. Gibt die Länge zurück.
+create or replace function public._race_pts_check(p_pts jsonb)
+returns numeric language plpgsql immutable set search_path = public as $$
+declare v_n integer; v_len numeric := 0; i integer; a jsonb; b jsonb;
+begin
+  if p_pts is null or jsonb_typeof(p_pts) <> 'array' then raise exception 'Ungültige Strecke.' using errcode = '22023'; end if;
+  v_n := jsonb_array_length(p_pts);
+  if v_n < 8 or v_n > 120 then raise exception 'Die Strecke braucht 8 bis 120 Punkte.' using errcode = '22023'; end if;
+  for i in 0 .. v_n - 1 loop
+    a := p_pts -> i;
+    b := p_pts -> ((i + 1) % v_n);
+    if jsonb_typeof(a) <> 'array' or jsonb_array_length(a) <> 2 or jsonb_typeof(a -> 0) <> 'number' or jsonb_typeof(a -> 1) <> 'number' then
+      raise exception 'Ungültige Strecke.' using errcode = '22023';
+    end if;
+    if abs((a ->> 0)::numeric) > 3000 or abs((a ->> 1)::numeric) > 3000 then raise exception 'Die Strecke ist zu groß.' using errcode = '22023'; end if;
+    v_len := v_len + sqrt(power((b ->> 0)::numeric - (a ->> 0)::numeric, 2) + power((b ->> 1)::numeric - (a ->> 1)::numeric, 2));
+  end loop;
+  if v_len < 600 or v_len > 40000 then raise exception 'Die Strecke muss zwischen 600 m und 40 km lang sein.' using errcode = '22023'; end if;
+  return v_len;
+end;
+$$;
+
+drop function if exists public.race_track_save(text, jsonb, integer, boolean);
+create or replace function public.race_track_save(p_name text, p_pts jsonb, p_width integer, p_public boolean)
+returns uuid language plpgsql security definer set search_path = public as $$
+declare v_me uuid := public._og_check(); v_id uuid;
+begin
+  perform public._feature_guard('cars');
+  perform public._race_pts_check(p_pts);
+  if p_name is null or char_length(btrim(p_name)) < 2 or char_length(btrim(p_name)) > 40 then raise exception 'Gib der Strecke einen Namen (2 bis 40 Zeichen).' using errcode = '22023'; end if;
+  if (select count(*) from public.race_tracks where owner = v_me) >= 20 then raise exception 'Du hast schon 20 Strecken. Lösche eine, um Platz zu schaffen.' using errcode = '22023'; end if;
+  insert into public.race_tracks (owner, name, pts, width, is_public) values (v_me, btrim(p_name), p_pts, least(greatest(coalesce(p_width, 16), 10), 30), coalesce(p_public, true)) returning id into v_id;
+  return v_id;
+end;
+$$;
+
+drop function if exists public.race_track_list();
+create or replace function public.race_track_list()
+returns jsonb language plpgsql stable security definer set search_path = public as $$
+declare v_me uuid := public._og_check();
+begin
+  perform public._feature_guard('cars');
+  return coalesce((
+    select jsonb_agg(jsonb_build_object('id', t.id, 'name', t.name, 'pts', t.pts, 'width', t.width, 'public', t.is_public, 'mine', t.owner = v_me, 'owner', coalesce(p.display_name, '?')) order by (t.owner = v_me) desc, t.created_at desc)
+    from (select * from public.race_tracks where owner = v_me or is_public order by (owner = v_me) desc, created_at desc limit 80) t
+    left join public.profiles p on p.id = t.owner), '[]'::jsonb);
+end;
+$$;
+
+drop function if exists public.race_track_delete(uuid);
+create or replace function public.race_track_delete(p_id uuid)
+returns void language plpgsql security definer set search_path = public as $$
+declare v_me uuid := public._og_check();
+begin
+  delete from public.race_tracks where id = p_id and (owner = v_me or public.is_staff());
+end;
+$$;
+
+-- ===== Supercar (Admin immer, Mods nur nach Freigabe) =====
+create table if not exists public.race_super_access (
+  user_id uuid primary key references auth.users(id) on delete cascade,
+  granted_by uuid,
+  created_at timestamptz not null default now()
+);
+alter table public.race_super_access enable row level security;
+revoke all on public.race_super_access from anon, authenticated;
+
+create or replace function public._race_super(p_user uuid)
+returns boolean language sql stable security definer set search_path = public as $$
+  select coalesce((select p.role = 'admin' and not p.blocked from public.profiles p where p.id = p_user), false)
+      or (exists (select 1 from public.race_super_access a where a.user_id = p_user)
+          and coalesce((select p.role in ('mod', 'alphamod', 'admin') and not p.blocked from public.profiles p where p.id = p_user), false))
+$$;
+
+drop function if exists public.race_super_ok();
+create or replace function public.race_super_ok()
+returns boolean language plpgsql stable security definer set search_path = public as $$
+begin
+  return public._race_super(public._og_check());
+end;
+$$;
+
+drop function if exists public.admin_super_list();
+create or replace function public.admin_super_list()
+returns jsonb language plpgsql stable security definer set search_path = public as $$
+begin
+  perform public._require_admin();
+  return coalesce((
+    select jsonb_agg(jsonb_build_object('id', p.id, 'name', coalesce(p.display_name, '?'), 'role', p.role, 'granted', p.role = 'admin' or a.user_id is not null) order by p.role, p.display_name)
+    from public.profiles p left join public.race_super_access a on a.user_id = p.id
+    where p.role in ('mod', 'alphamod', 'admin') and not p.blocked), '[]'::jsonb);
+end;
+$$;
+
+drop function if exists public.admin_super_set(uuid, boolean);
+create or replace function public.admin_super_set(p_user uuid, p_on boolean)
+returns void language plpgsql security definer set search_path = public as $$
+begin
+  perform public._require_admin();
+  if p_on then
+    if not exists (select 1 from public.profiles where id = p_user and role in ('mod', 'alphamod', 'admin')) then
+      raise exception 'Nur Mods und Admins können das Supercar bekommen.' using errcode = '22023';
+    end if;
+    insert into public.race_super_access (user_id, granted_by) values (p_user, (select auth.uid())) on conflict (user_id) do nothing;
+  else
+    delete from public.race_super_access where user_id = p_user;
+  end if;
+end;
+$$;
+
+-- ===== Online: Auto wählen (für alle in der Lobby sichtbar), Strecke aus 10 festen oder einer eigenen =====
+-- Das Auto wird auf dem Server aus dem Besitz bestimmt (nicht vom Client behauptet).
+drop function if exists public.og_race_pick(uuid, text);
+create or replace function public.og_race_pick(p_id uuid, p_car text)
+returns jsonb language plpgsql security definer set search_path = public as $$
+declare
+  v_me uuid := public._og_check();
+  g public.og_games;
+  c public.cars;
+  v_car jsonb;
+begin
+  select * into g from public.og_games where id = p_id for update;
+  if g.id is null or g.kind <> 'race' or not exists (select 1 from public.og_players where game_id = p_id and user_id = v_me and join_state in ('joined', 'invited')) then
+    raise exception 'Spiel nicht gefunden.' using errcode = 'P0002';
+  end if;
+  if g.status <> 'lobby' then return public._og_view(p_id, v_me); end if;
+  if p_car = 'supercar' then
+    if not public._race_super(v_me) then raise exception 'Das Supercar ist nicht freigegeben.' using errcode = '42501'; end if;
+    v_car := jsonb_build_object('id', 'supercar', 'name', 'Admin-Hyperion', 'kind', 'hypercar', 'color', '#facc15', 'top', 700);
+  else
+    select cc.* into c from public.cars cc join public.car_owned o on o.car_id = cc.id and o.user_id = v_me where cc.id = p_car;
+    if c.id is null then raise exception 'Dieses Auto gehört dir nicht.' using errcode = '42501'; end if;
+    v_car := jsonb_build_object('id', c.id, 'name', c.name, 'kind', c.kind, 'color', c.color, 'top', c.top_kmh);
+  end if;
+  update public.og_games set state = jsonb_set(coalesce(state, '{}'::jsonb) || jsonb_build_object('cars', coalesce(state -> 'cars', '{}'::jsonb)), array['cars', v_me::text], v_car, true), updated_at = now() where id = p_id;
+  perform public._og_bump(p_id);
+  return public._og_view(p_id, v_me);
+end;
+$$;
+
+drop function if exists public.og_race_set(uuid, integer, integer);
+drop function if exists public.og_race_set(uuid, integer, integer, uuid);
+create or replace function public.og_race_set(p_id uuid, p_track integer, p_laps integer, p_custom uuid default null)
+returns jsonb language plpgsql security definer set search_path = public as $$
+declare
+  v_me uuid := public._og_check();
+  g public.og_games;
+  t public.race_tracks;
+  v_state jsonb;
+begin
+  select * into g from public.og_games where id = p_id for update;
+  if g.id is null or g.kind <> 'race' or g.host_id <> v_me then
+    raise exception 'Spiel nicht gefunden.' using errcode = 'P0002';
+  end if;
+  if g.status <> 'lobby' then return public._og_view(p_id, v_me); end if;
+  v_state := jsonb_build_object('track', least(greatest(coalesce(p_track, 0), 0), 9), 'laps', least(greatest(coalesce(p_laps, 3), 1), 10), 'cars', coalesce(g.state -> 'cars', '{}'::jsonb));
+  if p_custom is not null then
+    select * into t from public.race_tracks where id = p_custom and (is_public or owner = v_me);
+    if t.id is null then raise exception 'Strecke nicht gefunden.' using errcode = 'P0002'; end if;
+    v_state := v_state || jsonb_build_object('custom', jsonb_build_object('id', t.id, 'name', t.name, 'pts', t.pts, 'width', t.width));
+  end if;
+  update public.og_games set state = v_state, updated_at = now() where id = p_id;
+  perform public._og_bump(p_id);
+  return public._og_view(p_id, v_me);
+end;
+$$;
+
+-- Beim Start bleiben gewählte Autos und eigene Strecke im Spielstand
+do $$
+declare v_oid oid; v_def text; v_new text;
+begin
+  select p.oid into v_oid from pg_proc p where p.pronamespace = 'public'::regnamespace and p.proname = '_og_start' limit 1;
+  if v_oid is null then raise exception 'Funktion _og_start fehlt.'; end if;
+  v_def := replace(pg_get_functiondef(v_oid), chr(13), '');
+  if position('''cars'', coalesce(state -> ''cars''' in v_def) > 0 then return; end if;
+  v_new := replace(v_def, '''t0'', (extract(epoch from now()) * 1000)::bigint, ''results'', ''{}''::jsonb)',
+                          '''t0'', (extract(epoch from now()) * 1000)::bigint, ''results'', ''{}''::jsonb, ''cars'', coalesce(state -> ''cars'', ''{}''::jsonb), ''custom'', coalesce(state -> ''custom'', ''null''::jsonb))');
+  if v_new = v_def then raise exception 'Patch für _og_start nicht anwendbar.'; end if;
+  execute v_new;
+end $$;
+
+-- ===== Rangliste =====
+create table if not exists public.race_records (
+  user_id uuid not null references auth.users(id) on delete cascade,
+  track text not null check (track ~ '^(t[0-9]|c:[0-9a-f-]{36})$'),
+  car_id text not null references public.cars(id) on delete cascade,
+  lap_ms integer not null check (lap_ms between 8000 and 3600000),
+  created_at timestamptz not null default now(),
+  primary key (user_id, track, car_id)
+);
+create index if not exists race_records_track_idx on public.race_records (track, lap_ms);
+alter table public.race_records enable row level security;
+revoke all on public.race_records from anon, authenticated;
+
+drop function if exists public.race_submit(text, text, integer);
+create or replace function public.race_submit(p_track text, p_car text, p_lap_ms integer)
+returns void language plpgsql security definer set search_path = public as $$
+declare v_me uuid := public._og_check();
+begin
+  perform public._feature_guard('cars');
+  if p_car is null or p_car = 'supercar' then return; end if;
+  if p_lap_ms is null or p_lap_ms < 8000 or p_lap_ms > 3600000 then return; end if;
+  if p_track !~ '^(t[0-9]|c:[0-9a-f-]{36})$' then return; end if;
+  if left(p_track, 2) = 'c:' and not exists (select 1 from public.race_tracks where id = substr(p_track, 3)::uuid) then return; end if;
+  if not exists (select 1 from public.car_owned where user_id = v_me and car_id = p_car) then return; end if;
+  insert into public.race_records (user_id, track, car_id, lap_ms) values (v_me, p_track, p_car, p_lap_ms)
+  on conflict (user_id, track, car_id) do update set lap_ms = least(public.race_records.lap_ms, excluded.lap_ms), created_at = case when excluded.lap_ms < public.race_records.lap_ms then now() else public.race_records.created_at end;
+end;
+$$;
+
+-- Beste Runde je Spieler auf einer Strecke
+drop function if exists public.race_board(text);
+create or replace function public.race_board(p_track text)
+returns jsonb language plpgsql stable security definer set search_path = public as $$
+declare v_me uuid := public._og_check();
+begin
+  perform public._feature_guard('cars');
+  return coalesce((
+    select jsonb_agg(jsonb_build_object('name', x.pname, 'car', x.cname, 'kind', x.kind, 'color', x.color, 'ms', x.lap_ms, 'me', x.user_id = v_me) order by x.lap_ms)
+    from (
+      select r.user_id, r.lap_ms, c.name as cname, c.kind, c.color, coalesce(p.display_name, '?') as pname
+      from (select distinct on (user_id) * from public.race_records where track = p_track order by user_id, lap_ms) r
+      join public.cars c on c.id = r.car_id
+      left join public.profiles p on p.id = r.user_id
+      order by r.lap_ms limit 25) x), '[]'::jsonb);
+end;
+$$;
+
+-- Beste Runde je Auto auf einer Strecke (welches Auto ist am schnellsten?)
+drop function if exists public.race_car_board(text);
+create or replace function public.race_car_board(p_track text)
+returns jsonb language plpgsql stable security definer set search_path = public as $$
+begin
+  perform public._og_check();
+  perform public._feature_guard('cars');
+  return coalesce((
+    select jsonb_agg(jsonb_build_object('name', x.cname, 'kind', x.kind, 'color', x.color, 'top', x.top_kmh, 'ms', x.lap_ms, 'driver', x.pname) order by x.lap_ms)
+    from (
+      select r.lap_ms, c.name as cname, c.kind, c.color, c.top_kmh, coalesce(p.display_name, '?') as pname
+      from (select distinct on (car_id) * from public.race_records where track = p_track order by car_id, lap_ms) r
+      join public.cars c on c.id = r.car_id
+      left join public.profiles p on p.id = r.user_id
+      order by r.lap_ms limit 25) x), '[]'::jsonb);
+end;
+$$;
+
+-- ===== Mehr Autos =====
+insert into public.cars (id, name, kind, color, price, top_kmh, sort) values
+  ('oldie2',      'Roadster 1950',    'oldtimer',     '#16a34a',   6000, 125, 40),
+  ('schulbus',    'Schulbus',         'bus',          '#f59e0b',   9000, 135, 41),
+  ('gelbsack',    'Gelber Sack',      'buggy',        '#facc15',  12000, 190, 42),
+  ('v8bulle',     'V8-Bulle',         'muscle',       '#eab308',  26000, 235, 43),
+  ('drifter',     'Drift-König',      'sportwagen',   '#a855f7',  30000, 255, 44),
+  ('dakar',       'Dakar-Bestie',     'rallye',       '#f97316',  38000, 245, 45),
+  ('riesenrad',   'Riesenrad',        'monstertruck', '#7c3aed',  40000, 160, 46),
+  ('gt_nacht',    'Nacht-GT',         'gt',           '#1e3a8a',  70000, 285, 47),
+  ('gt_weiss',    'Weißer Blitz',     'gt',           '#f8fafc',  75000, 290, 48),
+  ('phantom',     'Phantom',          'hypercar',     '#0f172a',  90000, 330, 49),
+  ('bolide',      'Bolide',           'rennwagen',    '#dc2626', 120000, 340, 50),
+  ('komet',       'Komet',            'hypercar',     '#06b6d4', 150000, 350, 51),
+  ('silberpfeil', 'Silberpfeil',      'rennwagen',    '#cbd5e1', 200000, 360, 52),
+  ('goldpfeil',   'Goldpfeil',        'rennwagen',    '#facc15', 350000, 380, 53),
+  ('lava',        'Lava',             'hypercar',     '#ef4444', 500000, 400, 54)
+on conflict (id) do nothing;
+
+do $$
+declare r record;
+begin
+  for r in
+    select p.oid::regprocedure as sig, p.proname from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+     where n.nspname = 'public' and p.proname in ('race_track_save', 'race_track_list', 'race_track_delete', 'race_super_ok', 'admin_super_list', 'admin_super_set',
+                                                  'og_race_pick', 'og_race_set', 'race_submit', 'race_board', 'race_car_board', '_race_pts_check', '_race_super')
+  loop
+    execute format('revoke all on function %s from public, anon, authenticated', r.sig);
+    if left(r.proname, 1) <> '_' then
+      execute format('grant execute on function %s to authenticated', r.sig);
+    end if;
+  end loop;
+end $$;

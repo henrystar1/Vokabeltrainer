@@ -24,7 +24,9 @@ export interface ShipsState { phase: 'placing' | 'running'; shots: Record<string
 export interface LudoLast { seat: number; dice: number; piece?: number; from?: number; to?: number; caps?: Array<{ seat: number; piece: number }>; rolled?: boolean; nomove?: boolean; again?: boolean }
 export interface LudoState { seats: number[]; pieces: Record<string, number[]>; turn: number; dice?: number; tries: number; out: number[]; last?: LudoLast; winner?: number }
 
-export interface RaceState { track?: number; laps?: number; t0?: number; first_at?: number; results?: Record<string, number> }
+export interface RaceCarState { id?: string; name?: string; kind: string; color: string; top?: number | null }
+export interface RaceCustomState { id: string; name: string; pts: Array<[number, number]>; width: number }
+export interface RaceState { cars?: Record<string, RaceCarState>; custom?: RaceCustomState | null; track?: number; laps?: number; t0?: number; first_at?: number; results?: Record<string, number> }
 
 export interface OgView {
   id: string
@@ -69,6 +71,7 @@ export const ogBoardMove = (id: string, state: Record<string, unknown>, result: 
 export const ogBoardResign = (id: string) => rpc<OgView>('og_board_resign', { p_id: id })
 export const ogBoardDraw = (id: string, action: 'offer' | 'accept' | 'decline' | 'withdraw') => rpc<OgView>('og_board_draw', { p_id: id, p_action: action })
 
-export const ogRaceSet = (id: string, track: number, laps: number) => rpc<OgView>('og_race_set', { p_id: id, p_track: track, p_laps: laps })
+export const ogRaceSet = (id: string, track: number, laps: number, custom: string | null = null) => rpc<OgView>('og_race_set', { p_id: id, p_track: track, p_laps: laps, p_custom: custom })
+export const ogRacePick = (id: string, car: string) => rpc<OgView>('og_race_pick', { p_id: id, p_car: car })
 export const ogRaceReport = (id: string, ms: number | null) => rpc<OgView>('og_race_report', { p_id: id, p_ms: ms })
 export const ogRaceLeave = (id: string) => rpc<OgView>('og_race_leave', { p_id: id })

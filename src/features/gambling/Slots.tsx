@@ -1,9 +1,9 @@
 import { useEffect, useRef, useState } from 'react'
 import { Bell, Cherry, Citrus, Clover, Gem, Star, type LucideIcon } from 'lucide-react'
 import Button from '../../components/ui/Button'
-import CoinIcon from '../../components/ui/CoinIcon'
+import CoinIcon from '../../components/ui/ChipIcon'
 import { ErrorBox } from '../../components/ui/States'
-import { useWallet } from '../koins/WalletProvider'
+import { useChips as useWallet } from './ChipsProvider'
 import { errorMessage } from '../../lib/errors'
 import { gamblingPlay } from '../../services/play'
 import BetBox from './BetBox'
@@ -95,8 +95,8 @@ export default function Slots({ maxBet, onPlayed, info }: { maxBet: number; onPl
         {reels.map((v, i) => <Reel key={i} v={v} spinning={spinning[i]} win={won && !spinning[i]} />)}
       </div>
       <div className="min-h-[44px] text-center" aria-live="polite">
-        {outcome && outcome.mult > 0 && <p className="text-lg font-semibold text-amber-300">{jackpot ? 'JACKPOT! ' : 'Gewonnen! '}+{outcome.payout} Coins (×{outcome.mult})</p>}
-        {outcome && outcome.mult === 0 && <p className="text-slate-400">Leider nichts – −{outcome.bet} Coins.</p>}
+        {outcome && outcome.mult > 0 && <p className="text-lg font-semibold text-amber-300">{jackpot ? 'JACKPOT! ' : 'Gewonnen! '}+{outcome.payout} Chips (×{outcome.mult})</p>}
+        {outcome && outcome.mult === 0 && <p className="text-slate-400">Leider nichts – −{outcome.bet} Chips.</p>}
       </div>
       <BetBox bet={bet} setBet={setBet} maxBet={maxBet} balance={wallet.balance} id="slot-bet" />
       <Button onClick={() => void play()} busy={busy} disabled={wallet.balance < bet || bet < 1 || bet > maxBet} className="w-full">

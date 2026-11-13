@@ -1,7 +1,17 @@
 /** Rennstrecken: geschlossene Kurven aus Stützpunkten (Catmull-Rom), fein abgetastet. Reine Logik, testbar. */
-export interface TrackDef { id: number; name: string; text: string; width: number; laps: number; theme: 'gras' | 'wueste' | 'schnee' | 'stadt' | 'nacht' | 'herbst'; pts: Array<[number, number]> }
+export interface TrackDef { id: number; /** Rangliste/Online: 't0'…'t9' oder 'c:<uuid>' */ key?: string; name: string; text: string; width: number; laps: number; theme: 'gras' | 'wueste' | 'schnee' | 'stadt' | 'nacht' | 'herbst'; pts: Array<[number, number]> }
 
 const R = (n: number, f: (i: number) => [number, number]): Array<[number, number]> => Array.from({ length: n }, (_, i) => f(i))
+
+/** Langgezogener Kurs: zwei lange Geraden (Halblänge `half`) und zwei Halbkreise (Radius `r`); `bend` = sanfte S-Kurven auf den Geraden (m). */
+function stadium(half: number, r: number, straightPts: number, bend = 0): Array<[number, number]> {
+  const p: Array<[number, number]> = []
+  for (let i = 0; i < straightPts; i++) { const x = -half + (2 * half * i) / straightPts; p.push([x, -r + bend * Math.sin((i / straightPts) * Math.PI * 2)]) }
+  for (let i = 1; i < 8; i++) { const a = -Math.PI / 2 + (Math.PI * i) / 8; p.push([half + Math.cos(a) * r * 0.9, Math.sin(a) * r]) }
+  for (let i = 0; i < straightPts; i++) { const x = half - (2 * half * i) / straightPts; p.push([x, r - bend * Math.sin((i / straightPts) * Math.PI * 2)]) }
+  for (let i = 1; i < 8; i++) { const a = Math.PI / 2 + (Math.PI * i) / 8; p.push([-half + Math.cos(a) * r * 0.9, Math.sin(a) * r]) }
+  return p
+}
 
 export const TRACKS: TrackDef[] = [
   { id: 0, name: 'Sonnenring', text: 'Breiter Oval-Kurs mit sanften Kurven – ideal zum Einstieg.', width: 17, laps: 3, theme: 'gras',
@@ -16,7 +26,19 @@ export const TRACKS: TrackDef[] = [
     pts: [[-150, 0], [-100, -90], [0, -130], [110, -100], [170, -20], [130, 70], [40, 110], [-30, 60], [-80, 100], [-150, 80]] },
   { id: 5, name: 'Nachtflug', text: 'Verschlungene Strecke bei Nacht mit Leuchtstreifen am Rand.', width: 15, laps: 3, theme: 'nacht',
     pts: R(16, (i) => { const a = (i / 16) * Math.PI * 2; const r = 140 + (i % 2 ? 26 : -22) + Math.sin(a * 3) * 14; return [Math.cos(a) * r * 1.25, Math.sin(a) * r] }) },
+  { id: 6, name: 'Highspeed-Ring', text: 'Rund 9 km mit zwei kilometerlangen Geraden – hier zeigt sich, was ein Auto kann.', width: 26, laps: 2, theme: 'gras', pts: stadium(1600, 380, 4) },
+  { id: 7, name: 'Endlos-Highway', text: 'Über 10 km, Geraden von 5 km Länge mit sanften Bögen. Für Höchstgeschwindigkeit.', width: 28, laps: 2, theme: 'wueste', pts: stadium(2500, 260, 6, 110) },
+  { id: 8, name: 'Alpen-Marathon', text: 'Rund 8 km: eine lange Gerade, dann Berg-Kurven bis zur Haarnadel.', width: 20, laps: 2, theme: 'schnee',
+    pts: [[-1300, 0], [-100, -10], [1100, 0], [1900, -120], [2150, -420], [1950, -740], [1350, -860], [900, -640], [500, -940], [0, -1160], [-650, -940], [-960, -620], [-1560, -540], [-2000, -330], [-1900, -90]] },
+  { id: 9, name: 'Kontinent-Express', text: 'Die Königsstrecke: rund 15 km, 6-km-Gerade, Bögen und lange Kurven.', width: 24, laps: 2, theme: 'herbst', pts: stadium(3000, 420, 8, 150) },
 ]
+
+export const trackKey = (d: TrackDef): string => d.key ?? `t${d.id}`
+
+/** Eigene (gemalte) Strecke als Streckendefinition. */
+export function customTrackDef(name: string, pts: Array<[number, number]>, width: number, key: string): TrackDef {
+  return { id: -1, key, name, text: 'Eigene Strecke', width, laps: 2, theme: 'gras', pts }
+}
 
 export interface Track {
   def: TrackDef

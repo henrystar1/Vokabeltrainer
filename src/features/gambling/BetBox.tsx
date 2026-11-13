@@ -1,4 +1,4 @@
-import CoinIcon from '../../components/ui/CoinIcon'
+import CoinIcon from '../../components/ui/ChipIcon'
 import { fmtCompact } from '../../lib/compact'
 
 const QUICK = [1, 5, 10, 25, 50, 100, 250, 500, 1000, 2500, 5000, 10000, 25000, 50000, 100000, 1e6, 1e7, 1e8, 1e9, 1e10, 1e11, 1e12, 1e13, 1e14, 1e15]
@@ -7,7 +7,7 @@ const QUICK = [1, 5, 10, 25, 50, 100, 250, 500, 1000, 2500, 5000, 10000, 25000, 
 export default function BetBox({ bet, setBet, maxBet, balance, id = 'bet' }: { bet: number; setBet: (n: number) => void; maxBet: number; balance: number; id?: string }) {
   return (
     <div>
-      <label htmlFor={id} className="label-mono inline-flex items-center gap-1.5"><CoinIcon size={13} /> Einsatz (Coins)</label>
+      <label htmlFor={id} className="label-mono inline-flex items-center gap-1.5"><CoinIcon size={13} /> Einsatz (Chips)</label>
       <input
         id={id}
         type="number"

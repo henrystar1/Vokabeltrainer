@@ -21,3 +21,16 @@ export const KIND_STATS: Record<string, KindStats> = {
 export const kindStats = (kind: string): KindStats => KIND_STATS[kind] ?? KIND_STATS.kleinwagen
 /** Tatsächliche Höchstgeschwindigkeit eines Autos: eigener Wert aus dem Shop, sonst der der Art. */
 export const carKmh = (kind: string, kmh?: number | null): number => (kmh && kmh > 0 ? kmh : kindStats(kind).kmh)
+
+/** Abmessungen der Karosserie in Metern (Länge × Breite) – gleiche Werte wie im 3D-Modell, dienen als Hitbox. */
+export const KIND_DIMS: Record<string, { len: number; wid: number }> = {
+  kleinwagen: { len: 3.9, wid: 1.8 }, limousine: { len: 4.8, wid: 1.9 }, kombi: { len: 4.8, wid: 1.9 }, suv: { len: 4.7, wid: 2.0 },
+  pickup: { len: 5.3, wid: 2.0 }, cabrio: { len: 4.3, wid: 1.85 }, sportwagen: { len: 4.5, wid: 1.95 }, bus: { len: 6.6, wid: 2.2 },
+  oldtimer: { len: 4.4, wid: 1.8 }, buggy: { len: 3.4, wid: 1.9 }, monstertruck: { len: 4.8, wid: 2.4 }, muscle: { len: 4.9, wid: 1.95 },
+  rallye: { len: 4.1, wid: 1.85 }, gt: { len: 4.7, wid: 2.0 }, hypercar: { len: 4.6, wid: 2.05 }, rennwagen: { len: 5.0, wid: 2.0 },
+}
+export const kindDims = (kind: string): { len: number; wid: number } => KIND_DIMS[kind] ?? KIND_DIMS.kleinwagen
+
+/** Das Admin-Supercar: virtuelles Auto (nicht im Shop), Höchstgeschwindigkeit 700 km/h. */
+export const SUPERCAR_ID = 'supercar'
+export const SUPERCAR = { id: SUPERCAR_ID, name: 'Admin-Hyperion', kind: 'hypercar', color: '#facc15', top: 700 }
