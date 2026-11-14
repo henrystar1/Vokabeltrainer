@@ -1,11 +1,11 @@
 import { useEffect, useRef, useState } from 'react'
 import type { RealtimeChannel, SupabaseClient } from '@supabase/supabase-js'
 import { gameClientFor, slotForKey, whenGameDbsReady } from '../../../lib/gameRealtime'
-import { botInput, crash, packLimit, startCar, statsFor, stepCar, type Bot, type Car, type CarStats, type Input } from './physics'
+import { DMG_MAX, botInput, crash, packLimit, startCar, statsFor, stepCar, type Bot, type Car, type CarStats, type Input } from './physics'
 import { TRACKS, buildTrack, curveAhead, pointAt, project, trackKey, type TrackDef } from './track'
 import { assistSteer, buildRaceLine } from './line'
 import { createFx } from './fx'
-import { canFly, flyHeight, isBike, kindDims } from '../stats'
+import { canFly, flyHeight, flyRoll, isBike, kindDims } from '../stats'
 import type { Up } from '../tuning'
 import { raceReward, raceSubmit } from '../../../services/cars'
 import { useWalletOptional } from '../../koins/WalletProvider'
@@ -41,10 +41,11 @@ export default function RaceView({ trackId, custom, laps, me, assistOk = false, 
   const mini = useRef<HTMLCanvasElement>(null)
   const inp = useRef<Record<Key, boolean>>({ gas: false, brake: false, left: false, right: false, fly: false })
   const resetReq = useRef(false)
-  const camRef = useRef<0 | 1>((() => { try { return localStorage.getItem('vt-race-cam') === '1' ? 1 : 0 } catch { return 0 } })())
-  const [cockpit, setCockpit] = useState(camRef.current === 1)
+  const camRef = useRef<0 | 1 | 2>((() => { try { const c = localStorage.getItem('vt-race-cam'); return c === '1' ? 1 : c === '2' ? 2 : 0 } catch { return 0 } })())
+  const [camMode, setCamMode] = useState<0 | 1 | 2>(camRef.current)
+  const cockpit = camMode === 1
   const wheelEl = useRef<HTMLDivElement>(null)
-  const toggleCam = () => { camRef.current = camRef.current === 1 ? 0 : 1; setCockpit(camRef.current === 1); try { localStorage.setItem('vt-race-cam', String(camRef.current)) } catch { /* ignorieren */ } }
+  const toggleCam = () => { camRef.current = ((camRef.current + 1) % 3) as 0 | 1 | 2; setCamMode(camRef.current); try { localStorage.setItem('vt-race-cam', String(camRef.current)) } catch { /* ignorieren */ } }
   const toggleRef = useRef(toggleCam)
   toggleRef.current = toggleCam
   const finishCb = useRef(onFinish)
@@ -220,6 +221,7 @@ export default function RaceView({ trackId, custom, laps, me, assistOk = false, 
         return all.findIndex((a) => a.me) + 1
       }
 
+      const hitAt = new WeakMap<object, number>()
       const loop = () => {
         raf = requestAnimationFrame(loop)
         const now = performance.now()
@@ -243,7 +245,32 @@ export default function RaceView({ trackId, custom, laps, me, assistOk = false, 
           const m = inp.current, ai = assistSteer(car, myStats, line), hand = m.left || m.right
           input = { left: hand ? m.left : ai.left, right: hand ? m.right : ai.right, gas: m.gas || m.brake ? m.gas : ai.gas, brake: m.gas || m.brake ? m.brake : ai.brake, fly: m.fly, drift: !hand, turn: ai.turn }
         }
-        car = stepCar(car, input, dt, track, myStats, go, true)
+        // Bei hohem Tempo in kleinen Teilschritten fahren (höchstens ~1,6 m pro Schritt) und nach jedem Schritt Zusammenstöße prüfen:
+        // so rast man nicht durch andere Autos hindurch, und der Aufprall wird richtig erkannt.
+        let bumped = false
+        const nSub = Math.max(1, Math.min(240, Math.ceil(Math.abs(car.v) * dt / 1.6)))
+        for (let k = 0; k < nSub; k++) {
+          car = stepCar(car, input, dt / nSub, track, myStats, go, true)
+          if (car.fly > 0) continue
+          for (const b of botList) {
+            const pre = car
+            const sc = now - (hitAt.get(b) ?? -1e9) < 250 ? 0 : 1
+            const c1 = crash(pre, myStats, { x: b.car.x, z: b.car.z, h: b.car.h, v: b.car.v }, b.st, 0.5, DMG_MAX, sc)
+            if (!c1) continue
+            car = c1; bumped = true
+            // gleicher Aufprall für den Bot, aus dem Zustand VOR dem Wegschieben – so bekommen beide Schaden
+            const c2 = crash(b.car, b.st, { x: pre.x, z: pre.z, h: pre.h, v: pre.v, slip: pre.slip }, myStats, 0.5, 85, sc)
+            if (c2) b.car = c2
+            if (sc) hitAt.set(b, now)
+          }
+          for (const r of remotes.values()) {
+            if (now - r.seen > 3000 || r.fl > 0) continue
+            const age = Math.min(0.25, (now - r.seen) / 1000), rd = kindDims(r.kind)
+            const sc = now - (hitAt.get(r) ?? -1e9) < 250 ? 0 : 1
+            const c1 = crash(car, myStats, { x: r.x + Math.sin(r.h) * r.v * age, z: r.z + Math.cos(r.h) * r.v * age, h: r.h, v: r.v, slip: r.slip }, { len: rd.len + 0.5, wid: rd.wid + 0.4 }, 0.5, DMG_MAX, sc)
+            if (c1) { car = c1; bumped = true; if (sc) hitAt.set(r, now) }
+          }
+        }
         if (!canDrive && go) car = { ...car, v: Math.min(car.v, 30) }
 
         // Bots
@@ -253,26 +280,15 @@ export default function RaceView({ trackId, custom, laps, me, assistOk = false, 
           b.car = stepCar(b.car, bi, dt, track, b.st, go, false)
           if (b.finished === null && b.car.total >= total) b.finished = raceMs
         }
-        // Zusammenstöße: gedrehte Hitboxen, Schaden aus der Aufprallgeschwindigkeit
-        let bumped = false
-        for (const b of botList) {
-          if (car.fly > 0) continue
-          const c1 = crash(car, myStats, { x: b.car.x, z: b.car.z, h: b.car.h, v: b.car.v }, b.st, 0.5)
-          if (c1) { car = c1; bumped = true }
-          const c2 = crash(b.car, b.st, { x: car.x, z: car.z, h: car.h, v: car.v, slip: car.slip }, myStats, 0.5, 85)
-          if (c2) b.car = c2
-        }
+        // Zusammenstöße der Bots untereinander (Auto-gegen-Auto-Schaden gleich für beide)
         for (let i = 0; i < botList.length; i++) for (let j = i + 1; j < botList.length; j++) {
           const A = botList[i], B = botList[j]
-          const c1 = crash(A.car, A.st, { x: B.car.x, z: B.car.z, h: B.car.h, v: B.car.v }, B.st, 0.5, 85)
+          const sc = now - (hitAt.get(A) ?? -1e9) < 250 || now - (hitAt.get(B) ?? -1e9) < 250 ? 0 : 1
+          const c1 = crash(A.car, A.st, { x: B.car.x, z: B.car.z, h: B.car.h, v: B.car.v }, B.st, 0.5, 85, sc)
+          const c2 = crash(B.car, B.st, { x: A.car.x, z: A.car.z, h: A.car.h, v: A.car.v }, A.st, 0.5, 85, sc)
           if (c1) A.car = c1
-          const c2 = crash(B.car, B.st, { x: A.car.x, z: A.car.z, h: A.car.h, v: A.car.v }, A.st, 0.5, 85)
           if (c2) B.car = c2
-        }
-        for (const r of remotes.values()) {
-          if (now - r.seen > 3000 || r.fl > 0 || car.fly > 0) continue
-          const c1 = crash(car, myStats, { x: r.x, z: r.z, h: r.h, v: r.v, slip: r.slip }, kindDims(r.kind), 0.5)
-          if (c1) { car = c1; bumped = true }
+          if (sc && (c1 || c2)) { hitAt.set(A, now); hitAt.set(B, now) }
         }
 
         // Runden / Ziel
@@ -303,7 +319,7 @@ export default function RaceView({ trackId, custom, laps, me, assistOk = false, 
           m.position.set(x, flyHeight(fly), z); m.rotation.y = h
           const lean = m.userData.lean as import('three').Group | undefined
           if (lean) { m.rotation.z = 0; lean.rotation.z += ((-Math.max(-0.85, Math.min(0.85, steer * Math.min(1, Math.abs(v) / 20) * 0.9 + slip * 0.5))) - lean.rotation.z) * Math.min(1, dt * 9) }
-          else m.rotation.z = -steer * Math.min(1, Math.abs(v) / 40) * 0.05
+          else m.rotation.z = -steer * Math.min(1, Math.abs(v) / 40) * 0.05 - flyRoll(fly)
           const jets = m.userData.jets as import('three').Group | undefined
           if (jets) jets.visible = fly > 0
           const wh = m.userData.wheels as import('three').Group[] | undefined
@@ -326,6 +342,7 @@ export default function RaceView({ trackId, custom, laps, me, assistOk = false, 
 
         // Kamera: Verfolger von hinten oder Cockpit (Blick aus dem Fenster)
         const sp = Math.max(0, car.v)
+        const camRoll = flyRoll(car.fly)
         if (camRef.current === 1) {
           myMesh.visible = false
           camH = car.h
@@ -334,16 +351,28 @@ export default function RaceView({ trackId, custom, laps, me, assistOk = false, 
           const look = car.h + car.steer * 0.05
           camera.lookAt(car.x + Math.sin(look) * 40, 1.0, car.z + Math.cos(look) * 40)
           if (bike) { camera.position.y = 1.55 + flyHeight(car.fly); camera.rotateZ(Math.max(-0.7, Math.min(0.7, car.steer * Math.min(1, sp / 20) * 0.8)) * 0.9) } else camera.rotateZ(-car.steer * 0.03 * Math.min(1, sp / 40))
+          if (camRoll) camera.rotateZ(-camRoll)
           camera.fov += ((74 + Math.min(16, sp * 0.2)) - camera.fov) * Math.min(1, dt * 3)
           if (wheelEl.current) wheelEl.current.style.transform = `rotate(${(-car.steer * 95).toFixed(1)}deg)`
+        } else if (camRef.current === 2) {
+          // Von unten: tief hinter dem Auto, so sieht man bei einem Flug den Wagenboden und die Wolken der Düsen
+          myMesh.visible = true
+          let dh = car.h - camH; while (dh > Math.PI) dh -= Math.PI * 2; while (dh < -Math.PI) dh += Math.PI * 2
+          camH += dh * Math.min(1, dt * 4.5)
+          const back = Math.min(30, 11 + sp * 0.03)
+          camera.position.set(car.x - Math.sin(camH) * back, 0.8, car.z - Math.cos(camH) * back)
+          camera.lookAt(car.x, flyHeight(car.fly) + 1.3, car.z)
+          if (camRoll) camera.rotateZ(-camRoll)
+          camera.fov += ((68 + Math.min(14, sp * 0.15)) - camera.fov) * Math.min(1, dt * 3)
         } else {
           myMesh.visible = true
           let dh = car.h - camH; while (dh > Math.PI) dh -= Math.PI * 2; while (dh < -Math.PI) dh += Math.PI * 2
           camH += dh * Math.min(1, dt * 4.5)
-          const back = 9.5 + sp * 0.06, up = 4.3 + sp * 0.018
+          const back = Math.min(40, 9.5 + sp * 0.06), up = Math.min(12, 4.3 + sp * 0.018)
           camera.position.set(car.x - Math.sin(camH) * back, up + flyHeight(car.fly) * 0.8, car.z - Math.cos(camH) * back)
           camera.lookAt(car.x + Math.sin(camH) * 22, 1.4, car.z + Math.cos(camH) * 22)
           if (bike) camera.rotateZ(Math.max(-0.7, Math.min(0.7, car.steer * Math.min(1, sp / 20) * 0.8)) * 0.5)
+          if (camRoll) camera.rotateZ(-camRoll)
           camera.fov += ((62 + Math.min(18, sp * 0.22)) - camera.fov) * Math.min(1, dt * 3)
         }
         camera.updateProjectionMatrix()
@@ -445,7 +474,7 @@ export default function RaceView({ trackId, custom, laps, me, assistOk = false, 
       {hud.count > 0 && <p className="pointer-events-none absolute inset-0 grid place-items-center text-8xl font-black text-white [text-shadow:0_3px_12px_#000]">{hud.count > 3 ? '' : hud.count}</p>}
       {hud.count === 0 && hud.ms < 1200 && <p className="pointer-events-none absolute inset-0 grid place-items-center text-7xl font-black text-emerald-300 [text-shadow:0_3px_12px_#000]">LOS!</p>}
       <div className="absolute left-3 top-[118px] flex flex-col items-start gap-1.5">
-        <button type="button" onClick={toggleCam} className="rounded-lg bg-black/45 px-3 py-1.5 text-xs text-white">{cockpit ? 'Außenansicht' : 'Cockpit'} (C)</button>
+        <button type="button" onClick={toggleCam} className="rounded-lg bg-black/45 px-3 py-1.5 text-xs text-white">{camMode === 0 ? 'Cockpit' : camMode === 1 ? 'Von unten' : 'Außenansicht'} (C)</button>
         <button type="button" onClick={() => { resetReq.current = true }} className="rounded-lg bg-black/45 px-3 py-1.5 text-xs text-white">Zurücksetzen / Reparieren (R)</button>
         {assistOk && <button type="button" onClick={toggleAssist} aria-pressed={assist} className={`rounded-lg px-3 py-1.5 text-xs font-bold ${assist ? 'bg-emerald-500 text-slate-950' : 'bg-black/45 text-white'}`}>Fahrassistent {assist ? 'AN' : 'aus'} (F)</button>}
       </div>

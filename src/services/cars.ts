@@ -21,7 +21,8 @@ export const adminSuperSet = (user: string, on: boolean) => rpc<void>('admin_sup
 export const adminSuperSpeed = (kmh: number) => rpc<void>('admin_super_speed', { p_kmh: kmh })
 /** Tempo des Supercars für einen Nutzer (null = Standard). */
 export const adminSuperUserSpeed = (user: string, kmh: number | null) => rpc<void>('admin_super_user_speed', { p_user: user, p_kmh: kmh })
-export interface SuperInfo { ok: boolean; kmh: number; /** Fahrassistent (nur Admins) */ assist: boolean }
+export interface SuperInfo { ok: boolean; kmh: number; /** Fahrassistent (nur Admins) */ assist: boolean; /** Flug-Einstellungen des Admins (Sekunden; Rolle an/aus) */ fly?: { sec: number; cool: number; roll: boolean } }
+export const adminFlySet = (sec: number, cool: number, roll: boolean) => rpc<void>('admin_fly_set', { p_sec: sec, p_cool: cool, p_roll: roll })
 export const raceSuperInfo = () => rpc<SuperInfo>('race_super_info')
 export interface CarUpRow { car_id: string; motor: number; reifen: number; bremse: number }
 export const carUpgrades = () => rpc<CarUpRow[]>('car_upgrades')

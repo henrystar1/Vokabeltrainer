@@ -756,3 +756,12 @@ Tabelle `book_library_hidden`; `in_library` blendet ein veröffentlichtes Buch d
 - **Motorräder**: `hyperbike` (420 km/h; Hyper-Bike 420, Raketen-Bike 520 km/h). Höchsttempo-Grenze `cars_top_kmh_check` auf 600.
 - SQL: `0100_race_coins_hyperbikes.sql` (nach 0099).
 
+## Update 115 – Flug einstellbar, Rolle, Unterkamera, faire Kollisionen, Tempo bis 100.000 km/h
+- **Flug-Einstellungen** (Admin, global): `fly_seconds` (1–60 s), `fly_cooldown` (0–300 s), `fly_roll` (0/1) in `app_settings`; `admin_fly_set`, `race_super_info().fly`. Client: `flyConfig`/`setFlyConfig` in `cars/stats.ts` (wird von `useRaceCars` aus `race_super_info` gesetzt), `physics.ts` und `flyHeight` lesen sie. Admin-Tab „Autos“ → „Fliegen“ (`FlySettings`).
+- **Rolle im Flug**: `flyRoll(left)` = eine volle Drehung über die Flugdauer; Modell `rotation.z` und Kamera `rotateZ(-roll)` (alle drei Ansichten).
+- **Unterkamera**: Kameraansicht (Taste C) hat jetzt drei Modi: Außen → Cockpit → „Von unten“ (tief hinter dem Auto, Blick nach oben auf Wagenboden und Düsenwolken). Außenkamera-Abstand/Höhe bei hohem Tempo gedeckelt.
+- **Kollisionen**: Schaden aus dem Annäherungstempo entlang der Mittelpunktsverbindung (`crash`; vorher falsche Achse bei tiefem Eindringen → oft kaum Schaden), kein 0,7-Dämpfer mehr, beide Seiten aus demselben Vor-Zustand (Spieler↔Bot und Bot↔Bot symmetrisch), 250-ms-Sperre je Gegner gegen Mehrfachschaden, Online-Gegner mit leicht vergrößerter Hitbox und auf die letzte Position hochgerechnet. Frontal mit 700 km/h → 100 % Schaden (Test).
+- **Teilschritte**: Der eigene Wagen wird bei hohem Tempo in Schritten von höchstens ~1,6 m simuliert (max. 240 pro Bild) und nach jedem Schritt auf Zusammenstöße geprüft: kein Durchrasen mehr.
+- **Supercar-Tempo bis 100.000 km/h** (Standard und je Nutzer; Check/Funktionen in 0101 angepasst).
+- SQL: `0101_fly_settings.sql` (nach 0100).
+

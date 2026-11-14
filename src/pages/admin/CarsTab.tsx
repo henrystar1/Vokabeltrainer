@@ -2,9 +2,37 @@ import { useState } from 'react'
 import { useAsync } from '../../lib/useAsync'
 import { errorMessage } from '../../lib/errors'
 import CarArt from '../../features/cars/CarArt'
-import { adminCarSet, adminSuperList, adminSuperSet, adminSuperSpeed, adminSuperUserSpeed, carList } from '../../services/cars'
+import { adminCarSet, adminSuperList, adminSuperSet, adminSuperSpeed, adminSuperUserSpeed, adminFlySet, carList, raceSuperInfo } from '../../services/cars'
 
-/** Admin: Supercar (rot, bis 1000 km/h) für Mods freigeben und das Tempo je Nutzer einstellen. Den Fahrassistenten haben nur Admins. */
+/** Admin: Flug von Sky-Roadster und Supercar – Flugdauer, Ladezeit und Rolle (gilt für alle). */
+function FlySettings() {
+  const info = useAsync(raceSuperInfo, [])
+  const [sec, setSec] = useState<string | null>(null)
+  const [cool, setCool] = useState<string | null>(null)
+  const [roll, setRoll] = useState<boolean | null>(null)
+  const [msg, setMsg] = useState<string | null>(null)
+  const cur = info.data?.fly
+  const v = { sec: sec ?? String(cur?.sec ?? 2), cool: cool ?? String(cur?.cool ?? 20), roll: roll ?? cur?.roll ?? false }
+  async function save() {
+    setMsg(null)
+    try { await adminFlySet(Math.floor(Number(v.sec) || 0), Math.floor(Number(v.cool) || 0), v.roll); await info.reload(); setSec(null); setCool(null); setRoll(null); setMsg('Flug-Einstellungen gespeichert.') } catch (e) { setMsg(errorMessage(e)) }
+  }
+  return (
+    <section className="space-y-2 rounded-xl border border-white/10 p-3">
+      <h3 className="font-semibold">Fliegen (Sky-Roadster und Supercar)</h3>
+      <p className="text-sm text-slate-400">Wie lange das Auto fliegt und wie lange es danach laden muss (ganze Sekunden). Mit Rolle dreht sich das Auto im Flug einmal seitwärts und die Kamera dreht mit.</p>
+      <div className="flex flex-wrap items-center gap-3 text-sm">
+        <label className="flex items-center gap-2">Flugdauer<input aria-label="Flugdauer in Sekunden" inputMode="numeric" value={v.sec} onChange={(e) => setSec(e.target.value)} className="min-h-[44px] w-20 rounded-lg border border-white/15 bg-space-900/60 px-3" />s (1–60)</label>
+        <label className="flex items-center gap-2">Laden<input aria-label="Ladezeit in Sekunden" inputMode="numeric" value={v.cool} onChange={(e) => setCool(e.target.value)} className="min-h-[44px] w-20 rounded-lg border border-white/15 bg-space-900/60 px-3" />s (0–300)</label>
+        <label className="flex items-center gap-2"><input type="checkbox" checked={v.roll} onChange={(e) => setRoll(e.target.checked)} className="h-5 w-5" />Rolle im Flug</label>
+        <button type="button" onClick={() => void save()} className="min-h-[44px] rounded-lg bg-accent-cyan px-3 font-semibold text-slate-950">Speichern</button>
+      </div>
+      {msg && <p className="text-sm text-amber-200" role="status">{msg}</p>}
+    </section>
+  )
+}
+
+/** Admin: Supercar (rot, bis 100.000 km/h) für Mods freigeben und das Tempo je Nutzer einstellen. Den Fahrassistenten haben nur Admins. */
 function SuperAccess() {
   const list = useAsync(adminSuperList, [])
   const [msg, setMsg] = useState<string | null>(null)
@@ -17,8 +45,8 @@ function SuperAccess() {
   const num = (v: string) => Math.floor(Number(v) || 0)
   return (
     <section className="space-y-2 rounded-xl border border-white/10 p-3">
-      <h3 className="font-semibold">Supercar „Admin-Hyperion“ (rot, bis 1000 km/h)</h3>
-      <p className="text-sm text-slate-400">Admins fahren es immer und haben als Einzige den Fahrassistenten (mit Drift). Mods bekommen das Auto ohne Assistent, sobald du es freigibst. Das Tempo stellst du für jeden einzeln ein (100–1000 km/h); ohne eigenen Wert gilt das Standard-Tempo.</p>
+      <h3 className="font-semibold">Supercar „Admin-Hyperion“ (rot, bis 100.000 km/h)</h3>
+      <p className="text-sm text-slate-400">Admins fahren es immer und haben als Einzige den Fahrassistenten (mit Drift). Mods bekommen das Auto ohne Assistent, sobald du es freigibst. Das Tempo stellst du für jeden einzeln ein (100–100.000 km/h); ohne eigenen Wert gilt das Standard-Tempo.</p>
       <div className="flex flex-wrap items-center gap-2 text-sm">
         <label className="flex items-center gap-2">Standard-Tempo<input aria-label="Standard-Tempo in km/h" inputMode="numeric" placeholder="700" value={def} onChange={(e) => setDef(e.target.value)} className="min-h-[44px] w-24 rounded-lg border border-white/15 bg-space-900/60 px-3" />km/h</label>
         <button type="button" onClick={() => void run(() => adminSuperSpeed(num(def)), 'Standard-Tempo gespeichert.')} className="min-h-[44px] rounded-lg bg-accent-cyan px-3 font-semibold text-slate-950">Speichern</button>
@@ -54,6 +82,7 @@ export default function CarsTab() {
   }
   return (
     <div className="max-w-2xl space-y-3">
+      <FlySettings />
       <SuperAccess />
       <p className="text-sm text-slate-400">Preise in Coins. Ein abgeschaltetes Auto kann nicht mehr gekauft werden; wer es schon hat, behält es.</p>
       <ul className="divide-y divide-white/5">

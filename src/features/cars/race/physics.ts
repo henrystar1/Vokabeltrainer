@@ -1,5 +1,5 @@
 import { advance, pointAt, project, type Track } from './track'
-import { canFly, carKmh, FLY_COOLDOWN, FLY_SECONDS, isBike, kindDims, kindStats } from '../stats'
+import { canFly, carKmh, flyConfig, isBike, kindDims, kindStats } from '../stats'
 import { upFactors, type Up } from '../tuning'
 import { boxHit, corners, impactDamage, type Box } from './collide'
 import { botSteer, type RaceLine } from './line'
@@ -77,9 +77,9 @@ export function stepCar(c: Car, inp: Input, dt: number, t: Track, st: CarStats, 
   const waiting = c.hold > 0
   let fly = c.fly, cool = c.cool
   if (fly <= 0 && cool > 0) cool = Math.max(0, cool - dt)
-  if (st.fly && inp.fly && canDrive && !wrecked && !waiting && fly <= 0 && cool <= 0) fly = FLY_SECONDS
+  if (st.fly && inp.fly && canDrive && !wrecked && !waiting && fly <= 0 && cool <= 0) fly = flyConfig.sec
   const flying = fly > 0
-  if (flying) { fly = Math.max(0, fly - dt); if (fly === 0) cool = FLY_COOLDOWN }
+  if (flying) { fly = Math.max(0, fly - dt); if (fly === 0) cool = flyConfig.cool }
   const can = canDrive && !wrecked && !waiting
   const gas = can && inp.gas, brake = canDrive && inp.brake && !waiting
   let v = c.v
@@ -155,16 +155,18 @@ export function stepCar(c: Car, inp: Input, dt: number, t: Track, st: CarStats, 
 
 /** Zusammenstoß zweier Autos (Hitboxen): verschiebt `me` (Anteil `share` der Eindringtiefe), bremst und beschädigt.
  *  `ov`/`ow` = Geschwindigkeitsvektor des anderen. Gibt null zurück, wenn sich die Autos nicht berühren. */
-export function crash(me: Car, my: CarStats, o: { x: number; z: number; h: number; v: number; slip?: number }, other: { len: number; wid: number }, share = 0.5, cap = DMG_MAX): Car | null {
+export function crash(me: Car, my: CarStats, o: { x: number; z: number; h: number; v: number; slip?: number }, other: { len: number; wid: number }, share = 0.5, cap = DMG_MAX, dmgScale = 1): Car | null {
   const hit = boxHit(boxOf(me, my), boxOf(o, other))
   if (!hit) return null
   const mh = me.h - me.slip, oh = o.h - (o.slip ?? 0)
   const rvx = Math.sin(mh) * me.v - Math.sin(oh) * o.v, rvz = Math.cos(mh) * me.v - Math.cos(oh) * o.v
-  const vn = Math.max(0, -(rvx * hit.nx + rvz * hit.nz))
+  // Annäherungstempo entlang der Verbindungslinie der Mittelpunkte: bleibt auch bei tiefem Eindringen (hohes Tempo) richtig
+  const dx = o.x - me.x, dz = o.z - me.z, dl = Math.hypot(dx, dz) || 1
+  const vn = Math.max(0, -(rvx * hit.nx + rvz * hit.nz), (rvx * dx + rvz * dz) / dl * 0.85)
   let c = { ...me, x: me.x + hit.nx * hit.depth * share, z: me.z + hit.nz * hit.depth * share }
   c.v = me.v * (1 - Math.min(0.5, vn * 0.012))
   c.hit = Math.max(c.hit, Math.min(1, vn / 25))
-  c = addDamage(c, impactDamage(vn) * 0.7, cap)
+  c = addDamage(c, impactDamage(vn) * dmgScale, cap)
   return c
 }
 

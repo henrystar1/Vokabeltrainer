@@ -47,10 +47,20 @@ export const isBike = (kind: string): boolean => BIKE_KINDS.includes(kind)
 export const canFly = (kind: string): boolean => kind === 'roadster' || kind === 'supercar'
 export const FLY_SECONDS = 2
 export const FLY_COOLDOWN = 20
+/** Vom Admin eingestellt (gilt für alle): Flugdauer, Ladezeit (Sekunden) und ob sich das Auto im Flug seitwärts rollt. */
+export const flyConfig = { sec: FLY_SECONDS, cool: FLY_COOLDOWN, roll: false }
+export const setFlyConfig = (c: { sec?: number; cool?: number; roll?: boolean } | null | undefined): void => {
+  flyConfig.sec = Math.max(1, Math.min(60, Number(c?.sec) || FLY_SECONDS))
+  flyConfig.cool = Math.max(0, Math.min(300, Number(c?.cool ?? FLY_COOLDOWN)))
+  flyConfig.roll = !!c?.roll
+}
+/** Rollwinkel (rad) im Flug: eine volle Drehung über die Flugdauer. */
+export const flyRoll = (left: number): number => (flyConfig.roll && left > 0 ? Math.PI * 2 * Math.min(1, Math.max(0, 1 - left / flyConfig.sec)) : 0)
 /** Höhe über der Straße (m) bei noch `left` Sekunden Flug: sanft hoch, oben halten, sanft runter. */
 export const flyHeight = (left: number): number => {
   if (left <= 0) return 0
-  const up = Math.min(1, (FLY_SECONDS - left) / 0.45), down = Math.min(1, left / 0.45)
+  const ramp = Math.min(0.45, flyConfig.sec / 3)
+  const up = Math.min(1, (flyConfig.sec - left) / ramp), down = Math.min(1, left / ramp)
   const k = Math.max(0, Math.min(up, down))
   return 6.5 * k * k * (3 - 2 * k)
 }
