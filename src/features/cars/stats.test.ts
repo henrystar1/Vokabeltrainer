@@ -4,8 +4,8 @@ import { KIND_STATS, carKmh, kindStats } from './stats'
 
 describe('Auto-Werte', () => {
   it('jede Art hat Werte', () => { for (const k of CAR_KINDS) expect(KIND_STATS[k], k).toBeDefined() })
-  it('Rennwagen am schnellsten, Oldtimer am langsamsten', () => {
-    const s = CAR_KINDS.map((k) => kindStats(k).kmh)
+  it('Rennwagen am schnellsten (außer dem Admin-Supercar), Oldtimer am langsamsten', () => {
+    const s = CAR_KINDS.filter((k) => k !== 'supercar').map((k) => kindStats(k).kmh)
     expect(kindStats('rennwagen').kmh).toBe(Math.max(...s))
     expect(kindStats('oldtimer').kmh).toBe(Math.min(...s))
   })

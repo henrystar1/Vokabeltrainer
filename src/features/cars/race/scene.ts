@@ -1,4 +1,5 @@
 import type * as T from 'three'
+import { isBike } from '../stats'
 import { RoundedBoxGeometry } from 'three/examples/jsm/geometries/RoundedBoxGeometry.js'
 import { project, type Track } from './track'
 
@@ -247,6 +248,7 @@ const BODIES: Record<string, Body> = {
   gt: { len: 4.7, wid: 2.0, hgt: 0.5, cabLen: 1.8, cabH: 0.45, cabZ: -0.1, wheelR: 0.39, spoiler: true, stripe: true },
   hypercar: { len: 4.6, wid: 2.05, hgt: 0.42, cabLen: 1.6, cabH: 0.4, cabZ: 0, wheelR: 0.39, spoiler: true, stripe: true },
   rennwagen: { len: 5.0, wid: 0.9, hgt: 0.42, cabLen: 0.8, cabH: 0.35, cabZ: -0.2, wheelR: 0.42, formula: true, track: 1.85, wheelW: 0.55 },
+  roadster: { len: 4.2, wid: 1.85, hgt: 0.5, cabLen: 1.0, cabH: 0.3, cabZ: -0.1, wheelR: 0.37, open: true, stripe: true },
 }
 
 function nameSprite(THREE: THREE, name: string, y: number): T.Sprite {
@@ -260,6 +262,8 @@ function nameSprite(THREE: THREE, name: string, y: number): T.Sprite {
 
 /** Schönes Auto aus abgerundeten Teilen: Karosserie, Kabine mit Glas, Räder mit Felgen, Lichter, je Art Besonderheiten. */
 function buildCar(THREE: THREE, kind: string, color: string, name: string, isMe: boolean): T.Group {
+  if (isBike(kind)) return buildBike(THREE, kind, color, name, isMe)
+  if (kind === 'supercar') return buildSupercar(THREE, color, name, isMe)
   const b = BODIES[kind] ?? BODIES.kleinwagen
   const g = new THREE.Group()
   const paint = new THREE.MeshStandardMaterial({ color, roughness: 0.28, metalness: 0.55 })
@@ -343,6 +347,16 @@ function buildCar(THREE: THREE, kind: string, color: string, name: string, isMe:
   sh.rotation.x = -Math.PI / 2; sh.position.y = 0.07
   g.add(sh)
   if (!isMe) g.add(nameSprite(THREE, name, b.hgt + b.cabH + 2.2))
+  if (kind === 'roadster') {
+    // Düsen unter dem Heck: nur im Flug sichtbar
+    const jets = new THREE.Group()
+    const flame = new THREE.MeshBasicMaterial({ color: 0x60e6ff, transparent: true, opacity: 0.9 })
+    for (const sx of [-0.55, 0.55]) { const f = new THREE.Mesh(new THREE.ConeGeometry(0.22, 1.4, 10), flame); f.rotation.x = -Math.PI / 2; f.position.set(sx, 0.35, -b.len / 2 - 0.55); jets.add(f) }
+    const glow = new THREE.Mesh(new THREE.PlaneGeometry(b.wid * 1.1, b.len * 0.9), new THREE.MeshBasicMaterial({ color: 0x60e6ff, transparent: true, opacity: 0.35, depthWrite: false }))
+    glow.rotation.x = -Math.PI / 2; glow.position.y = 0.12; jets.add(glow)
+    jets.visible = false
+    g.add(jets); g.userData.jets = jets
+  }
   g.userData.wheels = wheels
   g.userData.paint = paint
   g.userData.paint0 = new THREE.Color(color)
@@ -395,4 +409,126 @@ function damageCar(THREE: THREE, g: T.Group, dmg: number, slip: number, v: numbe
       mat.opacity = (1 - ph) * 0.5
     }
   })
+}
+
+const tyreMat = (THREE: THREE) => new THREE.MeshStandardMaterial({ color: 0x14161b, roughness: 0.9 })
+
+/** Motorrad (Sportbike, Chopper, Crossbike): Fahrer, Tank, Gabel, Lenker. Alles in `lean`, damit es sich in Kurven neigt. */
+function buildBike(THREE: THREE, kind: string, color: string, name: string, isMe: boolean): T.Group {
+  const g = new THREE.Group()
+  const lean = new THREE.Group()
+  g.add(lean)
+  const paint = new THREE.MeshStandardMaterial({ color, roughness: 0.25, metalness: 0.6 })
+  const dark = new THREE.MeshStandardMaterial({ color: 0x0d0f14, roughness: 0.6, metalness: 0.3 })
+  const chrome = new THREE.MeshStandardMaterial({ color: 0xcfd6e2, roughness: 0.2, metalness: 0.9 })
+  const suit = new THREE.MeshStandardMaterial({ color: kind === 'chopper' ? 0x3b2a1a : 0x1f2937, roughness: 0.7 })
+  const helm = new THREE.MeshStandardMaterial({ color: kind === 'crossbike' ? 0xf8fafc : 0xfacc15, roughness: 0.25, metalness: 0.2 })
+  const cfg = kind === 'chopper' ? { r: 0.36, wb: 2.1, fork: 0.5, bar: 1.15 } : kind === 'crossbike' ? { r: 0.4, wb: 1.35, fork: 0.35, bar: 1.2 } : { r: 0.33, wb: 1.4, fork: 0.35, bar: 0.95 }
+  const wheels: T.Group[] = []
+  for (const sz of [1, -1]) {
+    const w = new THREE.Group()
+    const tr = new THREE.Mesh(new THREE.CylinderGeometry(cfg.r, cfg.r, 0.17, 20), tyreMat(THREE)); tr.rotation.z = Math.PI / 2
+    const rm = new THREE.Mesh(new THREE.CylinderGeometry(cfg.r * 0.62, cfg.r * 0.62, 0.19, 12), chrome); rm.rotation.z = Math.PI / 2
+    w.add(tr, rm)
+    w.position.set(0, cfg.r, sz * cfg.wb / 2)
+    w.name = sz > 0 ? 'front' : 'rear'
+    lean.add(w); wheels.push(w)
+  }
+  // Rahmen, Motor, Tank, Sitz, Heck
+  const frame = new THREE.Mesh(new RoundedBoxGeometry(0.16, 0.28, cfg.wb * 0.62, 2, 0.05), dark); frame.position.set(0, cfg.r + 0.34, -0.05); lean.add(frame)
+  const engine = new THREE.Mesh(new RoundedBoxGeometry(0.34, 0.34, 0.5, 2, 0.08), kind === 'chopper' ? chrome : dark); engine.position.set(0, cfg.r + 0.2, 0.05); lean.add(engine)
+  const tank = new THREE.Mesh(new RoundedBoxGeometry(0.32, kind === 'chopper' ? 0.22 : 0.28, 0.6, 3, 0.1), paint); tank.position.set(0, cfg.r + 0.64, cfg.wb * 0.14); lean.add(tank)
+  const seat = new THREE.Mesh(new RoundedBoxGeometry(0.28, 0.1, 0.7, 2, 0.04), dark); seat.position.set(0, cfg.r + 0.56, -cfg.wb * 0.17); lean.add(seat)
+  if (kind === 'sportbike') {
+    const tail = new THREE.Mesh(new RoundedBoxGeometry(0.26, 0.2, 0.7, 3, 0.09), paint); tail.position.set(0, cfg.r + 0.68, -cfg.wb * 0.38); tail.rotation.x = 0.25; lean.add(tail)
+    const fair = new THREE.Mesh(new RoundedBoxGeometry(0.42, 0.42, 0.45, 3, 0.14), paint); fair.position.set(0, cfg.r + 0.68, cfg.wb / 2 - 0.2); lean.add(fair)
+    const ws = new THREE.Mesh(new RoundedBoxGeometry(0.32, 0.26, 0.05, 2, 0.02), new THREE.MeshStandardMaterial({ color: 0x15202e, roughness: 0.05, metalness: 0.9 })); ws.position.set(0, cfg.r + 0.98, cfg.wb / 2 - 0.35); ws.rotation.x = -0.6; lean.add(ws)
+  } else {
+    const fender = new THREE.Mesh(new RoundedBoxGeometry(0.22, 0.05, 0.7, 2, 0.02), paint); fender.position.set(0, cfg.r * 2 + (kind === 'crossbike' ? 0.18 : 0.06), cfg.wb / 2 + (kind === 'crossbike' ? 0.1 : 0)); lean.add(fender)
+    const rf = new THREE.Mesh(new RoundedBoxGeometry(0.24, 0.05, 0.8, 2, 0.02), paint); rf.position.set(0, cfg.r * 2 + 0.05, -cfg.wb / 2); lean.add(rf)
+  }
+  // Gabel und Lenker
+  for (const sx of [-0.09, 0.09]) {
+    const f = new THREE.Mesh(new THREE.CylinderGeometry(0.025, 0.025, cfg.r + cfg.bar * 0.55 + cfg.fork, 6), chrome)
+    f.position.set(sx, cfg.r + (cfg.bar * 0.55) / 2 + cfg.fork / 2 - 0.1, cfg.wb / 2 - (kind === 'chopper' ? 0.35 : 0.14)); f.rotation.x = kind === 'chopper' ? 0.5 : 0.28; lean.add(f)
+  }
+  const bar = new THREE.Mesh(new THREE.CylinderGeometry(0.022, 0.022, kind === 'sportbike' ? 0.55 : 0.8, 6), chrome); bar.rotation.z = Math.PI / 2
+  bar.position.set(0, cfg.bar, cfg.wb / 2 - (kind === 'chopper' ? 0.62 : 0.3)); lean.add(bar)
+  const lamp = new THREE.Mesh(new THREE.SphereGeometry(0.11, 10, 8), new THREE.MeshBasicMaterial({ color: 0xfff6c8 })); lamp.position.set(0, cfg.bar - 0.2, cfg.wb / 2 + 0.05); lean.add(lamp)
+  const tailL = new THREE.Mesh(new THREE.BoxGeometry(0.16, 0.06, 0.05), new THREE.MeshBasicMaterial({ color: 0xff2a2a })); tailL.position.set(0, cfg.r + 0.62, -cfg.wb / 2 - 0.1); lean.add(tailL)
+  const pipe = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.065, 0.9, 8), chrome); pipe.rotation.x = Math.PI / 2; pipe.position.set(0.2, cfg.r + 0.12, -cfg.wb * 0.25); lean.add(pipe)
+  // Fahrer
+  const back = kind === 'chopper' ? -0.35 : kind === 'sportbike' ? 0.5 : 0.15
+  const torso = new THREE.Mesh(new RoundedBoxGeometry(0.34, 0.5, 0.26, 3, 0.1), suit); torso.position.set(0, cfg.r + 0.98, -cfg.wb * 0.12 + back * 0.15); torso.rotation.x = back; lean.add(torso)
+  const head = new THREE.Mesh(new THREE.SphereGeometry(0.15, 14, 12), helm); head.position.set(0, cfg.r + 1.4, -cfg.wb * 0.06 + back * 0.35); lean.add(head)
+  const visor = new THREE.Mesh(new THREE.BoxGeometry(0.2, 0.06, 0.1), dark); visor.position.set(0, cfg.r + 1.4, -cfg.wb * 0.06 + back * 0.35 + 0.12); lean.add(visor)
+  for (const sx of [-0.2, 0.2]) {
+    const arm = new THREE.Mesh(new THREE.CylinderGeometry(0.055, 0.05, 0.62, 8), suit)
+    arm.position.set(sx, (cfg.r + 1.05 + cfg.bar) / 2 - 0.05, cfg.wb * 0.02 + 0.12); arm.rotation.x = 1.0; arm.rotation.z = sx > 0 ? -0.12 : 0.12; lean.add(arm)
+    const leg = new THREE.Mesh(new THREE.CylinderGeometry(0.07, 0.06, 0.62, 8), suit)
+    leg.position.set(sx * 1.05, cfg.r + 0.42, -cfg.wb * 0.04); leg.rotation.x = -0.9; lean.add(leg)
+  }
+  const sh = new THREE.Mesh(new THREE.PlaneGeometry(0.9, cfg.wb + 0.9), new THREE.MeshBasicMaterial({ color: 0x000000, transparent: true, opacity: 0.3, depthWrite: false }))
+  sh.rotation.x = -Math.PI / 2; sh.position.y = 0.07; g.add(sh)
+  if (!isMe) g.add(nameSprite(THREE, name, 2.9))
+  g.userData.wheels = wheels
+  g.userData.wheelR = cfg.r
+  g.userData.lean = lean
+  g.userData.paint = paint
+  g.userData.paint0 = new THREE.Color(color)
+  g.userData.body = tank
+  g.userData.len = cfg.wb + 0.8
+  g.userData.wid = 0.8
+  return g
+}
+
+/** Admin-Supercar: flaches, rotes Coupé mit Fließheck, Entenbürzel und runden Scheinwerfern (eigener Entwurf). */
+function buildSupercar(THREE: THREE, color: string, name: string, isMe: boolean): T.Group {
+  const g = new THREE.Group()
+  const paint = new THREE.MeshStandardMaterial({ color, roughness: 0.18, metalness: 0.65 })
+  const glass = new THREE.MeshStandardMaterial({ color: 0x0f1a28, roughness: 0.04, metalness: 0.95 })
+  const dark = new THREE.MeshStandardMaterial({ color: 0x0b0d12, roughness: 0.6 })
+  const chrome = new THREE.MeshStandardMaterial({ color: 0xd9dee8, roughness: 0.15, metalness: 0.95 })
+  const c0 = 0.26
+  const L = 4.5, W = 1.85
+  const body = new THREE.Mesh(new RoundedBoxGeometry(W, 0.46, L, 5, 0.2), paint); body.position.y = c0 + 0.23; g.add(body)
+  for (const sx of [-0.68, 0.68]) {
+    const hip = new THREE.Mesh(new RoundedBoxGeometry(0.5, 0.42, 1.7, 4, 0.18), paint); hip.position.set(sx, c0 + 0.38, -1.05); g.add(hip)
+    const fen = new THREE.Mesh(new RoundedBoxGeometry(0.46, 0.34, 1.2, 4, 0.15), paint); fen.position.set(sx * 0.95, c0 + 0.42, 1.45); g.add(fen)
+    const lamp = new THREE.Mesh(new THREE.SphereGeometry(0.15, 14, 10), new THREE.MeshStandardMaterial({ color: 0xfff6c8, emissive: 0xfff2b0, emissiveIntensity: 0.9 })); lamp.scale.set(1, 1, 0.55); lamp.position.set(sx * 0.92, c0 + 0.6, 2.03); g.add(lamp)
+    const ring = new THREE.Mesh(new THREE.TorusGeometry(0.16, 0.025, 6, 16), chrome); ring.position.copy(lamp.position); ring.position.z += 0.02; g.add(ring)
+    const mirror = new THREE.Mesh(new RoundedBoxGeometry(0.2, 0.1, 0.12, 2, 0.04), paint); mirror.position.set(sx * 1.08, c0 + 0.88, 0.55); g.add(mirror)
+    const intake = new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.16, 0.6), dark); intake.position.set(sx * 1.1, c0 + 0.38, -0.7); g.add(intake)
+  }
+  const cab = new THREE.Mesh(new RoundedBoxGeometry(W * 0.78, 0.42, 1.7, 4, 0.18), glass); cab.position.set(0, c0 + 0.66, -0.15); g.add(cab)
+  const roof = new THREE.Mesh(new RoundedBoxGeometry(W * 0.74, 0.07, 1.15, 3, 0.03), paint); roof.position.set(0, c0 + 0.88, -0.25); g.add(roof)
+  const slope = new THREE.Mesh(new RoundedBoxGeometry(W * 0.76, 0.08, 1.35, 3, 0.04), paint); slope.position.set(0, c0 + 0.76, -1.15); slope.rotation.x = -0.34; g.add(slope)
+  const hood = new THREE.Mesh(new RoundedBoxGeometry(W * 0.72, 0.06, 1.3, 3, 0.03), paint); hood.position.set(0, c0 + 0.5, 1.35); hood.rotation.x = 0.07; g.add(hood)
+  const duck = new THREE.Mesh(new RoundedBoxGeometry(W * 0.84, 0.07, 0.5, 3, 0.03), paint); duck.position.set(0, c0 + 0.7, -2.15); duck.rotation.x = 0.18; g.add(duck)
+  const lip = new THREE.Mesh(new RoundedBoxGeometry(W * 0.9, 0.08, 0.3, 2, 0.03), dark); lip.position.set(0, c0 + 0.06, 2.2); g.add(lip)
+  const bar = new THREE.Mesh(new THREE.BoxGeometry(W * 0.75, 0.07, 0.05), new THREE.MeshBasicMaterial({ color: 0xff1a1a })); bar.position.set(0, c0 + 0.5, -2.26); g.add(bar)
+  for (const sx of [-0.4, 0.4]) { const ex = new THREE.Mesh(new THREE.CylinderGeometry(0.07, 0.07, 0.3, 10), chrome); ex.rotation.x = Math.PI / 2; ex.position.set(sx, c0 + 0.12, -2.3); g.add(ex) }
+  const stripe = new THREE.Mesh(new THREE.BoxGeometry(0.28, 0.012, 1.3), new THREE.MeshStandardMaterial({ color: 0xf8fafc, roughness: 0.4 })); stripe.position.set(0, c0 + 0.535, 1.4); stripe.rotation.x = 0.07; g.add(stripe)
+  const wheels: T.Group[] = []
+  const rimM = new THREE.MeshStandardMaterial({ color: 0xe5c07b, roughness: 0.25, metalness: 0.9 })
+  for (const [sx, sz, r, w] of [[-1, 1, 0.35, 0.3], [1, 1, 0.35, 0.3], [-1, -1, 0.38, 0.36], [1, -1, 0.38, 0.36]] as const) {
+    const wh = new THREE.Group()
+    const tr = new THREE.Mesh(new THREE.CylinderGeometry(r, r, w, 22), tyreMat(THREE)); tr.rotation.z = Math.PI / 2
+    const rm = new THREE.Mesh(new THREE.CylinderGeometry(r * 0.64, r * 0.64, w + 0.02, 14), rimM); rm.rotation.z = Math.PI / 2
+    wh.add(tr, rm)
+    wh.position.set(sx * (W / 2 - 0.1), r, sz * (sz > 0 ? 1.4 : 1.4))
+    wh.name = sz > 0 ? 'front' : 'rear'
+    g.add(wh); wheels.push(wh)
+  }
+  const shd = new THREE.Mesh(new THREE.PlaneGeometry(W * 1.25, L * 1.12), new THREE.MeshBasicMaterial({ color: 0x000000, transparent: true, opacity: 0.32, depthWrite: false }))
+  shd.rotation.x = -Math.PI / 2; shd.position.y = 0.07; g.add(shd)
+  if (!isMe) g.add(nameSprite(THREE, name, 2.6))
+  g.userData.wheels = wheels
+  g.userData.wheelR = 0.36
+  g.userData.paint = paint
+  g.userData.paint0 = new THREE.Color(color)
+  g.userData.body = body
+  g.userData.len = L
+  g.userData.wid = W
+  return g
 }

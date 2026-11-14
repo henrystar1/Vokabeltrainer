@@ -94,7 +94,7 @@ export default function OnlineGame() {
               ? `${view.players.filter((p) => p.join_state === 'joined').length} von ${view.players.filter((p) => p.join_state !== 'declined' && p.join_state !== 'left').length} haben zugesagt. ${me.user_id === view.host_id ? 'Starte, sobald alle da sind (mindestens 2).' : `Warte, bis ${host?.name ?? 'der Gastgeber'} startet.`}`
               : 'Warte, bis die Einladung angenommen wird …'}
           </p>
-          {view.kind === 'race' && <RaceLobbyOptions view={view} isHost={me.user_id === view.host_id} busy={busy} onSet={(t, l, c) => void act(() => ogRaceSet(id, t, l, c ?? null))} />}
+          {view.kind === 'race' && <RaceLobbyOptions view={view} isHost={me.user_id === view.host_id} busy={busy} onSet={(t, l, c) => void act(() => ogRaceSet(id, t, l, c ?? null))} onView={(v) => { apply(v); ping() }} />}
           {(view.kind === 'ludo' || view.kind === 'shooter' || view.kind === 'race') && me.user_id === view.host_id && (
             <Button busy={busy} disabled={view.players.filter((p) => p.join_state === 'joined').length < 2} onClick={() => void act(() => ogStart(id))}>Spiel starten{view.kind === 'shooter' ? ' (kostet dich 50 Coins)' : ''}</Button>
           )}

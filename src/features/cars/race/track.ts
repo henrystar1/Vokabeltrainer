@@ -1,5 +1,5 @@
 /** Rennstrecken: geschlossene Kurven aus Stützpunkten (Catmull-Rom), fein abgetastet. Reine Logik, testbar. */
-export interface TrackDef { id: number; /** Rangliste/Online: 't0'…'t9' oder 'c:<uuid>' */ key?: string; name: string; text: string; width: number; laps: number; theme: 'gras' | 'wueste' | 'schnee' | 'stadt' | 'nacht' | 'herbst'; pts: Array<[number, number]> }
+export interface TrackDef { id: number; /** Rangliste/Online: 't0'…'t10' oder 'c:<uuid>' */ key?: string; name: string; text: string; width: number; laps: number; theme: 'gras' | 'wueste' | 'schnee' | 'stadt' | 'nacht' | 'herbst'; pts: Array<[number, number]> }
 
 const R = (n: number, f: (i: number) => [number, number]): Array<[number, number]> => Array.from({ length: n }, (_, i) => f(i))
 
@@ -31,6 +31,8 @@ export const TRACKS: TrackDef[] = [
   { id: 8, name: 'Alpen-Marathon', text: 'Rund 8 km: eine lange Gerade, dann Berg-Kurven bis zur Haarnadel.', width: 20, laps: 2, theme: 'schnee',
     pts: [[-1300, 0], [-100, -10], [1100, 0], [1900, -120], [2150, -420], [1950, -740], [1350, -860], [900, -640], [500, -940], [0, -1160], [-650, -940], [-960, -620], [-1560, -540], [-2000, -330], [-1900, -90]] },
   { id: 9, name: 'Kontinent-Express', text: 'Die Königsstrecke: rund 15 km, 6-km-Gerade, Bögen und lange Kurven.', width: 24, laps: 2, theme: 'herbst', pts: stadium(3000, 420, 8, 150) },
+  { id: 10, name: 'Drift-Arena', text: 'Extrabreite Fahrbahn (48 m) mit weiten, langen Bögen – zum Quer-Driften, ohne anzuecken.', width: 48, laps: 3, theme: 'nacht',
+    pts: R(20, (i) => { const a = (i / 20) * Math.PI * 2; const r = 400 + 115 * Math.sin(2 * a + 0.6) + 65 * Math.cos(3 * a); return [Math.cos(a) * r * 1.35, Math.sin(a) * r] }) },
 ]
 
 export const trackKey = (d: TrackDef): string => d.key ?? `t${d.id}`

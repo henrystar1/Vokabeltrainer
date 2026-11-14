@@ -1,7 +1,7 @@
 import type { ReactNode } from 'react'
 
 /** Selbst gezeichnete Auto-Bilder (SVG, eigene Entwürfe ohne Marken). */
-export const CAR_KINDS = ['kleinwagen', 'limousine', 'kombi', 'suv', 'pickup', 'cabrio', 'sportwagen', 'bus', 'oldtimer', 'buggy', 'monstertruck', 'muscle', 'rallye', 'gt', 'hypercar', 'rennwagen'] as const
+export const CAR_KINDS = ['kleinwagen', 'limousine', 'kombi', 'suv', 'pickup', 'cabrio', 'sportwagen', 'bus', 'oldtimer', 'buggy', 'monstertruck', 'muscle', 'rallye', 'gt', 'hypercar', 'rennwagen', 'roadster', 'supercar', 'chopper', 'crossbike', 'sportbike'] as const
 export type CarKind = (typeof CAR_KINDS)[number]
 
 interface Shape {
@@ -19,7 +19,7 @@ interface Shape {
   hideBody?: boolean
 }
 
-const SHAPES: Record<CarKind, Shape> = {
+const SHAPES: Record<Exclude<CarKind, 'chopper' | 'crossbike' | 'sportbike'>, Shape> = {
   kleinwagen: { body: 'M26 76 L26 58 Q28 50 44 48 L62 31 Q66 27 76 27 L116 27 Q125 27 131 34 L147 49 Q168 51 173 62 L173 76 Z', glass: ['M68 33 L79 33 L79 47 L57 47 Z', 'M85 33 L114 33 L128 47 L85 47 Z'], wheels: [56, 146], r: 15 },
   limousine: { body: 'M12 76 L12 60 Q14 54 34 52 L60 36 Q66 31 78 31 L122 31 Q131 31 138 38 L156 52 Q186 54 190 63 L190 76 Z', glass: ['M71 37 L83 37 L83 51 L58 51 Z', 'M89 37 L122 37 L137 51 L89 51 Z'], wheels: [48, 154], r: 14 },
   kombi: { body: 'M14 76 L14 56 Q16 50 34 48 L56 33 Q62 29 72 29 L152 29 Q160 29 162 38 L170 52 Q186 54 188 63 L188 76 Z', glass: ['M64 35 L76 35 L76 50 L52 50 Z', 'M82 35 L116 35 L116 50 L82 50 Z', 'M122 35 L152 35 L158 50 L122 50 Z'], wheels: [50, 150], r: 14 },
@@ -43,6 +43,43 @@ const SHAPES: Record<CarKind, Shape> = {
     <rect x="6" y="40" width="30" height="5" rx="1.5" fill="#0f172a" /><rect x="12" y="44" width="4" height="22" fill="#0f172a" /><rect x="26" y="44" width="4" height="22" fill="#0f172a" /><rect x="10" y="38" width="22" height="3" fill={c} />
     <circle cx="64" cy="66" r="4" fill="#fff" opacity=".9" /><text x="64" y="69" textAnchor="middle" fontSize="6" fontWeight="800" fill="#0f172a">1</text>
   </> },
+  roadster: { body: 'M6 76 L6 64 Q10 58 34 56 L70 48 Q78 45 90 46 L112 46 Q122 46 130 52 L160 57 Q192 59 195 67 L195 76 Z', glass: ['M92 41 L108 41 L114 47 L92 47 Z'], wheels: [46, 156], r: 14, extra: () => <><path d="M104 40 Q112 34 122 38" fill="none" stroke="#e2e8f0" strokeWidth="2.5" /><rect x="6" y="52" width="22" height="3" rx="1.5" fill="#0f172a" /><path d="M20 70 L10 80 L28 76 Z" fill="#60e6ff" opacity=".9" /><path d="M60 66 L150 66" stroke="#0f172a" strokeOpacity=".4" strokeWidth="2" /></> },
+  supercar: { body: 'M5 76 L5 62 Q8 56 26 54 L50 44 Q60 36 76 33 L104 33 Q122 33 134 44 L150 52 Q178 55 190 60 Q196 64 196 76 Z', glass: ['M70 40 Q78 36 92 36 L106 36 Q118 36 126 44 L72 46 Z'], wheels: [46, 154], r: 15, extra: () => <><rect x="4" y="50" width="26" height="4" rx="2" fill="#7f1d1d" /><circle cx="176" cy="58" r="6" fill="#fff7c2" stroke="#e2e8f0" strokeWidth="2" /><rect x="4" y="60" width="9" height="3" fill="#ff1a1a" /><path d="M120 52 L186 58" stroke="#fff" strokeOpacity=".6" strokeWidth="2.4" /><rect x="60" y="68" width="76" height="3" rx="1.5" fill="#0f172a" opacity=".6" /></> },
+}
+
+/** Motorräder haben eigene Zeichnung (zwei Räder, Fahrer). */
+const BIKE_ART: Record<string, { r: number; wb: number; bars: number; chopper?: boolean; cross?: boolean }> = {
+  sportbike: { r: 17, wb: 78, bars: 52 },
+  chopper: { r: 18, wb: 108, bars: 36, chopper: true },
+  crossbike: { r: 19, wb: 70, bars: 44, cross: true },
+}
+function BikeArt({ kind, color, className, label }: { kind: string; color: string; className: string; label?: string }) {
+  const b = BIKE_ART[kind]
+  const cx = 100, rw = cx - b.wb / 2, fw = cx + b.wb / 2, wy = 76
+  const rider = '#1f2937'
+  return (
+    <svg viewBox="0 0 200 100" className={className} role="img" aria-label={label ?? 'Motorrad'}>
+      <ellipse cx="100" cy="92" rx="70" ry="4" fill="#000" opacity=".3" />
+      {[rw, fw].map((x) => <g key={x}><circle cx={x} cy={wy} r={b.r} fill="#0b1220" /><circle cx={x} cy={wy} r={b.r * 0.62} fill="#e2e8f0" /><circle cx={x} cy={wy} r={b.r * 0.16} fill="#334155" /></g>)}
+      {/* Gabel und Rahmen */}
+      <path d={`M${fw} ${wy} L${fw - (b.chopper ? 26 : 10)} ${b.bars}`} stroke="#cbd5e1" strokeWidth="3.5" strokeLinecap="round" />
+      <path d={`M${rw} ${wy} L${cx - 6} ${wy - 14} L${cx + 14} ${wy - 12} L${fw - 8} ${wy - 6}`} fill="none" stroke="#0f172a" strokeWidth="6" strokeLinejoin="round" />
+      <rect x={cx - 14} y={wy - 24} width="30" height="14" rx="7" fill={color} />
+      <rect x={cx - 14} y={wy - 24} width="30" height="14" rx="7" fill="#fff" opacity=".15" />
+      <rect x={cx - 8} y={wy - 12} width="22" height="14" rx="4" fill="#111827" />
+      <path d={`M${rw + 4} ${wy - 22} L${cx - 14} ${wy - 22} L${cx - 14} ${wy - 14} L${rw + 4} ${wy - 12} Z`} fill={b.cross ? '#0f172a' : color} />
+      {kind === 'sportbike' && <path d={`M${fw - 12} ${wy - 28} L${fw + 6} ${wy - 16} L${fw - 4} ${wy - 8} L${fw - 22} ${wy - 12} Z`} fill={color} />}
+      <path d={`M${fw - (b.chopper ? 30 : 12)} ${b.bars} L${fw - (b.chopper ? 38 : 20)} ${b.bars - (b.chopper ? 14 : 2)}`} stroke="#cbd5e1" strokeWidth="3" strokeLinecap="round" />
+      <circle cx={fw + 2} cy={b.bars + 8} r="4.5" fill="#fde68a" />
+      <rect x={rw - 4} y={wy - 22} width="6" height="4" rx="2" fill="#ef4444" />
+      {/* Fahrer */}
+      <path d={`M${cx - 10} ${wy - 26} L${cx + (b.chopper ? -6 : 8)} ${wy - 52} L${cx + (b.chopper ? 0 : 16)} ${wy - 50} L${cx + 6} ${wy - 24} Z`} fill={rider} />
+      <circle cx={cx + (b.chopper ? 2 : 18)} cy={wy - 58} r="7" fill={b.cross ? '#f8fafc' : '#facc15'} />
+      <path d={`M${cx + (b.chopper ? 0 : 14)} ${wy - 46} L${fw - (b.chopper ? 38 : 20)} ${b.bars - 2}`} stroke={rider} strokeWidth="5" strokeLinecap="round" />
+      <path d={`M${cx - 4} ${wy - 24} L${cx + 12} ${wy - 6} L${cx + 4} ${wy + 2}`} stroke={rider} strokeWidth="6" strokeLinecap="round" fill="none" />
+      <path d={`M${rw + 6} ${wy - 6} L${cx + 26} ${wy - 4}`} stroke="#cbd5e1" strokeWidth="4" strokeLinecap="round" />
+    </svg>
+  )
 }
 
 /** Stabile Hell/Dunkel-Version einer Farbe für die Akzente. */
@@ -53,7 +90,8 @@ function shade(hex: string, f: number): string {
 }
 
 export default function CarArt({ kind, color, className = '', label }: { kind: string; color: string; className?: string; label?: string }) {
-  const k: CarKind = (CAR_KINDS as readonly string[]).includes(kind) ? (kind as CarKind) : 'kleinwagen'
+  if (BIKE_ART[kind]) return <BikeArt kind={kind} color={color} className={className} label={label} />
+  const k = ((CAR_KINDS as readonly string[]).includes(kind) ? kind : 'kleinwagen') as keyof typeof SHAPES
   const sh = SHAPES[k]
   const wy = sh.wy ?? 76
   const id = `${k}-${color.replace('#', '')}`

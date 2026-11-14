@@ -24,7 +24,7 @@ export interface ShipsState { phase: 'placing' | 'running'; shots: Record<string
 export interface LudoLast { seat: number; dice: number; piece?: number; from?: number; to?: number; caps?: Array<{ seat: number; piece: number }>; rolled?: boolean; nomove?: boolean; again?: boolean }
 export interface LudoState { seats: number[]; pieces: Record<string, number[]>; turn: number; dice?: number; tries: number; out: number[]; last?: LudoLast; winner?: number }
 
-export interface RaceCarState { id?: string; name?: string; kind: string; color: string; top?: number | null }
+export interface RaceCarState { id?: string; name?: string; kind: string; color: string; top?: number | null; /** Tuning-Stufen (Motor, Reifen, Bremse) */ up?: { m?: number; r?: number; b?: number } }
 export interface RaceCustomState { id: string; name: string; pts: Array<[number, number]>; width: number }
 export interface RaceState { cars?: Record<string, RaceCarState>; custom?: RaceCustomState | null; track?: number; laps?: number; t0?: number; first_at?: number; results?: Record<string, number> }
 

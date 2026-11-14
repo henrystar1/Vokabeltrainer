@@ -9,10 +9,12 @@ import CarArt from '../features/cars/CarArt'
 import CarRun from '../features/cars/CarRun'
 import RaceMenu from '../features/cars/race/RaceMenu'
 import RaceBoard from '../features/cars/race/RaceBoard'
+import TuneTab from '../features/cars/TuneTab'
 import { useRaceCars } from '../features/cars/race/useRaceCars'
 import { Link } from 'react-router-dom'
 import { carBuy, carList } from '../services/cars'
 import { carKmh } from '../features/cars/stats'
+import { upFactors } from '../features/cars/tuning'
 
 const MAX_KMH = 320
 /** Höchstgeschwindigkeit als Zahl und Balken. */
@@ -31,7 +33,7 @@ export default function Cars() {
   const wallet = useWallet()
   const list = useAsync(carList, [])
   const [busy, setBusy] = useState<string | null>(null)
-  const [tab, setTab] = useState<'shop' | 'race' | 'rank' | 'drive'>('shop')
+  const [tab, setTab] = useState<'shop' | 'tune' | 'race' | 'rank' | 'drive'>('shop')
   const [pick, setPick] = useState<string | null>(null)
   const [msg, setMsg] = useState<string | null>(null)
   const cars = list.data ?? []
@@ -50,15 +52,16 @@ export default function Cars() {
       {list.error && <ErrorBox message={list.error} onRetry={list.reload} />}
       {list.loading && !list.data && <Spinner />}
       <div className="flex gap-2" role="tablist" aria-label="Bereich">
-        {([['shop', 'Kaufen'], ['race', 'Rennen'], ['rank', 'Rangliste'], ['drive', 'Autobahn']] as const).map(([k, l]) => <button key={k} type="button" role="tab" aria-selected={tab === k} onClick={() => setTab(k)} className={`min-h-[44px] rounded-lg border px-4 ${tab === k ? 'border-accent-cyan bg-accent-cyan/20' : 'border-white/15 hover:bg-white/10'}`}>{l}</button>)}
+        {([['shop', 'Kaufen'], ['tune', 'Tuning'], ['race', 'Rennen'], ['rank', 'Rangliste'], ['drive', 'Autobahn']] as const).map(([k, l]) => <button key={k} type="button" role="tab" aria-selected={tab === k} onClick={() => setTab(k)} className={`min-h-[44px] rounded-lg border px-4 ${tab === k ? 'border-accent-cyan bg-accent-cyan/20' : 'border-white/15 hover:bg-white/10'}`}>{l}</button>)}
       </div>
+      {tab === 'tune' && <Card><TuneTab cars={rc.cars} shop={cars} onChanged={rc.reload} /></Card>}
       {tab === 'race' && (
         <Card>
           {!drive ? <p className="text-sm text-slate-300">Du brauchst erst ein Auto. Kaufe eins unter „Kaufen“.</p> : (
             <div className="space-y-3">
               <div className="flex flex-wrap gap-2">{rc.cars.map((c) => <button key={c.id} type="button" onClick={() => setPick(c.id)} aria-pressed={drive.id === c.id} className={`w-24 rounded-xl border p-1 text-center text-xs ${drive.id === c.id ? 'border-accent-cyan bg-white/10' : 'border-white/10'}`}><CarArt kind={c.kind} color={c.color} label={c.name} className="w-full" />{c.name}</button>)}</div>
-              <p className="text-sm text-slate-300">Dein Auto: <b>{drive.name}</b> · {carKmh(drive.kind, drive.top)} km/h{drive.id === 'supercar' ? ' · Fahrassistent mit F oder dem Knopf im Rennen' : ''}</p>
-              <RaceMenu key={drive.id} car={{ id: drive.id, name: 'Du', kind: drive.kind, color: drive.color, top: drive.top }} assistOk={drive.id === 'supercar'} />
+              <p className="text-sm text-slate-300">Dein Auto: <b>{drive.name}</b> · {Math.round(carKmh(drive.kind, drive.top) * upFactors(drive.up).top)} km/h{drive.id === 'supercar' && rc.assistOk ? ' · Fahrassistent mit F oder dem Knopf im Rennen' : ''}{drive.kind === 'roadster' ? ' · fliegen mit E oder dem Knopf (2 s, danach 20 s laden)' : ''}</p>
+              <RaceMenu key={drive.id} car={{ id: drive.id, name: 'Du', kind: drive.kind, color: drive.color, top: drive.top, up: drive.up }} assistOk={drive.id === 'supercar' && rc.assistOk} />
               <p className="text-sm"><Link to="/mehrspieler" className="text-accent-cyan hover:underline">Online-Rennen mit Freunden starten →</Link></p>
             </div>
           )}

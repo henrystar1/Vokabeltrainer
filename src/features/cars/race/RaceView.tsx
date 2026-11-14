@@ -3,11 +3,13 @@ import type { RealtimeChannel, SupabaseClient } from '@supabase/supabase-js'
 import { gameClientFor, slotForKey, whenGameDbsReady } from '../../../lib/gameRealtime'
 import { botInput, crash, startCar, statsFor, stepCar, type Bot, type Car, type CarStats, type Input } from './physics'
 import { TRACKS, buildTrack, curveAhead, pointAt, project, trackKey, type TrackDef } from './track'
-import { botSteer, buildRaceLine } from './line'
-import { kindDims } from '../stats'
+import { assistSteer, buildRaceLine } from './line'
+import { canFly, flyHeight, isBike, kindDims } from '../stats'
+import type { Up } from '../tuning'
 import { raceSubmit } from '../../../services/cars'
 
-export interface RaceCarInfo { /** Auto-ID im Shop (für die Rangliste) */ id?: string; name: string; kind: string; color: string; /** eigene Höchstgeschwindigkeit des Autos (km/h) */ top?: number | null }
+export interface RaceCarInfo { /** Auto-ID im Shop (für die Rangliste) */ id?: string; /** Tuning-Stufen */ up?: Up; name: string; kind: string; color: string; /** eigene Höchstgeschwindigkeit des Autos (km/h) */ top?: number | null }
+type Key = 'gas' | 'brake' | 'left' | 'right' | 'fly'
 export interface RaceStanding { name: string; ms: number | null; me?: boolean }
 interface Props {
   trackId: number
@@ -25,7 +27,7 @@ interface Props {
   onExit?: () => void
 }
 
-interface Remote { id: string; name: string; kind: string; color: string; x: number; z: number; h: number; v: number; tx: number; tz: number; th: number; total: number; ft: number | null; seen: number; dmg: number; slip: number; mesh?: import('three').Group }
+interface Remote { id: string; name: string; kind: string; color: string; x: number; z: number; h: number; v: number; tx: number; tz: number; th: number; total: number; ft: number | null; seen: number; dmg: number; slip: number; fl: number; mesh?: import('three').Group }
 
 const COUNT_MS = 4500
 const fmt = (ms: number) => { const m = Math.floor(ms / 60000); const s = ms / 1000 - m * 60; return `${m}:${s.toFixed(2).padStart(5, '0')}` }
@@ -35,7 +37,7 @@ const lapKey = (key: string) => `race-best-${key}`
 export default function RaceView({ trackId, custom, laps, me, assistOk = false, bots = [], online, onFinish, onAgain, onExit }: Props) {
   const mount = useRef<HTMLDivElement>(null)
   const mini = useRef<HTMLCanvasElement>(null)
-  const inp = useRef<Input>({ gas: false, brake: false, left: false, right: false })
+  const inp = useRef<Record<Key, boolean>>({ gas: false, brake: false, left: false, right: false, fly: false })
   const resetReq = useRef(false)
   const camRef = useRef<0 | 1>((() => { try { return localStorage.getItem('vt-race-cam') === '1' ? 1 : 0 } catch { return 0 } })())
   const [cockpit, setCockpit] = useState(camRef.current === 1)
@@ -51,8 +53,10 @@ export default function RaceView({ trackId, custom, laps, me, assistOk = false, 
   const toggleAssist = () => { if (!assistOk) return; assistRef.current = !assistRef.current; setAssist(assistRef.current) }
   const assistToggleRef = useRef(toggleAssist)
   assistToggleRef.current = toggleAssist
-  const [hud, setHud] = useState({ speed: 0, lap: 1, pos: 1, of: 1 + bots.length + (online ? online.players.length - 1 : 0), ms: 0, count: 4, wrong: false, curve: 0, curveDist: 0, offroad: false, best: 0, dmg: 0, drift: false })
+  const [hud, setHud] = useState({ speed: 0, lap: 1, pos: 1, of: 1 + bots.length + (online ? online.players.length - 1 : 0), ms: 0, count: 4, wrong: false, curve: 0, curveDist: 0, offroad: false, best: 0, dmg: 0, drift: false, fly: 0, cool: 0 })
   const [done, setDone] = useState<{ ms: number; best: number; standings: RaceStanding[] } | null>(null)
+  const flyer = canFly(me.kind)
+  const bikeUi = isBike(me.kind)
   const [loadErr, setLoadErr] = useState<string | null>(null)
 
   useEffect(() => {
@@ -89,8 +93,9 @@ export default function RaceView({ trackId, custom, laps, me, assistOk = false, 
       cleanups.push(() => { ro.disconnect(); renderer.dispose(); renderer.domElement.remove() })
 
       // Fahrzeuge
-      const myStats: CarStats = statsFor(me.kind, me.top)
+      const myStats: CarStats = statsFor(me.kind, me.top, me.up)
       const line = buildRaceLine(track)
+      const bike = isBike(me.kind)
       let slot = 0
       const mySlot = online ? Math.max(0, online.players.findIndex((p) => p.id === online.userId)) : bots.length
       let car: Car = startCar(track, mySlot)
@@ -102,10 +107,10 @@ export default function RaceView({ trackId, custom, laps, me, assistOk = false, 
       })
       const botMeshes = botList.map((b) => { const m = rs.makeCar(b.kind, b.color, b.name, false); scene.add(m); return m })
       const remotes = new Map<string, Remote>()
-      if (online) online.players.forEach((p, i) => { if (p.id !== online.userId) { const c = startCar(track, i); const oc = online.cars?.[p.id]; const r: Remote = { id: p.id, name: p.name, kind: oc?.kind ?? 'kleinwagen', color: oc?.color ?? '#94a3b8', x: c.x, z: c.z, h: c.h, v: 0, tx: c.x, tz: c.z, th: c.h, total: c.total, ft: null, seen: 0, dmg: 0, slip: 0 }; if (oc) { r.mesh = rs.makeCar(r.kind, r.color, r.name, false); r.mesh.position.set(c.x, 0, c.z); r.mesh.rotation.y = c.h; scene.add(r.mesh) } remotes.set(p.id, r) } })
+      if (online) online.players.forEach((p, i) => { if (p.id !== online.userId) { const c = startCar(track, i); const oc = online.cars?.[p.id]; const r: Remote = { id: p.id, name: p.name, kind: oc?.kind ?? 'kleinwagen', color: oc?.color ?? '#94a3b8', x: c.x, z: c.z, h: c.h, v: 0, tx: c.x, tz: c.z, th: c.h, total: c.total, ft: null, seen: 0, dmg: 0, slip: 0, fl: 0 }; if (oc) { r.mesh = rs.makeCar(r.kind, r.color, r.name, false); r.mesh.position.set(c.x, 0, c.z); r.mesh.rotation.y = c.h; scene.add(r.mesh) } remotes.set(p.id, r) } })
 
       // Tastatur
-      const keyMap: Record<string, keyof Input> = { ArrowLeft: 'left', a: 'left', A: 'left', ArrowRight: 'right', d: 'right', D: 'right', ArrowUp: 'gas', w: 'gas', W: 'gas', ArrowDown: 'brake', s: 'brake', S: 'brake', ' ': 'brake' }
+      const keyMap: Record<string, Key> = { ArrowLeft: 'left', a: 'left', A: 'left', ArrowRight: 'right', d: 'right', D: 'right', ArrowUp: 'gas', w: 'gas', W: 'gas', ArrowDown: 'brake', s: 'brake', S: 'brake', ' ': 'brake', e: 'fly', E: 'fly' }
       const kd = (e: KeyboardEvent) => { const k = keyMap[e.key]; if (k) { inp.current[k] = true; e.preventDefault() } else if (e.key === 'r' || e.key === 'R') resetReq.current = true; else if (e.key === 'c' || e.key === 'C') toggleRef.current(); else if (e.key === 'f' || e.key === 'F') assistToggleRef.current() }
       const ku = (e: KeyboardEvent) => { const k = keyMap[e.key]; if (k) { inp.current[k] = false; e.preventDefault() } }
       window.addEventListener('keydown', kd); window.addEventListener('keyup', ku)
@@ -122,7 +127,7 @@ export default function RaceView({ trackId, custom, laps, me, assistOk = false, 
           const r = remotes.get(payload.u as string)
           if (!r) return
           r.tx = Number(payload.x) || 0; r.tz = Number(payload.z) || 0; r.th = Number(payload.h) || 0; r.v = Number(payload.v) || 0
-          r.dmg = Number(payload.d) || 0; r.slip = Number(payload.sl) || 0
+          r.dmg = Number(payload.d) || 0; r.slip = Number(payload.sl) || 0; r.fl = Number(payload.fl) || 0
           r.total = Number(payload.t) || 0; r.ft = typeof payload.f === 'number' ? payload.f : null; r.seen = performance.now()
           if (typeof payload.k === 'string' && (payload.k !== r.kind || payload.c !== r.color)) {
             r.kind = payload.k; r.color = String(payload.c || '#94a3b8')
@@ -193,10 +198,10 @@ export default function RaceView({ trackId, custom, laps, me, assistOk = false, 
         const assisting = assistRef.current && finishedMs === null && go
         if (assisting) {
           usedAssist = true
-          const m = inp.current, ai = botSteer(car, myStats, line, 1, 0)
-          input = { left: m.left || m.right ? m.left : ai.left, right: m.left || m.right ? m.right : ai.right, gas: m.gas || m.brake ? m.gas : ai.gas, brake: m.gas || m.brake ? m.brake : ai.brake }
+          const m = inp.current, ai = assistSteer(car, myStats, line), hand = m.left || m.right
+          input = { left: hand ? m.left : ai.left, right: hand ? m.right : ai.right, gas: m.gas || m.brake ? m.gas : ai.gas, brake: m.gas || m.brake ? m.brake : ai.brake, fly: m.fly, drift: !hand, turn: ai.turn }
         }
-        car = stepCar(car, input, dt, track, myStats, go, !assisting)
+        car = stepCar(car, input, dt, track, myStats, go, true)
         if (!canDrive && go) car = { ...car, v: Math.min(car.v, 30) }
 
         // Bots
@@ -208,6 +213,7 @@ export default function RaceView({ trackId, custom, laps, me, assistOk = false, 
         // Zusammenstöße: gedrehte Hitboxen, Schaden aus der Aufprallgeschwindigkeit
         let bumped = false
         for (const b of botList) {
+          if (car.fly > 0) continue
           const c1 = crash(car, myStats, { x: b.car.x, z: b.car.z, h: b.car.h, v: b.car.v }, b.st, 0.5)
           if (c1) { car = c1; bumped = true }
           const c2 = crash(b.car, b.st, { x: car.x, z: car.z, h: car.h, v: car.v, slip: car.slip }, myStats, 0.5, 85)
@@ -221,7 +227,7 @@ export default function RaceView({ trackId, custom, laps, me, assistOk = false, 
           if (c2) B.car = c2
         }
         for (const r of remotes.values()) {
-          if (now - r.seen > 3000) continue
+          if (now - r.seen > 3000 || r.fl > 0 || car.fly > 0) continue
           const c1 = crash(car, myStats, { x: r.x, z: r.z, h: r.h, v: r.v, slip: r.slip }, kindDims(r.kind), 0.5)
           if (c1) { car = c1; bumped = true }
         }
@@ -245,13 +251,18 @@ export default function RaceView({ trackId, custom, laps, me, assistOk = false, 
         }
 
         // Modelle
-        const place = (m: import('three').Group, x: number, z: number, h: number, v: number, steer: number, dmg = 0, slip = 0) => {
+        const place = (m: import('three').Group, x: number, z: number, h: number, v: number, steer: number, dmg = 0, slip = 0, fly = 0) => {
           rs.damageCar(m, dmg, slip, v, now / 1000)
-          m.position.set(x, 0, z); m.rotation.y = h; m.rotation.z = -steer * Math.min(1, Math.abs(v) / 40) * 0.05
+          m.position.set(x, flyHeight(fly), z); m.rotation.y = h
+          const lean = m.userData.lean as import('three').Group | undefined
+          if (lean) { m.rotation.z = 0; lean.rotation.z += ((-Math.max(-0.85, Math.min(0.85, steer * Math.min(1, Math.abs(v) / 20) * 0.9 + slip * 0.5))) - lean.rotation.z) * Math.min(1, dt * 9) }
+          else m.rotation.z = -steer * Math.min(1, Math.abs(v) / 40) * 0.05
+          const jets = m.userData.jets as import('three').Group | undefined
+          if (jets) jets.visible = fly > 0
           const wh = m.userData.wheels as import('three').Group[] | undefined
           if (wh) for (const w of wh) { w.children.forEach((c) => { c.rotation.x += (v * dt) / (m.userData.wheelR as number) }); if (w.name === 'front') w.rotation.y = steer * 0.45 }
         }
-        place(myMesh, car.x, car.z, car.h, car.v, car.steer, car.dmg, car.slip)
+        place(myMesh, car.x, car.z, car.h, car.v, car.steer, car.dmg, car.slip, car.fly)
         botList.forEach((b, i) => place(botMeshes[i], b.car.x, b.car.z, b.car.h, b.car.v, b.car.steer, b.car.dmg, b.car.slip))
         for (const r of remotes.values()) {
           if (!r.mesh) continue
@@ -260,7 +271,7 @@ export default function RaceView({ trackId, custom, laps, me, assistOk = false, 
           let dh = r.th - r.h; while (dh > Math.PI) dh -= Math.PI * 2; while (dh < -Math.PI) dh += Math.PI * 2
           r.h += dh * k
           r.mesh.visible = now - r.seen < 5000
-          place(r.mesh, r.x, r.z, r.h, r.v, 0, r.dmg, r.slip)
+          place(r.mesh, r.x, r.z, r.h, r.v, 0, r.dmg, r.slip, r.fl)
         }
 
         // Kamera: Verfolger von hinten oder Cockpit (Blick aus dem Fenster)
@@ -269,10 +280,10 @@ export default function RaceView({ trackId, custom, laps, me, assistOk = false, 
           myMesh.visible = false
           camH = car.h
           const bx = Math.sin(car.h), bz = Math.cos(car.h)
-          camera.position.set(car.x + bx * 0.25 - bz * 0.35, 1.18, car.z + bz * 0.25 + bx * 0.35)
+          camera.position.set(car.x + bx * 0.25 - bz * 0.35, 1.18 + flyHeight(car.fly), car.z + bz * 0.25 + bx * 0.35)
           const look = car.h + car.steer * 0.05
           camera.lookAt(car.x + Math.sin(look) * 40, 1.0, car.z + Math.cos(look) * 40)
-          camera.rotateZ(-car.steer * 0.03 * Math.min(1, sp / 40))
+          if (bike) { camera.position.y = 1.55 + flyHeight(car.fly); camera.rotateZ(Math.max(-0.7, Math.min(0.7, car.steer * Math.min(1, sp / 20) * 0.8)) * 0.9) } else camera.rotateZ(-car.steer * 0.03 * Math.min(1, sp / 40))
           camera.fov += ((74 + Math.min(16, sp * 0.2)) - camera.fov) * Math.min(1, dt * 3)
           if (wheelEl.current) wheelEl.current.style.transform = `rotate(${(-car.steer * 95).toFixed(1)}deg)`
         } else {
@@ -280,8 +291,9 @@ export default function RaceView({ trackId, custom, laps, me, assistOk = false, 
           let dh = car.h - camH; while (dh > Math.PI) dh -= Math.PI * 2; while (dh < -Math.PI) dh += Math.PI * 2
           camH += dh * Math.min(1, dt * 4.5)
           const back = 9.5 + sp * 0.06, up = 4.3 + sp * 0.018
-          camera.position.set(car.x - Math.sin(camH) * back, up, car.z - Math.cos(camH) * back)
+          camera.position.set(car.x - Math.sin(camH) * back, up + flyHeight(car.fly) * 0.8, car.z - Math.cos(camH) * back)
           camera.lookAt(car.x + Math.sin(camH) * 22, 1.4, car.z + Math.cos(camH) * 22)
+          if (bike) camera.rotateZ(Math.max(-0.7, Math.min(0.7, car.steer * Math.min(1, sp / 20) * 0.8)) * 0.5)
           camera.fov += ((62 + Math.min(18, sp * 0.22)) - camera.fov) * Math.min(1, dt * 3)
         }
         camera.updateProjectionMatrix()
@@ -292,7 +304,7 @@ export default function RaceView({ trackId, custom, laps, me, assistOk = false, 
 
         if (online && now - lastSend > 55) {
           lastSend = now
-          send({ u: online.userId, x: car.x, z: car.z, h: car.h, v: car.v, t: car.total, k: me.kind, c: me.color, f: finishedMs, d: Math.round(car.dmg), sl: Math.round(car.slip * 100) / 100 })
+          send({ u: online.userId, x: car.x, z: car.z, h: car.h, v: car.v, t: car.total, k: me.kind, c: me.color, f: finishedMs, d: Math.round(car.dmg), sl: Math.round(car.slip * 100) / 100, fl: Math.round(car.fly * 100) / 100 })
         }
         if (now - lastHud > 110) {
           lastHud = now
@@ -300,7 +312,7 @@ export default function RaceView({ trackId, custom, laps, me, assistOk = false, 
           const dot = Math.sin(car.h) * track.tx[pr.i] + Math.cos(car.h) * track.tz[pr.i]
           const ca = curveAhead(track, pr.i, 110)
           const count = go ? 0 : Math.ceil((startAt - now) / 1000)
-          setHud({ speed: Math.round(Math.abs(car.v) * 3.6), lap: Math.min(laps, Math.max(1, lapNow + 1)), pos: rankNow(), of: 1 + botList.length + remotes.size, ms: finishedMs ?? raceMs, count, wrong: dot < -0.3 && car.v > 4, curve: Math.abs(ca.k) > 0.004 ? Math.sign(ca.k) : 0, curveDist: Math.round(ca.dist / 10) * 10, offroad: car.offroad, best: bestLap, dmg: Math.round(car.dmg), drift: Math.abs(car.slip) > 0.2 && car.v > 10 })
+          setHud({ speed: Math.round(Math.abs(car.v) * 3.6), lap: Math.min(laps, Math.max(1, lapNow + 1)), pos: rankNow(), of: 1 + botList.length + remotes.size, ms: finishedMs ?? raceMs, count, wrong: dot < -0.3 && car.v > 4, curve: Math.abs(ca.k) > 0.004 ? Math.sign(ca.k) : 0, curveDist: Math.round(ca.dist / 10) * 10, offroad: car.offroad, best: bestLap, dmg: Math.round(car.dmg), drift: Math.abs(car.slip) > 0.2 && car.v > 10, fly: Math.round(car.fly * 10) / 10, cool: Math.ceil(car.cool) })
           drawMini()
           if (finishedMs !== null) {
             const fin = finishedMs
@@ -321,7 +333,7 @@ export default function RaceView({ trackId, custom, laps, me, assistOk = false, 
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
-  const hold = (k: keyof Input) => ({
+  const hold = (k: Key) => ({
     onPointerDown: (e: React.PointerEvent) => { e.preventDefault(); (e.currentTarget as HTMLElement).setPointerCapture?.(e.pointerId); inp.current[k] = true },
     onPointerUp: () => { inp.current[k] = false },
     onPointerCancel: () => { inp.current[k] = false },
@@ -334,7 +346,13 @@ export default function RaceView({ trackId, custom, laps, me, assistOk = false, 
     <div className="relative select-none overflow-hidden rounded-2xl bg-slate-900" style={{ height: 'min(72vh, 640px)', touchAction: 'none' }}>
       <div ref={mount} className="absolute inset-0" />
       {loadErr && <p className="absolute inset-0 grid place-items-center p-6 text-center text-sm text-rose-200">{loadErr}</p>}
-      {cockpit && (
+      {cockpit && bikeUi && (
+        <div className="pointer-events-none absolute inset-x-0 bottom-0 h-[34%]" aria-hidden>
+          <svg viewBox="0 0 400 120" preserveAspectRatio="none" className="absolute inset-0 h-full w-full"><path d="M120 120 L170 70 L230 70 L280 120 Z" fill="#111827" /><path d="M60 92 Q200 62 340 92" fill="none" stroke="#cbd5e1" strokeWidth="6" strokeLinecap="round" /><circle cx="58" cy="92" r="11" fill="#0f172a" /><circle cx="342" cy="92" r="11" fill="#0f172a" /><rect x="176" y="66" width="48" height="26" rx="6" fill="#0b1220" stroke="#475569" /></svg>
+          <div className="absolute bottom-3 left-1/2 -translate-x-1/2 rounded-lg bg-black/70 px-3 py-0.5 font-mono text-lg font-bold text-cyan-300">{hud.speed} <span className="text-xs">km/h</span></div>
+        </div>
+      )}
+      {cockpit && !bikeUi && (
         <div className="pointer-events-none absolute inset-x-0 bottom-0 h-[46%]" aria-hidden>
           <svg viewBox="0 0 400 180" preserveAspectRatio="none" className="absolute inset-0 h-full w-full">
             <defs><linearGradient id="dash" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stopColor="#1f2937" /><stop offset="1" stopColor="#030712" /></linearGradient></defs>
@@ -363,6 +381,7 @@ export default function RaceView({ trackId, custom, laps, me, assistOk = false, 
         <div className="ml-auto mt-1 h-2 w-20 overflow-hidden rounded bg-black/50" role="img" aria-label={`Schaden ${hud.dmg} Prozent`}><div className={`h-full ${hud.dmg > 70 ? 'bg-rose-500' : hud.dmg > 35 ? 'bg-amber-400' : 'bg-emerald-400'}`} style={{ width: `${hud.dmg}%` }} /></div>
         <p className="text-[10px]">Schaden {hud.dmg}%</p>
         {hud.drift && <p className="text-xs font-bold text-amber-200">DRIFT!</p>}
+        {flyer && <p className={`text-xs font-bold ${hud.fly > 0 ? 'text-cyan-300' : hud.cool > 0 ? 'text-slate-300' : 'text-emerald-300'}`}>{hud.fly > 0 ? `FLUG ${hud.fly.toFixed(1)} s` : hud.cool > 0 ? `Laden ${hud.cool} s` : 'Flug bereit (E)'}</p>}
       </div>
       {hud.dmg >= 100 && <p className="pointer-events-none absolute top-14 left-1/2 -translate-x-1/2 rounded-lg bg-rose-700 px-3 py-1 text-sm font-bold text-white">Totalschaden! R = Werkstatt (3 s Pause)</p>}
       {hud.curve !== 0 && hud.count === 0 && (
@@ -385,6 +404,7 @@ export default function RaceView({ trackId, custom, laps, me, assistOk = false, 
         <button type="button" aria-label="Nach rechts" {...hold('right')} className={`${btn} h-24 w-24 text-4xl`}>▶</button>
       </div>
       <div className="absolute bottom-3 right-3 flex items-end gap-3">
+        {flyer && <button type="button" aria-label="Fliegen" {...hold('fly')} className={`${btn} h-20 w-24 text-base !bg-cyan-600/60`}>FLIEGEN</button>}
         <button type="button" aria-label="Bremse" {...hold('brake')} className={`${btn} h-20 w-24 text-base !bg-rose-600/60`}>BREMSE</button>
         <button type="button" aria-label="Gas" {...hold('gas')} className={`${btn} h-28 w-28 text-xl !bg-emerald-600/65`}>GAS</button>
       </div>
@@ -403,7 +423,7 @@ export default function RaceView({ trackId, custom, laps, me, assistOk = false, 
           </div>
         </div>
       )}
-      <p className="pointer-events-none sr-only">Steuerung: Pfeiltasten oder WASD, R setzt das Auto zurück, C wechselt die Kamera, Bremse + Lenken driftet.{assistOk ? ' F schaltet den Fahrassistenten ein.' : ''}</p>
+      <p className="pointer-events-none sr-only">Steuerung: Pfeiltasten oder WASD, R setzt das Auto zurück, C wechselt die Kamera, Bremse + Lenken driftet.{flyer ? ' E lässt den Roadster 2 Sekunden fliegen (danach 20 s laden).' : ''}{assistOk ? ' F schaltet den Fahrassistenten ein.' : ''}</p>
     </div>
   )
 }

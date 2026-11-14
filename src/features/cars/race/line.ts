@@ -51,15 +51,15 @@ export function buildRaceLine(t: Track, margin = 3.2, iterations = 140): RaceLin
 }
 
 /** Seitliche Beschleunigung, die ein Fahrer mit `skill` aus dem Auto herausholt (m/s²). */
-const latAcc = (st: CarStats, skill: number) => (28 + st.turn * 7) * (0.72 + 0.28 * skill) / (1 + Math.max(0, st.top - 90) / 260)
+const latAcc = (st: CarStats, skill: number, mul = 1) => (28 + st.turn * 7) * (0.72 + 0.28 * skill) * mul / (1 + Math.max(0, st.top - 90) / 260)
 
 /** Sollgeschwindigkeit entlang der Linie (m/s): Kurvengrenze, dazu rückwärts gerechnet die Bremswege. */
-export function speedProfile(line: RaceLine, st: CarStats, skill: number): Float32Array {
-  const key = `${st.top.toFixed(1)}|${st.acc.toFixed(1)}|${st.brake.toFixed(1)}|${st.turn}|${skill.toFixed(2)}`
+export function speedProfile(line: RaceLine, st: CarStats, skill: number, mul = 1): Float32Array {
+  const key = `${st.top.toFixed(1)}|${st.acc.toFixed(1)}|${st.brake.toFixed(1)}|${st.turn}|${skill.toFixed(2)}|${mul}`
   const hit = line.cache.get(key)
   if (hit) return hit
   const n = line.t.n, ds = line.t.length / n
-  const a = latAcc(st, skill), topEff = st.top * (0.86 + 0.14 * skill)
+  const a = mul > 1 ? Math.min(latAcc(st, skill, mul), 80) : latAcc(st, skill), topEff = st.top * (0.86 + 0.14 * skill)
   const v = new Float32Array(n)
   for (let i = 0; i < n; i++) v[i] = Math.min(topEff, Math.sqrt(a / Math.max(line.k[i], 1e-4)))
   const b = st.brake * 0.7
@@ -80,4 +80,26 @@ export function botSteer(c: Car, st: CarStats, line: RaceLine, skill: number, la
   const dev = Math.hypot(line.x[i] - c.x, line.z[i] - c.z)
   const vt = prof[(i + 2) % n] / (1 + Math.max(0, dev - 3) * 0.06)
   return { gas: v < vt, brake: v > vt + 1.5 + v * 0.03, left: d > 0.022, right: d < -0.022 }
+}
+
+/** Fahrassistent mit Drift: nimmt Kurven quer (viel höheres Kurventempo) und lenkt nach der Fahrtrichtung, nicht nach der Blickrichtung.
+ *  Wie stark er driftet, steuert `DRIFT_MUL` (Faktor auf die seitliche Beschleunigung). */
+export const DRIFT_MUL = 3.4
+export function assistSteer(c: Car, st: CarStats, line: RaceLine): Input {
+  const t = line.t, n = t.n, ds = t.length / n
+  const prof = speedProfile(line, st, 1, DRIFT_MUL)
+  const v = Math.max(0, c.v)
+  const i = c.idx
+  const j = (i + Math.max(2, Math.round((10 + v * 0.22) / ds))) % n
+  const tx = line.x[j], tz = line.z[j]
+  const moveH = c.h - c.slip
+  const dist = Math.max(4, Math.hypot(tx - c.x, tz - c.z))
+  const d = wrap(Math.atan2(tx - c.x, tz - c.z) - moveH)
+  const dev = Math.hypot(line.x[i] - c.x, line.z[i] - c.z)
+  const vt = prof[(i + 2) % n] / (1 + Math.max(0, dev - 4) * 0.05)
+  // Pure Pursuit: Krümmung = 2·sin(α)/Abstand, Drehrate = Tempo × Krümmung
+  const turn = v * 2 * Math.sin(d) / dist
+  // Der Assistent fährt immer im Drift-Modus: auf Geraden steht das Auto gerade, in Kurven stellt es sich quer
+  const drift = true
+  return { gas: v < vt, brake: v > vt + 2 + v * 0.03, left: d > 0.01, right: d < -0.01, drift, turn }
 }

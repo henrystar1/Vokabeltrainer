@@ -1,20 +1,22 @@
 import { advance, pointAt, project, type Track } from './track'
-import { carKmh, kindDims, kindStats } from '../stats'
+import { canFly, carKmh, FLY_COOLDOWN, FLY_SECONDS, isBike, kindDims, kindStats } from '../stats'
+import { upFactors, type Up } from '../tuning'
 import { boxHit, corners, impactDamage, type Box } from './collide'
 import { botSteer, type RaceLine } from './line'
 
 /** Fahrwerte eines Autos: Höchstgeschwindigkeit (m/s), Beschleunigung, Lenkung, Bremse. */
-export interface CarStats { top: number; acc: number; turn: number; brake: number; len: number; wid: number }
+export interface CarStats { top: number; acc: number; turn: number; brake: number; len: number; wid: number; fly: boolean; bike: boolean }
 /** Werte je Art; mit `kmh` (eigener Höchstwert des Autos) wird Tempo und Beschleunigung entsprechend skaliert. */
-export const statsFor = (kind: string, kmh?: number | null): CarStats => {
+export const statsFor = (kind: string, kmh?: number | null, up?: Up | null): CarStats => {
   const k = kindStats(kind)
   const f = carKmh(kind, kmh) / k.kmh
   const d = kindDims(kind)
-  return { top: (k.kmh * f) / 3.6, acc: k.acc * Math.pow(f, 0.8), turn: k.turn, brake: k.brake * Math.pow(f, 0.5), len: d.len, wid: d.wid }
+  const u = up ? upFactors(up) : { top: 1, acc: 1, turn: 1, brake: 1 }
+  return { top: (k.kmh * f * u.top) / 3.6, acc: k.acc * Math.pow(f, 0.8) * u.acc, turn: k.turn * u.turn, brake: k.brake * Math.pow(f, 0.5) * u.brake, len: d.len, wid: d.wid, fly: canFly(kind), bike: isBike(kind) }
 }
 export const STATS: Record<string, CarStats> = Object.fromEntries(['kleinwagen', 'limousine', 'kombi', 'suv', 'pickup', 'cabrio', 'sportwagen', 'bus', 'oldtimer', 'buggy', 'monstertruck', 'muscle', 'rallye', 'gt', 'hypercar', 'rennwagen'].map((k) => [k, statsFor(k)]))
 
-export interface Input { gas: boolean; brake: boolean; left: boolean; right: boolean }
+export interface Input { gas: boolean; brake: boolean; left: boolean; right: boolean; /** Flug starten (nur Roadster) */ fly?: boolean; /** Auto-Drift des Fahrassistenten: driftet ohne Bremsen und ohne Tempoverlust */ drift?: boolean; /** Gewünschte Drehrate der Fahrtrichtung (rad/s) beim Auto-Drift */ turn?: number }
 export interface Car {
   x: number; z: number
   /** Fahrtrichtung in Bogenmaß: 0 = nach +z, wächst gegen den Uhrzeigersinn von oben (dx = sin h, dz = cos h) */
@@ -38,6 +40,10 @@ export interface Car {
   hold: number
   /** Aufprallstärke in diesem Schritt (0–1, für Schütteln und Funken) */
   hit: number
+  /** Restzeit des Flugs (s), 0 = am Boden */
+  fly: number
+  /** Wartezeit bis zum nächsten Flug (s) */
+  cool: number
 }
 
 export const CAR_R = 2.2
@@ -46,10 +52,12 @@ export function startCar(t: Track, slot: number): Car {
   // Aufstellung: Zweierreihen hinter der Startlinie
   const row = Math.floor(slot / 2), col = slot % 2
   const p = pointAt(t, t.length - 10 - row * 9, (col ? 1 : -1) * t.def.width * 0.22)
-  return { x: p.x, z: p.z, h: Math.atan2(p.hx, p.hz), v: 0, steer: 0, total: -(10 + row * 9), idx: p.i, lap: 0, offroad: false, bump: 0, slip: 0, dmg: 0, pull: 1, hold: 0, hit: 0 }
+  return { x: p.x, z: p.z, h: Math.atan2(p.hx, p.hz), v: 0, steer: 0, total: -(10 + row * 9), idx: p.i, lap: 0, offroad: false, bump: 0, slip: 0, dmg: 0, pull: 1, hold: 0, hit: 0, fly: 0, cool: 0 }
 }
 
 export const DMG_MAX = 100
+/** Größte Seitenbeschleunigung beim Auto-Drift (m/s²) */
+export const AUTO_LAT = 110
 const wrap = (d: number) => { while (d > Math.PI) d -= Math.PI * 2; while (d < -Math.PI) d += Math.PI * 2; return d }
 
 /** Hitbox eines Autos. */
@@ -67,19 +75,25 @@ export function stepCar(c: Car, inp: Input, dt: number, t: Track, st: CarStats, 
   const d = c.dmg / DMG_MAX
   const wrecked = c.dmg >= DMG_MAX
   const waiting = c.hold > 0
+  let fly = c.fly, cool = c.cool
+  if (fly <= 0 && cool > 0) cool = Math.max(0, cool - dt)
+  if (st.fly && inp.fly && canDrive && !wrecked && !waiting && fly <= 0 && cool <= 0) fly = FLY_SECONDS
+  const flying = fly > 0
+  if (flying) { fly = Math.max(0, fly - dt); if (fly === 0) cool = FLY_COOLDOWN }
   const can = canDrive && !wrecked && !waiting
   const gas = can && inp.gas, brake = canDrive && inp.brake && !waiting
   let v = c.v
   const half = t.def.width / 2
   const pr = project(t, c.x, c.z, c.idx)
   const off = pr.dist > half
-  const top = st.top * (off ? 0.5 : 1) * (wrecked ? 0.12 : 1 - 0.5 * d)
+  const top = st.top * (off && !flying ? 0.5 : 1) * (wrecked ? 0.12 : 1 - 0.5 * d)
   const acc = st.acc * (1 - 0.55 * d)
   const target = (inp.right ? -1 : 0) + (inp.left ? 1 : 0)
-  const drifting = drift && can && brake && target !== 0 && v > 14
+  const auto = !!inp.drift
+  const drifting = drift && can && (auto ? v > 14 : brake && target !== 0 && v > 14)
   if (gas) v += acc * (1 - Math.max(0, v) / (st.top * 1.08)) * dt
-  if (brake) v -= (v > 0 ? st.brake * (drifting ? 0.3 : 1) : st.acc * 0.6) * dt
-  if (!gas && !brake) v -= Math.sign(v) * Math.min(Math.abs(v), (4 + v * v * 0.004 + (wrecked ? 10 : 0)) * dt)
+  if (brake) v -= (v > 0 ? st.brake * (drifting && !auto ? 0.3 : 1) : st.acc * 0.6) * dt
+  if (!gas && !brake && !flying) v -= Math.sign(v) * Math.min(Math.abs(v), (4 + v * v * 0.004 + (wrecked ? 10 : 0)) * dt)
   if (waiting) v -= Math.sign(v) * Math.min(Math.abs(v), 40 * dt)
   if (v > top) v -= (v - top) * Math.min(1, 2.4 * dt)
   v = Math.max(-10, v)
@@ -88,14 +102,21 @@ export function stepCar(c: Car, inp: Input, dt: number, t: Track, st: CarStats, 
   const grip = Math.min(1, Math.abs(v) / 9)
   const speedFactor = 1 / (1 + Math.abs(v) * 0.022)
   // Driftwinkel: baut sich beim Driften auf, sonst bekommen die Reifen wieder Halt
-  const slipTarget = drifting ? Math.sign(target) * Math.min(0.7, 0.22 + v / 140) : 0
+  const slipTarget = drifting ? (auto ? Math.max(-0.62, Math.min(0.62, (inp.turn ?? 0) * 0.24)) : Math.sign(target) * Math.min(0.7, 0.22 + v / 140)) : 0
   const slip = c.slip + (slipTarget - c.slip) * Math.min(1, (drifting ? 3.2 : 2.4) * dt)
-  let h = c.h + steer * st.turn * grip * speedFactor * Math.sign(v || 1) * dt * 1.35 * (1 + Math.abs(slip) * 0.9)
+  const autoDrift = auto && drifting
+  let h = c.h + steer * st.turn * grip * speedFactor * Math.sign(v || 1) * dt * 1.35 * (1 + Math.abs(slip) * (auto ? 3.4 : 0.9))
+  // Auto-Drift (Fahrassistent): die Fahrtrichtung folgt direkt der Wunschdrehung, das Heck steht quer dazu
+  if (autoDrift) {
+    const maxRate = AUTO_LAT / Math.max(Math.abs(v), 8)
+    const rate = Math.max(-maxRate, Math.min(maxRate, inp.turn ?? 0))
+    h = c.h - c.slip + rate * dt + slip
+  }
   // beschädigtes Auto zieht zur Seite
   if (d > 0.3) h += c.pull * (d - 0.3) * 0.5 * Math.min(1, Math.abs(v) / 25) * dt
   // Seitenrutschen in schnellen Kurven und beim Driften: Tempo geht verloren
-  v -= Math.abs(steer) * Math.abs(v) * 0.16 * dt * (Math.abs(v) / st.top)
-  v -= Math.abs(slip) * Math.abs(v) * 0.22 * dt
+  v -= Math.abs(steer) * Math.abs(v) * 0.16 * dt * (Math.abs(v) / st.top) * (auto ? 0.3 : 1)
+  v -= Math.abs(slip) * Math.abs(v) * 0.22 * dt * (auto ? 0.25 : 1)
   const moveH = h - slip
   let x = c.x + Math.sin(moveH) * v * dt
   let z = c.z + Math.cos(moveH) * v * dt
@@ -110,7 +131,11 @@ export function stepCar(c: Car, inp: Input, dt: number, t: Track, st: CarStats, 
     const q = project(t, cx, cz, pr2.i)
     if (q.dist - wall > worst) { worst = q.dist - wall; wi = q.i; wl = q.lat }
   }
-  if (worst > 0) {
+  if (worst > 0 && flying) {
+    // im Flug: nur zurück auf die Strecke schieben, kein Schaden
+    const nx = -t.tz[wi] * Math.sign(wl || 1), nz = t.tx[wi] * Math.sign(wl || 1)
+    x -= nx * worst; z -= nz * worst
+  } else if (worst > 0) {
     const nx = -t.tz[wi] * Math.sign(wl || 1), nz = t.tx[wi] * Math.sign(wl || 1)
     x -= nx * worst; z -= nz * worst
     const tang = Math.atan2(t.tx[wi], t.tz[wi])
@@ -125,7 +150,7 @@ export function stepCar(c: Car, inp: Input, dt: number, t: Track, st: CarStats, 
   }
   const total = advance(c.total, pr2.s, t.length)
   const pull = c.dmg === 0 && dmg > 0 ? (Math.random() < 0.5 ? -1 : 1) : c.pull
-  return { x, z, h, v, steer, total, idx: pr2.i, lap: Math.floor(total / t.length), offroad: pr2.dist > half, bump, slip, dmg, pull, hold: Math.max(0, c.hold - dt), hit }
+  return { x, z, h, v, steer, total, idx: pr2.i, lap: Math.floor(total / t.length), offroad: pr2.dist > half, bump, slip, dmg, pull, hold: Math.max(0, c.hold - dt), hit, fly, cool }
 }
 
 /** Zusammenstoß zweier Autos (Hitboxen): verschiebt `me` (Anteil `share` der Eindringtiefe), bremst und beschädigt.
