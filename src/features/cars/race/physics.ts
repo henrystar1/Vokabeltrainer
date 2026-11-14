@@ -169,7 +169,25 @@ export function crash(me: Car, my: CarStats, o: { x: number; z: number; h: numbe
 }
 
 /** Bots und Fahrassistent: folgen der Ideallinie (kürzester Weg durch die Kurven) mit Geschwindigkeitsprofil. skill 0.7–1. lane = kleiner seitlicher Versatz (m). */
-export interface Bot { car: Car; kind: string; color: string; name: string; skill: number; lane: number; wobble: number; finished: number | null; top?: number | null; st: CarStats }
-export function botInput(b: { car: Car; st: CarStats; skill: number; lane: number; wobble: number }, line: RaceLine, time: number): Input {
-  return botSteer(b.car, b.st, line, b.skill, b.lane + Math.sin(time * 0.7 + b.wobble) * (1 - b.skill) * 6)
+export interface Bot { car: Car; kind: string; color: string; name: string; skill: number; lane: number; wobble: number; finished: number | null; top?: number | null; st: CarStats; /** Versatz zur Linie in der Startaufstellung (m) und Streckenstand beim Start: die Bots bleiben erst in ihrer Spur und ziehen später zur Linie */ lat0?: number; total0?: number; /** Tempolimit wegen eines Autos direkt davor (m/s) */ limit?: number }
+/** Tempo, das ein Bot höchstens fahren darf, damit er nicht auf ein Auto direkt vor ihm in seiner Spur auffährt. */
+export function packLimit(me: { x: number; z: number; h: number; v: number }, others: Array<{ x: number; z: number; v: number }>): number {
+  const fx = Math.sin(me.h), fz = Math.cos(me.h)
+  let lim = Infinity
+  for (const o of others) {
+    const dx = o.x - me.x, dz = o.z - me.z
+    const ahead = dx * fx + dz * fz, side = Math.abs(dx * fz - dz * fx)
+    if (ahead > 0 && ahead < 28 && side < 3.4) lim = Math.min(lim, Math.max(0, o.v) + (ahead - 7.5) * 0.7)
+  }
+  return lim
+}
+export function botInput(b: { car: Car; st: CarStats; skill: number; lane: number; wobble: number; lat0?: number; total0?: number; limit?: number }, line: RaceLine, time: number): Input {
+  let lane = b.lane + Math.sin(time * 0.7 + b.wobble) * (1 - b.skill) * 6
+  if (b.lat0 !== undefined && b.total0 !== undefined) {
+    // erst 60 m geradeaus in der eigenen Spur, dann über 350 m weich zur Linie – so rutschen nicht alle gleichzeitig in die Mitte
+    const f = Math.max(0, Math.min(1, (b.car.total - b.total0 - 60) / 350))
+    const s = f * f * (3 - 2 * f)
+    lane = b.lat0 * (1 - s) + lane * s
+  }
+  return botSteer(b.car, b.st, line, b.skill, lane, b.limit)
 }

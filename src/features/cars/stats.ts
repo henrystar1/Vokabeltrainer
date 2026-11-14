@@ -22,6 +22,7 @@ export const KIND_STATS: Record<string, KindStats> = {
   chopper: { kmh: 190, acc: 17, turn: 2.1, brake: 30 },
   crossbike: { kmh: 175, acc: 24, turn: 2.7, brake: 34 },
   sportbike: { kmh: 260, acc: 30, turn: 2.6, brake: 44 },
+  hyperbike: { kmh: 420, acc: 40, turn: 2.4, brake: 54 },
 }
 export const kindStats = (kind: string): KindStats => KIND_STATS[kind] ?? KIND_STATS.kleinwagen
 /** Tatsächliche Höchstgeschwindigkeit eines Autos: eigener Wert aus dem Shop, sonst der der Art. */
@@ -34,15 +35,16 @@ export const KIND_DIMS: Record<string, { len: number; wid: number }> = {
   oldtimer: { len: 4.4, wid: 1.8 }, buggy: { len: 3.4, wid: 1.9 }, monstertruck: { len: 4.8, wid: 2.4 }, muscle: { len: 4.9, wid: 1.95 },
   rallye: { len: 4.1, wid: 1.85 }, gt: { len: 4.7, wid: 2.0 }, hypercar: { len: 4.6, wid: 2.05 }, rennwagen: { len: 5.0, wid: 2.0 },
   roadster: { len: 4.2, wid: 1.85 }, supercar: { len: 4.5, wid: 1.85 },
-  chopper: { len: 2.6, wid: 0.9 }, crossbike: { len: 2.1, wid: 0.8 }, sportbike: { len: 2.1, wid: 0.8 },
+  chopper: { len: 2.6, wid: 0.9 }, crossbike: { len: 2.1, wid: 0.8 }, sportbike: { len: 2.1, wid: 0.8 }, hyperbike: { len: 2.2, wid: 0.8 },
 }
 export const kindDims = (kind: string): { len: number; wid: number } => KIND_DIMS[kind] ?? KIND_DIMS.kleinwagen
 
 /** Motorräder: legen sich in die Kurve (Modell und Kamera). */
-export const BIKE_KINDS = ['chopper', 'crossbike', 'sportbike']
+export const BIKE_KINDS = ['chopper', 'crossbike', 'sportbike', 'hyperbike']
 export const isBike = (kind: string): boolean => BIKE_KINDS.includes(kind)
 /** Nur der Roadster kann kurz fliegen (2 s, danach 20 s laden). */
-export const canFly = (kind: string): boolean => kind === 'roadster'
+/** Fliegen können der Sky-Roadster und das Admin-Supercar. */
+export const canFly = (kind: string): boolean => kind === 'roadster' || kind === 'supercar'
 export const FLY_SECONDS = 2
 export const FLY_COOLDOWN = 20
 /** Höhe über der Straße (m) bei noch `left` Sekunden Flug: sanft hoch, oben halten, sanft runter. */

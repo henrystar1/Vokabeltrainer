@@ -1,7 +1,7 @@
 import type * as T from 'three'
 import { isBike } from '../stats'
 import { RoundedBoxGeometry } from 'three/examples/jsm/geometries/RoundedBoxGeometry.js'
-import { project, type Track } from './track'
+import { roadProximity, type Track } from './track'
 
 type THREE = typeof import('three')
 
@@ -165,6 +165,8 @@ export function buildScene(THREE: THREE, t: Track): RaceScene {
   const houseGeo = new RoundedBoxGeometry(12, 14, 12, 2, 0.6)
   const cityMats = [0x9aa5b4, 0xb7a58f, 0x8896ab].map((c) => new THREE.MeshStandardMaterial({ color: c, roughness: 0.85 }))
   // Bäume, Felsen, Häuser entlang der Strecke (als Instanzen: wenige Zeichenaufrufe, auch bei 15 km)
+  // Abstand zu JEDEM Streckenpunkt (nicht nur in der Nähe von i): sonst stehen Häuser/Bäume auf Streckenteilen, die an anderer Stelle vorbeilaufen
+  const nearRoad = roadProximity(t)
   const spacing = Math.max(14, t.length / 700)
   const slots: Array<{ x: number; z: number; i: number }> = []
   for (let s0 = 0; s0 < t.length; s0 += spacing) {
@@ -172,7 +174,7 @@ export function buildScene(THREE: THREE, t: Track): RaceScene {
     const side = rnd() < 0.5 ? -1 : 1
     const lat = side * (half + 14 + rnd() * (t.def.theme === 'stadt' ? 70 : 150))
     const x = t.x[i] - t.tz[i] * lat, z = t.z[i] + t.tx[i] * lat
-    if (project(t, x, z, i).dist < half + 12) continue
+    if (nearRoad(x, z, half + (t.def.theme === 'stadt' ? 30 : 16))) continue
     slots.push({ x, z, i })
   }
   const dummy = new THREE.Object3D()
@@ -181,7 +183,7 @@ export function buildScene(THREE: THREE, t: Track): RaceScene {
   }
   const trees: typeof slots = [], rocks: typeof slots = [], houses: typeof slots = []
   for (const sl of slots) {
-    if (t.def.theme === 'stadt' && project(t, sl.x, sl.z, sl.i).dist < half + 90) houses.push(sl)
+    if (t.def.theme === 'stadt') houses.push(sl)
     else if (t.def.theme === 'wueste' && rnd() < 0.5) rocks.push(sl)
     else trees.push(sl)
   }
@@ -249,6 +251,21 @@ const BODIES: Record<string, Body> = {
   hypercar: { len: 4.6, wid: 2.05, hgt: 0.42, cabLen: 1.6, cabH: 0.4, cabZ: 0, wheelR: 0.39, spoiler: true, stripe: true },
   rennwagen: { len: 5.0, wid: 0.9, hgt: 0.42, cabLen: 0.8, cabH: 0.35, cabZ: -0.2, wheelR: 0.42, formula: true, track: 1.85, wheelW: 0.55 },
   roadster: { len: 4.2, wid: 1.85, hgt: 0.5, cabLen: 1.0, cabH: 0.3, cabZ: -0.1, wheelR: 0.37, open: true, stripe: true },
+}
+
+/** Flugdüsen unter dem Auto (zeigen nach unten): nur im Flug sichtbar. */
+function addJets(THREE: THREE, g: T.Group, len: number, wid: number): void {
+  const jets = new THREE.Group()
+  const flame = new THREE.MeshBasicMaterial({ color: 0x60e6ff, transparent: true, opacity: 0.9 })
+  const core = new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.95 })
+  for (const sx of [-wid * 0.3, wid * 0.3]) for (const z of [-len * 0.28, len * 0.22]) {
+    const f = new THREE.Mesh(new THREE.ConeGeometry(0.2, 1.6, 10), flame); f.rotation.x = Math.PI; f.position.set(sx, -0.45, z); jets.add(f)
+    const c = new THREE.Mesh(new THREE.ConeGeometry(0.09, 1.0, 8), core); c.rotation.x = Math.PI; c.position.set(sx, -0.25, z); jets.add(c)
+  }
+  const glow = new THREE.Mesh(new THREE.PlaneGeometry(wid * 1.1, len * 0.9), new THREE.MeshBasicMaterial({ color: 0x60e6ff, transparent: true, opacity: 0.3, depthWrite: false }))
+  glow.rotation.x = -Math.PI / 2; glow.position.y = 0.1; jets.add(glow)
+  jets.visible = false
+  g.add(jets); g.userData.jets = jets
 }
 
 function nameSprite(THREE: THREE, name: string, y: number): T.Sprite {
@@ -347,16 +364,7 @@ function buildCar(THREE: THREE, kind: string, color: string, name: string, isMe:
   sh.rotation.x = -Math.PI / 2; sh.position.y = 0.07
   g.add(sh)
   if (!isMe) g.add(nameSprite(THREE, name, b.hgt + b.cabH + 2.2))
-  if (kind === 'roadster') {
-    // Düsen unter dem Heck: nur im Flug sichtbar
-    const jets = new THREE.Group()
-    const flame = new THREE.MeshBasicMaterial({ color: 0x60e6ff, transparent: true, opacity: 0.9 })
-    for (const sx of [-0.55, 0.55]) { const f = new THREE.Mesh(new THREE.ConeGeometry(0.22, 1.4, 10), flame); f.rotation.x = -Math.PI / 2; f.position.set(sx, 0.35, -b.len / 2 - 0.55); jets.add(f) }
-    const glow = new THREE.Mesh(new THREE.PlaneGeometry(b.wid * 1.1, b.len * 0.9), new THREE.MeshBasicMaterial({ color: 0x60e6ff, transparent: true, opacity: 0.35, depthWrite: false }))
-    glow.rotation.x = -Math.PI / 2; glow.position.y = 0.12; jets.add(glow)
-    jets.visible = false
-    g.add(jets); g.userData.jets = jets
-  }
+  if (kind === 'roadster') addJets(THREE, g, b.len, b.wid)
   g.userData.wheels = wheels
   g.userData.paint = paint
   g.userData.paint0 = new THREE.Color(color)
@@ -414,7 +422,9 @@ function damageCar(THREE: THREE, g: T.Group, dmg: number, slip: number, v: numbe
 const tyreMat = (THREE: THREE) => new THREE.MeshStandardMaterial({ color: 0x14161b, roughness: 0.9 })
 
 /** Motorrad (Sportbike, Chopper, Crossbike): Fahrer, Tank, Gabel, Lenker. Alles in `lean`, damit es sich in Kurven neigt. */
-function buildBike(THREE: THREE, kind: string, color: string, name: string, isMe: boolean): T.Group {
+function buildBike(THREE: THREE, kind0: string, color: string, name: string, isMe: boolean): T.Group {
+  const hyper = kind0 === 'hyperbike'
+  const kind = hyper ? 'sportbike' : kind0
   const g = new THREE.Group()
   const lean = new THREE.Group()
   g.add(lean)
@@ -479,6 +489,13 @@ function buildBike(THREE: THREE, kind: string, color: string, name: string, isMe
   g.userData.body = tank
   g.userData.len = cfg.wb + 0.8
   g.userData.wid = 0.8
+  if (hyper) {
+    // Hyper-Bike: Neonstreifen, Heckflügel und Doppelauspuff
+    const neon = new THREE.MeshBasicMaterial({ color: 0x38f8ff })
+    const st1 = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.04, 1.5), neon); st1.position.set(0, 0.78, 0.1); lean.add(st1)
+    const wing = new THREE.Mesh(new THREE.BoxGeometry(0.6, 0.04, 0.2), dark); wing.position.set(0, 0.95, -0.85); lean.add(wing)
+    for (const sx of [-0.1, 0.1]) { const pipe = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.06, 0.5, 8), chrome); pipe.rotation.x = Math.PI / 2; pipe.position.set(sx, 0.4, -0.9); lean.add(pipe) }
+  }
   return g
 }
 
@@ -530,5 +547,6 @@ function buildSupercar(THREE: THREE, color: string, name: string, isMe: boolean)
   g.userData.body = body
   g.userData.len = L
   g.userData.wid = W
+  addJets(THREE, g, 4.5, 1.95)
   return g
 }

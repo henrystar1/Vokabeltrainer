@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { TRACKS, buildTrack } from './track'
+import { TRACKS, buildTrack, roadProximity } from './track'
 import { assistSteer, botSteer, buildRaceLine } from './line'
 import { startCar, statsFor, stepCar, type Car } from './physics'
 import { FLY_COOLDOWN, FLY_SECONDS, flyHeight, isBike, canFly, kindStats } from '../stats'
@@ -23,6 +23,7 @@ function drive(kind: string, seconds: number, fly: (t: number) => boolean) {
 describe('Roadster: Flug', () => {
   it('nur der Roadster kann fliegen', () => {
     expect(canFly('roadster')).toBe(true)
+    expect(canFly('supercar')).toBe(true)
     expect(canFly('sportwagen')).toBe(false)
     const r = drive('sportwagen', 5, () => true)
     expect(r.flights).toHaveLength(0)
@@ -59,7 +60,7 @@ describe('Roadster: Flug', () => {
 
 describe('Motorräder und Tuning', () => {
   it('Motorrad-Arten sind erkannt und haben Werte', () => {
-    for (const k of ['chopper', 'crossbike', 'sportbike']) { expect(isBike(k)).toBe(true); expect(kindStats(k).kmh).toBeGreaterThan(100) }
+    for (const k of ['chopper', 'crossbike', 'sportbike', 'hyperbike']) { expect(isBike(k)).toBe(true); expect(kindStats(k).kmh).toBeGreaterThan(100) }
     expect(isBike('sportwagen')).toBe(false)
     expect(statsFor('sportbike').bike).toBe(true)
   })
@@ -106,5 +107,25 @@ describe('Drift-Arena', () => {
     expect(d.id).toBe(10)
     expect(d.width).toBe(48)
     expect(Math.max(...TRACKS.slice(0, 10).map((t) => t.width))).toBeLessThan(d.width)
+  })
+})
+
+describe('Szenerie-Abstand', () => {
+  it('roadProximity findet jede Straße, auch weit entfernte Streckenteile', () => {
+    for (const id of [0, 3, 10]) {
+      const t = buildTrack(TRACKS[id]), near = roadProximity(t)
+      for (let i = 0; i < t.n; i += 17) {
+        expect(near(t.x[i], t.z[i], 5)).toBe(true)
+        expect(near(t.x[i] - t.tz[i] * (t.def.width / 2 + 2), t.z[i] + t.tx[i] * (t.def.width / 2 + 2), t.def.width / 2 + 8)).toBe(true)
+      }
+      expect(near(1e6, 1e6, 100)).toBe(false)
+    }
+  })
+})
+
+describe('Schnelleres Motorrad', () => {
+  it('Hyper-Bike ist schneller als das Sportbike', () => {
+    expect(kindStats('hyperbike').kmh).toBeGreaterThan(kindStats('sportbike').kmh * 1.5)
+    expect(statsFor('hyperbike', 520).top * 3.6).toBeCloseTo(520, 0)
   })
 })

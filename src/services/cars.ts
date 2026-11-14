@@ -26,3 +26,6 @@ export const raceSuperInfo = () => rpc<SuperInfo>('race_super_info')
 export interface CarUpRow { car_id: string; motor: number; reifen: number; bremse: number }
 export const carUpgrades = () => rpc<CarUpRow[]>('car_upgrades')
 export const carUpgrade = (car: string, part: string) => rpc<{ koins: number } & CarUpRow>('car_upgrade', { p_car: car, p_part: part })
+/** Coins fürs Rennen (Platz, Starterfeld inkl. dir, Zeit); der Server rechnet und deckelt pro Tag. */
+export interface RaceRewardResult { coins: number; koins: number | null; capped: boolean }
+export const raceReward = (place: number, field: number, ms: number, online: boolean) => rpc<RaceRewardResult>('race_reward', { p_place: place, p_field: field, p_ms: ms, p_online: online })

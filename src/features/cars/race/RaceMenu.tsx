@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { buildTrack, customTrackDef, TRACKS, type TrackDef } from './track'
 import RaceView, { type RaceCarInfo } from './RaceView'
 import TrackEditor from './TrackEditor'
+import { useAuthOptional } from '../../auth/AuthProvider'
 import { raceTrackDelete, raceTrackList, type RaceTrackRow } from '../../../services/cars'
 
 const BOT_NAMES = ['Blitz', 'Turbo Tom', 'Rennfuchs', 'Drift-Dora', 'Pit-Paul', 'Nitro Nina', 'Kurven-Karl', 'Gummi-Gerd', 'Apex-Alex', 'Schumi Jr.']
@@ -39,6 +40,7 @@ export function TrackPreview({ id = 0, def, className = '' }: { id?: number; def
 
 /** Einzelspieler: Strecke wählen (feste oder gemalte), Training oder gegen Bots. */
 export default function RaceMenu({ car, assistOk = false }: { car: RaceCarInfo; assistOk?: boolean }) {
+  const isAdmin = useAuthOptional()?.isAdmin ?? false
   const [sel, setSel] = useState<{ t: number } | { c: RaceTrackRow }>({ t: 0 })
   const [laps, setLaps] = useState(3)
   const [mode, setMode] = useState<'train' | 'bots'>('bots')
@@ -97,7 +99,7 @@ export default function RaceMenu({ car, assistOk = false }: { car: RaceCarInfo; 
                     <p className="mt-1 text-sm font-semibold">{c.name}</p>
                     <p className="text-xs text-slate-400">von {c.mine ? 'dir' : c.owner}{c.public ? '' : ' · privat'}</p>
                   </button>
-                  {c.mine && <button type="button" onClick={() => { if (window.confirm(`„${c.name}“ löschen?`)) void raceTrackDelete(c.id).then(loadCustom).catch(() => undefined) }} className="mt-1 text-xs text-rose-300 hover:underline">Löschen</button>}
+                  {(c.mine || isAdmin) && <button type="button" onClick={() => { if (window.confirm(`„${c.name}“ löschen?${c.mine ? '' : ' (Admin: Strecke eines anderen Nutzers)'}`)) void raceTrackDelete(c.id).then(loadCustom).catch(() => undefined) }} className="mt-1 text-xs text-rose-300 hover:underline">Löschen</button>}
                 </li>
               )
             })}

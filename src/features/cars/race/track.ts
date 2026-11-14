@@ -146,3 +146,18 @@ export function curveAhead(t: Track, i: number, ahead: number): { k: number; dis
   for (let q = 1; q <= cnt; q++) { const kk = t.k[(i + q) % t.n]; if (Math.abs(kk) > Math.abs(best)) { best = kk; at = q * step } }
   return { k: best, dist: at }
 }
+
+/** Liefert eine Prüfung „liegt (x,z) näher als r an irgendeinem Streckenpunkt?“ (Raster, auch für Strecken, die an sich selbst vorbeilaufen). */
+export function roadProximity(t: Track): (x: number, z: number, r: number) => boolean {
+  const CELL = 60
+  const grid = new Map<string, number[]>()
+  for (let i = 0; i < t.n; i++) { const key = `${Math.floor(t.x[i] / CELL)},${Math.floor(t.z[i] / CELL)}`; const a = grid.get(key); if (a) a.push(i); else grid.set(key, [i]) }
+  return (x, z, r) => {
+    const cx = Math.floor(x / CELL), cz = Math.floor(z / CELL), reach = Math.ceil(r / CELL)
+    for (let gx = cx - reach; gx <= cx + reach; gx++) for (let gz = cz - reach; gz <= cz + reach; gz++) {
+      const a = grid.get(`${gx},${gz}`)
+      if (a) for (const i of a) if (Math.hypot(t.x[i] - x, t.z[i] - z) < r) return true
+    }
+    return false
+  }
+}

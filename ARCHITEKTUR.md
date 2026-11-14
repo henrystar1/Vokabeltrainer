@@ -746,3 +746,13 @@ Tabelle `book_library_hidden`; `in_library` blendet ein veröffentlichtes Buch d
 - **Online-Autowahl-Fix**: `RaceLobbyOptions` zeigt die Wahl sofort (lokaler Zustand) und übernimmt die vom Server zurückgegebene Ansicht (`onView` → `apply` + `ping`); vorher kam sie erst beim nächsten Abruf.
 - SQL: `0099_tuning_fly_bikes.sql` (nach 0098).
 
+## Update 114 – Flug fürs Supercar, Effekte, Renn-Coins, Bot-Start, Szenerie
+- **Fliegen**: `canFly` gilt jetzt für Sky-Roadster und Supercar. Düsen (`addJets`) zeigen nach unten; im Flug schießen Wolken-Partikel nach unten, treffen den Boden und breiten sich aus. Abzeichen „✈ kann fliegen“ im Autohaus/Garage.
+- **Effekte** (`race/fx.ts`, `createFx`): gemeinsamer Partikel-Vorrat (Wolken, Feuer additiv, Rauch; 300 Sprites) + Reifenspuren als InstancedMesh-Ringpuffer (1200 Streifen). Supercar: Auspuff-Feuer und Rauch bei Gas. Reifenspuren an den Hinterrädern bei |slip| > 0,14 (alle Autos, auch Bots und Online-Gegner). `carFx` in `RaceView`.
+- **Szenerie**: `roadProximity(track)` (Raster) prüft den Abstand zu *jedem* Streckenpunkt; vorher wurde nur nahe dem eigenen Index geprüft, daher standen Häuser/Bäume auf Straßenstücken, die an anderer Stelle vorbeilaufen. Stadt: Häuser mind. Straßenbreite/2 + 30 m weg.
+- **Bot-Start**: Bots bleiben 60 m in ihrer Startspur (`lat0`, `total0`) und ziehen dann über 350 m weich zur Linie (`botInput`); `packLimit` bremst Bots vor einem Auto direkt davor in ihrer Spur. Start-Crash-Schaden von 250–490 auf ~0 (Test „Startpulk“).
+- **Renn-Coins**: `race_reward(place, field, ms, online)` (0100): (Grundbetrag 25 + 12 × Gegner) × Platzfaktor (100/60/40/20 %), online × 1,5; Rennen < 15 s zählen nicht, 15 s Abstand, Tageslimit 2000 (24 h, Einstellungen `race_coin_base`, `race_coin_daily`). Ledger-Grund `race`. Kein Lohn für Supercar oder Fahrassistent. Anzeige im Zielfenster.
+- **Strecken löschen**: Admins sehen „Löschen“ bei allen (sichtbaren) gemalten Strecken (`race_track_delete` erlaubte Staff schon).
+- **Motorräder**: `hyperbike` (420 km/h; Hyper-Bike 420, Raketen-Bike 520 km/h). Höchsttempo-Grenze `cars_top_kmh_check` auf 600.
+- SQL: `0100_race_coins_hyperbikes.sql` (nach 0099).
+

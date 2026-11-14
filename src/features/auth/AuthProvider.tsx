@@ -217,3 +217,8 @@ export function useAuth(): AuthState {
   if (!ctx) throw new Error('useAuth muss innerhalb von AuthProvider verwendet werden.')
   return ctx
 }
+
+/** Wie useAuth, aber ohne Fehler außerhalb des Providers (z. B. in Tests): liefert dann null. */
+export function useAuthOptional(): AuthState | null {
+  return useContext(AuthContext)
+}

@@ -13,7 +13,7 @@ import TuneTab from '../features/cars/TuneTab'
 import { useRaceCars } from '../features/cars/race/useRaceCars'
 import { Link } from 'react-router-dom'
 import { carBuy, carList } from '../services/cars'
-import { carKmh } from '../features/cars/stats'
+import { canFly, carKmh } from '../features/cars/stats'
 import { upFactors } from '../features/cars/tuning'
 
 const MAX_KMH = 320
@@ -29,6 +29,9 @@ function Speed({ kind, kmh }: { kind: string; kmh: number | null }) {
 }
 
 /** Autohaus: Autos kaufen und in der Garage sammeln. */
+/** Kleines Abzeichen: dieses Auto kann fliegen. */
+function FlyBadge() { return <span className="ml-2 rounded-full bg-sky-500/20 px-2 py-0.5 text-xs font-semibold text-sky-300">✈ kann fliegen</span> }
+
 export default function Cars() {
   const wallet = useWallet()
   const list = useAsync(carList, [])
@@ -83,7 +86,7 @@ export default function Cars() {
         <Card>
           <h2 className="mb-2 font-semibold">Meine Garage ({owned.length})</h2>
           <ul className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
-            {owned.map((c) => <li key={c.id} className="rounded-xl bg-white/5 p-2 text-center"><CarArt kind={c.kind} color={c.color} label={c.name} className="w-full" /><p className="text-xs">{c.name}</p><p className="text-[11px] text-slate-400">{carKmh(c.kind, c.top_kmh)} km/h</p></li>)}
+            {owned.map((c) => <li key={c.id} className="rounded-xl bg-white/5 p-2 text-center"><CarArt kind={c.kind} color={c.color} label={c.name} className="w-full" /><p className="text-xs">{canFly(c.kind) && '✈ '}{c.name}</p><p className="text-[11px] text-slate-400">{carKmh(c.kind, c.top_kmh)} km/h</p></li>)}
           </ul>
         </Card>
       )}
@@ -93,7 +96,7 @@ export default function Cars() {
             <Card>
               <CarArt kind={c.kind} color={c.color} label={c.name} className="w-full rounded-xl bg-gradient-to-b from-slate-700/40 to-slate-900/60" />
               <div className="mt-2 flex items-center justify-between gap-2">
-                <div className="min-w-0 flex-1"><p className="font-semibold">{c.name}</p><p className="text-sm text-slate-400">{c.price.toLocaleString('de-DE')} Coins</p></div>
+                <div className="min-w-0 flex-1"><p className="font-semibold">{c.name}{canFly(c.kind) && <FlyBadge />}</p><p className="text-sm text-slate-400">{c.price.toLocaleString('de-DE')} Coins{canFly(c.kind) && ' · fliegt 2 s, lädt 20 s'}</p></div>
                 {c.owned
                   ? <span className="rounded-lg bg-emerald-500/20 px-3 py-2 text-sm text-emerald-300">In der Garage</span>
                   : <button type="button" disabled={busy !== null} onClick={() => void buy(c.id, c.name)} className="min-h-[44px] rounded-lg bg-accent-cyan px-4 font-semibold text-slate-950 disabled:opacity-40">{busy === c.id ? '…' : 'Kaufen'}</button>}

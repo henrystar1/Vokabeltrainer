@@ -1,12 +1,14 @@
 import { useEffect, useRef, useState } from 'react'
 import type { RealtimeChannel, SupabaseClient } from '@supabase/supabase-js'
 import { gameClientFor, slotForKey, whenGameDbsReady } from '../../../lib/gameRealtime'
-import { botInput, crash, startCar, statsFor, stepCar, type Bot, type Car, type CarStats, type Input } from './physics'
+import { botInput, crash, packLimit, startCar, statsFor, stepCar, type Bot, type Car, type CarStats, type Input } from './physics'
 import { TRACKS, buildTrack, curveAhead, pointAt, project, trackKey, type TrackDef } from './track'
 import { assistSteer, buildRaceLine } from './line'
+import { createFx } from './fx'
 import { canFly, flyHeight, isBike, kindDims } from '../stats'
 import type { Up } from '../tuning'
-import { raceSubmit } from '../../../services/cars'
+import { raceReward, raceSubmit } from '../../../services/cars'
+import { useWalletOptional } from '../../koins/WalletProvider'
 
 export interface RaceCarInfo { /** Auto-ID im Shop (für die Rangliste) */ id?: string; /** Tuning-Stufen */ up?: Up; name: string; kind: string; color: string; /** eigene Höchstgeschwindigkeit des Autos (km/h) */ top?: number | null }
 type Key = 'gas' | 'brake' | 'left' | 'right' | 'fly'
@@ -54,6 +56,9 @@ export default function RaceView({ trackId, custom, laps, me, assistOk = false, 
   const assistToggleRef = useRef(toggleAssist)
   assistToggleRef.current = toggleAssist
   const [hud, setHud] = useState({ speed: 0, lap: 1, pos: 1, of: 1 + bots.length + (online ? online.players.length - 1 : 0), ms: 0, count: 4, wrong: false, curve: 0, curveDist: 0, offroad: false, best: 0, dmg: 0, drift: false, fly: 0, cool: 0 })
+  const wallet = useWalletOptional()
+  const walletRef = useRef(wallet); walletRef.current = wallet
+  const [reward, setReward] = useState<{ coins: number; capped: boolean } | null>(null)
   const [done, setDone] = useState<{ ms: number; best: number; standings: RaceStanding[] } | null>(null)
   const flyer = canFly(me.kind)
   const bikeUi = isBike(me.kind)
@@ -92,6 +97,41 @@ export default function RaceView({ trackId, custom, laps, me, assistOk = false, 
       ro.observe(host)
       cleanups.push(() => { ro.disconnect(); renderer.dispose(); renderer.domElement.remove() })
 
+      // Effekte: Wolken beim Fliegen, Auspuff-Feuer (Supercar), Reifenspuren beim Driften
+      const fx = createFx(THREE, rs.scene)
+      cleanups.push(() => fx.dispose())
+      let fxTick = 0
+      const carFx = (kind: string, x: number, z: number, h: number, v: number, slip: number, fly: number, gas: boolean, dt2: number) => {
+        const fxv = Math.sin(h), fzv = Math.cos(h), rx = Math.cos(h), rz = -Math.sin(h)
+        const d = kindDims(kind), sp = Math.abs(v)
+        const y0 = flyHeight(fly)
+        if (fly > 0 && canFly(kind)) {
+          // Düsenstrahl nach unten: Wolken schießen zum Boden und breiten sich dort aus
+          fxTick++
+          for (const sz of fxTick % 2 ? [-1, 1] : [1, -1]) {
+            const nz = (fxTick % 4 < 2 ? -0.28 : 0.22) * d.len
+            const px = x + rx * sz * d.wid * 0.3 + fxv * nz, pz = z + rz * sz * d.wid * 0.3 + fzv * nz
+            fx.emit('cloud', px, y0 - 0.3, pz, fxv * v * 0.55 + (Math.random() - 0.5) * 3, -13 - Math.random() * 5, fzv * v * 0.55 + (Math.random() - 0.5) * 3, 1.5 + Math.random() * 0.8)
+            fx.emit('fire', px, y0 - 0.5, pz, 0, -9, 0, 1.2)
+          }
+        }
+        if (kind === 'supercar' && fly <= 0 && gas && sp > 2) {
+          // Auspuff: Flammen und Rauch hinten, bei hohem Tempo stärker
+          for (const sx of [-1, 1]) {
+            const px = x + rx * sx * 0.5 - fxv * (d.len / 2 + 0.05), pz = z + rz * sx * 0.5 - fzv * (d.len / 2 + 0.05)
+            const back = 5 + Math.random() * 4
+            fx.emit('fire', px, 0.34, pz, fxv * (v * 0.5 - back) + (Math.random() - 0.5) * 0.8, (Math.random() - 0.3) * 0.8, fzv * (v * 0.5 - back) + (Math.random() - 0.5) * 0.8, 0.5 + Math.min(0.9, sp / 150) + Math.random() * 0.25)
+            if (Math.random() < 0.5) fx.emit('smoke', px, 0.4, pz, fxv * v * 0.35 - fxv * 2, 0.8, fzv * v * 0.35 - fzv * 2, 0.7)
+          }
+        }
+        if (Math.abs(slip) > 0.14 && sp > 8 && fly <= 0) {
+          const mh = h - slip, len = Math.max(0.7, sp * dt2 * 1.2 + 0.25)
+          const rear = -d.len * 0.32
+          const wheels = isBike(kind) ? [0] : [-1, 1]
+          for (const sx of wheels) fx.skid(x + fxv * rear + rx * sx * d.wid * 0.42, z + fzv * rear + rz * sx * d.wid * 0.42, mh, len)
+        }
+      }
+
       // Fahrzeuge
       const myStats: CarStats = statsFor(me.kind, me.top, me.up)
       const line = buildRaceLine(track)
@@ -102,7 +142,9 @@ export default function RaceView({ trackId, custom, laps, me, assistOk = false, 
       const myMesh = rs.makeCar(me.kind, me.color, me.name, true)
       scene.add(myMesh)
       const botList: Bot[] = bots.map((b, i) => {
-        const bt: Bot = { car: startCar(track, slot++), kind: b.kind, color: b.color, name: b.name, skill: b.skill, lane: (i % 3 - 1) * Math.min(2.2, def.width * 0.1), wobble: i * 1.7, finished: null, top: b.top, st: statsFor(b.kind, b.top) }
+        const c0 = startCar(track, slot++)
+        const lat0 = (c0.x - line.x[c0.idx]) * -track.tz[c0.idx] + (c0.z - line.z[c0.idx]) * track.tx[c0.idx]
+        const bt: Bot = { car: c0, kind: b.kind, color: b.color, name: b.name, skill: b.skill, lane: (i % 5 - 2) * Math.min(2.6, def.width * 0.09), wobble: i * 1.7, finished: null, top: b.top, st: statsFor(b.kind, b.top), lat0, total0: c0.total }
         return bt
       })
       const botMeshes = botList.map((b) => { const m = rs.makeCar(b.kind, b.color, b.name, false); scene.add(m); return m })
@@ -206,6 +248,7 @@ export default function RaceView({ trackId, custom, laps, me, assistOk = false, 
 
         // Bots
         for (const b of botList) {
+          b.limit = packLimit(b.car, [car, ...botList.filter((o) => o !== b).map((o) => o.car)])
           const bi = go ? botInput(b, line, now / 1000) : { gas: false, brake: false, left: false, right: false }
           b.car = stepCar(b.car, bi, dt, track, b.st, go, false)
           if (b.finished === null && b.car.total >= total) b.finished = raceMs
@@ -247,6 +290,10 @@ export default function RaceView({ trackId, custom, laps, me, assistOk = false, 
           for (const b of botList) st.push({ name: b.name, ms: b.finished })
           for (const r of remotes.values()) st.push({ name: r.name, ms: r.ft })
           setDone({ ms: finishedMs, best: bestLap, standings: st })
+          if (me.id !== 'supercar' && !usedAssist) {
+            const place = 1 + st.filter((x) => !x.me && x.ms !== null && x.ms < finishedMs!).length
+            void raceReward(place, st.length, finishedMs, !!online).then((r) => { setReward({ coins: r.coins, capped: r.capped }); if (r.koins !== null) walletRef.current?.setBalance(r.koins) }).catch(() => undefined)
+          }
           if (me.id && raceBest > 0 && !usedAssist) void raceSubmit(trackKey(def), me.id, Math.round(raceBest)).catch(() => undefined)
         }
 
@@ -263,7 +310,9 @@ export default function RaceView({ trackId, custom, laps, me, assistOk = false, 
           if (wh) for (const w of wh) { w.children.forEach((c) => { c.rotation.x += (v * dt) / (m.userData.wheelR as number) }); if (w.name === 'front') w.rotation.y = steer * 0.45 }
         }
         place(myMesh, car.x, car.z, car.h, car.v, car.steer, car.dmg, car.slip, car.fly)
+        carFx(me.kind, car.x, car.z, car.h, car.v, car.slip, car.fly, input.gas, dt)
         botList.forEach((b, i) => place(botMeshes[i], b.car.x, b.car.z, b.car.h, b.car.v, b.car.steer, b.car.dmg, b.car.slip))
+        for (const b of botList) carFx(b.kind, b.car.x, b.car.z, b.car.h, b.car.v, b.car.slip, 0, b.car.v > 5, dt)
         for (const r of remotes.values()) {
           if (!r.mesh) continue
           const k = Math.min(1, dt * 10)
@@ -272,6 +321,7 @@ export default function RaceView({ trackId, custom, laps, me, assistOk = false, 
           r.h += dh * k
           r.mesh.visible = now - r.seen < 5000
           place(r.mesh, r.x, r.z, r.h, r.v, 0, r.dmg, r.slip, r.fl)
+          if (r.mesh.visible) carFx(r.kind, r.x, r.z, r.h, r.v, r.slip, r.fl, r.v > 5, dt)
         }
 
         // Kamera: Verfolger von hinten oder Cockpit (Blick aus dem Fenster)
@@ -300,6 +350,7 @@ export default function RaceView({ trackId, custom, laps, me, assistOk = false, 
         if (car.bump > 0.2 || bumped) camera.position.y += (Math.random() - 0.5) * (0.25 + car.hit * 0.9)
         rs.follow.position.set(camera.position.x, 0, camera.position.z)
         rs.sun.position.set(car.x + 120, 220, car.z + 80); rs.sun.target.position.set(car.x, 0, car.z); rs.sun.target.updateMatrixWorld()
+        fx.update(dt)
         renderer.render(scene, camera)
 
         if (online && now - lastSend > 55) {
@@ -415,6 +466,7 @@ export default function RaceView({ trackId, custom, laps, me, assistOk = false, 
             <p className="text-4xl font-black">{hud.pos}. Platz</p>
             <p className="font-mono text-xl">{fmt(done.ms)}</p>
             {done.best > 0 && <p className="text-sm text-amber-200">Beste Runde {fmt(done.best)}</p>}
+            {reward && (reward.coins > 0 ? <p className="text-sm font-semibold text-emerald-300">+{reward.coins.toLocaleString('de-DE')} Coins fürs Rennen</p> : reward.capped ? <p className="text-xs text-slate-400">Tageslimit für Renn-Coins erreicht.</p> : null)}
             {done.standings.length > 1 && <ul className="space-y-0.5 text-left text-sm">{[...done.standings].sort((a, b) => (a.ms ?? 1e12) - (b.ms ?? 1e12)).map((s, i) => <li key={s.name + i} className={s.me ? 'font-bold text-accent-cyan' : ''}>{i + 1}. {s.name} {s.ms !== null ? `· ${fmt(s.ms)}` : '· fährt noch'}</li>)}</ul>}
             <div className="flex justify-center gap-2">
               {onAgain && <button type="button" onClick={onAgain} className="min-h-[44px] rounded-lg bg-accent-cyan px-4 font-semibold text-slate-950">Nochmal</button>}

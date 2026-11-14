@@ -133,3 +133,8 @@ export function useWallet(): WalletState {
   if (!ctx) throw new Error('useWallet muss innerhalb von WalletProvider verwendet werden.')
   return ctx
 }
+
+/** Wie useWallet, aber ohne Fehler außerhalb des Providers (z. B. in Tests): liefert dann null. */
+export function useWalletOptional(): WalletState | null {
+  return useContext(WalletContext)
+}

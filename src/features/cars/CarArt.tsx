@@ -1,7 +1,7 @@
 import type { ReactNode } from 'react'
 
 /** Selbst gezeichnete Auto-Bilder (SVG, eigene Entwürfe ohne Marken). */
-export const CAR_KINDS = ['kleinwagen', 'limousine', 'kombi', 'suv', 'pickup', 'cabrio', 'sportwagen', 'bus', 'oldtimer', 'buggy', 'monstertruck', 'muscle', 'rallye', 'gt', 'hypercar', 'rennwagen', 'roadster', 'supercar', 'chopper', 'crossbike', 'sportbike'] as const
+export const CAR_KINDS = ['kleinwagen', 'limousine', 'kombi', 'suv', 'pickup', 'cabrio', 'sportwagen', 'bus', 'oldtimer', 'buggy', 'monstertruck', 'muscle', 'rallye', 'gt', 'hypercar', 'rennwagen', 'roadster', 'supercar', 'chopper', 'crossbike', 'sportbike', 'hyperbike'] as const
 export type CarKind = (typeof CAR_KINDS)[number]
 
 interface Shape {
@@ -19,7 +19,7 @@ interface Shape {
   hideBody?: boolean
 }
 
-const SHAPES: Record<Exclude<CarKind, 'chopper' | 'crossbike' | 'sportbike'>, Shape> = {
+const SHAPES: Record<Exclude<CarKind, 'chopper' | 'crossbike' | 'sportbike' | 'hyperbike'>, Shape> = {
   kleinwagen: { body: 'M26 76 L26 58 Q28 50 44 48 L62 31 Q66 27 76 27 L116 27 Q125 27 131 34 L147 49 Q168 51 173 62 L173 76 Z', glass: ['M68 33 L79 33 L79 47 L57 47 Z', 'M85 33 L114 33 L128 47 L85 47 Z'], wheels: [56, 146], r: 15 },
   limousine: { body: 'M12 76 L12 60 Q14 54 34 52 L60 36 Q66 31 78 31 L122 31 Q131 31 138 38 L156 52 Q186 54 190 63 L190 76 Z', glass: ['M71 37 L83 37 L83 51 L58 51 Z', 'M89 37 L122 37 L137 51 L89 51 Z'], wheels: [48, 154], r: 14 },
   kombi: { body: 'M14 76 L14 56 Q16 50 34 48 L56 33 Q62 29 72 29 L152 29 Q160 29 162 38 L170 52 Q186 54 188 63 L188 76 Z', glass: ['M64 35 L76 35 L76 50 L52 50 Z', 'M82 35 L116 35 L116 50 L82 50 Z', 'M122 35 L152 35 L158 50 L122 50 Z'], wheels: [50, 150], r: 14 },
@@ -50,6 +50,7 @@ const SHAPES: Record<Exclude<CarKind, 'chopper' | 'crossbike' | 'sportbike'>, Sh
 /** Motorräder haben eigene Zeichnung (zwei Räder, Fahrer). */
 const BIKE_ART: Record<string, { r: number; wb: number; bars: number; chopper?: boolean; cross?: boolean }> = {
   sportbike: { r: 17, wb: 78, bars: 52 },
+  hyperbike: { r: 17, wb: 84, bars: 50 },
   chopper: { r: 18, wb: 108, bars: 36, chopper: true },
   crossbike: { r: 19, wb: 70, bars: 44, cross: true },
 }
@@ -68,7 +69,7 @@ function BikeArt({ kind, color, className, label }: { kind: string; color: strin
       <rect x={cx - 14} y={wy - 24} width="30" height="14" rx="7" fill="#fff" opacity=".15" />
       <rect x={cx - 8} y={wy - 12} width="22" height="14" rx="4" fill="#111827" />
       <path d={`M${rw + 4} ${wy - 22} L${cx - 14} ${wy - 22} L${cx - 14} ${wy - 14} L${rw + 4} ${wy - 12} Z`} fill={b.cross ? '#0f172a' : color} />
-      {kind === 'sportbike' && <path d={`M${fw - 12} ${wy - 28} L${fw + 6} ${wy - 16} L${fw - 4} ${wy - 8} L${fw - 22} ${wy - 12} Z`} fill={color} />}
+      {(kind === 'sportbike' || kind === 'hyperbike') && <path d={`M${fw - 12} ${wy - 28} L${fw + 6} ${wy - 16} L${fw - 4} ${wy - 8} L${fw - 22} ${wy - 12} Z`} fill={color} />}
       <path d={`M${fw - (b.chopper ? 30 : 12)} ${b.bars} L${fw - (b.chopper ? 38 : 20)} ${b.bars - (b.chopper ? 14 : 2)}`} stroke="#cbd5e1" strokeWidth="3" strokeLinecap="round" />
       <circle cx={fw + 2} cy={b.bars + 8} r="4.5" fill="#fde68a" />
       <rect x={rw - 4} y={wy - 22} width="6" height="4" rx="2" fill="#ef4444" />

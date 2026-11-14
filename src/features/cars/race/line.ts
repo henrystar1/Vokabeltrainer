@@ -69,7 +69,7 @@ export function speedProfile(line: RaceLine, st: CarStats, skill: number, mul = 
 }
 
 /** Eingaben für ein Auto, das der Ideallinie folgt (Bots und Fahrassistent). lane = Versatz zur Linie in m. */
-export function botSteer(c: Car, st: CarStats, line: RaceLine, skill: number, lane = 0): Input {
+export function botSteer(c: Car, st: CarStats, line: RaceLine, skill: number, lane = 0, limit = Infinity): Input {
   const t = line.t, n = t.n, ds = t.length / n
   const prof = speedProfile(line, st, skill)
   const v = Math.max(0, c.v)
@@ -78,7 +78,7 @@ export function botSteer(c: Car, st: CarStats, line: RaceLine, skill: number, la
   const tx = line.x[j] - t.tz[j] * lane, tz = line.z[j] + t.tx[j] * lane
   const d = wrap(Math.atan2(tx - c.x, tz - c.z) - c.h)
   const dev = Math.hypot(line.x[i] - c.x, line.z[i] - c.z)
-  const vt = prof[(i + 2) % n] / (1 + Math.max(0, dev - 3) * 0.06)
+  const vt = Math.min(limit, prof[(i + 2) % n] / (1 + Math.max(0, dev - 3) * 0.06))
   return { gas: v < vt, brake: v > vt + 1.5 + v * 0.03, left: d > 0.022, right: d < -0.022 }
 }
 
