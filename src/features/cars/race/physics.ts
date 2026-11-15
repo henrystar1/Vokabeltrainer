@@ -1,6 +1,7 @@
 import { advance, inPolygon, pointAt, project, type Track } from './track'
 import { canFly, carKmh, flyConfig, flyHeight, isBike, kindDims, kindStats } from '../stats'
 import { CITY, bridgeH, cityPush, onDeck } from './city'
+import { G, STUNT, arenaPush, groundH, loopPoint } from './stunt'
 import { upFactors, type Up } from '../tuning'
 import { boxHit, corners, impactDamage, type Box } from './collide'
 import { botSteer, type RaceLine } from './line'
@@ -45,6 +46,11 @@ export interface Car {
   fly: number
   /** 1 = auf der Brücke (nur Stadt) */
   lvl?: number
+  /** Stunt-Park: Höhe, Steiggeschwindigkeit, Loopwinkel (0 = nicht im Looping) und Einfahrdaten */
+  y?: number
+  vy?: number
+  loop?: number
+  lp?: { x: number; z: number; h: number; lat: number; v0: number }
   /** Wartezeit bis zum nächsten Flug (s) */
   cool: number
 }
@@ -54,6 +60,7 @@ export const CAR_R = 2.2
 export function startCar(t: Track, slot: number): Car {
   // Aufstellung: Zweierreihen hinter der Startlinie
   const row = Math.floor(slot / 2), col = slot % 2
+  if (t.def.mode === 'stunt') return { x: (col ? 5 : -5) - 150, z: -280 - row * 10, h: 0, v: 0, steer: 0, total: 0, idx: 0, lap: 0, offroad: false, bump: 0, slip: 0, dmg: 0, pull: 1, hold: 0, hit: 0, fly: 0, cool: 0 }
   if (t.def.mode === 'city') return { x: (col ? 5 : -5), z: -row * 10, h: 0, v: 0, steer: 0, total: 0, idx: 0, lap: 0, offroad: false, bump: 0, slip: 0, dmg: 0, pull: 1, hold: 0, hit: 0, fly: 0, cool: 0, lvl: 0 }
   if (t.def.mode === 'fill') {
     const P = t.def.pts, n = P.length
@@ -81,6 +88,7 @@ export function addDamage(c: Car, amount: number, cap = DMG_MAX): Car {
 /** Ein Zeitschritt. Arcade-Fahrverhalten: Lenkung hängt vom Tempo ab, Gras bremst, Leitplanken (mit Hitbox) fangen ab und beschädigen.
  *  Driften: Bremse + Lenken bei Tempo schiebt das Heck raus (`drift` = erlaubt). */
 export function stepCar(c: Car, inp: Input, dt: number, t: Track, st: CarStats, canDrive = true, drift = true): Car {
+  if (t.def.mode === 'stunt' && (c.loop ?? 0) > 0 && c.lp) return loopStep(c, dt)
   const d = c.dmg / DMG_MAX
   const wrecked = c.dmg >= DMG_MAX
   const waiting = c.hold > 0
@@ -94,7 +102,8 @@ export function stepCar(c: Car, inp: Input, dt: number, t: Track, st: CarStats, 
   let v = c.v
   const fill = t.def.mode === 'fill'
   const city = t.def.mode === 'city'
-  const free = t.def.mode === 'free' || fill || city, disc = t.def.mode === 'disc'
+  const stunt = t.def.mode === 'stunt'
+  const free = t.def.mode === 'free' || fill || city || stunt, disc = t.def.mode === 'disc'
   const pr = free ? { i: c.idx, s: 0, lat: 0, dist: fill && !inPolygon(t.def.pts, c.x, c.z) ? t.def.width : 0 } : project(t, c.x, c.z, c.idx)
   const half = free || disc ? t.def.width / 2 : t.hw[pr.i]
   const off = pr.dist > half
@@ -197,9 +206,43 @@ export function stepCar(c: Car, inp: Input, dt: number, t: Track, st: CarStats, 
       }
     }
   }
+  let y = c.y ?? 0, vy = c.vy ?? 0, loop = 0
+  let lp: Car['lp']
+  if (stunt) {
+    // Arenagrenze
+    const ap = arenaPush(x, z)
+    if (ap) {
+      x += ap.nx * ap.depth; z += ap.nz * ap.depth
+      const vn = Math.max(0, -(Math.sin(moveH) * ap.nx + Math.cos(moveH) * ap.nz) * v)
+      dmg = Math.min(DMG_MAX, dmg + impactDamage(vn + Math.min(6, ap.depth * 4)))
+      v *= 1 - Math.min(0.9, (2.2 + vn * 0.04) * dt); bump = Math.max(bump, Math.min(1, Math.abs(v) / 30)); hit = Math.max(hit, Math.min(1, vn / 25))
+    }
+    // Rampen, Hügel und Sprünge: am Boden der Rampe folgen, sonst fliegen (Wurfparabel)
+    const gH = groundH(x, z), gPrev = groundH(c.x, c.z)
+    if (y > gPrev + 0.05) {
+      vy -= G * dt; y += vy * dt
+      if (y <= gH) {
+        dmg = Math.min(DMG_MAX, dmg + impactDamage(-vy * 0.7)); v *= 0.98
+        bump = Math.max(bump, Math.min(1, -vy / 15)); y = gH; vy = 0
+      }
+    } else {
+      const ball = y + vy * dt - 0.5 * G * dt * dt
+      if (vy > 0.5 && gH < ball - 0.05) { vy -= G * dt; y = ball }
+      else { vy = Math.max(-25, Math.min(25, (gH - y) / dt)); y = gH }
+    }
+    // Looping: ab 100 km/h am Einstieg
+    const L = STUNT.loop
+    if (y < 0.3) {
+      const f = (x - L.x) * Math.sin(L.h) + (z - L.z) * Math.cos(L.h), lat = (x - L.x) * Math.cos(L.h) - (z - L.z) * Math.sin(L.h)
+      let dh = h - L.h; while (dh > Math.PI) dh -= Math.PI * 2; while (dh < -Math.PI) dh += Math.PI * 2
+      if (f >= 0 && f < 2.5 && Math.abs(lat) < 3 && Math.abs(dh) < 0.35 && v >= STUNT.vmin) {
+        loop = 0.001; lp = { x: L.x, z: L.z, h: L.h, lat, v0: v }
+      }
+    }
+  }
   const total = free ? c.total : advance(c.total, pr2.s, t.length)
   const pull = c.dmg === 0 && dmg > 0 ? (Math.random() < 0.5 ? -1 : 1) : c.pull
-  return { x, z, h, v, steer, total, idx: pr2.i, lap: Math.floor(total / t.length), offroad: free ? pr2.dist > half : pr2.dist > t.hw[pr2.i], lvl, bump, slip, dmg, pull, hold: Math.max(0, c.hold - dt), hit, fly, cool }
+  return { x, z, h, v, steer, total, idx: pr2.i, lap: Math.floor(total / t.length), offroad: free ? pr2.dist > half : pr2.dist > t.hw[pr2.i], lvl, y, vy, loop, lp, bump, slip, dmg, pull, hold: Math.max(0, c.hold - dt), hit, fly, cool }
 }
 
 /** Zusammenstoß zweier Autos (Hitboxen): verschiebt `me` (Anteil `share` der Eindringtiefe), bremst und beschädigt.
@@ -241,4 +284,19 @@ export function botInput(b: { car: Car; st: CarStats; skill: number; lane: numbe
     lane = b.lat0 * (1 - s) + lane * s
   }
   return botSteer(b.car, b.st, line, b.skill, lane, b.limit)
+}
+
+
+/** Im Looping: das Auto läuft auf der Wendel (Energieerhaltung); zu langsam oben = Absturz. */
+function loopStep(c: Car, dt: number): Car {
+  const lp = c.lp!
+  const th = (c.loop ?? 0) + (Math.max(c.v, 2) / STUNT.R) * dt
+  const pt = loopPoint(lp, Math.min(th, Math.PI * 2), lp.lat)
+  const v = Math.sqrt(Math.max(0, lp.v0 * lp.v0 - 2 * G * pt.y))
+  if (th > Math.PI / 2 && th < Math.PI * 1.5 && v < Math.sqrt(G * STUNT.R) * 1.05) {
+    // Absturz aus dem Looping
+    return { ...c, x: pt.x, z: pt.z, h: lp.h, v: v * 0.6, y: pt.y, vy: 0, loop: 0, lp: undefined, dmg: Math.min(DMG_MAX, c.dmg + impactDamage(14)), hit: 1, bump: 1 }
+  }
+  if (th >= Math.PI * 2) return { ...c, x: pt.x, z: pt.z, h: lp.h, v, y: 0, vy: 0, loop: 0, lp: undefined, steer: 0, slip: 0 }
+  return { ...c, x: pt.x, z: pt.z, h: lp.h, v, y: pt.y, vy: 0, loop: th, steer: 0, slip: 0, idx: c.idx }
 }

@@ -786,3 +786,9 @@ Tabelle `book_library_hidden`; `in_library` blendet ein veröffentlichtes Buch d
 - `scene.ts` `buildCity`: Straßen mit Mittelstrichen, Häuser als ein zusammengeführtes Mesh mit Fenster-Textur, Gehwege, Parks mit Bäumen, Brücke mit Pfeilern. `RaceView`: Höhe `carY` (Flug oder Brücke).
 - Offene Lobby (ohne SQL): `RaceView` mit `online.open`; Kanal `rc-open-city` über den vorhandenen Spiel-Funkdienst; Mitspieler entstehen aus den Funkdaten (Name `n`, Brückenebene `lv`) und verschwinden nach 15 s ohne Signal. Start über „Offene Stadt-Lobby“ im Rennmenü. Autos auf verschiedenen Ebenen stoßen nicht zusammen.
 - Tests: `city.test.ts`.
+
+## Update 119 – Stunt-Park
+- `race/stunt.ts`: Karte `TRACKS[14]` „Stunt-Park“ (`mode: 'stunt'`, zählt als `isOpen`): 600×600-m-Fläche mit Zaun (`arenaPush`), Rampen/Hügel (`RAMPS`, `groundH`) und einem Looping (`STUNT.loop`, Radius 12 m, `loopPoint` = Wendel mit 6 m seitlichem Versatz).
+- `physics.ts`: neue optionale Car-Felder `y`, `vy`, `loop`, `lp`. Am Boden folgt das Auto der Rampenhöhe; hebt der Boden ab (Rampenende, Hügelkamm bei Tempo) fliegt es auf einer Wurfparabel (g = 9,8), Landung mit kleinem Schaden. Looping: Einfahrt ab 28 m/s (≈ 100 km/h) und gerader Ausrichtung am Einstieg, danach läuft `loopStep` die Wendel mit Energieerhaltung; oben zu langsam = Absturz mit Schaden.
+- `scene.ts` `buildStunt`: Keile für Rampen, Wendel mit Seitenwänden, Stützen, Zaun. `RaceView`: `carY` berücksichtigt `y`, `pitchOf` neigt die Nase (im Looping volle Drehung), Funkdaten `y`/`pt`, Autos auf unterschiedlicher Höhe stoßen nicht zusammen.
+- Tests: `stunt.test.ts`.

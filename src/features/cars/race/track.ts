@@ -1,5 +1,5 @@
 /** Rennstrecken: geschlossene Kurven aus Stützpunkten (Catmull-Rom), fein abgetastet. Reine Logik, testbar. */
-export interface TrackDef { id: number; /** Rangliste/Online: 't0'…'t10' oder 'c:<uuid>' */ key?: string; name: string; text: string; width: number; laps: number; theme: 'gras' | 'wueste' | 'schnee' | 'stadt' | 'nacht' | 'herbst'; pts: Array<[number, number]>; /** 'free' = endloses Übungsfeld (kein Ziel, keine Wände), 'disc' = Kreisfläche ohne Barrieren */ mode?: 'free' | 'disc' | 'fill' | 'city'; /** Größter seitlicher Versatz der Ideallinie (m), z. B. bei der Kreisfläche */ lineMax?: number }
+export interface TrackDef { id: number; /** Rangliste/Online: 't0'…'t10' oder 'c:<uuid>' */ key?: string; name: string; text: string; width: number; laps: number; theme: 'gras' | 'wueste' | 'schnee' | 'stadt' | 'nacht' | 'herbst'; pts: Array<[number, number]>; /** 'free' = endloses Übungsfeld (kein Ziel, keine Wände), 'disc' = Kreisfläche ohne Barrieren */ mode?: 'free' | 'disc' | 'fill' | 'city' | 'stunt'; /** Größter seitlicher Versatz der Ideallinie (m), z. B. bei der Kreisfläche */ lineMax?: number }
 
 const R = (n: number, f: (i: number) => [number, number]): Array<[number, number]> => Array.from({ length: n }, (_, i) => f(i))
 
@@ -39,6 +39,8 @@ export const TRACKS: TrackDef[] = [
     pts: R(96, (i) => { const a = (i / 96) * Math.PI * 2; return [Math.cos(a) * 150, Math.sin(a) * 150] }) },
   { id: 13, name: 'Stadt', text: 'Offene Stadt mit Häuserblöcken, Straßen, engen Gassen, Parks und einer Brücke (Rampen oder mit dem Flugauto). Frei herumfahren, kein Ziel.', width: 24, laps: 1, theme: 'stadt', mode: 'city',
     pts: R(48, (i) => { const a = (i / 48) * Math.PI * 2; return [Math.cos(a) * 120, Math.sin(a) * 120] }) },
+  { id: 14, name: 'Stunt-Park', text: 'Looping (ab 100 km/h), Hügel, Schanzen mit Landerampen und eine riesige Sprungrampe auf offener Fläche. Kein Ziel.', width: 24, laps: 1, theme: 'wueste', mode: 'stunt',
+    pts: R(48, (i) => { const a = (i / 48) * Math.PI * 2; return [Math.cos(a) * 120, Math.sin(a) * 120] }) },
 ]
 
 export const trackKey = (d: TrackDef): string => d.key ?? `t${d.id}`
@@ -51,7 +53,7 @@ export function customTrackDef(name: string, pts: Array<[number, number]>, width
 }
 
 /** Übungsfläche ohne Ziel (Endlos-Feld oder ausgefüllte Fläche). */
-export const isOpen = (d: TrackDef): boolean => d.mode === 'free' || d.mode === 'fill' || d.mode === 'city'
+export const isOpen = (d: TrackDef): boolean => d.mode === 'free' || d.mode === 'fill' || d.mode === 'city' || d.mode === 'stunt'
 
 /** Liegt (x,z) im Vieleck? */
 export function inPolygon(p: Array<[number, number]>, x: number, z: number): boolean {

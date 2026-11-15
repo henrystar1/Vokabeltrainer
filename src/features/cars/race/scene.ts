@@ -3,6 +3,7 @@ import { isBike } from '../stats'
 import { RoundedBoxGeometry } from 'three/examples/jsm/geometries/RoundedBoxGeometry.js'
 import { roadProximity, type Track } from './track'
 import { CITY, bridgeH, city } from './city'
+import { RAMPS, STUNT, loopPoint } from './stunt'
 
 type THREE = typeof import('three')
 
@@ -283,7 +284,8 @@ export function buildScene(THREE: THREE, t: Track): RaceScene {
   }
 
   // Übungsfeld: keine Strecke, keine Szenerie – nur der endlose Asphalt
-  if (mode === 'free' || mode === 'fill' || mode === 'city') while (scene.children.length > mark) scene.remove(scene.children[mark])
+  if (mode === 'free' || mode === 'fill' || mode === 'city' || mode === 'stunt') while (scene.children.length > mark) scene.remove(scene.children[mark])
+  if (mode === 'stunt') buildStunt(THREE, scene, ground)
   if (mode === 'city') buildCity(THREE, scene, ground, !!th.night)
   if (mode === 'fill') {
     // ausgefüllte Fläche: Asphalt im Vieleck, weiße Randlinie, keine Barriere
@@ -713,4 +715,56 @@ function buildCity(THREE: THREE, scene: T.Scene, ground: T.Mesh, night: boolean)
     const d = new THREE.Mesh(new THREE.BoxGeometry(4, 0.03, 0.3), new THREE.MeshBasicMaterial({ color: 0xf8fafc }))
     d.position.set(x, bridgeH(x) + 0.08, zc); scene.add(d)
   }
+}
+
+
+/** Stunt-Park: Asphalt, Zaun, Rampen als Keile, Looping als Wendel mit Geländer. */
+function buildStunt(THREE: THREE, scene: T.Scene, ground: T.Mesh) {
+  ground.material = new THREE.MeshStandardMaterial({ color: 0x3a3d45, roughness: 0.95 })
+  const H = STUNT.half
+  const fence = new THREE.MeshStandardMaterial({ color: 0xf59e0b, roughness: 0.7 })
+  for (const [x, z, w, d] of [[0, -H, 2 * H, 1], [0, H, 2 * H, 1], [-H, 0, 1, 2 * H], [H, 0, 1, 2 * H]] as number[][]) {
+    const m = new THREE.Mesh(new THREE.BoxGeometry(w, 2.2, d), fence); m.position.set(x, 1.1, z); scene.add(m)
+  }
+  // Rampen: geschlossene Keile
+  const rm = new THREE.MeshStandardMaterial({ color: 0xea580c, roughness: 0.75, side: THREE.DoubleSide })
+  for (const r of RAMPS) {
+    const sn = Math.sin(r.h), cs = Math.cos(r.h)
+    const P = (u: number, w: number, y: number): number[] => [r.x + sn * u + cs * w, y, r.z + cs * u - sn * w]
+    const a = r.wid / 2
+    const pos: number[] = [], idx: number[] = []
+    const quad = (p: number[][]) => { const o = pos.length / 3; p.forEach((q) => pos.push(...q)); idx.push(o, o + 1, o + 2, o, o + 2, o + 3) }
+    quad([P(0, -a, r.h0), P(0, a, r.h0), P(r.len, a, r.h1), P(r.len, -a, r.h1)])
+    quad([P(0, -a, 0), P(r.len, -a, 0), P(r.len, -a, r.h1), P(0, -a, r.h0)])
+    quad([P(0, a, 0), P(0, a, r.h0), P(r.len, a, r.h1), P(r.len, a, 0)])
+    quad([P(0, -a, 0), P(0, -a, r.h0), P(0, a, r.h0), P(0, a, 0)])
+    quad([P(r.len, -a, 0), P(r.len, a, 0), P(r.len, a, r.h1), P(r.len, -a, r.h1)])
+    const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); g.setIndex(idx); g.computeVertexNormals()
+    scene.add(new THREE.Mesh(g, rm))
+  }
+  // Looping: Wendel mit Fahrfläche und Seitenwänden
+  const L = STUNT.loop, w = 3.4, N = 90
+  const pos: number[] = [], idx: number[] = [], wp: number[] = [], wi: number[] = []
+  for (let i = 0; i <= N; i++) {
+    const th = (i / N) * Math.PI * 2
+    const c = loopPoint(L, th, 0)
+    const nx = Math.cos(L.h), nz = -Math.sin(L.h)
+    pos.push(c.x - nx * w, c.y + 0.02, c.z - nz * w, c.x + nx * w, c.y + 0.02, c.z + nz * w)
+    wp.push(c.x - nx * w, c.y + 0.02, c.z - nz * w, c.x - nx * w, c.y + 1.2, c.z - nz * w, c.x + nx * w, c.y + 0.02, c.z + nz * w, c.x + nx * w, c.y + 1.2, c.z + nz * w)
+    if (i < N) { const o = i * 2; idx.push(o, o + 1, o + 3, o, o + 3, o + 2) ; const q = i * 4; wi.push(q, q + 1, q + 5, q, q + 5, q + 4, q + 2, q + 3, q + 7, q + 2, q + 7, q + 6) }
+  }
+  const lg = new THREE.BufferGeometry(); lg.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); lg.setIndex(idx); lg.computeVertexNormals()
+  scene.add(new THREE.Mesh(lg, new THREE.MeshStandardMaterial({ color: 0x374151, roughness: 0.85, side: THREE.DoubleSide })))
+  const wg = new THREE.BufferGeometry(); wg.setAttribute('position', new THREE.Float32BufferAttribute(wp, 3)); wg.setIndex(wi); wg.computeVertexNormals()
+  scene.add(new THREE.Mesh(wg, new THREE.MeshStandardMaterial({ color: 0xfacc15, roughness: 0.6, side: THREE.DoubleSide })))
+  // Stützen und Einfahrt-Pfeiler
+  for (const th of [Math.PI / 2, Math.PI * 1.5]) for (const sg of [-1, 1]) {
+    const c = loopPoint(L, th, 0), p = new THREE.Mesh(new THREE.BoxGeometry(1, c.y, 1), new THREE.MeshStandardMaterial({ color: 0x6b7280, roughness: 1 }))
+    p.position.set(c.x + sg * (w + 1), c.y / 2, c.z); scene.add(p)
+  }
+  for (const sg of [-1, 1]) {
+    const p = new THREE.Mesh(new THREE.BoxGeometry(0.6, 6, 0.6), new THREE.MeshStandardMaterial({ color: 0xdc2626, roughness: 0.6 })); p.position.set(L.x + sg * (w + 1.6), 3, L.z - 6); scene.add(p)
+  }
+  // Anfahrstreifen
+  const strip = new THREE.Mesh(new THREE.PlaneGeometry(2 * w, 160), new THREE.MeshBasicMaterial({ color: 0x1f2937 })); strip.rotation.x = -Math.PI / 2; strip.position.set(L.x, 0.03, L.z - 100); scene.add(strip)
 }

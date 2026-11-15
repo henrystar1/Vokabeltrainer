@@ -102,7 +102,7 @@ describe('Fahrassistent mit Drift (Supercar)', () => {
 
 describe('Drift-Arena', () => {
   it('ist Strecke 10, 48 m breit und deutlich breiter als alle anderen', () => {
-    expect(TRACKS).toHaveLength(14)
+    expect(TRACKS).toHaveLength(15)
     const d = TRACKS[10]
     expect(d.id).toBe(10)
     expect(d.width).toBe(48)
@@ -211,7 +211,7 @@ describe('Endlos-Asphalt und Drift-Kreis', () => {
   const free = TRACKS[11], disc = TRACKS[12]
   it('Definitionen', () => {
     expect(free.mode).toBe('free'); expect(disc.mode).toBe('disc')
-    expect(TRACKS.filter((t) => t.mode).map((t) => t.id)).toEqual([11, 12, 13])
+    expect(TRACKS.filter((t) => t.mode).map((t) => t.id)).toEqual([11, 12, 13, 14])
     expect(disc.width).toBeGreaterThan(300)
   })
   it('Endlos-Asphalt: keine Wände, kein Gras, kein Fortschritt – man fährt beliebig weit weg', () => {

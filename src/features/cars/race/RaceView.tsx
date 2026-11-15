@@ -15,7 +15,9 @@ export interface RaceCarInfo { /** Auto-ID im Shop (für die Rangliste) */ id?: 
 type Key = 'gas' | 'brake' | 'left' | 'right' | 'fly'
 export interface RaceStanding { name: string; ms: number | null; me?: boolean }
 /** Höhe über dem Boden: Flug oder Brücke (der höhere Wert zählt). */
-const carY = (c: { fly: number; lvl?: number; x: number }): number => Math.max(flyHeight(c.fly), c.lvl ? bridgeH(c.x) : 0)
+const carY = (c: { fly: number; lvl?: number; x: number; y?: number }): number => Math.max(flyHeight(c.fly), c.lvl ? bridgeH(c.x) : 0, c.y ?? 0)
+/** Neigung der Nase: im Looping eine volle Drehung, sonst nach Steigen/Fallen (Rampen, Sprünge) */
+const pitchOf = (c: { loop?: number; vy?: number; v: number }): number => (c.loop ?? 0) > 0 ? -(c.loop ?? 0) : -Math.max(-0.6, Math.min(0.6, Math.atan2(c.vy ?? 0, Math.max(Math.abs(c.v), 8))))
 
 interface Props {
   trackId: number
@@ -33,7 +35,7 @@ interface Props {
   onExit?: () => void
 }
 
-interface Remote { id: string; name: string; kind: string; color: string; x: number; z: number; h: number; v: number; tx: number; tz: number; th: number; total: number; ft: number | null; seen: number; dmg: number; slip: number; fl: number; lv?: number; mesh?: import('three').Group }
+interface Remote { id: string; name: string; kind: string; color: string; x: number; z: number; h: number; v: number; tx: number; tz: number; th: number; total: number; ft: number | null; seen: number; dmg: number; slip: number; fl: number; lv?: number; yy?: number; pt?: number; mesh?: import('three').Group }
 
 const COUNT_MS = 4500
 const fmt = (ms: number) => { const m = Math.floor(ms / 60000); const s = ms / 1000 - m * 60; return `${m}:${s.toFixed(2).padStart(5, '0')}` }
@@ -178,7 +180,7 @@ export default function RaceView({ trackId, custom, laps, me, assistOk = false, 
             remotes.set(payload.u, r)
           }
           if (!r) return
-          r.lv = Number(payload.lv) || 0
+          r.lv = Number(payload.lv) || 0; r.yy = Number(payload.y) || 0; r.pt = Number(payload.pt) || 0
           r.tx = Number(payload.x) || 0; r.tz = Number(payload.z) || 0; r.th = Number(payload.h) || 0; r.v = Number(payload.v) || 0
           r.dmg = Number(payload.d) || 0; r.slip = Number(payload.sl) || 0; r.fl = Number(payload.fl) || 0
           r.total = Number(payload.t) || 0; r.ft = typeof payload.f === 'number' ? payload.f : null; r.seen = performance.now()
@@ -277,7 +279,7 @@ export default function RaceView({ trackId, custom, laps, me, assistOk = false, 
             if (sc) hitAt.set(b, now)
           }
           for (const r of remotes.values()) {
-            if (now - r.seen > 3000 || r.fl > 0 || (r.lv ?? 0) !== (car.lvl ?? 0)) continue
+            if (now - r.seen > 3000 || r.fl > 0 || (r.lv ?? 0) !== (car.lvl ?? 0) || Math.abs((r.yy ?? 0) - (car.y ?? 0)) > 2) continue
             const age = Math.min(0.25, (now - r.seen) / 1000), rd = kindDims(r.kind)
             const sc = now - (hitAt.get(r) ?? -1e9) < 250 ? 0 : 1
             const c1 = crash(car, myStats, { x: r.x + Math.sin(r.h) * r.v * age, z: r.z + Math.cos(r.h) * r.v * age, h: r.h, v: r.v, slip: r.slip }, { len: rd.len + 0.5, wid: rd.wid + 0.4 }, 0.5, DMG_MAX, sc)
@@ -327,9 +329,9 @@ export default function RaceView({ trackId, custom, laps, me, assistOk = false, 
         }
 
         // Modelle
-        const place = (m: import('three').Group, x: number, z: number, h: number, v: number, steer: number, dmg = 0, slip = 0, fly = 0, lv = 0) => {
+        const place = (m: import('three').Group, x: number, z: number, h: number, v: number, steer: number, dmg = 0, slip = 0, fly = 0, lv = 0, yy = 0, pitch = 0) => {
           rs.damageCar(m, dmg, slip, v, now / 1000)
-          m.position.set(x, carY({ fly, lvl: lv, x }), z); m.rotation.y = h
+          m.rotation.order = 'YXZ'; m.position.set(x, carY({ fly, lvl: lv, x, y: yy }), z); m.rotation.y = h; m.rotation.x = pitch
           const lean = m.userData.lean as import('three').Group | undefined
           if (lean) { m.rotation.z = 0; lean.rotation.z += ((-Math.max(-0.85, Math.min(0.85, steer * Math.min(1, Math.abs(v) / 20) * 0.9 + slip * 0.5))) - lean.rotation.z) * Math.min(1, dt * 9) }
           else m.rotation.z = -steer * Math.min(1, Math.abs(v) / 40) * 0.05 - flyRoll(fly)
@@ -338,7 +340,7 @@ export default function RaceView({ trackId, custom, laps, me, assistOk = false, 
           const wh = m.userData.wheels as import('three').Group[] | undefined
           if (wh) for (const w of wh) { w.children.forEach((c) => { c.rotation.x += (v * dt) / (m.userData.wheelR as number) }); if (w.name === 'front') w.rotation.y = steer * 0.45 }
         }
-        place(myMesh, car.x, car.z, car.h, car.v, car.steer, car.dmg, car.slip, car.fly, car.lvl ?? 0)
+        place(myMesh, car.x, car.z, car.h, car.v, car.steer, car.dmg, car.slip, car.fly, car.lvl ?? 0, car.y ?? 0, pitchOf(car))
         carFx(me.kind, car.x, car.z, car.h, car.v, car.slip, car.fly, input.gas, dt)
         botList.forEach((b, i) => place(botMeshes[i], b.car.x, b.car.z, b.car.h, b.car.v, b.car.steer, b.car.dmg, b.car.slip))
         for (const b of botList) carFx(b.kind, b.car.x, b.car.z, b.car.h, b.car.v, b.car.slip, 0, b.car.v > 5, dt)
@@ -349,7 +351,7 @@ export default function RaceView({ trackId, custom, laps, me, assistOk = false, 
           let dh = r.th - r.h; while (dh > Math.PI) dh -= Math.PI * 2; while (dh < -Math.PI) dh += Math.PI * 2
           r.h += dh * k
           r.mesh.visible = now - r.seen < 5000
-          place(r.mesh, r.x, r.z, r.h, r.v, 0, r.dmg, r.slip, r.fl, r.lv ?? 0)
+          place(r.mesh, r.x, r.z, r.h, r.v, 0, r.dmg, r.slip, r.fl, r.lv ?? 0, r.yy ?? 0, r.pt ?? 0)
           if (online?.open && now - r.seen > 15000) { scene.remove(r.mesh); remotes.delete(r.id) }
           if (r.mesh.visible) carFx(r.kind, r.x, r.z, r.h, r.v, r.slip, r.fl, r.v > 5, dt)
         }
@@ -406,7 +408,7 @@ export default function RaceView({ trackId, custom, laps, me, assistOk = false, 
 
         if (online && now - lastSend > 55) {
           lastSend = now
-          send({ u: online.userId, x: car.x, z: car.z, h: car.h, v: car.v, t: car.total, k: me.kind, c: me.color, f: finishedMs, d: Math.round(car.dmg), sl: Math.round(car.slip * 100) / 100, fl: Math.round(car.fly * 100) / 100, lv: car.lvl ?? 0, n: online.name ?? me.name })
+          send({ u: online.userId, x: car.x, z: car.z, h: car.h, v: car.v, t: car.total, k: me.kind, c: me.color, f: finishedMs, d: Math.round(car.dmg), sl: Math.round(car.slip * 100) / 100, fl: Math.round(car.fly * 100) / 100, lv: car.lvl ?? 0, y: Math.round((car.y ?? 0) * 10) / 10, pt: Math.round(pitchOf(car) * 100) / 100, n: online.name ?? me.name })
         }
         if (now - lastHud > 110) {
           lastHud = now
