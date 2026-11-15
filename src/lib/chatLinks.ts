@@ -10,7 +10,8 @@ export function normKey(s: string): string {
     .replace(/[^a-z0-9]/g, '')
 }
 
-const ITEMS = [...NAV_ITEMS, STAFF_NAV_ITEM]
+// Sammelseiten (/spielen, /laden) nach hinten: #Shop und #Spiele sollen auf Shop bzw. die Arcade-Spiele führen.
+const ITEMS = [...NAV_ITEMS.filter((i) => i.to !== '/spielen' && i.to !== '/laden'), ...NAV_ITEMS.filter((i) => i.to === '/spielen' || i.to === '/laden'), STAFF_NAV_ITEM]
 const ALIAS: Record<string, string> = { startseite: '/', home: '/', brett: '/brett', hausaufgabe: '/hausaufgaben', flaggen: '/auswendig', pi: '/auswendig', hochzahlen: '/auswendig', website: '/websites', advent: '/advent', loot: '/loot', online: '/mehrspieler', boerse: '/boerse', autohaus: '/autohaus', schnelllesen: '/schnelllesen', aktien: '/boerse', kalender: '/advent', admin: '/verwaltung' }
 
 /** Welche Seite meint #Name? Passt auf Menünamen (ohne Klammerzusatz) und auf den Pfad. */

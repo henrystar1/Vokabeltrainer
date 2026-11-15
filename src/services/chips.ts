@@ -17,4 +17,6 @@ export type ChipTrade = ChipStatus & { koins: number }
 
 export const getChipStatus = () => rpc<ChipStatus>('chip_status')
 export const buyChips = (chips: number) => rpc<ChipTrade>('chip_buy', { p_chips: chips })
+/** Admin: Chips an eine Person vergeben (auch negativ), ohne Tageslimit. */
+export const adminGrantChips = (userId: string, chips: number, note = '') => rpc<number>('admin_grant_chips', { p_user: userId, p_chips: chips, p_note: note })
 export const sellChips = (chips: number) => rpc<ChipTrade>('chip_sell', { p_chips: chips })

@@ -17,6 +17,10 @@ export interface NavItem {
   hub?: string
   /** false = nicht im Menü, nur als Kachel auf der Lernen-Seite */
   menu?: false
+  /** Kachel auf einer Sammelseite (Spiele / Shop) statt im Menü. */
+  hubOf?: 'games' | 'shop'
+  /** Zwischenüberschrift auf der Sammelseite */
+  hubGroup?: string
 }
 
 export interface NavGroup {
@@ -40,6 +44,7 @@ export const NAV_GROUPS: NavGroup[] = [
     { lock: 'cards', to: '/karteikarten', label: 'Karteikarten', icon: Layers, hub: 'Karten umdrehen und sortieren' },
     { lock: 'test', to: '/test', label: 'Test', icon: ClipboardCheck, hub: 'Wissen prüfen, Auswertung am Ende' },
     { lock: 'homework', to: '/hausaufgaben', label: 'Hausaufgaben', icon: ClipboardList },
+    { to: '/schnelllesen', label: 'Schnelllesen', icon: ScanText },
     { lock: 'copy', to: '/abschreiben', label: 'Abschreiben', icon: PenLine, menu: false, hub: 'Wörter abschreiben und einprägen' },
     { lock: 'cram', to: '/crashkurs', label: 'Crashkurs', icon: Timer, menu: false, hub: 'Schnell vor der Arbeit: ansehen, Karten, Test' },
     { lock: 'practice', to: '/ueben', label: 'Multiple Choice', icon: ListChecks, menu: false, hub: 'Antwort aus mehreren auswählen' },
@@ -51,7 +56,6 @@ export const NAV_GROUPS: NavGroup[] = [
   ]), langPicker: true },
   g('Mehr üben', [
     { lock: 'math', to: '/mathe', label: 'Mathe', icon: Calculator },
-    { to: '/schnelllesen', label: 'Schnelllesen', icon: ScanText },
     { lock: 'memorize', to: '/auswendig', label: 'Auswendig (Pi, Flaggen)', icon: Binary },
   ]),
   g('Wettkampf', [
@@ -61,21 +65,22 @@ export const NAV_GROUPS: NavGroup[] = [
     { lock: 'ranking', to: '/rangliste', label: 'Rangliste', icon: Trophy },
     { lock: 'stats', to: '/statistik', label: 'Statistik', icon: BarChart3 },
   ]),
-  g('Spiele', [
-    { lock: 'games', to: '/spiele', label: 'Spiele', icon: Gamepad2 },
-    { lock: 'online', to: '/mehrspieler', label: 'Online-Spiele', icon: Puzzle },
-    { lock: 'duels', to: '/deathrun', label: 'Offene Deathrun-Lobby', icon: Skull },
-    { lock: 'parkour', to: '/parkour', label: 'Parkour', icon: Mountain },
-    { lock: 'cars', to: '/autohaus', label: 'Autohaus & Rennen', icon: Car },
-    { lock: 'gambling', to: '/gambling', label: 'Gambling', icon: Dices },
-  ]),
-  g('Coins & Belohnungen', [
+  g('Spiele & Shop', [
+    { to: '/spielen', label: 'Spiele', icon: Gamepad2 },
     { lock: 'advent', to: '/advent', label: 'Adventskalender', icon: Gift },
     { lock: 'loot', to: '/loot', label: 'Loot Drop', icon: Package },
     { lock: 'stocks', to: '/boerse', label: 'Börse', icon: TrendingUp },
-    { lock: 'shop', to: '/shop', label: 'Shop', icon: ShoppingBag },
-    { lock: 'print', to: '/druckshop', label: '3D-Druck-Shop', icon: Printer },
-    { lock: 'plus', to: '/plus', label: 'Plus & Pro', icon: Crown, brand: true },
+    { to: '/laden', label: 'Shop', icon: ShoppingBag },
+    // nur als Kacheln auf den Sammelseiten
+    { lock: 'games', to: '/spiele', label: 'Arcade-Spiele', icon: Gamepad2, menu: false, hubOf: 'games', hubGroup: 'Allein spielen', hub: 'Knobeln, Wortspiele, Reaktion' },
+    { lock: 'parkour', to: '/parkour', label: 'Parkour', icon: Mountain, menu: false, hubOf: 'games', hubGroup: 'Allein spielen', hub: 'Hindernisse in 3D' },
+    { lock: 'cars', to: '/autohaus', label: 'Autohaus & Rennen', icon: Car, menu: false, hubOf: 'games', hubGroup: 'Rennen', hub: 'Autos kaufen, Strecken fahren' },
+    { lock: 'online', to: '/mehrspieler', label: 'Online-Spiele', icon: Puzzle, menu: false, hubOf: 'games', hubGroup: 'Mit anderen', hub: 'Ludo, Shooter und mehr' },
+    { lock: 'duels', to: '/deathrun', label: 'Offene Deathrun-Lobby', icon: Skull, menu: false, hubOf: 'games', hubGroup: 'Mit anderen', hub: 'Sofort mitspielen' },
+    { lock: 'gambling', to: '/gambling', label: 'Gambling', icon: Dices, menu: false, hubOf: 'games', hubGroup: 'Glück', hub: 'Mit Chips spielen' },
+    { lock: 'shop', to: '/shop', label: 'Shop', icon: ShoppingBag, menu: false, hubOf: 'shop', hub: 'Mit Koins einkaufen' },
+    { lock: 'print', to: '/druckshop', label: '3D-Druck-Shop', icon: Printer, menu: false, hubOf: 'shop', hub: 'Dinge drucken lassen' },
+    { lock: 'plus', to: '/plus', label: 'Plus & Pro', icon: Crown, brand: true, menu: false, hubOf: 'shop', hub: 'Mehr Funktionen freischalten' },
   ]),
   g('Community', [
     { lock: 'chat', to: '/chat', label: 'Chat', icon: MessagesSquare },
@@ -118,4 +123,15 @@ export const NAV_LANGS: { id: string; label: string; short: string }[] = [
 /** Kacheln auf der Lernen-Seite: alle Übungsarten (auch die, die nicht im Menü stehen). */
 export function hubItemsFor(locked: ReadonlySet<LockKey> = new Set(), language = 'en'): NavItem[] {
   return NAV_ITEMS.filter((i) => i.hub && (!i.lock || !locked.has(i.lock)) && (!i.langs || i.langs.includes(language)))
+}
+
+/** Kacheln einer Sammelseite (Spiele oder Shop), gruppiert nach Zwischenüberschrift. */
+export function hubPageFor(of: 'games' | 'shop', locked: ReadonlySet<LockKey> = new Set()): { title: string; items: NavItem[] }[] {
+  const out: { title: string; items: NavItem[] }[] = []
+  for (const i of NAV_ITEMS.filter((x) => x.hubOf === of && (!x.lock || !locked.has(x.lock)))) {
+    const t = i.hubGroup ?? ''
+    const grp = out.find((x) => x.title === t)
+    if (grp) grp.items.push(i); else out.push({ title: t, items: [i] })
+  }
+  return out
 }

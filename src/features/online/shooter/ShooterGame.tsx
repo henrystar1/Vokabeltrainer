@@ -13,6 +13,9 @@ interface Props {
 
 interface Remote { id: string; name: string; seat: number; x: number; z: number; yaw: number; hp: number; alive: boolean; hidden: boolean; tx: number; tz: number; vx: number; vz: number; pt: number; mesh?: import('three').Object3D }
 
+/** Sichtfeld beim Zielen: Scharfschütze starkes Zoom, andere leicht. */
+const zoomFov = (w: number) => (WEAPONS[w]?.id === 'sniper' ? 16 : 55)
+
 const mmss = (s: number) => `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`
 
 /** Falsche „Lern-Seite“, die sofort alles überdeckt (Panic-Button). */
@@ -48,6 +51,9 @@ export default function ShooterGame({ view, onReport }: Props) {
   const weaponRef = useRef(0)
   const cycleWeapon = useRef<(d: number) => void>(() => undefined)
   const mouseHeld = useRef(false)
+  const aimRef = useRef(false)
+  const [aiming, setAiming] = useState(false)
+  const setAim = useRef<(on: boolean) => void>(() => undefined)
   const joy = useRef({ x: 0, y: 0 })
   const look = useRef({ dx: 0, dy: 0 })
   const fireHeld = useRef(false)
@@ -105,21 +111,59 @@ export default function ShooterGame({ view, onReport }: Props) {
       const sun = new THREE.DirectionalLight(0xffffff, 1.2)
       sun.position.set(10, 30, 8)
       scene.add(sun)
-      const floor = new THREE.Mesh(new THREE.PlaneGeometry(60, 60), new THREE.MeshStandardMaterial({ color: 0x1b2338, roughness: 0.95 }))
+      // Prozedurale Texturen (Canvas): Betonboden mit Fugen, Ziegelwand, Kisten mit Rahmen
+      const rnd = (() => { let a = 12345; return () => { a = (a * 1664525 + 1013904223) >>> 0; return a / 4294967296 } })()
+      const mkTex = (size: number, draw: (g: CanvasRenderingContext2D, n: number) => void, rx: number, ry: number) => {
+        const c = document.createElement('canvas'); c.width = size; c.height = size
+        const g = c.getContext('2d')
+        if (g) draw(g, size)
+        const t = new THREE.CanvasTexture(c)
+        t.wrapS = THREE.RepeatWrapping; t.wrapT = THREE.RepeatWrapping; t.repeat.set(rx, ry)
+        t.anisotropy = Math.min(8, renderer.capabilities.getMaxAnisotropy())
+        t.colorSpace = THREE.SRGBColorSpace
+        return t
+      }
+      const noise = (g: CanvasRenderingContext2D, n: number, count: number, a: number) => {
+        for (let i = 0; i < count; i++) { const v = Math.floor(rnd() * 255); g.fillStyle = `rgba(${v},${v},${v},${a})`; g.fillRect(rnd() * n, rnd() * n, 1 + rnd() * 2, 1 + rnd() * 2) }
+      }
+      const floorTex = mkTex(256, (g, n) => {
+        g.fillStyle = '#2a3350'; g.fillRect(0, 0, n, n); noise(g, n, 2600, 0.07)
+        g.strokeStyle = '#141a2c'; g.lineWidth = 3; g.strokeRect(0, 0, n, n)
+        g.strokeStyle = 'rgba(255,255,255,.05)'; g.lineWidth = 1; g.strokeRect(3, 3, n - 6, n - 6)
+      }, 30, 30)
+      const wallTex = mkTex(256, (g, n) => {
+        g.fillStyle = '#3a4466'; g.fillRect(0, 0, n, n)
+        const bh = n / 8; const bw = n / 4
+        for (let r = 0; r < 8; r++) for (let c = -1; c < 4; c++) {
+          const x = c * bw + (r % 2 ? bw / 2 : 0); const sh = 0.85 + rnd() * 0.3
+          g.fillStyle = `rgb(${Math.floor(70 * sh)},${Math.floor(82 * sh)},${Math.floor(120 * sh)})`; g.fillRect(x + 2, r * bh + 2, bw - 4, bh - 4)
+        }
+        noise(g, n, 1500, 0.08)
+      }, 12, 1)
+      const crateTex = mkTex(128, (g, n) => {
+        g.fillStyle = '#8a8fa8'; g.fillRect(0, 0, n, n)
+        for (let y = 0; y < n; y += 16) { g.fillStyle = y % 32 ? 'rgba(0,0,0,.10)' : 'rgba(255,255,255,.07)'; g.fillRect(0, y, n, 16) }
+        noise(g, n, 700, 0.1)
+        g.strokeStyle = '#2a2f45'; g.lineWidth = 8; g.strokeRect(4, 4, n - 8, n - 8)
+        g.lineWidth = 5; g.beginPath(); g.moveTo(8, 8); g.lineTo(n - 8, n - 8); g.moveTo(n - 8, 8); g.lineTo(8, n - 8); g.stroke()
+      }, 1, 1)
+      const sky = mkTex(256, (g, n) => {
+        const gr = g.createLinearGradient(0, 0, 0, n); gr.addColorStop(0, '#050a1c'); gr.addColorStop(1, '#2b3a6e'); g.fillStyle = gr; g.fillRect(0, 0, n, n)
+        for (let i = 0; i < 160; i++) { g.fillStyle = `rgba(255,255,255,${0.3 + rnd() * 0.7})`; g.fillRect(rnd() * n, rnd() * n * 0.7, 1.5, 1.5) }
+      }, 1, 1)
+      scene.background = sky
+      const floor = new THREE.Mesh(new THREE.PlaneGeometry(60, 60), new THREE.MeshStandardMaterial({ map: floorTex, roughness: 0.9 }))
       floor.rotation.x = -Math.PI / 2
       scene.add(floor)
-      const grid = new THREE.GridHelper(60, 30, 0x3b4a78, 0x25304f)
-      grid.position.y = 0.01
-      scene.add(grid)
-      const wallMat = new THREE.MeshStandardMaterial({ color: 0x334166, transparent: true, opacity: 0.55 })
+            const wallMat = new THREE.MeshStandardMaterial({ map: wallTex, roughness: 0.85 })
       for (const [x, z, w, d] of [[0, -30, 60, 0.6], [0, 30, 60, 0.6], [-30, 0, 0.6, 60], [30, 0, 0.6, 60]] as const) {
         const m = new THREE.Mesh(new THREE.BoxGeometry(w, 4, d), wallMat)
         m.position.set(x, 2, z)
         scene.add(m)
       }
-      const palette = [0x4f6cb3, 0x6b4fb3, 0x2f8f83, 0xb36b4f]
+      const palette = [0xc8d4ff, 0xe0c8ff, 0xb8ffe8, 0xffd2bd]
       boxes.forEach((b, i) => {
-        const m = new THREE.Mesh(new THREE.BoxGeometry(b.w, b.h, b.d), new THREE.MeshStandardMaterial({ color: palette[i % palette.length], roughness: 0.7 }))
+        const m = new THREE.Mesh(new THREE.BoxGeometry(b.w, b.h, b.d), new THREE.MeshStandardMaterial({ map: crateTex, color: palette[i % palette.length], roughness: 0.7 }))
         m.position.set(b.x, b.h / 2, b.z)
         scene.add(m)
       })
@@ -222,16 +266,22 @@ export default function ShooterGame({ view, onReport }: Props) {
       }
 
       const el = renderer.domElement
+      const aimOn = (on: boolean) => { aimRef.current = on; setAiming(on) }
+      setAim.current = aimOn
       const onDown = (e: MouseEvent) => {
         if (panicRef.current || touch) return
         if (document.pointerLockElement !== el) { void el.requestPointerLock?.(); return }
         if (e.button === 0) { mouseHeld.current = true; fire() }
+        if (e.button === 2) aimOn(true)
       }
-      const onUp = (e: MouseEvent) => { if (e.button === 0) mouseHeld.current = false }
+      const onUp = (e: MouseEvent) => { if (e.button === 0) mouseHeld.current = false; if (e.button === 2) aimOn(false) }
+      const onCtx = (e: Event) => e.preventDefault()
+      el.addEventListener('contextmenu', onCtx)
       const onMove = (e: MouseEvent) => {
         if (document.pointerLockElement !== el || panicRef.current) return
-        st.yaw -= e.movementX * 0.0025
-        st.pitch = Math.max(-1.4, Math.min(1.4, st.pitch - e.movementY * 0.0025))
+        const k = 0.0025 * (aimRef.current ? zoomFov(weaponRef.current) / 75 : 1)
+        st.yaw -= e.movementX * k
+        st.pitch = Math.max(-1.4, Math.min(1.4, st.pitch - e.movementY * k))
       }
       const onKey = (e: KeyboardEvent) => {
         if (e.code === 'KeyP' || e.code === 'Backquote') { e.preventDefault(); if (e.type === 'keydown' && !e.repeat) togglePanic(!panicRef.current); return }
@@ -245,6 +295,9 @@ export default function ShooterGame({ view, onReport }: Props) {
         if (e.type === 'keydown') keys.add(e.code); else keys.delete(e.code)
       }
       const selectWeapon = (i: number) => { weaponRef.current = i; setWeapon(i) }
+      const onKeyAim = (e: KeyboardEvent) => { if (e.code === 'KeyF' && !e.repeat && !panicRef.current) aimOn(!aimRef.current) }
+      window.addEventListener('keydown', onKeyAim)
+      cleanups.push(() => window.removeEventListener('keydown', onKeyAim))
       cycleWeapon.current = (dlt) => selectWeapon((weaponRef.current + dlt + WEAPONS.length) % WEAPONS.length)
       const onLock = () => { /* HUD liest den Lock-Zustand im Tick */ }
       el.addEventListener('mousedown', onDown)
@@ -254,7 +307,7 @@ export default function ShooterGame({ view, onReport }: Props) {
       window.addEventListener('keyup', onKey)
       document.addEventListener('pointerlockchange', onLock)
       cleanups.push(() => {
-        el.removeEventListener('mousedown', onDown); window.removeEventListener('mouseup', onUp); document.removeEventListener('mousemove', onMove)
+        el.removeEventListener('mousedown', onDown); el.removeEventListener('contextmenu', onCtx); window.removeEventListener('mouseup', onUp); document.removeEventListener('mousemove', onMove)
         window.removeEventListener('keydown', onKey); window.removeEventListener('keyup', onKey)
         document.removeEventListener('pointerlockchange', onLock)
       })
@@ -271,10 +324,12 @@ export default function ShooterGame({ view, onReport }: Props) {
         const paused = panicRef.current
         if (!paused) {
           if (look.current.dx || look.current.dy) {
-            st.yaw -= look.current.dx * 0.006
-            st.pitch = Math.max(-1.4, Math.min(1.4, st.pitch - look.current.dy * 0.006))
+            const k = 0.006 * (aimRef.current ? zoomFov(weaponRef.current) / 75 : 1)
+            st.yaw -= look.current.dx * k
+            st.pitch = Math.max(-1.4, Math.min(1.4, st.pitch - look.current.dy * k))
             look.current.dx = 0; look.current.dy = 0
           }
+          if (!st.alive && aimRef.current) aimOn(false)
           if (fireHeld.current || mouseHeld.current || keys.has('Space')) fire()
           if (keys.has('ArrowLeft')) st.yaw += 2.4 * dt
           if (keys.has('ArrowRight')) st.yaw -= 2.4 * dt
@@ -298,6 +353,8 @@ export default function ShooterGame({ view, onReport }: Props) {
             ;[st.x, st.z] = collide(st.x + dx, st.z + dz, 0.5, boxes)
           }
         }
+        const tf = aimRef.current && st.alive ? zoomFov(weaponRef.current) : 75
+        if (Math.abs(camera.fov - tf) > 0.2) { camera.fov += (tf - camera.fov) * Math.min(1, dt * 16); camera.updateProjectionMatrix() }
         camera.position.set(st.x, st.alive ? EYE : 0.5, st.z)
         camera.rotation.set(st.alive ? st.pitch : -0.9, st.yaw, 0)
         for (const r of remotes.values()) {
@@ -350,6 +407,13 @@ export default function ShooterGame({ view, onReport }: Props) {
       {hitFlash > 0 && <HitMarker key={hitFlash} />}
       {!panic && (
         <>
+          {aiming && WEAPONS[weapon].id === 'sniper' && hud.alive && (
+            <div className="pointer-events-none absolute inset-0" aria-hidden data-testid="scope">
+              <div className="absolute inset-0" style={{ background: 'radial-gradient(circle at center, transparent 0, transparent 30%, rgba(0,0,0,.92) 31%)' }} />
+              <span className="absolute left-0 top-1/2 h-px w-full bg-black/70" /><span className="absolute left-1/2 top-0 h-full w-px bg-black/70" />
+              <span className="absolute left-1/2 top-1/2 h-1.5 w-1.5 -translate-x-1/2 -translate-y-1/2 rounded-full bg-rose-500" />
+            </div>
+          )}
           <div className="pointer-events-none absolute left-1/2 top-1/2 h-4 w-4 -translate-x-1/2 -translate-y-1/2" aria-hidden>
             <span className="absolute left-1/2 top-0 h-full w-px -translate-x-1/2 bg-white/80" /><span className="absolute left-0 top-1/2 h-px w-full -translate-y-1/2 bg-white/80" />
           </div>
@@ -363,11 +427,11 @@ export default function ShooterGame({ view, onReport }: Props) {
             <div className="h-3 overflow-hidden rounded bg-black/60"><div className="h-full bg-emerald-400 transition-[width]" style={{ width: `${hud.hp}%`, background: hud.hp > 50 ? '#34d399' : hud.hp > 25 ? '#fbbf24' : '#ef4444' }} /></div>
             <p className="mt-0.5 text-xs text-white">{hud.alive ? `${hud.hp} Leben` : `Du bist raus – zurück in ${hud.respawn} s`}</p>
           </div>
-          {!hud.locked && <div className="pointer-events-none absolute inset-0 flex items-center justify-center bg-black/40 text-center text-white"><p className="max-w-xs text-sm">Klicke ins Bild, um zu spielen.<br />WASD bewegen · Maus oder Pfeiltasten zielen · Klick oder Leertaste schießen<br />1–4 oder Q/E Waffe wechseln · Shift rennen · P = Panik</p></div>}
+          {!hud.locked && <div className="pointer-events-none absolute inset-0 flex items-center justify-center bg-black/40 text-center text-white"><p className="max-w-xs text-sm">Klicke ins Bild, um zu spielen.<br />WASD bewegen · Maus oder Pfeiltasten zielen · Klick oder Leertaste schießen<br />1–4 oder Q/E Waffe wechseln · Rechtsklick/F zielen (Zoom) · Shift rennen · P = Panik</p></div>}
           <div className="pointer-events-none absolute bottom-3 left-1/2 flex -translate-x-1/2 gap-1 text-xs" aria-label="Waffen">
             {WEAPONS.map((w, i) => <span key={w.id} className={`rounded-md px-2 py-1 ${i === weapon ? 'bg-white text-slate-900 font-bold' : 'bg-black/50 text-white/80'}`}>{i + 1} {w.name}</span>)}
           </div>
-          {touch && hud.alive && <TouchControls joy={joy} look={look} fireHeld={fireHeld} onWeapon={() => cycleWeapon.current(1)} weaponName={WEAPONS[weapon].name} />}
+          {touch && hud.alive && <TouchControls joy={joy} look={look} fireHeld={fireHeld} onWeapon={() => cycleWeapon.current(1)} weaponName={WEAPONS[weapon].name} aiming={aiming} onAim={() => setAim.current(!aimRef.current)} />}
           <button type="button" onClick={() => togglePanic(true)} className="absolute right-3 top-3 min-h-[40px] rounded-lg bg-rose-600 px-3 text-sm font-bold text-white shadow hover:bg-rose-500" aria-label="Panik-Knopf: Spiel sofort verstecken">PANIK (P)</button>
         </>
       )}
@@ -379,7 +443,7 @@ export default function ShooterGame({ view, onReport }: Props) {
 type XY = { current: { x: number; y: number } }
 
 /** Touch-Steuerung (iPad/Tablet): links Joystick (erscheint dort, wo der Finger aufsetzt), rechts wischen zum Zielen, FEUER und Waffenwechsel. */
-function TouchControls({ joy, look, fireHeld, onWeapon, weaponName }: { joy: XY; look: { current: { dx: number; dy: number } }; fireHeld: { current: boolean }; onWeapon: () => void; weaponName: string }) {
+function TouchControls({ joy, look, fireHeld, onWeapon, weaponName, aiming, onAim }: { aiming: boolean; onAim: () => void; joy: XY; look: { current: { dx: number; dy: number } }; fireHeld: { current: boolean }; onWeapon: () => void; weaponName: string }) {
   const [knob, setKnob] = useState<{ x: number; y: number; ox: number; oy: number } | null>(null)
   const joyId = useRef<number | null>(null)
   const joyOrigin = useRef<{ x: number; y: number }>({ x: 0, y: 0 })
@@ -433,6 +497,7 @@ function TouchControls({ joy, look, fireHeld, onWeapon, weaponName }: { joy: XY;
       >
         <p className="pointer-events-none absolute right-4 top-2 text-xs text-white/60">Zielen: Finger rechts bewegen</p>
       </div>
+      <button type="button" onClick={onAim} className={`absolute bottom-32 right-6 min-h-[56px] touch-none select-none rounded-xl border-2 px-3 text-sm font-bold text-white ${aiming ? 'border-amber-300 bg-amber-600/80' : 'border-white/50 bg-slate-800/80'}`} aria-pressed={aiming} aria-label="Zielen (Zoom)">ZIELEN</button>
       <button type="button" onClick={onWeapon} className="absolute bottom-6 right-36 min-h-[56px] touch-none select-none rounded-xl border-2 border-white/50 bg-slate-800/80 px-3 text-sm font-bold text-white active:bg-slate-700" aria-label="Waffe wechseln">{weaponName}<span className="block text-[10px] font-normal text-white/60">tippen = wechseln</span></button>
       <button
         type="button"

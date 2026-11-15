@@ -11,6 +11,7 @@ import { useAsync } from '../../lib/useAsync'
 import { randomPassword } from '../../pages/admin/AccountsTab'
 import { adminAdjustPoints, adminSetPassword } from '../../services/admin'
 import { parkourJumpsList, parkourJumpsSet, parkourLearnOffList, parkourLearnSet } from '../../services/play'
+import { adminGrantChips } from '../../services/chips'
 import { adminGrantItem, adminGrantKoins, adminListItems, adminListUserItems, adminRevokeItem } from '../../services/koins'
 
 
@@ -29,7 +30,7 @@ export function ManageButton({ userId, name, onChanged }: { userId: string; name
   )
 }
 
-type Tab = 'coins' | 'items' | 'points' | 'parkour' | 'password'
+type Tab = 'coins' | 'chips' | 'items' | 'points' | 'parkour' | 'password'
 
 /** Schnellaktionen für eine Person: Coins buchen (auch sehr hohe Beträge auf einmal), Artikel schenken/entziehen, Punkte. */
 export default function ManageUser({ userId, name, onClose, onChanged }: { userId: string; name: string; onClose: () => void; onChanged?: () => void }) {
@@ -71,7 +72,7 @@ export default function ManageUser({ userId, name, onClose, onChanged }: { userI
   const n = parseCoins(amount)
   const validAmount = Number.isSafeInteger(n) && n !== 0 && Math.abs(n) <= MAX
   const p = Number.parseInt(pts, 10)
-  const tabs: Array<[Tab, string]> = [['coins', 'Coins'], ['items', 'Artikel'], ['points', 'Punkte'], ['parkour', 'Parkour'], ['password', 'Kennwort']]
+  const tabs: Array<[Tab, string]> = [['coins', 'Coins'], ['chips', 'Chips'], ['items', 'Artikel'], ['points', 'Punkte'], ['parkour', 'Parkour'], ['password', 'Kennwort']]
 
   return (
     <Modal title={`${name} verwalten`} onClose={onClose}>
@@ -91,6 +92,18 @@ export default function ManageUser({ userId, name, onClose, onChanged }: { userI
           <Field label="Notiz (optional)"><TextInput value={note} maxLength={100} onChange={(e) => setNote(e.target.value)} /></Field>
           <Button disabled={busy || !validAmount} onClick={() => void run(() => adminGrantKoins(userId, n, note), `${name}: ${n > 0 ? '+' : ''}${n.toLocaleString('de-DE')} Coins.`)}>
             {n < 0 ? 'Abziehen' : 'Überweisen'}{validAmount ? ` (${n.toLocaleString('de-DE')})` : ''}
+          </Button>
+        </div>
+      )}
+
+      {tab === 'chips' && (
+        <div className="space-y-3">
+          <Field label="Anzahl Chips" hint="Plus = schenken, Minus = abziehen. Kein Tageslimit. Kurzschreibweise: k, m, mrd, b.">
+            <TextInput inputMode="numeric" value={amount} onChange={(e) => setAmount(e.target.value)} placeholder="z. B. 5000, 1m, 1mrd" />
+          </Field>
+          <Field label="Notiz (optional)"><TextInput value={note} maxLength={100} onChange={(e) => setNote(e.target.value)} /></Field>
+          <Button disabled={busy || !validAmount} onClick={() => void run(() => adminGrantChips(userId, n, note), `${name}: ${n > 0 ? '+' : ''}${n.toLocaleString('de-DE')} Chips.`)}>
+            {n < 0 ? 'Abziehen' : 'Chips vergeben'}{validAmount ? ` (${n.toLocaleString('de-DE')})` : ''}
           </Button>
         </div>
       )}

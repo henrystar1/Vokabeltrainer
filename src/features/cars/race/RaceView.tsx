@@ -12,6 +12,7 @@ import { raceReward, raceSubmit } from '../../../services/cars'
 import { useWalletOptional } from '../../koins/WalletProvider'
 
 export interface RaceCarInfo { /** Auto-ID im Shop (für die Rangliste) */ id?: string; /** Tuning-Stufen */ up?: Up; name: string; kind: string; color: string; /** eigene Höchstgeschwindigkeit des Autos (km/h) */ top?: number | null }
+const TOP_MIN = 20
 type Key = 'gas' | 'brake' | 'left' | 'right' | 'fly'
 export interface RaceStanding { name: string; ms: number | null; me?: boolean }
 /** Höhe über dem Boden: Flug oder Brücke (der höhere Wert zählt). */
@@ -60,6 +61,11 @@ export default function RaceView({ trackId, custom, laps, me, assistOk = false, 
   const isFreeUi = isOpen(def)
   const assistRef = useRef(false)
   const [assist, setAssist] = useState(false)
+  const setTopRef = useRef<((k: number) => void) | undefined>(undefined)
+  const maxTop = me.top ?? 300
+  const [topKmh, setTopKmh] = useState(maxTop)
+  /** Höchstgeschwindigkeit des Supercars im Rennen ändern (zwischen 20 km/h und dem freigegebenen Wert) */
+  const applyTop = (k: number) => { const v = Math.round(Math.min(Math.max(k, TOP_MIN), Math.max(maxTop, TOP_MIN))); setTopKmh(v); setTopRef.current?.(v) }
   const toggleAssist = () => { if (!assistOk) return; assistRef.current = !assistRef.current; setAssist(assistRef.current) }
   const assistToggleRef = useRef(toggleAssist)
   assistToggleRef.current = toggleAssist
@@ -141,7 +147,8 @@ export default function RaceView({ trackId, custom, laps, me, assistOk = false, 
       }
 
       // Fahrzeuge
-      const myStats: CarStats = statsFor(me.kind, me.top, me.up)
+      let myStats: CarStats = statsFor(me.kind, me.top, me.up)
+      setTopRef.current = (k: number) => { myStats = statsFor(me.kind, k, me.up) }
       const line = buildRaceLine(track)
       const bike = isBike(me.kind)
       let slot = 0
@@ -511,6 +518,18 @@ export default function RaceView({ trackId, custom, laps, me, assistOk = false, 
       <div className="absolute left-3 top-[118px] flex flex-col items-start gap-1.5">
         <button type="button" onClick={toggleCam} className="rounded-lg bg-black/45 px-3 py-1.5 text-xs text-white">{camMode === 0 ? 'Cockpit' : camMode === 1 ? 'Von unten' : 'Außenansicht'} (C)</button>
         <button type="button" onClick={() => { resetReq.current = true }} className="rounded-lg bg-black/45 px-3 py-1.5 text-xs text-white">Zurücksetzen / Reparieren (R)</button>
+        {me.kind === 'supercar' && (
+          <div className="w-52 rounded-lg bg-black/45 px-3 py-2 text-xs text-white" role="group" aria-label="Höchstgeschwindigkeit">
+            <p className="mb-1 flex justify-between"><span>Höchstgeschw.</span><b className="tabular-nums">{topKmh.toLocaleString('de-DE')} km/h</b></p>
+            <input type="range" min={0} max={1000} aria-label="Höchstgeschwindigkeit in km/h" value={Math.round((1000 * Math.log(topKmh / TOP_MIN)) / Math.log(Math.max(maxTop, TOP_MIN * 2) / TOP_MIN))}
+              onChange={(e) => applyTop(Math.round(TOP_MIN * Math.pow(Math.max(maxTop, TOP_MIN * 2) / TOP_MIN, Number(e.target.value) / 1000)))} className="w-full" />
+            <div className="mt-1 flex gap-1">
+              <button type="button" onClick={() => applyTop(topKmh / 2)} className="flex-1 rounded bg-white/15 py-1">÷2</button>
+              <button type="button" onClick={() => applyTop(topKmh * 2)} className="flex-1 rounded bg-white/15 py-1">×2</button>
+              <button type="button" onClick={() => applyTop(maxTop)} className="flex-1 rounded bg-white/15 py-1">Max</button>
+            </div>
+          </div>
+        )}
         {assistOk && <button type="button" onClick={toggleAssist} aria-pressed={assist} className={`rounded-lg px-3 py-1.5 text-xs font-bold ${assist ? 'bg-emerald-500 text-slate-950' : 'bg-black/45 text-white'}`}>Fahrassistent {assist ? 'AN' : 'aus'} (F)</button>}
       </div>
       {/* Bedienung: links Lenken, rechts Gas und Bremse */}

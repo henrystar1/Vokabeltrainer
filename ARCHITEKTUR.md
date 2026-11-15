@@ -805,3 +805,10 @@ Tabelle `book_library_hidden`; `in_library` blendet ein veröffentlichtes Buch d
 - `lib/navigation.ts`: Gruppen Start · Lernen · Mehr üben · Wettkampf · Spiele (Spiele, Online-Spiele, Deathrun, Parkour, Autohaus, Gambling) · Coins & Belohnungen (Advent, Loot, Börse, Shop, 3D-Druck, Plus & Pro) · Community (Chat, Wer ist da?, Websites) · Konto. Test in `navigation.test.ts`.
 - `features/learning/CardBoxDock.tsx`: Karteikasten als feste Leiste rechts (ab 1280 px, einklappbar, Zustand in localStorage `vt-cardbox-dock`, `AppShell` schafft Platz mit `xl:pr-[236px]`); auf kleineren Bildschirmen ein Reiter am rechten Rand mit Schublade. Fach anklicken → `/lernen?fach=N` (Learn liest `fach`). Lädt höchstens einmal pro Minute neu; im Fokusmodus (Lernrunde) ausgeblendet.
 - Spiele-Seiten gegliedert: Online-Spiele „Brettspiele“ / „Action in 3D“, Spiele „Knobeln & Denken“ / „Geschick & Reaktion“.
+
+
+## Update 122
+- Supercar: Regler für die Höchstgeschwindigkeit (log-Skala 20 bis Maximum, Tasten ÷2, ×2, Max) in `RaceView`; wirkt sofort über `setTopRef`.
+- Ego-Shooter: Zielen (Rechtsklick/F, Touch-Knopf „ZIELEN“) mit Zoom (Scharfschütze FOV 16 mit Zielfernrohr-Overlay, sonst 55, Empfindlichkeit skaliert); prozedurale Canvas-Texturen für Boden, Wände, Kisten, Sternenhimmel.
+- Admin: `admin_grant_chips` (Migration 0104, unbegrenzt, auch negativ), Chips-Kauf ohne Limit für Admins (`_chip_buy_max`), Tab „Chips vergeben“ in `ManageUser`.
+- Menü: `Spiele` und `Shop` sind je ein Eintrag; Sammelseiten `/spielen` und `/laden` (`pages/HubPage.tsx`, `hubPageFor`, `NavItem.hubOf/hubGroup`). Schnelllesen steht in der Gruppe Lernen.

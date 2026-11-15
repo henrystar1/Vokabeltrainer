@@ -8,6 +8,7 @@ import { useWallet } from '../koins/WalletProvider'
 import { buyChips, sellChips, type ChipTrade } from '../../services/chips'
 import { useChips } from './ChipsProvider'
 import { maxBuyable } from './chipLogic'
+import { useAuthOptional } from '../auth/AuthProvider'
 
 /** Chips kaufen (mit Tageslimit) und zurücktauschen. Spielgeld fürs Gambling: 1 Chip kostet mehrere Coins. */
 export default function ChipsPanel() {
@@ -18,7 +19,8 @@ export default function ChipsPanel() {
   const [msg, setMsg] = useState<{ tone: 'info' | 'warn'; text: string } | null>(null)
   const s = chips.status
   const rate = s?.rate ?? 10
-  const buyMax = maxBuyable(wallet.balance, rate, s?.buy_left ?? 0)
+  const isAdmin = useAuthOptional()?.isAdmin ?? false
+  const buyMax = maxBuyable(wallet.balance, rate, isAdmin ? Number.MAX_SAFE_INTEGER : (s?.buy_left ?? 0))
 
   const trade = async (kind: 'buy' | 'sell') => {
     setBusy(kind)
@@ -44,7 +46,7 @@ export default function ChipsPanel() {
       </div>
       {s && (
         <p className="text-xs text-slate-400">
-          Jeden Tag gibt es {s.daily.toLocaleString('de-DE')} Chips geschenkt. Gekauft werden können heute noch höchstens <b className="text-slate-200">{s.buy_left.toLocaleString('de-DE')}</b> von {s.limit.toLocaleString('de-DE')} Chips.
+          Jeden Tag gibt es {s.daily.toLocaleString('de-DE')} Chips geschenkt. Gekauft werden können heute noch höchstens <b className="text-slate-200">{s.buy_left.toLocaleString('de-DE')}</b> von {s.limit.toLocaleString('de-DE')} Chips.{isAdmin ? ' Als Admin kaufst du ohne Limit.' : ''}
         </p>
       )}
       {s && s.gift > 0 && <Notice tone="info">Tagesgeschenk: +{s.gift.toLocaleString('de-DE')} Chips.</Notice>}

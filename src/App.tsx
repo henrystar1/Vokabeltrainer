@@ -19,6 +19,7 @@ import ImportBook from './pages/ImportBook'
 import Leaderboard from './pages/Leaderboard'
 import Copy from './pages/Copy'
 import Learn from './pages/Learn'
+import HubPage from './pages/HubPage'
 import Placeholder from './pages/Placeholder'
 import Feedback from './pages/Feedback'
 import Games from './pages/Games'
@@ -121,6 +122,8 @@ export default function App() {
           <Route path="test" element={<Gate k="test"><Test /></Gate>} />
           <Route path="grammatik" element={<Gate k="grammar"><Grammar /></Gate>} />
           <Route path="plus" element={<Gate k="plus"><PlusPage /></Gate>} />
+          <Route path="spielen" element={<HubPage of="games" />} />
+          <Route path="laden" element={<HubPage of="shop" />} />
           <Route path="spiele" element={<Gate k="games"><Games /></Gate>} />
           <Route path="gambling" element={<Gate k="gambling"><Gambling /></Gate>} />
           <Route path="mathe" element={<Gate k="math"><MathPage /></Gate>} />
