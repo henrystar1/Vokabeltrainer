@@ -6,7 +6,7 @@ import { raceTrackList, type RaceTrackRow } from '../../../services/cars'
 import { ogRacePick, type OgView } from '../../../services/online'
 import RaceView, { type RaceCarInfo } from './RaceView'
 import { TrackPreview } from './RaceMenu'
-import { TRACKS, customTrackDef } from './track'
+import { TRACKS, customTrackDef, isOpen } from './track'
 import { useRaceCars } from './useRaceCars'
 
 const KEY = 'vt-race-car'
@@ -74,13 +74,13 @@ export function RaceLobbyOptions({ view, isHost, busy, onSet, onView }: { view: 
         {isHost ? (
           <div className="space-y-2">
             <ul className="grid grid-cols-3 gap-2 sm:grid-cols-5">
-              {TRACKS.map((t) => <li key={t.id}><button type="button" disabled={busy} onClick={() => onSet(t.id, TRACKS[t.id].laps === laps ? laps : laps, null)} aria-pressed={!cust && track === t.id} className={`w-full rounded-lg border p-1 text-[11px] ${!cust && track === t.id ? 'border-accent-cyan bg-white/10' : 'border-white/10'}`}><TrackPreview id={t.id} className="w-full" />{t.name}</button></li>)}
+              {TRACKS.filter((t) => !isOpen(t)).map((t) => <li key={t.id}><button type="button" disabled={busy} onClick={() => onSet(t.id, TRACKS[t.id].laps === laps ? laps : laps, null)} aria-pressed={!cust && track === t.id} className={`w-full rounded-lg border p-1 text-[11px] ${!cust && track === t.id ? 'border-accent-cyan bg-white/10' : 'border-white/10'}`}><TrackPreview id={t.id} className="w-full" />{t.name}</button></li>)}
             </ul>
             {custom.length > 0 && (
               <>
                 <p className="text-xs text-slate-400">Gemalte Strecken</p>
                 <ul className="grid grid-cols-3 gap-2 sm:grid-cols-5">
-                  {custom.map((c) => <li key={c.id}><button type="button" disabled={busy} onClick={() => onSet(0, laps, c.id)} aria-pressed={cust?.id === c.id} className={`w-full rounded-lg border p-1 text-[11px] ${cust?.id === c.id ? 'border-accent-cyan bg-white/10' : 'border-white/10'}`}><TrackPreview def={customTrackDef(c.name, c.pts, c.width, `c:${c.id}`)} className="w-full" />{c.name}</button></li>)}
+                  {custom.filter((c) => !c.fill).map((c) => <li key={c.id}><button type="button" disabled={busy} onClick={() => onSet(0, laps, c.id)} aria-pressed={cust?.id === c.id} className={`w-full rounded-lg border p-1 text-[11px] ${cust?.id === c.id ? 'border-accent-cyan bg-white/10' : 'border-white/10'}`}><TrackPreview def={customTrackDef(c.name, c.pts, c.width, `c:${c.id}`)} className="w-full" />{c.name}</button></li>)}
                 </ul>
               </>
             )}

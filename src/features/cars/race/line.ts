@@ -18,7 +18,7 @@ const wrap = (d: number) => { while (d > Math.PI) d -= Math.PI * 2; while (d < -
 
 export function buildRaceLine(t: Track, margin = 3.2, iterations = 140): RaceLine {
   const n = t.n, half = t.def.width / 2
-  const lim = Math.max(0, half - margin)
+  const lim = Math.min(t.def.lineMax ?? Infinity, Math.max(0, half - margin))
   const ds = t.length / n
   const K = Math.max(2, Math.round(14 / ds))
   const off = new Float32Array(n)

@@ -2,10 +2,11 @@ import { useEffect, useRef, useState } from 'react'
 import type { RealtimeChannel, SupabaseClient } from '@supabase/supabase-js'
 import { gameClientFor, slotForKey, whenGameDbsReady } from '../../../lib/gameRealtime'
 import { DMG_MAX, botInput, crash, packLimit, startCar, statsFor, stepCar, type Bot, type Car, type CarStats, type Input } from './physics'
-import { TRACKS, buildTrack, curveAhead, pointAt, project, trackKey, type TrackDef } from './track'
+import { TRACKS, buildTrack, curveAhead, isOpen, pointAt, project, trackKey, type TrackDef } from './track'
 import { assistSteer, buildRaceLine } from './line'
 import { createFx } from './fx'
 import { canFly, flyHeight, flyRoll, isBike, kindDims } from '../stats'
+import { bridgeH } from './city'
 import type { Up } from '../tuning'
 import { raceReward, raceSubmit } from '../../../services/cars'
 import { useWalletOptional } from '../../koins/WalletProvider'
@@ -13,6 +14,9 @@ import { useWalletOptional } from '../../koins/WalletProvider'
 export interface RaceCarInfo { /** Auto-ID im Shop (für die Rangliste) */ id?: string; /** Tuning-Stufen */ up?: Up; name: string; kind: string; color: string; /** eigene Höchstgeschwindigkeit des Autos (km/h) */ top?: number | null }
 type Key = 'gas' | 'brake' | 'left' | 'right' | 'fly'
 export interface RaceStanding { name: string; ms: number | null; me?: boolean }
+/** Höhe über dem Boden: Flug oder Brücke (der höhere Wert zählt). */
+const carY = (c: { fly: number; lvl?: number; x: number }): number => Math.max(flyHeight(c.fly), c.lvl ? bridgeH(c.x) : 0)
+
 interface Props {
   trackId: number
   /** Eigene (gemalte) Strecke statt einer festen */
@@ -22,14 +26,14 @@ interface Props {
   /** Fahrassistent (Ideallinie) darf eingeschaltet werden: Supercar */
   assistOk?: boolean
   bots?: Array<RaceCarInfo & { skill: number }>
-  online?: { gameId: string; userId: string; players: Array<{ id: string; name: string }>; /** gewählte Autos aller Spieler (vom Server) */ cars?: Record<string, { name?: string; kind: string; color: string; top?: number | null }> }
+  online?: { gameId: string; userId: string; players: Array<{ id: string; name: string }>; /** Offene Lobby: Mitspieler kommen und gehen jederzeit, sie werden aus den Funkdaten angelegt */ open?: boolean; /** eigener Anzeigename (offene Lobby) */ name?: string; /** gewählte Autos aller Spieler (vom Server) */ cars?: Record<string, { name?: string; kind: string; color: string; top?: number | null }> }
   /** Zielzeit melden (Millisekunden seit Start der Ampel) */
   onFinish?: (ms: number) => void
   onAgain?: () => void
   onExit?: () => void
 }
 
-interface Remote { id: string; name: string; kind: string; color: string; x: number; z: number; h: number; v: number; tx: number; tz: number; th: number; total: number; ft: number | null; seen: number; dmg: number; slip: number; fl: number; mesh?: import('three').Group }
+interface Remote { id: string; name: string; kind: string; color: string; x: number; z: number; h: number; v: number; tx: number; tz: number; th: number; total: number; ft: number | null; seen: number; dmg: number; slip: number; fl: number; lv?: number; mesh?: import('three').Group }
 
 const COUNT_MS = 4500
 const fmt = (ms: number) => { const m = Math.floor(ms / 60000); const s = ms / 1000 - m * 60; return `${m}:${s.toFixed(2).padStart(5, '0')}` }
@@ -51,12 +55,13 @@ export default function RaceView({ trackId, custom, laps, me, assistOk = false, 
   const finishCb = useRef(onFinish)
   finishCb.current = onFinish
   const def = custom ?? TRACKS[Math.max(0, Math.min(TRACKS.length - 1, trackId))]
+  const isFreeUi = isOpen(def)
   const assistRef = useRef(false)
   const [assist, setAssist] = useState(false)
   const toggleAssist = () => { if (!assistOk) return; assistRef.current = !assistRef.current; setAssist(assistRef.current) }
   const assistToggleRef = useRef(toggleAssist)
   assistToggleRef.current = toggleAssist
-  const [hud, setHud] = useState({ speed: 0, lap: 1, pos: 1, of: 1 + bots.length + (online ? online.players.length - 1 : 0), ms: 0, count: 4, wrong: false, curve: 0, curveDist: 0, offroad: false, best: 0, dmg: 0, drift: false, fly: 0, cool: 0 })
+  const [hud, setHud] = useState({ speed: 0, lap: 1, pos: 1, of: 1 + bots.length + (online ? online.players.length - 1 : 0), ms: 0, count: 4, wrong: false, curve: 0, curveDist: 0, offroad: false, best: 0, dmg: 0, drift: false, dp: 0, dc: 0, db: 0, fly: 0, cool: 0 })
   const wallet = useWalletOptional()
   const walletRef = useRef(wallet); walletRef.current = wallet
   const [reward, setReward] = useState<{ coins: number; capped: boolean } | null>(null)
@@ -167,8 +172,13 @@ export default function RaceView({ trackId, custom, laps, me, assistOk = false, 
         client = gameClientFor(slotForKey(online.gameId))
         ch = client.channel(`rc-${online.gameId}`, { config: { broadcast: { self: false } } })
         ch.on('broadcast', { event: 'r' }, ({ payload }) => {
-          const r = remotes.get(payload.u as string)
+          let r = remotes.get(payload.u as string)
+          if (!r && online.open && typeof payload.u === 'string' && payload.u !== online.userId) {
+            r = { id: payload.u, name: String(payload.n || 'Fahrer').slice(0, 24), kind: 'kleinwagen', color: '#94a3b8', x: Number(payload.x) || 0, z: Number(payload.z) || 0, h: 0, v: 0, tx: 0, tz: 0, th: 0, total: 0, ft: null, seen: performance.now(), dmg: 0, slip: 0, fl: 0 }
+            remotes.set(payload.u, r)
+          }
           if (!r) return
+          r.lv = Number(payload.lv) || 0
           r.tx = Number(payload.x) || 0; r.tz = Number(payload.z) || 0; r.th = Number(payload.h) || 0; r.v = Number(payload.v) || 0
           r.dmg = Number(payload.d) || 0; r.slip = Number(payload.sl) || 0; r.fl = Number(payload.fl) || 0
           r.total = Number(payload.t) || 0; r.ft = typeof payload.f === 'number' ? payload.f : null; r.seen = performance.now()
@@ -182,12 +192,15 @@ export default function RaceView({ trackId, custom, laps, me, assistOk = false, 
       })
 
       // Ablauf
-      const startAt = performance.now() + COUNT_MS
+      const isFree = isOpen(def)
+      const startAt = performance.now() + (isFree ? 0 : COUNT_MS)
       let finishedMs: number | null = null
       let lastLap = 0, lapStart = 0, bestLap = Number(localStorage.getItem(lapKey(trackKey(def)))) || 0
       let raceBest = 0, usedAssist = false
       let camH = car.h
       let lastSend = 0, lastHud = 0
+      // Übungsfeld: Drift-Punkte (Serie zählt, solange man quer fährt; nach kurzer Pause wird sie gutgeschrieben)
+      let dTotal = 0, dCombo = 0, dBest = (() => { try { return Number(localStorage.getItem('vt-race-driftbest')) || 0 } catch { return 0 } })(), dIdle = 0
       let prev = performance.now()
       const mmPts: Array<[number, number]> = []
       let mmMin = [Infinity, Infinity], mmMax = [-Infinity, -Infinity]
@@ -264,7 +277,7 @@ export default function RaceView({ trackId, custom, laps, me, assistOk = false, 
             if (sc) hitAt.set(b, now)
           }
           for (const r of remotes.values()) {
-            if (now - r.seen > 3000 || r.fl > 0) continue
+            if (now - r.seen > 3000 || r.fl > 0 || (r.lv ?? 0) !== (car.lvl ?? 0)) continue
             const age = Math.min(0.25, (now - r.seen) / 1000), rd = kindDims(r.kind)
             const sc = now - (hitAt.get(r) ?? -1e9) < 250 ? 0 : 1
             const c1 = crash(car, myStats, { x: r.x + Math.sin(r.h) * r.v * age, z: r.z + Math.cos(r.h) * r.v * age, h: r.h, v: r.v, slip: r.slip }, { len: rd.len + 0.5, wid: rd.wid + 0.4 }, 0.5, DMG_MAX, sc)
@@ -314,9 +327,9 @@ export default function RaceView({ trackId, custom, laps, me, assistOk = false, 
         }
 
         // Modelle
-        const place = (m: import('three').Group, x: number, z: number, h: number, v: number, steer: number, dmg = 0, slip = 0, fly = 0) => {
+        const place = (m: import('three').Group, x: number, z: number, h: number, v: number, steer: number, dmg = 0, slip = 0, fly = 0, lv = 0) => {
           rs.damageCar(m, dmg, slip, v, now / 1000)
-          m.position.set(x, flyHeight(fly), z); m.rotation.y = h
+          m.position.set(x, carY({ fly, lvl: lv, x }), z); m.rotation.y = h
           const lean = m.userData.lean as import('three').Group | undefined
           if (lean) { m.rotation.z = 0; lean.rotation.z += ((-Math.max(-0.85, Math.min(0.85, steer * Math.min(1, Math.abs(v) / 20) * 0.9 + slip * 0.5))) - lean.rotation.z) * Math.min(1, dt * 9) }
           else m.rotation.z = -steer * Math.min(1, Math.abs(v) / 40) * 0.05 - flyRoll(fly)
@@ -325,7 +338,7 @@ export default function RaceView({ trackId, custom, laps, me, assistOk = false, 
           const wh = m.userData.wheels as import('three').Group[] | undefined
           if (wh) for (const w of wh) { w.children.forEach((c) => { c.rotation.x += (v * dt) / (m.userData.wheelR as number) }); if (w.name === 'front') w.rotation.y = steer * 0.45 }
         }
-        place(myMesh, car.x, car.z, car.h, car.v, car.steer, car.dmg, car.slip, car.fly)
+        place(myMesh, car.x, car.z, car.h, car.v, car.steer, car.dmg, car.slip, car.fly, car.lvl ?? 0)
         carFx(me.kind, car.x, car.z, car.h, car.v, car.slip, car.fly, input.gas, dt)
         botList.forEach((b, i) => place(botMeshes[i], b.car.x, b.car.z, b.car.h, b.car.v, b.car.steer, b.car.dmg, b.car.slip))
         for (const b of botList) carFx(b.kind, b.car.x, b.car.z, b.car.h, b.car.v, b.car.slip, 0, b.car.v > 5, dt)
@@ -336,7 +349,8 @@ export default function RaceView({ trackId, custom, laps, me, assistOk = false, 
           let dh = r.th - r.h; while (dh > Math.PI) dh -= Math.PI * 2; while (dh < -Math.PI) dh += Math.PI * 2
           r.h += dh * k
           r.mesh.visible = now - r.seen < 5000
-          place(r.mesh, r.x, r.z, r.h, r.v, 0, r.dmg, r.slip, r.fl)
+          place(r.mesh, r.x, r.z, r.h, r.v, 0, r.dmg, r.slip, r.fl, r.lv ?? 0)
+          if (online?.open && now - r.seen > 15000) { scene.remove(r.mesh); remotes.delete(r.id) }
           if (r.mesh.visible) carFx(r.kind, r.x, r.z, r.h, r.v, r.slip, r.fl, r.v > 5, dt)
         }
 
@@ -347,10 +361,10 @@ export default function RaceView({ trackId, custom, laps, me, assistOk = false, 
           myMesh.visible = false
           camH = car.h
           const bx = Math.sin(car.h), bz = Math.cos(car.h)
-          camera.position.set(car.x + bx * 0.25 - bz * 0.35, 1.18 + flyHeight(car.fly), car.z + bz * 0.25 + bx * 0.35)
+          camera.position.set(car.x + bx * 0.25 - bz * 0.35, 1.18 + carY(car), car.z + bz * 0.25 + bx * 0.35)
           const look = car.h + car.steer * 0.05
           camera.lookAt(car.x + Math.sin(look) * 40, 1.0, car.z + Math.cos(look) * 40)
-          if (bike) { camera.position.y = 1.55 + flyHeight(car.fly); camera.rotateZ(Math.max(-0.7, Math.min(0.7, car.steer * Math.min(1, sp / 20) * 0.8)) * 0.9) } else camera.rotateZ(-car.steer * 0.03 * Math.min(1, sp / 40))
+          if (bike) { camera.position.y = 1.55 + carY(car); camera.rotateZ(Math.max(-0.7, Math.min(0.7, car.steer * Math.min(1, sp / 20) * 0.8)) * 0.9) } else camera.rotateZ(-car.steer * 0.03 * Math.min(1, sp / 40))
           if (camRoll) camera.rotateZ(-camRoll)
           camera.fov += ((74 + Math.min(16, sp * 0.2)) - camera.fov) * Math.min(1, dt * 3)
           if (wheelEl.current) wheelEl.current.style.transform = `rotate(${(-car.steer * 95).toFixed(1)}deg)`
@@ -361,7 +375,7 @@ export default function RaceView({ trackId, custom, laps, me, assistOk = false, 
           camH += dh * Math.min(1, dt * 4.5)
           const back = Math.min(30, 11 + sp * 0.03)
           camera.position.set(car.x - Math.sin(camH) * back, 0.8, car.z - Math.cos(camH) * back)
-          camera.lookAt(car.x, flyHeight(car.fly) + 1.3, car.z)
+          camera.lookAt(car.x, carY(car) + 1.3, car.z)
           if (camRoll) camera.rotateZ(-camRoll)
           camera.fov += ((68 + Math.min(14, sp * 0.15)) - camera.fov) * Math.min(1, dt * 3)
         } else {
@@ -369,7 +383,7 @@ export default function RaceView({ trackId, custom, laps, me, assistOk = false, 
           let dh = car.h - camH; while (dh > Math.PI) dh -= Math.PI * 2; while (dh < -Math.PI) dh += Math.PI * 2
           camH += dh * Math.min(1, dt * 4.5)
           const back = Math.min(40, 9.5 + sp * 0.06), up = Math.min(12, 4.3 + sp * 0.018)
-          camera.position.set(car.x - Math.sin(camH) * back, up + flyHeight(car.fly) * 0.8, car.z - Math.cos(camH) * back)
+          camera.position.set(car.x - Math.sin(camH) * back, up + carY(car) * 0.8, car.z - Math.cos(camH) * back)
           camera.lookAt(car.x + Math.sin(camH) * 22, 1.4, car.z + Math.cos(camH) * 22)
           if (bike) camera.rotateZ(Math.max(-0.7, Math.min(0.7, car.steer * Math.min(1, sp / 20) * 0.8)) * 0.5)
           if (camRoll) camera.rotateZ(-camRoll)
@@ -378,13 +392,21 @@ export default function RaceView({ trackId, custom, laps, me, assistOk = false, 
         camera.updateProjectionMatrix()
         if (car.bump > 0.2 || bumped) camera.position.y += (Math.random() - 0.5) * (0.25 + car.hit * 0.9)
         rs.follow.position.set(camera.position.x, 0, camera.position.z)
+        rs.focus?.(camera.position.x, camera.position.z)
+        if (isFree && go) {
+          if (Math.abs(car.slip) > 0.15 && car.v > 8 && car.fly <= 0) { dCombo += car.v * Math.abs(car.slip) * dt * 2; dIdle = 0 } else if (dCombo > 0 && (dIdle += dt) > 0.9) {
+            dTotal += Math.round(dCombo)
+            if (dCombo > dBest) { dBest = dCombo; try { localStorage.setItem('vt-race-driftbest', String(Math.round(dBest))) } catch { /* ignorieren */ } }
+            dCombo = 0; dIdle = 0
+          }
+        }
         rs.sun.position.set(car.x + 120, 220, car.z + 80); rs.sun.target.position.set(car.x, 0, car.z); rs.sun.target.updateMatrixWorld()
         fx.update(dt)
         renderer.render(scene, camera)
 
         if (online && now - lastSend > 55) {
           lastSend = now
-          send({ u: online.userId, x: car.x, z: car.z, h: car.h, v: car.v, t: car.total, k: me.kind, c: me.color, f: finishedMs, d: Math.round(car.dmg), sl: Math.round(car.slip * 100) / 100, fl: Math.round(car.fly * 100) / 100 })
+          send({ u: online.userId, x: car.x, z: car.z, h: car.h, v: car.v, t: car.total, k: me.kind, c: me.color, f: finishedMs, d: Math.round(car.dmg), sl: Math.round(car.slip * 100) / 100, fl: Math.round(car.fly * 100) / 100, lv: car.lvl ?? 0, n: online.name ?? me.name })
         }
         if (now - lastHud > 110) {
           lastHud = now
@@ -392,7 +414,7 @@ export default function RaceView({ trackId, custom, laps, me, assistOk = false, 
           const dot = Math.sin(car.h) * track.tx[pr.i] + Math.cos(car.h) * track.tz[pr.i]
           const ca = curveAhead(track, pr.i, 110)
           const count = go ? 0 : Math.ceil((startAt - now) / 1000)
-          setHud({ speed: Math.round(Math.abs(car.v) * 3.6), lap: Math.min(laps, Math.max(1, lapNow + 1)), pos: rankNow(), of: 1 + botList.length + remotes.size, ms: finishedMs ?? raceMs, count, wrong: dot < -0.3 && car.v > 4, curve: Math.abs(ca.k) > 0.004 ? Math.sign(ca.k) : 0, curveDist: Math.round(ca.dist / 10) * 10, offroad: car.offroad, best: bestLap, dmg: Math.round(car.dmg), drift: Math.abs(car.slip) > 0.2 && car.v > 10, fly: Math.round(car.fly * 10) / 10, cool: Math.ceil(car.cool) })
+          setHud({ speed: Math.round(Math.abs(car.v) * 3.6), lap: Math.min(laps, Math.max(1, lapNow + 1)), pos: rankNow(), of: 1 + botList.length + remotes.size, ms: finishedMs ?? raceMs, count, wrong: !isFree && dot < -0.3 && car.v > 4, curve: !isFree && Math.abs(ca.k) > 0.004 ? Math.sign(ca.k) : 0, curveDist: Math.round(ca.dist / 10) * 10, offroad: car.offroad, best: bestLap, dmg: Math.round(car.dmg), drift: Math.abs(car.slip) > 0.2 && car.v > 10, dp: dTotal, dc: Math.round(dCombo), db: Math.round(dBest), fly: Math.round(car.fly * 10) / 10, cool: Math.ceil(car.cool) })
           drawMini()
           if (finishedMs !== null) {
             const fin = finishedMs
@@ -450,12 +472,23 @@ export default function RaceView({ trackId, custom, laps, me, assistOk = false, 
       )}
       {/* Anzeigen */}
       <div className="pointer-events-none absolute left-3 top-3 space-y-1 text-white [text-shadow:0_1px_3px_#000]">
-        <p className="text-3xl font-black leading-none">{hud.pos}<span className="text-lg font-bold">/{hud.of}</span></p>
-        <p className="text-sm font-semibold">Runde {hud.lap}/{laps}</p>
-        <p className="font-mono text-sm">{fmt(hud.ms)}</p>
-        {hud.best > 0 && <p className="text-xs text-amber-200">Beste Runde {fmt(hud.best)}</p>}
+        {isFreeUi ? (
+          <>
+            <p className="text-sm font-semibold">Drift-Punkte</p>
+            <p className="text-3xl font-black leading-none">{hud.dp.toLocaleString('de-DE')}</p>
+            <p className="text-lg font-bold text-amber-200">{hud.dc > 0 ? `Serie +${hud.dc.toLocaleString('de-DE')}` : ' '}</p>
+            <p className="text-xs text-amber-200">Beste Serie {hud.db.toLocaleString('de-DE')}</p>
+          </>
+        ) : (
+          <>
+            <p className="text-3xl font-black leading-none">{hud.pos}<span className="text-lg font-bold">/{hud.of}</span></p>
+            <p className="text-sm font-semibold">Runde {hud.lap}/{laps}</p>
+            <p className="font-mono text-sm">{fmt(hud.ms)}</p>
+            {hud.best > 0 && <p className="text-xs text-amber-200">Beste Runde {fmt(hud.best)}</p>}
+          </>
+        )}
       </div>
-      <canvas ref={mini} width={220} height={160} className="pointer-events-none absolute right-2 top-2 h-[84px] w-[116px] rounded-xl bg-black/35 sm:h-[120px] sm:w-[165px]" aria-label="Streckenkarte" />
+      {!isFreeUi && <canvas ref={mini} width={220} height={160} className="pointer-events-none absolute right-2 top-2 h-[84px] w-[116px] rounded-xl bg-black/35 sm:h-[120px] sm:w-[165px]" aria-label="Streckenkarte" />}
       <div className="pointer-events-none absolute right-3 top-[100px] text-right text-white [text-shadow:0_1px_3px_#000] sm:top-[135px]">
         <p className="text-3xl font-black leading-none">{hud.speed}</p><p className="text-xs">km/h</p>
         <div className="ml-auto mt-1 h-2 w-20 overflow-hidden rounded bg-black/50" role="img" aria-label={`Schaden ${hud.dmg} Prozent`}><div className={`h-full ${hud.dmg > 70 ? 'bg-rose-500' : hud.dmg > 35 ? 'bg-amber-400' : 'bg-emerald-400'}`} style={{ width: `${hud.dmg}%` }} /></div>

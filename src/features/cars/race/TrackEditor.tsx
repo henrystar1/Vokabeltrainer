@@ -17,8 +17,9 @@ export default function TrackEditor({ onClose, onTest, onSaved }: { onClose: () 
   const [busy, setBusy] = useState(false)
   const [msg, setMsg] = useState<string | null>(null)
   const [stroke, setStroke] = useState(false)
-  const fit = useMemo(() => (raw.length && !stroke ? fitDrawing(raw, km * 1000, width) : null), [raw, km, width, stroke])
-  const def = useMemo(() => (fit && !fit.error ? customTrackDef(name.trim() || 'Eigene Strecke', fit.pts, width, 'c:preview') : null), [fit, name, width])
+  const [fill, setFill] = useState(false)
+  const fit = useMemo(() => (raw.length && !stroke ? fitDrawing(raw, km * 1000, width, fill) : null), [raw, km, width, stroke, fill])
+  const def = useMemo(() => (fit && !fit.error ? customTrackDef(name.trim() || 'Eigene Strecke', fit.pts, width, 'c:preview', fill) : null), [fit, name, width, fill])
 
   const at = (e: React.PointerEvent): Pt => {
     const r = svg.current!.getBoundingClientRect()
@@ -32,7 +33,7 @@ export default function TrackEditor({ onClose, onTest, onSaved }: { onClose: () 
     if (!def || !fit) return
     if (name.trim().length < 2) { setMsg('Gib der Strecke einen Namen (mindestens 2 Zeichen).'); return }
     setBusy(true); setMsg(null)
-    try { await raceTrackSave(name.trim(), fit.pts, width, isPublic); onSaved() } catch (e) { setMsg(errorMessage(e)) } finally { setBusy(false) }
+    try { await raceTrackSave(name.trim(), fit.pts, width, isPublic, fill); onSaved() } catch (e) { setMsg(errorMessage(e)) } finally { setBusy(false) }
   }
   const btn = 'min-h-[44px] rounded-lg px-4 font-semibold disabled:opacity-40'
   return (
@@ -47,7 +48,8 @@ export default function TrackEditor({ onClose, onTest, onSaved }: { onClose: () 
       {fit?.error && <p className="text-sm text-amber-200" role="alert">{fit.error}</p>}
       <div className="grid gap-3 sm:grid-cols-2">
         <label className="text-sm">Länge: <b>{km} km</b><input type="range" min={1} max={12} step={0.5} value={km} onChange={(e) => setKm(Number(e.target.value))} className="mt-1 block w-full" /></label>
-        <label className="text-sm">Breite: <b>{width} m</b><input type="range" min={12} max={30} step={2} value={width} onChange={(e) => setWidth(Number(e.target.value))} className="mt-1 block w-full" /></label>
+        <label className="flex items-center gap-2 text-sm sm:col-span-2"><input type="checkbox" checked={fill} onChange={(e) => setFill(e.target.checked)} className="h-5 w-5" />Fläche ausfüllen (komplett Straße, ohne Ziel und Barriere, zum Üben und Driften)</label>
+        {!fill && <label className="text-sm">Breite: <b>{width} m</b><input type="range" min={12} max={30} step={2} value={width} onChange={(e) => setWidth(Number(e.target.value))} className="mt-1 block w-full" /></label>}
       </div>
       <div className="flex flex-wrap items-center gap-3">
         <input aria-label="Name der Strecke" placeholder="Name der Strecke" maxLength={40} value={name} onChange={(e) => setName(e.target.value)} className="min-h-[44px] min-w-0 flex-1 rounded-lg border border-white/15 bg-space-900/60 px-3" />

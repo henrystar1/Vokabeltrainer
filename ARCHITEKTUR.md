@@ -765,3 +765,24 @@ Tabelle `book_library_hidden`; `in_library` blendet ein veröffentlichtes Buch d
 - **Supercar-Tempo bis 100.000 km/h** (Standard und je Nutzer; Check/Funktionen in 0101 angepasst).
 - SQL: `0101_fly_settings.sql` (nach 0100).
 
+## Update 116 – Endlos-Asphalt und Drift-Kreis
+- `TrackDef.mode`: `'free'` (Strecke 11 „Endlos-Asphalt“) und `'disc'` (Strecke 12 „Drift-Kreis“), `lineMax` begrenzt den Versatz der Ideallinie (sonst würde das elastische Band auf der 304 m breiten Kreisfläche zur Mitte hin schrumpfen).
+- **Endlos-Asphalt** (`free`): `stepCar` überspringt `project`/Wände/Gras (`offroad` immer false, `total` bleibt) – man fährt beliebig weit. Szene: nur eine 9 km große Asphaltfläche mit Übungskreisen (Textur 120-m-Kachel), die der Kamera folgt; `RaceScene.focus(x, z)` schiebt die Texture-Offsets, damit die Markierungen an der Welt hängen. Alles andere (Straße, Szenerie) wird nach dem Bauen entfernt. Kein Countdown, keine Bots/Runden/Rangliste/Minikarte/Online; stattdessen **Drift-Punkte** (Serie ∝ Tempo × |Driftwinkel|, wird nach 0,9 s ohne Drift gutgeschrieben, beste Serie in `localStorage` `vt-race-driftbest`).
+- **Drift-Kreis** (`disc`): Straßenband von der Mitte bis 304 m, **keine Leitplanken/Randsteine/Torbogen**, nur weiße Randlinie und gelbe Linie auf der Ideallinie; `stepCar` überspringt die Wand (Gras außerhalb). Normale Rennen mit Bots, Runden, Rangliste (`t12`) und Online.
+- SQL `0102_drift_tracks.sql`: Schlüssel `t11`/`t12` in `race_records`-Check und `race_submit`, Online-Streckenwahl bis 12.
+- Tests (`fly.test.ts`): Definitionen, endlose Fahrt ohne Schaden, Mitte und Rand des Kreises, Bots fahren eine Runde auf dem Kreis schadenfrei.
+
+## Update 117 – Strecken-Limits, Ausfüllen, breite Kurven, Schotter, Bot-Anzahl
+- `0103_track_limits.sql`: eigene Strecken je Tarif begrenzt (ohne Plus/Pro 1, Plus 2, Pro 3; `_plus_active`/`_pro_active`), Spalte `race_tracks.fill`, neue Prüfung `_race_track_valid` (keine Selbstkreuzung, Kurvenradius ≥ 1,2 × halbe Breite), bisher gespeicherte ungültige Strecken samt Bestzeiten gelöscht, `race_track_save(..., p_fill)`, `race_track_list` liefert `fill`, `og_race_set` lehnt Flächen ab (nur allein fahrbar).
+- `track.ts`: `Track.hw` (halbe Breite je Punkt, in Kurven bis +30 %, innen durch 0,8/Krümmung begrenzt), `Track.gr/gs` (Schotterbreite außen und Seite; nur an jeder zweiten Kurve, nie an zwei hintereinander, nicht neben anderen Streckenteilen). `mode: 'fill'` = ausgefüllte Fläche (Vieleck, `inPolygon`, wie `free` ohne Ziel/Wände), `isOpen(def)` = free oder fill.
+- `physics.ts`: Fahrbahngrenze und Wand folgen `hw`; im Schotter Höchsttempo ×0,36 plus Bremswirkung, kein Schaden (Wand erst hinter dem Schotter).
+- `scene.ts`: `ribbon` skaliert Versätze mit `hw` und begrenzt sie auf der Kurveninnenseite (keine Überschlagung, kein grauer Rand auf der Bahn), Schotterband, Fläche als `ShapeGeometry`.
+- `trackDraw.ts`: `fitDrawing(..., fill)`; zusätzlich Abstandsprüfung zwischen entfernten Streckenteilen. `TrackEditor`: Option „Fläche ausfüllen“. `RaceMenu`: Bot-Anzahl 0–7.
+- Tests: `track117.test.ts`.
+
+## Update 118 – Stadt, Brücke, offene Lobby
+- `race/city.ts`: deterministische Stadt (8×8 Blöcke, Raster 120 m, Straßen 24 m): ein großes Haus, zwei oder vier Häuser mit 8-m-Gassen, Parks; Stadtmauer bei ±492 m; Raster `cityPush(x,z)` für Kollisionen; Brücke (`CITY`, `bridgeH`, `onDeck`): über der Straße z = 240, Fahrbahn 16 m, 5 m hoch, 60-m-Rampen.
+- `TRACKS[13]` „Stadt“ (`mode: 'city'`, zählt als `isOpen`: kein Ziel, keine Bots, keine Rangliste). `physics.ts`: Häuser/Mauer wie Wände (Schaden aus Aufprallgeschwindigkeit), `Car.lvl` (1 = auf der Brücke): Auffahren über die Rampe (längs, > 3 m/s) oder Landen im Flug von der Seite; oben Geländer; Autos unter der Brücke bleiben unten.
+- `scene.ts` `buildCity`: Straßen mit Mittelstrichen, Häuser als ein zusammengeführtes Mesh mit Fenster-Textur, Gehwege, Parks mit Bäumen, Brücke mit Pfeilern. `RaceView`: Höhe `carY` (Flug oder Brücke).
+- Offene Lobby (ohne SQL): `RaceView` mit `online.open`; Kanal `rc-open-city` über den vorhandenen Spiel-Funkdienst; Mitspieler entstehen aus den Funkdaten (Name `n`, Brückenebene `lv`) und verschwinden nach 15 s ohne Signal. Start über „Offene Stadt-Lobby“ im Rennmenü. Autos auf verschiedenen Ebenen stoßen nicht zusammen.
+- Tests: `city.test.ts`.

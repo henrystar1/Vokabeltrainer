@@ -2,6 +2,7 @@ import type * as T from 'three'
 import { isBike } from '../stats'
 import { RoundedBoxGeometry } from 'three/examples/jsm/geometries/RoundedBoxGeometry.js'
 import { roadProximity, type Track } from './track'
+import { CITY, bridgeH, city } from './city'
 
 type THREE = typeof import('three')
 
@@ -36,13 +37,27 @@ function roadTex(THREE: THREE, base: number): T.CanvasTexture {
 }
 
 /** Band entlang der Strecke zwischen zwei seitlichen Versätzen (lat0 → lat1) in Höhe y; v-Wiederholung pro `tile` Meter. */
-function ribbon(THREE: THREE, t: Track, lat0: number, lat1: number, y: number, tile: number, y1 = y): T.BufferGeometry {
+/** Band entlang der Strecke. Die Versätze sind für die Grundbreite gedacht: Werte bis zur halben Breite wachsen mit der Kurvenbreite mit, Werte weiter außen
+ *  rücken um denselben Betrag nach außen. Auf der Innenseite einer engen Kurve wird der Versatz begrenzt, damit sich das Band nie überschlägt.
+ *  `gravel`: Außenband des Schotterfelds (Versatz 0 = Außenkante der Fahrbahn+Randstein, 1 = Leitplanke), nur dort sichtbar, wo es Schotter gibt. */
+function ribbon(THREE: THREE, t: Track, lat0: number, lat1: number, y: number, tile: number, y1 = y, gravel = false): T.BufferGeometry {
   const n = t.n
+  const half = t.def.width / 2
   const pos: number[] = [], uv: number[] = [], idx: number[] = []
+  const off = (k: number, l: number) => {
+    if (gravel) return 0
+    const a = Math.abs(l)
+    let v = a <= half + 1e-6 ? l * (t.hw[k] / half) : Math.sign(l) * (t.hw[k] + (a - half))
+    const kk = t.k[k]
+    if (kk * v > 0 && Math.abs(kk) > 1e-5) { const lim = 0.88 / Math.abs(kk); if (Math.abs(v) > lim) v = Math.sign(v) * lim }
+    return v
+  }
   for (let i = 0; i <= n; i++) {
     const k = i % n
     const nx = -t.tz[k], nz = t.tx[k]
-    pos.push(t.x[k] + nx * lat0, y, t.z[k] + nz * lat0, t.x[k] + nx * lat1, y1, t.z[k] + nz * lat1)
+    let a0 = off(k, lat0), a1 = off(k, lat1)
+    if (gravel) { const sg = t.gs[k], g = t.gr[k]; a0 = sg * (t.hw[k] + 1.6); a1 = sg * (t.hw[k] + 4.5 + g); if (g <= 0) a1 = a0 }
+    pos.push(t.x[k] + nx * a0, y, t.z[k] + nz * a0, t.x[k] + nx * a1, y1, t.z[k] + nz * a1)
     const v = (i * (t.length / n)) / tile
     uv.push(0, v, 1, v)
     if (i < n) { const a = i * 2; idx.push(a, a + 2, a + 1, a + 1, a + 2, a + 3) }
@@ -63,6 +78,8 @@ export interface RaceScene {
   makeCar: (kind: string, color: string, name: string, isMe: boolean) => T.Group
   /** Himmel, Boden und Berge: wandert jedes Bild mit der Kamera mit (große Strecken). */
   follow: T.Group
+  /** Nur beim Übungsfeld: Boden-Markierungen an der Kamera ausrichten (damit der Asphalt „festsitzt“). */
+  focus?: (x: number, z: number) => void
   /** Schaden (0–100), Driftwinkel und Zeit sichtbar machen: dunkler, verbeult, Rauch, Reifenqualm. */
   damageCar: (g: T.Group, dmg: number, slip: number, v: number, time: number) => void
 }
@@ -98,12 +115,42 @@ export function buildScene(THREE: THREE, t: Track): RaceScene {
 
   // Straße, Randsteine, Leitplanken
   const half = t.def.width / 2
+  const mode = t.def.mode
+  const mark = scene.children.length
+  let focus: RaceScene['focus']
+  if (mode === 'free') {
+    // Endloses Übungsfeld: riesige Asphaltfläche mit Übungskreisen, folgt der Kamera, Markierungen bleiben an der Welt
+    const TILE = 120, px = 512
+    const cvs = document.createElement('canvas'); cvs.width = cvs.height = px
+    const g = cvs.getContext('2d')!
+    g.fillStyle = '#3a3d45'; g.fillRect(0, 0, px, px)
+    for (let i = 0; i < 1800; i++) { g.fillStyle = `rgba(${i % 2 ? 255 : 0},${i % 2 ? 255 : 0},${i % 2 ? 255 : 0},0.04)`; g.fillRect(Math.random() * px, Math.random() * px, 2, 2) }
+    g.strokeStyle = 'rgba(248,250,252,0.85)'; g.lineWidth = 3
+    g.beginPath(); g.arc(px / 2, px / 2, 128, 0, Math.PI * 2); g.stroke()
+    g.beginPath(); g.arc(px / 2, px / 2, 64, 0, Math.PI * 2); g.stroke()
+    g.fillStyle = '#facc15'; g.beginPath(); g.arc(px / 2, px / 2, 8, 0, Math.PI * 2); g.fill()
+    g.strokeStyle = 'rgba(248,250,252,0.35)'; g.lineWidth = 2; g.strokeRect(1, 1, px - 2, px - 2)
+    const ft = new THREE.CanvasTexture(cvs); ft.colorSpace = THREE.SRGBColorSpace
+    ft.wrapS = ft.wrapT = THREE.RepeatWrapping; ft.repeat.set(9000 / TILE, 9000 / TILE); ft.anisotropy = 8
+    ground.material = new THREE.MeshStandardMaterial({ map: ft, roughness: 0.95 })
+    focus = (x, z) => { const f = (v: number) => v - Math.floor(v); ft.offset.set(f((x - 4500) / TILE), f((-z - 4500) / TILE)) }
+  }
   const tex = roadTex(THREE, th.road)
   const rt = tex.clone(); rt.needsUpdate = true
   const road = new THREE.Mesh(ribbon(THREE, t, -half, half, 0.02, 24), new THREE.MeshStandardMaterial({ map: rt, roughness: 0.92, side: THREE.DoubleSide }))
   scene.add(road)
+  // Schotterfeld (außen in manchen Kurven)
+  if (!mode && t.gr.some((g) => g > 0)) {
+    const gc = document.createElement('canvas'); gc.width = gc.height = 128
+    const gg = gc.getContext('2d')!
+    gg.fillStyle = th.night ? '#7c6f58' : '#c9b48a'; gg.fillRect(0, 0, 128, 128)
+    for (let i = 0; i < 900; i++) { gg.fillStyle = `rgba(${i % 2 ? 255 : 60},${i % 2 ? 245 : 50},${i % 2 ? 220 : 30},0.35)`; gg.fillRect(Math.random() * 128, Math.random() * 128, 2, 2) }
+    const gt = new THREE.CanvasTexture(gc); gt.colorSpace = THREE.SRGBColorSpace; gt.wrapS = gt.wrapT = THREE.RepeatWrapping
+    const gm = new THREE.Mesh(ribbon(THREE, t, 0, 0, 0.035, 14, 0.035, true), new THREE.MeshStandardMaterial({ map: gt, roughness: 1, side: THREE.DoubleSide }))
+    scene.add(gm)
+  }
   const curbTex = stripeTex(THREE, '#e11d48', '#f8fafc')
-  for (const sgn of [-1, 1] as const) {
+  for (const sgn of (mode === 'disc' ? [] : [-1, 1]) as Array<-1 | 1>) {
     const a = sgn * half, b = sgn * (half + 1.6)
     scene.add(new THREE.Mesh(ribbon(THREE, t, Math.min(a, b), Math.max(a, b), 0.05, 2.4), new THREE.MeshStandardMaterial({ map: curbTex, roughness: 0.8, side: THREE.DoubleSide })))
     const gA = sgn * (half + 4.5)
@@ -130,7 +177,14 @@ export function buildScene(THREE: THREE, t: Track): RaceScene {
   bar.position.set(0, 9, 0); gate.add(bar)
   gate.position.set(t.x[0], 0, t.z[0])
   gate.rotation.y = Math.atan2(t.tx[0], t.tz[0])
-  scene.add(gate)
+  if (mode !== 'disc') scene.add(gate)
+  if (mode === 'disc') {
+    // Kreisfläche: weiße Randlinie außen und eine dünne Linie auf der Ideallinie (kein Rand, keine Barriere)
+    const edge = new THREE.Mesh(new THREE.RingGeometry(half - 4.5, half - 3.5, 160), new THREE.MeshBasicMaterial({ color: 0xf8fafc, side: THREE.DoubleSide }))
+    edge.rotation.x = -Math.PI / 2; edge.position.set(0, 0.04, 0); scene.add(edge)
+    const mid = new THREE.Mesh(new THREE.RingGeometry(149.6, 150.4, 160), new THREE.MeshBasicMaterial({ color: 0xfacc15, transparent: true, opacity: 0.55, side: THREE.DoubleSide }))
+    mid.rotation.x = -Math.PI / 2; mid.position.set(0, 0.04, 0); scene.add(mid)
+  }
 
   // Kurvenschilder: Pfeile außen in engen Kurven (zeigen die Kurvenrichtung schon von Weitem)
   const arrowCv = document.createElement('canvas'); arrowCv.width = 128; arrowCv.height = 128
@@ -147,7 +201,7 @@ export function buildScene(THREE: THREE, t: Track): RaceScene {
     if (Math.abs(kk) < 0.0075) continue
     const outer = kk > 0 ? -1 : 1   // Rechtskurve → außen = links
     const nx = -t.tz[i], nz = t.tx[i]
-    const lat = outer * (half + 7)
+    const lat = outer * (t.hw[i] + (t.gs[i] === outer ? t.gr[i] : 0) + 7)
     const s = new THREE.Mesh(signGeo, kk > 0 ? signMat : signMatL)
     s.position.set(t.x[i] + nx * lat, 3.6, t.z[i] + nz * lat)
     s.lookAt(s.position.x - t.tx[i] * 20, 3.6, s.position.z - t.tz[i] * 20)
@@ -174,7 +228,7 @@ export function buildScene(THREE: THREE, t: Track): RaceScene {
     const side = rnd() < 0.5 ? -1 : 1
     const lat = side * (half + 14 + rnd() * (t.def.theme === 'stadt' ? 70 : 150))
     const x = t.x[i] - t.tz[i] * lat, z = t.z[i] + t.tx[i] * lat
-    if (nearRoad(x, z, half + (t.def.theme === 'stadt' ? 30 : 16))) continue
+    if (nearRoad(x, z, half + 14 + (t.def.theme === 'stadt' ? 30 : 16))) continue
     slots.push({ x, z, i })
   }
   const dummy = new THREE.Object3D()
@@ -228,8 +282,20 @@ export function buildScene(THREE: THREE, t: Track): RaceScene {
     scene.add(gl)
   }
 
+  // Übungsfeld: keine Strecke, keine Szenerie – nur der endlose Asphalt
+  if (mode === 'free' || mode === 'fill' || mode === 'city') while (scene.children.length > mark) scene.remove(scene.children[mark])
+  if (mode === 'city') buildCity(THREE, scene, ground, !!th.night)
+  if (mode === 'fill') {
+    // ausgefüllte Fläche: Asphalt im Vieleck, weiße Randlinie, keine Barriere
+    const P = t.def.pts
+    const shape = new THREE.Shape(P.map(([px, pz]) => new THREE.Vector2(px, -pz)))
+    const fl = new THREE.Mesh(new THREE.ShapeGeometry(shape), new THREE.MeshStandardMaterial({ color: 0x3a3d45, roughness: 0.92, side: THREE.DoubleSide }))
+    fl.rotation.x = -Math.PI / 2; fl.position.y = 0.03; scene.add(fl)
+    const ln = new THREE.LineLoop(new THREE.BufferGeometry().setFromPoints(P.map(([px, pz]) => new THREE.Vector3(px, 0.06, pz))), new THREE.LineBasicMaterial({ color: 0xf8fafc }))
+    scene.add(ln)
+  }
   const makeCar = (kind: string, color: string, name: string, isMe: boolean) => buildCar(THREE, kind, color, name, isMe)
-  return { scene, sun, theme: th, makeCar, follow, damageCar: (g, dmg, slip, v, time) => damageCar(THREE, g, dmg, slip, v, time) }
+  return { scene, sun, theme: th, makeCar, follow, focus, damageCar: (g, dmg, slip, v, time) => damageCar(THREE, g, dmg, slip, v, time) }
 }
 
 interface Body { len: number; wid: number; hgt: number; cabLen: number; cabH: number; cabZ: number; wheelR: number; spoiler?: boolean; bed?: boolean; open?: boolean; tall?: boolean; cage?: boolean; scoop?: boolean; formula?: boolean; track?: number; wheelW?: number; stripe?: boolean }
@@ -549,4 +615,102 @@ function buildSupercar(THREE: THREE, color: string, name: string, isMe: boolean)
   g.userData.wid = W
   addJets(THREE, g, 4.5, 1.95)
   return g
+}
+
+
+/** Stadt: Straßen (Asphalt mit Mittelstrichen), Häuserblöcke mit Fenstern, Parks mit Bäumen und die Brücke. */
+function buildCity(THREE: THREE, scene: T.Scene, ground: T.Mesh, night: boolean) {
+  ground.material = new THREE.MeshStandardMaterial({ color: 0x33363e, roughness: 0.95 })
+  const P = CITY.pitch
+  // Mittelstriche: gestrichelt, ein Instanz-Mesh
+  const seg = Math.floor((CITY.half * 2) / 10)
+  const dash = new THREE.InstancedMesh(new THREE.BoxGeometry(0.35, 0.02, 4), new THREE.MeshBasicMaterial({ color: 0xe5e7eb }), 9 * seg * 2)
+  const m4 = new THREE.Matrix4(), q = new THREE.Quaternion(), qy = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), Math.PI / 2)
+  let n = 0
+  for (let k = -4; k <= 4; k++) for (let i = 0; i < seg; i++) {
+    const t = -CITY.half + 5 + i * 10
+    m4.compose(new THREE.Vector3(k * P, 0.04, t), q.identity(), new THREE.Vector3(1, 1, 1)); dash.setMatrixAt(n++, m4)
+    m4.compose(new THREE.Vector3(t, 0.04, k * P), qy, new THREE.Vector3(1, 1, 1)); dash.setMatrixAt(n++, m4)
+  }
+  dash.count = n; scene.add(dash)
+
+  // Fenster-Textur (eine Kachel = 6 m)
+  const wc = document.createElement('canvas'); wc.width = wc.height = 64
+  const wg = wc.getContext('2d')!
+  wg.fillStyle = '#d6d3d1'; wg.fillRect(0, 0, 64, 64)
+  for (let ix = 0; ix < 2; ix++) for (let iy = 0; iy < 2; iy++) {
+    const lit = (ix * 3 + iy * 5) % 3 === 0
+    wg.fillStyle = night ? (lit ? '#fde68a' : '#1e293b') : (lit ? '#bae6fd' : '#475569'); wg.fillRect(6 + ix * 30, 8 + iy * 28, 20, 18)
+  }
+  const wt = new THREE.CanvasTexture(wc); wt.colorSpace = THREE.SRGBColorSpace; wt.wrapS = wt.wrapT = THREE.RepeatWrapping
+  const pal = [0xe7e5e4, 0xfca5a5, 0xfde68a, 0xa5b4fc, 0x99f6e4, 0xd6a77a].map((c) => new THREE.Color(c).multiplyScalar(night ? 0.6 : 1))
+  const { buildings, parks } = city()
+  const pos: number[] = [], uv: number[] = [], col: number[] = [], idx: number[] = [], nor: number[] = []
+  const face = (p: number[][], nrm: number[], u: number, v: number, c: T.Color) => {
+    const b = pos.length / 3
+    const uvs = [[0, 0], [u, 0], [u, v], [0, v]]
+    p.forEach((a, i) => { pos.push(...a); nor.push(...nrm); uv.push(...uvs[i]); col.push(c.r, c.g, c.b) })
+    idx.push(b, b + 1, b + 2, b, b + 2, b + 3)
+  }
+  for (const b of buildings) {
+    const x0 = b.x - b.w / 2, x1 = b.x + b.w / 2, z0 = b.z - b.d / 2, z1 = b.z + b.d / 2, h = b.h, c = pal[b.c]
+    const tw = b.w / 6, td = b.d / 6, th = h / 6
+    face([[x0, 0, z1], [x1, 0, z1], [x1, h, z1], [x0, h, z1]], [0, 0, 1], tw, th, c)
+    face([[x1, 0, z0], [x0, 0, z0], [x0, h, z0], [x1, h, z0]], [0, 0, -1], tw, th, c)
+    face([[x1, 0, z1], [x1, 0, z0], [x1, h, z0], [x1, h, z1]], [1, 0, 0], td, th, c)
+    face([[x0, 0, z0], [x0, 0, z1], [x0, h, z1], [x0, h, z0]], [-1, 0, 0], td, th, c)
+    face([[x0, h, z1], [x1, h, z1], [x1, h, z0], [x0, h, z0]], [0, 1, 0], 0.01, 0.01, c.clone().multiplyScalar(0.55))
+  }
+  const bg = new THREE.BufferGeometry()
+  bg.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); bg.setAttribute('normal', new THREE.Float32BufferAttribute(nor, 3))
+  bg.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2)); bg.setAttribute('color', new THREE.Float32BufferAttribute(col, 3)); bg.setIndex(idx)
+  scene.add(new THREE.Mesh(bg, new THREE.MeshStandardMaterial({ map: wt, vertexColors: true, roughness: 0.85 })))
+
+  // Gehwege unter jedem Block (hellgrau, leicht erhöht) und Parks
+  const walk = new THREE.MeshStandardMaterial({ color: night ? 0x5b6270 : 0x9ca3af, roughness: 1 })
+  for (let kx = -4; kx <= 3; kx++) for (let kz = -4; kz <= 3; kz++) {
+    const cx = P * kx + P / 2, cz = P * kz + P / 2
+    const park = parks.some((p) => p.x === cx && p.z === cz)
+    const m = new THREE.Mesh(new THREE.BoxGeometry(96, 0.3, 96), park ? new THREE.MeshStandardMaterial({ color: night ? 0x1f4a2a : 0x4d9a4a, roughness: 1 }) : walk)
+    m.position.set(cx, 0.1, cz); scene.add(m)
+  }
+  const treeG = new THREE.ConeGeometry(2.4, 6, 7)
+  const trees = new THREE.InstancedMesh(treeG, new THREE.MeshStandardMaterial({ color: night ? 0x14532d : 0x15803d, roughness: 1 }), parks.length * 14)
+  let tn = 0
+  parks.forEach((p, pi) => { for (let i = 0; i < 14; i++) { const a = Math.sin(pi * 12.9 + i * 78.2) * 43758.5, b = Math.sin(pi * 4.1 + i * 12.7) * 24634.6; m4.compose(new THREE.Vector3(p.x + ((a - Math.floor(a)) - 0.5) * 80, 3.3, p.z + ((b - Math.floor(b)) - 0.5) * 80), q.identity(), new THREE.Vector3(1, 1, 1)); trees.setMatrixAt(tn++, m4) } })
+  trees.count = tn; scene.add(trees)
+
+  // Brücke
+  const step = 5, cnt = Math.round((CITY.bx1 - CITY.bx0) / step)
+  const bp: number[] = [], bi: number[] = []
+  const quad = (a: number[], b: number[], c: number[], d: number[]) => { const o = bp.length / 3; bp.push(...a, ...b, ...c, ...d); bi.push(o, o + 1, o + 2, o, o + 2, o + 3) }
+  const rp: number[] = [], ri: number[] = []
+  const rquad = (a: number[], b: number[], c: number[], d: number[]) => { const o = rp.length / 3; rp.push(...a, ...b, ...c, ...d); ri.push(o, o + 1, o + 2, o, o + 2, o + 3) }
+  const zc = CITY.bz, w = CITY.bw
+  for (let i = 0; i < cnt; i++) {
+    const xa = CITY.bx0 + i * step, xb = xa + step, ya = bridgeH(xa), yb = bridgeH(xb)
+    quad([xa, ya + 0.05, zc - w], [xa, ya + 0.05, zc + w], [xb, yb + 0.05, zc + w], [xb, yb + 0.05, zc - w])
+    quad([xa, ya - 0.8, zc + w], [xa, ya + 0.05, zc + w], [xb, yb + 0.05, zc + w], [xb, yb - 0.8, zc + w])
+    quad([xa, ya + 0.05, zc - w], [xa, ya - 0.8, zc - w], [xb, yb - 0.8, zc - w], [xb, yb + 0.05, zc - w])
+    quad([xa, ya - 0.8, zc - w], [xa, ya - 0.8, zc + w], [xb, yb - 0.8, zc + w], [xb, yb - 0.8, zc - w])
+    if (ya > 1.5 && yb > 1.5) for (const sg of [-1, 1]) {
+      const zz = zc + sg * (w - 0.4)
+      rquad([xa, ya + 0.05, zz], [xb, yb + 0.05, zz], [xb, yb + 1.2, zz], [xa, ya + 1.2, zz])
+    }
+  }
+  const dg = new THREE.BufferGeometry(); dg.setAttribute('position', new THREE.Float32BufferAttribute(bp, 3)); dg.setIndex(bi); dg.computeVertexNormals()
+  scene.add(new THREE.Mesh(dg, new THREE.MeshStandardMaterial({ color: 0x4b5563, roughness: 0.9, side: THREE.DoubleSide })))
+  const rg = new THREE.BufferGeometry(); rg.setAttribute('position', new THREE.Float32BufferAttribute(rp, 3)); rg.setIndex(ri); rg.computeVertexNormals()
+  scene.add(new THREE.Mesh(rg, new THREE.MeshStandardMaterial({ color: 0xfacc15, roughness: 0.6, side: THREE.DoubleSide })))
+  for (let x = CITY.bx0 + 40; x < CITY.bx1 - 30; x += 40) for (const sg of [-1, 1]) {
+    const hh = bridgeH(x) - 0.8
+    if (hh < 1) continue
+    const pil = new THREE.Mesh(new THREE.BoxGeometry(1.2, hh, 1.2), new THREE.MeshStandardMaterial({ color: 0x6b7280, roughness: 1 }))
+    pil.position.set(x, hh / 2, zc + sg * (w - 1.2)); scene.add(pil)
+  }
+  // Mittelstrich auf der Brücke
+  for (let x = CITY.bx0 + 10; x < CITY.bx1 - 10; x += 8) {
+    const d = new THREE.Mesh(new THREE.BoxGeometry(4, 0.03, 0.3), new THREE.MeshBasicMaterial({ color: 0xf8fafc }))
+    d.position.set(x, bridgeH(x) + 0.08, zc); scene.add(d)
+  }
 }

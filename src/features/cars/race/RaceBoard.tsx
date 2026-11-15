@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import CarArt from '../CarArt'
 import { carKmh } from '../stats'
 import { raceBoard, raceCarBoard, raceTrackList, type BoardRow, type CarBoardRow, type CarRow, type RaceTrackRow } from '../../../services/cars'
-import { TRACKS } from './track'
+import { TRACKS, isOpen } from './track'
 
 const fmt = (ms: number) => { const m = Math.floor(ms / 60000); const s = ms / 1000 - m * 60; return `${m}:${s.toFixed(2).padStart(5, '0')}` }
 
@@ -25,8 +25,8 @@ export default function RaceBoard({ cars }: { cars: CarRow[] }) {
   return (
     <div className="space-y-5">
       <div className="flex flex-wrap gap-2" role="group" aria-label="Strecke">
-        {TRACKS.map((t) => <button key={t.id} type="button" className={chip(track === `t${t.id}`)} aria-pressed={track === `t${t.id}`} onClick={() => setTrack(`t${t.id}`)}>{t.name}</button>)}
-        {custom.map((c) => <button key={c.id} type="button" className={chip(track === `c:${c.id}`)} aria-pressed={track === `c:${c.id}`} onClick={() => setTrack(`c:${c.id}`)}>{c.name}</button>)}
+        {TRACKS.filter((t) => !isOpen(t)).map((t) => <button key={t.id} type="button" className={chip(track === `t${t.id}`)} aria-pressed={track === `t${t.id}`} onClick={() => setTrack(`t${t.id}`)}>{t.name}</button>)}
+        {custom.filter((c) => !c.fill).map((c) => <button key={c.id} type="button" className={chip(track === `c:${c.id}`)} aria-pressed={track === `c:${c.id}`} onClick={() => setTrack(`c:${c.id}`)}>{c.name}</button>)}
       </div>
       {err && <p className="text-sm text-amber-200" role="alert">{err}</p>}
       <div className="grid gap-5 lg:grid-cols-2">

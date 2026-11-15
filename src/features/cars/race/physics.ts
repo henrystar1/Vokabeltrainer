@@ -1,5 +1,6 @@
-import { advance, pointAt, project, type Track } from './track'
-import { canFly, carKmh, flyConfig, isBike, kindDims, kindStats } from '../stats'
+import { advance, inPolygon, pointAt, project, type Track } from './track'
+import { canFly, carKmh, flyConfig, flyHeight, isBike, kindDims, kindStats } from '../stats'
+import { CITY, bridgeH, cityPush, onDeck } from './city'
 import { upFactors, type Up } from '../tuning'
 import { boxHit, corners, impactDamage, type Box } from './collide'
 import { botSteer, type RaceLine } from './line'
@@ -42,6 +43,8 @@ export interface Car {
   hit: number
   /** Restzeit des Flugs (s), 0 = am Boden */
   fly: number
+  /** 1 = auf der Brücke (nur Stadt) */
+  lvl?: number
   /** Wartezeit bis zum nächsten Flug (s) */
   cool: number
 }
@@ -51,6 +54,12 @@ export const CAR_R = 2.2
 export function startCar(t: Track, slot: number): Car {
   // Aufstellung: Zweierreihen hinter der Startlinie
   const row = Math.floor(slot / 2), col = slot % 2
+  if (t.def.mode === 'city') return { x: (col ? 5 : -5), z: -row * 10, h: 0, v: 0, steer: 0, total: 0, idx: 0, lap: 0, offroad: false, bump: 0, slip: 0, dmg: 0, pull: 1, hold: 0, hit: 0, fly: 0, cool: 0, lvl: 0 }
+  if (t.def.mode === 'fill') {
+    const P = t.def.pts, n = P.length
+    const cx = P.reduce((a, q) => a + q[0], 0) / n, cz = P.reduce((a, q) => a + q[1], 0) / n
+    return { x: cx + (col ? 6 : -6), z: cz - row * 9, h: 0, v: 0, steer: 0, total: 0, idx: 0, lap: 0, offroad: false, bump: 0, slip: 0, dmg: 0, pull: 1, hold: 0, hit: 0, fly: 0, cool: 0 }
+  }
   const p = pointAt(t, t.length - 10 - row * 9, (col ? 1 : -1) * t.def.width * 0.22)
   return { x: p.x, z: p.z, h: Math.atan2(p.hx, p.hz), v: 0, steer: 0, total: -(10 + row * 9), idx: p.i, lap: 0, offroad: false, bump: 0, slip: 0, dmg: 0, pull: 1, hold: 0, hit: 0, fly: 0, cool: 0 }
 }
@@ -83,10 +92,15 @@ export function stepCar(c: Car, inp: Input, dt: number, t: Track, st: CarStats, 
   const can = canDrive && !wrecked && !waiting
   const gas = can && inp.gas, brake = canDrive && inp.brake && !waiting
   let v = c.v
-  const half = t.def.width / 2
-  const pr = project(t, c.x, c.z, c.idx)
+  const fill = t.def.mode === 'fill'
+  const city = t.def.mode === 'city'
+  const free = t.def.mode === 'free' || fill || city, disc = t.def.mode === 'disc'
+  const pr = free ? { i: c.idx, s: 0, lat: 0, dist: fill && !inPolygon(t.def.pts, c.x, c.z) ? t.def.width : 0 } : project(t, c.x, c.z, c.idx)
+  const half = free || disc ? t.def.width / 2 : t.hw[pr.i]
   const off = pr.dist > half
-  const top = st.top * (off && !flying ? 0.5 : 1) * (wrecked ? 0.12 : 1 - 0.5 * d)
+  // Schotterfeld: außen in manchen Kurven – deutlich langsamer, aber ohne Schaden
+  const gravel = off && !free && !disc && t.gr[pr.i] > 0 && Math.sign(pr.lat) === t.gs[pr.i]
+  const top = st.top * (off && !flying ? (gravel ? 0.36 : 0.5) : 1) * (wrecked ? 0.12 : 1 - 0.5 * d)
   const acc = st.acc * (1 - 0.55 * d)
   const target = (inp.right ? -1 : 0) + (inp.left ? 1 : 0)
   const auto = !!inp.drift
@@ -96,6 +110,7 @@ export function stepCar(c: Car, inp: Input, dt: number, t: Track, st: CarStats, 
   if (!gas && !brake && !flying) v -= Math.sign(v) * Math.min(Math.abs(v), (4 + v * v * 0.004 + (wrecked ? 10 : 0)) * dt)
   if (waiting) v -= Math.sign(v) * Math.min(Math.abs(v), 40 * dt)
   if (v > top) v -= (v - top) * Math.min(1, 2.4 * dt)
+  if (gravel && !flying) v -= v * Math.min(1, 0.5 * dt)
   v = Math.max(-10, v)
   // Lenkung läuft sanft auf den Zielwert (weniger Zappeln mit Tasten)
   const steer = c.steer + (target - c.steer) * Math.min(1, 7 * dt)
@@ -124,11 +139,11 @@ export function stepCar(c: Car, inp: Input, dt: number, t: Track, st: CarStats, 
   let hit = 0
   let dmg = c.dmg
   // Leitplanke: die Ecken der Karosserie zählen, nicht nur die Mitte
-  const wall = half + 4.5
-  const pr2 = project(t, x, z, pr.i)
+  const pr2 = free ? pr : project(t, x, z, pr.i)
   let worst = 0, wi = pr2.i, wl = pr2.lat
-  for (const [cx, cz] of corners({ x, z, h, l: st.len, w: st.wid })) {
+  if (!free && !disc) for (const [cx, cz] of corners({ x, z, h, l: st.len, w: st.wid })) {
     const q = project(t, cx, cz, pr2.i)
+    const wall = t.hw[q.i] + 4.5 + (t.gs[q.i] === Math.sign(q.lat) ? t.gr[q.i] : 0)
     if (q.dist - wall > worst) { worst = q.dist - wall; wi = q.i; wl = q.lat }
   }
   if (worst > 0 && flying) {
@@ -148,9 +163,43 @@ export function stepCar(c: Car, inp: Input, dt: number, t: Track, st: CarStats, 
     hit = Math.min(1, vn / 25)
     v *= 1 - Math.min(0.9, (2.2 + vn * 0.04) * dt)
   }
-  const total = advance(c.total, pr2.s, t.length)
+  let lvl = c.lvl ?? 0
+  if (city) {
+    // Brücke: Rampe hinauf (längs fahren) oder im Flug von der Seite landen; oben Geländer
+    if (lvl === 0) {
+      if (onDeck(x, z)) {
+        const H = bridgeH(x)
+        if (flying ? flyHeight(fly) <= H + 0.2 && H > 1.5 : H < 1.5 && Math.abs(Math.sin(moveH)) > 0.75 && Math.abs(v) > 3) lvl = 1
+      }
+    } else if (!onDeck(x, z)) lvl = 0
+    if (lvl === 1 && bridgeH(x) > 1.5) {
+      const dz = z - CITY.bz, lim = CITY.bw - 0.8
+      if (Math.abs(dz) > lim) {
+        z = CITY.bz + Math.sign(dz) * lim
+        const vn = Math.abs(v) * Math.abs(Math.cos(moveH))
+        dmg = Math.min(DMG_MAX, dmg + impactDamage(vn))
+        v *= 1 - Math.min(0.9, (2.2 + vn * 0.04) * dt); bump = Math.max(bump, Math.min(1, Math.abs(v) / 30)); hit = Math.max(hit, Math.min(1, vn / 25))
+      }
+    }
+    // Häuser und Stadtmauer (auf der Brücke fährt man darüber)
+    if (lvl === 0) {
+      let bd = 0, bnx = 0, bnz = 0
+      for (const [cx, cz] of corners({ x, z, h, l: st.len, w: st.wid })) {
+        const p = cityPush(cx, cz)
+        if (p && p.depth > bd) { bd = p.depth; bnx = p.nx; bnz = p.nz }
+      }
+      if (bd > 0) {
+        x += bnx * bd; z += bnz * bd
+        const vn = Math.max(0, -(Math.sin(moveH) * bnx + Math.cos(moveH) * bnz) * v)
+        dmg = Math.min(DMG_MAX, dmg + impactDamage(vn + Math.min(6, bd * 4)))
+        v *= 1 - Math.min(0.9, (2.2 + vn * 0.04) * dt)
+        bump = Math.max(bump, Math.min(1, Math.abs(v) / 30)); hit = Math.max(hit, Math.min(1, vn / 25))
+      }
+    }
+  }
+  const total = free ? c.total : advance(c.total, pr2.s, t.length)
   const pull = c.dmg === 0 && dmg > 0 ? (Math.random() < 0.5 ? -1 : 1) : c.pull
-  return { x, z, h, v, steer, total, idx: pr2.i, lap: Math.floor(total / t.length), offroad: pr2.dist > half, bump, slip, dmg, pull, hold: Math.max(0, c.hold - dt), hit, fly, cool }
+  return { x, z, h, v, steer, total, idx: pr2.i, lap: Math.floor(total / t.length), offroad: free ? pr2.dist > half : pr2.dist > t.hw[pr2.i], lvl, bump, slip, dmg, pull, hold: Math.max(0, c.hold - dt), hit, fly, cool }
 }
 
 /** Zusammenstoß zweier Autos (Hitboxen): verschiebt `me` (Anteil `share` der Eindringtiefe), bremst und beschädigt.

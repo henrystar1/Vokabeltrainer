@@ -59,7 +59,8 @@ describe('Fahren', () => {
     let c = { ...startCar(t, 0), v: 40 }
     // stur geradeaus in die Kurve
     for (let i = 0; i < 60 * 30; i++) c = stepCar(c, { gas: true, brake: false, left: false, right: false }, 1 / 60, t, STATS.sportwagen)
-    expect(project(t, c.x, c.z).dist).toBeLessThan(t.def.width / 2 + 6)
+    const pr = project(t, c.x, c.z)
+    expect(pr.dist).toBeLessThan(t.hw[pr.i] + t.gr[pr.i] + 6)
   })
 
   it('Zusammenstoß schiebt auseinander und beschädigt', () => {

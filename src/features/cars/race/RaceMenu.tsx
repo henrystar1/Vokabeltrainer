@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { buildTrack, customTrackDef, TRACKS, type TrackDef } from './track'
+import { buildTrack, customTrackDef, isOpen, TRACKS, type TrackDef } from './track'
 import RaceView, { type RaceCarInfo } from './RaceView'
 import TrackEditor from './TrackEditor'
 import { useAuthOptional } from '../../auth/AuthProvider'
@@ -31,8 +31,10 @@ export function TrackPreview({ id = 0, def, className = '' }: { id?: number; def
   }, [use])
   return (
     <svg viewBox="0 0 200 120" className={className} role="img" aria-label={`Strecke ${use.name}`}>
-      <path d={d.p} fill="none" stroke="#0f172a" strokeWidth="11" strokeLinejoin="round" />
-      <path d={d.p} fill="none" stroke="#cbd5e1" strokeWidth="7" strokeLinejoin="round" />
+      {use.mode === 'fill' ? <path d={d.p} fill="#64748b" stroke="#f8fafc" strokeWidth="2" strokeLinejoin="round" /> : <>
+        <path d={d.p} fill="none" stroke="#0f172a" strokeWidth="11" strokeLinejoin="round" />
+        <path d={d.p} fill="none" stroke="#cbd5e1" strokeWidth="7" strokeLinejoin="round" />
+      </>}
       <circle cx={d.sx} cy={d.sz} r="4.5" fill="#22d3ee" />
     </svg>
   )
@@ -40,29 +42,33 @@ export function TrackPreview({ id = 0, def, className = '' }: { id?: number; def
 
 /** Einzelspieler: Strecke wählen (feste oder gemalte), Training oder gegen Bots. */
 export default function RaceMenu({ car, assistOk = false }: { car: RaceCarInfo; assistOk?: boolean }) {
-  const isAdmin = useAuthOptional()?.isAdmin ?? false
+  const auth = useAuthOptional()
+  const isAdmin = auth?.isAdmin ?? false
+  const [openLobby, setOpenLobby] = useState(false)
   const [sel, setSel] = useState<{ t: number } | { c: RaceTrackRow }>({ t: 0 })
   const [laps, setLaps] = useState(3)
   const [mode, setMode] = useState<'train' | 'bots'>('bots')
   const [level, setLevel] = useState('mittel')
+  const [nBots, setNBots] = useState(4)
   const [run, setRun] = useState<{ key: number } | null>(null)
   const [test, setTest] = useState<TrackDef | null>(null)
   const [editor, setEditor] = useState(false)
   const [custom, setCustom] = useState<RaceTrackRow[]>([])
   const loadCustom = () => { void raceTrackList().then(setCustom).catch(() => undefined) }
   useEffect(loadCustom, [])
-  const def: TrackDef = 'c' in sel ? customTrackDef(sel.c.name, sel.c.pts, sel.c.width, `c:${sel.c.id}`) : TRACKS[sel.t]
+  const def: TrackDef = 'c' in sel ? customTrackDef(sel.c.name, sel.c.pts, sel.c.width, `c:${sel.c.id}`, !!sel.c.fill) : TRACKS[sel.t]
   const pickTrack = (s: { t: number } | { c: RaceTrackRow }) => { setSel(s); setLaps('c' in s ? 2 : TRACKS[s.t].laps) }
   const bots = useMemo(() => {
-    if (mode === 'train') return []
+    if (mode === 'train' || isOpen(def) || nBots === 0) return []
     const lv = LEVELS.find((l) => l.id === level) ?? LEVELS[1]
     const names = [...BOT_NAMES].sort(() => Math.random() - 0.5)
     const cols = [...BOT_COLORS].sort(() => Math.random() - 0.5)
     const pool = [...lv.pool].sort(() => Math.random() - 0.5)
-    return Array.from({ length: 4 }, (_, i) => ({ name: names[i], kind: pool[i % pool.length].kind, top: pool[i % pool.length].top, color: cols[i], skill: Math.min(1, lv.skill - 0.04 + i * 0.015) }))
+    return Array.from({ length: Math.min(nBots, names.length, cols.length) }, (_, i) => ({ name: names[i], kind: pool[i % pool.length].kind, top: pool[i % pool.length].top, color: cols[i], skill: Math.min(1, lv.skill - 0.04 + i * 0.015) }))
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [mode, level, run?.key])
+  }, [mode, level, nBots, run?.key])
 
+  if (openLobby && auth?.user) return <RaceView key="open" trackId={13} laps={1} me={car} assistOk={assistOk} online={{ gameId: 'open-city', userId: auth.user.id, players: [], open: true, name: auth.displayName ?? car.name }} onExit={() => setOpenLobby(false)} />
   if (test) return <RaceView key="test" trackId={0} custom={test} laps={1} me={car} assistOk={assistOk} onAgain={() => setTest({ ...test })} onExit={() => setTest(null)} />
   if (run) return <RaceView key={run.key} trackId={'t' in sel ? sel.t : 0} custom={'c' in sel ? def : undefined} laps={laps} me={car} assistOk={assistOk} bots={bots} onAgain={() => setRun({ key: run.key + 1 })} onExit={() => setRun(null)} />
   if (editor) return <TrackEditor onClose={() => setEditor(false)} onTest={(d) => setTest(d)} onSaved={() => { setEditor(false); loadCustom() }} />
@@ -90,7 +96,7 @@ export default function RaceMenu({ car, assistOk = false }: { car: RaceCarInfo; 
         {custom.length === 0 ? <p className="text-sm text-slate-400">Noch keine. Male deine eigene Strecke – allein oder online fahrbar.</p> : (
           <ul className="grid grid-cols-2 gap-3 sm:grid-cols-3">
             {custom.map((c) => {
-              const d = customTrackDef(c.name, c.pts, c.width, `c:${c.id}`)
+              const d = customTrackDef(c.name, c.pts, c.width, `c:${c.id}`, !!c.fill)
               const on = 'c' in sel && sel.c.id === c.id
               return (
                 <li key={c.id}>
@@ -106,16 +112,18 @@ export default function RaceMenu({ car, assistOk = false }: { car: RaceCarInfo; 
           </ul>
         )}
       </div>
-      <div className="flex flex-wrap items-center gap-2">
+      {!isOpen(def) && <div className="flex flex-wrap items-center gap-2">
         <span className="text-sm text-slate-300">Modus:</span>
         <button type="button" className={chip(mode === 'bots')} onClick={() => setMode('bots')}>Gegen Bots</button>
         <button type="button" className={chip(mode === 'train')} onClick={() => setMode('train')}>Training allein</button>
-      </div>
-      {mode === 'bots' && (
+      </div>}
+      {mode === 'bots' && !isOpen(def) && (<>
+        <div className="flex flex-wrap items-center gap-2"><span className="text-sm text-slate-300">Bots:</span>{[0, 1, 2, 3, 4, 5, 6, 7].map((n) => <button key={n} type="button" className={chip(nBots === n)} aria-pressed={nBots === n} onClick={() => setNBots(n)}>{n}</button>)}</div>
         <div className="flex flex-wrap items-center gap-2"><span className="text-sm text-slate-300">Schwierigkeit:</span>{LEVELS.map((l) => <button key={l.id} type="button" className={chip(level === l.id)} onClick={() => setLevel(l.id)}>{l.label}</button>)}<span className="text-xs text-slate-400">Profi fährt starke Autos exakt auf der Ideallinie.</span></div>
-      )}
-      <div className="flex flex-wrap items-center gap-2"><span className="text-sm text-slate-300">Runden:</span>{[1, 2, 3, 5].map((n) => <button key={n} type="button" className={chip(laps === n)} onClick={() => setLaps(n)}>{n}</button>)}</div>
-      <button type="button" onClick={() => setRun({ key: 1 })} className="min-h-[48px] rounded-xl bg-accent-cyan px-6 text-lg font-bold text-slate-950">Rennen starten</button>
+      </>)}
+      {!isOpen(def) && <div className="flex flex-wrap items-center gap-2"><span className="text-sm text-slate-300">Runden:</span>{[1, 2, 3, 5].map((n) => <button key={n} type="button" className={chip(laps === n)} onClick={() => setLaps(n)}>{n}</button>)}</div>}
+      {auth?.user && <button type="button" onClick={() => setOpenLobby(true)} className="min-h-[48px] rounded-xl border border-accent-cyan px-6 text-lg font-semibold text-accent-cyan">Offene Stadt-Lobby: sofort mitfahren</button>}
+      <button type="button" onClick={() => setRun({ key: 1 })} className="min-h-[48px] rounded-xl bg-accent-cyan px-6 text-lg font-bold text-slate-950">{isOpen(def) ? 'Üben starten' : 'Rennen starten'}</button>
       <p className="text-xs text-slate-400">Steuerung: links ◀ ▶, rechts Gas und Bremse (am iPad mit den Fingern, am Computer Pfeiltasten oder WASD, Leertaste bremst, R repariert und setzt das Auto zurück). Driften: Bremse und Lenken gleichzeitig. Wände und andere Autos machen Schaden. Online gegen Freunde: unter Mehrspieler → Rennen.</p>
     </div>
   )

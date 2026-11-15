@@ -1,5 +1,5 @@
 /** Rennstrecken: geschlossene Kurven aus Stützpunkten (Catmull-Rom), fein abgetastet. Reine Logik, testbar. */
-export interface TrackDef { id: number; /** Rangliste/Online: 't0'…'t10' oder 'c:<uuid>' */ key?: string; name: string; text: string; width: number; laps: number; theme: 'gras' | 'wueste' | 'schnee' | 'stadt' | 'nacht' | 'herbst'; pts: Array<[number, number]> }
+export interface TrackDef { id: number; /** Rangliste/Online: 't0'…'t10' oder 'c:<uuid>' */ key?: string; name: string; text: string; width: number; laps: number; theme: 'gras' | 'wueste' | 'schnee' | 'stadt' | 'nacht' | 'herbst'; pts: Array<[number, number]>; /** 'free' = endloses Übungsfeld (kein Ziel, keine Wände), 'disc' = Kreisfläche ohne Barrieren */ mode?: 'free' | 'disc' | 'fill' | 'city'; /** Größter seitlicher Versatz der Ideallinie (m), z. B. bei der Kreisfläche */ lineMax?: number }
 
 const R = (n: number, f: (i: number) => [number, number]): Array<[number, number]> => Array.from({ length: n }, (_, i) => f(i))
 
@@ -33,13 +33,34 @@ export const TRACKS: TrackDef[] = [
   { id: 9, name: 'Kontinent-Express', text: 'Die Königsstrecke: rund 15 km, 6-km-Gerade, Bögen und lange Kurven.', width: 24, laps: 2, theme: 'herbst', pts: stadium(3000, 420, 8, 150) },
   { id: 10, name: 'Drift-Arena', text: 'Extrabreite Fahrbahn (48 m) mit weiten, langen Bögen – zum Quer-Driften, ohne anzuecken.', width: 48, laps: 3, theme: 'nacht',
     pts: R(20, (i) => { const a = (i / 20) * Math.PI * 2; const r = 400 + 115 * Math.sin(2 * a + 0.6) + 65 * Math.cos(3 * a); return [Math.cos(a) * r * 1.35, Math.sin(a) * r] }) },
+  { id: 11, name: 'Endlos-Asphalt', text: 'Unendlich großes Feld zum Driften-Üben: kein Ziel, keine Wände, nur Asphalt mit Übungskreisen.', width: 60, laps: 1, theme: 'stadt', mode: 'free',
+    pts: R(48, (i) => { const a = (i / 48) * Math.PI * 2; return [Math.cos(a) * 120, Math.sin(a) * 120] }) },
+  { id: 12, name: 'Drift-Kreis', text: 'Riesige runde Asphaltfläche, die Mitte ist komplett Straße, ohne Barrieren: Kreise driften, quer durchfahren, Runden sammeln.', width: 304, laps: 5, theme: 'wueste', mode: 'disc', lineMax: 45,
+    pts: R(96, (i) => { const a = (i / 96) * Math.PI * 2; return [Math.cos(a) * 150, Math.sin(a) * 150] }) },
+  { id: 13, name: 'Stadt', text: 'Offene Stadt mit Häuserblöcken, Straßen, engen Gassen, Parks und einer Brücke (Rampen oder mit dem Flugauto). Frei herumfahren, kein Ziel.', width: 24, laps: 1, theme: 'stadt', mode: 'city',
+    pts: R(48, (i) => { const a = (i / 48) * Math.PI * 2; return [Math.cos(a) * 120, Math.sin(a) * 120] }) },
 ]
 
 export const trackKey = (d: TrackDef): string => d.key ?? `t${d.id}`
 
 /** Eigene (gemalte) Strecke als Streckendefinition. */
-export function customTrackDef(name: string, pts: Array<[number, number]>, width: number, key: string): TrackDef {
-  return { id: -1, key, name, text: 'Eigene Strecke', width, laps: 2, theme: 'gras', pts }
+export function customTrackDef(name: string, pts: Array<[number, number]>, width: number, key: string, fill = false): TrackDef {
+  return fill
+    ? { id: -1, key, name, text: 'Eigene Fläche', width, laps: 1, theme: 'stadt', pts, mode: 'fill' }
+    : { id: -1, key, name, text: 'Eigene Strecke', width, laps: 2, theme: 'gras', pts }
+}
+
+/** Übungsfläche ohne Ziel (Endlos-Feld oder ausgefüllte Fläche). */
+export const isOpen = (d: TrackDef): boolean => d.mode === 'free' || d.mode === 'fill' || d.mode === 'city'
+
+/** Liegt (x,z) im Vieleck? */
+export function inPolygon(p: Array<[number, number]>, x: number, z: number): boolean {
+  let ins = false
+  for (let i = 0, j = p.length - 1; i < p.length; j = i++) {
+    const a = p[i], b = p[j]
+    if ((a[1] > z) !== (b[1] > z) && x < ((b[0] - a[0]) * (z - a[1])) / (b[1] - a[1]) + a[0]) ins = !ins
+  }
+  return ins
 }
 
 export interface Track {
@@ -52,6 +73,11 @@ export interface Track {
   s: Float32Array
   /** Krümmung je Punkt (1/m, + = Rechtskurve von oben gesehen) */
   k: Float32Array
+  /** halbe Straßenbreite je Punkt (in Kurven breiter, wie bei der Formel 1) */
+  hw: Float32Array
+  /** Breite des Schotterfelds außen (m, 0 = keins) und seine Seite (+1/-1 = Vorzeichen des seitlichen Versatzes) */
+  gr: Float32Array
+  gs: Int8Array
   n: number
   length: number
 }
@@ -99,7 +125,10 @@ export function buildTrack(def: TrackDef, step = 3): Track {
     const ang = Math.asin(Math.max(-1, Math.min(1, cross)))
     k[i] = ang / (4 * (len / n))
   }
-  return { def, x, z, tx, tz, s, k, n, length: len }
+  const half = def.width / 2
+  const hw = new Float32Array(n).fill(half), gr = new Float32Array(n), gs = new Int8Array(n)
+  if (!def.mode) widen(x, z, k, n, len, half, hw, gr, gs)
+  return { def, x, z, tx, tz, s, k, hw, gr, gs, n, length: len }
 }
 
 export interface Proj { i: number; s: number; lat: number; /** Abstand zur Mitte (immer ≥ 0) */ dist: number }
@@ -159,5 +188,62 @@ export function roadProximity(t: Track): (x: number, z: number, r: number) => bo
       if (a) for (const i of a) if (Math.hypot(t.x[i] - x, t.z[i] - z) < r) return true
     }
     return false
+  }
+}
+
+
+/** Kurven breiter machen (bis +30 %) und außen ein Schotterfeld anlegen – aber nur an jeder zweiten Kurve, nie mehrere hintereinander. */
+function widen(x: Float32Array, z: Float32Array, k: Float32Array, n: number, len: number, half: number, hw: Float32Array, gr: Float32Array, gs: Int8Array) {
+  const step = len / n
+  const W = Math.max(1, Math.round(45 / step))
+  const cm = new Float32Array(n)
+  for (let i = 0; i < n; i++) { let m = 0; for (let q = -W; q <= W; q++) m = Math.max(m, Math.abs(k[(i + q + n) % n])); cm[i] = m }
+  const lo = 1 / Math.max(300, 9 * half * 2), hi = 1 / Math.max(110, 4 * half * 2)
+  for (let i = 0; i < n; i++) {
+    const c = Math.max(0, Math.min(1, (cm[i] - lo) / (hi - lo)))
+    // innen darf die Fahrbahn nie über den Krümmungsmittelpunkt hinausragen
+    hw[i] = Math.min(half * (1 + 0.3 * c), Math.max(half, 0.8 / Math.max(cm[i], 1e-6)))
+  }
+  // Kurven finden: zusammenhängende Stücke mit starker Krümmung
+  const thr = 1 / Math.max(160, 7 * half * 2)
+  const runs: Array<{ a: number; b: number; sg: number }> = []
+  let first = 0
+  while (first < n && cm[first] > thr) first++
+  if (first === n) return
+  let i0 = -1, pk = 0, sg = 0
+  for (let q = 1; q <= n; q++) {
+    const i = (first + q) % n
+    if (cm[i] > thr) {
+      if (i0 < 0) { i0 = q; pk = 0 }
+      if (Math.abs(k[i]) > pk) { pk = Math.abs(k[i]); sg = Math.sign(k[i]) }
+    } else if (i0 >= 0) { runs.push({ a: first + i0, b: first + q - 1, sg }); i0 = -1 }
+  }
+  const G = Math.min(16, 9 + half * 0.35)
+  const grid = new Map<string, number[]>()
+  const CELL = 60
+  for (let i = 0; i < n; i++) { const key = `${Math.floor(x[i] / CELL)},${Math.floor(z[i] / CELL)}`; const a = grid.get(key); if (a) a.push(i); else grid.set(key, [i]) }
+  const clear = (i: number, r: number) => {
+    const cx = Math.floor(x[i] / CELL), cz = Math.floor(z[i] / CELL), reach = Math.ceil(r / CELL)
+    for (let gx = cx - reach; gx <= cx + reach; gx++) for (let gz = cz - reach; gz <= cz + reach; gz++) for (const j of grid.get(`${gx},${gz}`) ?? []) {
+      const d = Math.min(Math.abs(j - i), n - Math.abs(j - i))
+      if (d * step > 150 && Math.hypot(x[j] - x[i], z[j] - z[i]) < r) return false
+    }
+    return true
+  }
+  let prev: boolean = false
+  const ramp = Math.round(20 / step)
+  for (const r of runs) {
+    const long = (r.b - r.a) * step >= 25
+    const give: boolean = long && !prev
+    prev = give
+    if (!give) continue
+    for (let q = r.a - ramp * 2; q <= r.b + ramp * 2; q++) {
+      const i = ((q % n) + n) % n
+      const f = Math.max(0, Math.min(1, Math.min(q - (r.a - ramp * 2), r.b + ramp * 2 - q) / ramp))
+      const g = G * f
+      if (g < 1) continue
+      if (!clear(i, hw[i] + 4.5 + g + 8)) continue
+      gr[i] = g; gs[i] = -r.sg
+    }
   }
 }

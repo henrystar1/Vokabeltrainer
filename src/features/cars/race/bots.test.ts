@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { TRACKS, buildTrack } from './track'
+import { TRACKS, buildTrack, isOpen } from './track'
 import { buildRaceLine } from './line'
 import { botInput, crash, packLimit, startCar, statsFor, stepCar, type Bot, type Car } from './physics'
 
@@ -24,7 +24,7 @@ function lap(trackId: number, kind: string, top: number | null, skill: number) {
 describe('Ideallinien-Bots', () => {
   for (const kind of ['kleinwagen', 'sportwagen', 'rennwagen']) {
     it(`${kind} fährt auf allen Strecken eine Runde ohne Schaden`, () => {
-      for (const tr of TRACKS) {
+      for (const tr of TRACKS.filter((x) => !isOpen(x))) {
         const r = lap(tr.id, kind, null, 1)
         expect(r.done, `${tr.name} ${kind} fertig`).toBe(true)
         expect(r.dmg, `${tr.name} ${kind} Schaden`).toBeLessThan(5)

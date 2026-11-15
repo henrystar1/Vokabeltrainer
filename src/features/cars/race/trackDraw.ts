@@ -49,7 +49,7 @@ export function selfIntersects(p: Pt[]): boolean {
 export interface Fit { pts: Pt[]; length: number; error: string | null }
 
 /** Aus einer gemalten Linie (Bildschirmpunkte) eine Strecke machen: schließen, gleichmäßig verteilen, glätten, auf `targetM` Meter skalieren, prüfen. */
-export function fitDrawing(raw: Pt[], targetM: number, width: number): Fit {
+export function fitDrawing(raw: Pt[], targetM: number, width: number, fill = false): Fit {
   const fail = (error: string): Fit => ({ pts: [], length: 0, error })
   if (raw.length < 12) return fail('Male eine längere Linie – am besten eine Runde, die wieder beim Start ankommt.')
   const px = loopLength(raw)
@@ -63,10 +63,19 @@ export function fitDrawing(raw: Pt[], targetM: number, width: number): Fit {
     const k = targetM / loopLength(q)
     q = q.map((a) => [Math.round((a[0] - cx) * k), Math.round((a[1] - cz) * k)] as Pt)
     if (selfIntersects(q)) { if (smooth >= 40) return fail('Die Strecke kreuzt sich selbst. Male eine Runde ohne Überschneidung.'); continue }
+    if (fill) return { pts: q, length: Math.round(loopLength(q)), error: null }
     const t = buildTrack(customTrackDef('x', q, width, 'c:x'), 6)
     let kmax = 0
     for (let i = 0; i < t.n; i++) kmax = Math.max(kmax, Math.abs(t.k[i]))
     if (kmax > 1 / (width * 0.9)) { if (smooth >= 40) return fail('Eine Kurve ist zu eng. Male sie weiter und runder, oder wähle eine größere Strecke.'); continue }
+    // Straßenteile dürfen sich nicht zu nahe kommen (Fahrbahn, Randstein, Leitplanke und Schotter brauchen Platz)
+    const gap = width * 1.5 + 12, near = Math.round(150 / (t.length / t.n))
+    let tooNear = false
+    for (let i = 0; i < t.n && !tooNear; i++) for (let j = i + near; j < t.n; j++) {
+      if (t.n - (j - i) < near) continue
+      if (Math.hypot(t.x[i] - t.x[j], t.z[i] - t.z[j]) < gap) { tooNear = true; break }
+    }
+    if (tooNear) { if (smooth >= 40) return fail('Zwei Teile der Strecke liegen zu dicht beieinander. Male sie weiter auseinander.'); continue }
     return { pts: q, length: Math.round(t.length), error: null }
   }
   return fail('Aus der Linie lässt sich keine befahrbare Strecke machen. Versuche es mit weicheren Kurven.')

@@ -102,7 +102,7 @@ describe('Fahrassistent mit Drift (Supercar)', () => {
 
 describe('Drift-Arena', () => {
   it('ist Strecke 10, 48 m breit und deutlich breiter als alle anderen', () => {
-    expect(TRACKS).toHaveLength(11)
+    expect(TRACKS).toHaveLength(14)
     const d = TRACKS[10]
     expect(d.id).toBe(10)
     expect(d.width).toBe(48)
@@ -204,5 +204,44 @@ describe('Tempo bis 100.000 km/h', () => {
     }
     for (const x of [car.x, car.z, car.v, car.h, car.total, car.dmg]) expect(Number.isFinite(x)).toBe(true)
     expect(vmax).toBeGreaterThan(100)
+  })
+})
+
+describe('Endlos-Asphalt und Drift-Kreis', () => {
+  const free = TRACKS[11], disc = TRACKS[12]
+  it('Definitionen', () => {
+    expect(free.mode).toBe('free'); expect(disc.mode).toBe('disc')
+    expect(TRACKS.filter((t) => t.mode).map((t) => t.id)).toEqual([11, 12, 13])
+    expect(disc.width).toBeGreaterThan(300)
+  })
+  it('Endlos-Asphalt: keine Wände, kein Gras, kein Fortschritt – man fährt beliebig weit weg', () => {
+    const t = buildTrack(free), st = statsFor('supercar', 700)
+    let car: Car = startCar(t, 0)
+    for (let i = 0; i < 30 * 40; i++) car = stepCar(car, { gas: true, brake: false, left: false, right: false }, dt, t, st, true)
+    expect(Math.hypot(car.x, car.z)).toBeGreaterThan(2000)
+    expect(car.dmg).toBe(0)
+    expect(car.offroad).toBe(false)
+    expect(car.total).toBe(startCar(t, 0).total)
+    expect(car.v).toBeGreaterThan(100)
+  })
+  it('Drift-Kreis: durch die Mitte und über den Rand ohne Wandschaden; außen ist Gras', () => {
+    const t = buildTrack(disc), st = statsFor('gt', 300)
+    let car: Car = { ...startCar(t, 0), v: 60 }
+    const mid = { ...car, x: 0, z: 0 }
+    expect(stepCar(mid, { gas: false, brake: false, left: false, right: false }, dt, t, st, true).offroad).toBe(false)
+    let sawOff = false
+    // Auto quer durch die Mitte (Kurs auf den Mittelpunkt) und weit über den Rand hinaus
+    car = { ...car, h: Math.atan2(-car.x, -car.z) }
+    for (let i = 0; i < 30 * 12; i++) { car = stepCar(car, { gas: true, brake: false, left: false, right: false }, dt, t, st, true); if (car.offroad) sawOff = true }
+    expect(car.dmg).toBe(0)
+    expect(sawOff).toBe(true)
+  })
+  it('Bots fahren eine Runde auf dem Drift-Kreis ohne Schaden, auf der Ideallinie nahe am Kreis', () => {
+    const t = buildTrack(disc), line = buildRaceLine(t), st = statsFor('rennwagen', 400)
+    for (let i = 0; i < t.n; i += 8) expect(Math.abs(Math.hypot(line.x[i], line.z[i]) - 150)).toBeLessThanOrEqual(46)
+    let car: Car = startCar(t, 0), time = 0
+    while (time < 300 && car.total < t.length) { car = stepCar(car, botSteer(car, st, line, 1, 0), dt, t, st, time > 1, false); time += dt }
+    expect(car.total).toBeGreaterThanOrEqual(t.length)
+    expect(car.dmg).toBeLessThan(2)
   })
 })
