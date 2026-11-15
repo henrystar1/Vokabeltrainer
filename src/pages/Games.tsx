@@ -32,6 +32,8 @@ import { usePlus } from '../features/plus/PlusProvider'
 import { plusRevive } from '../services/plus'
 import { Heart } from 'lucide-react'
 
+const KNOBEL: GameId[] = ['tetris', 'blast', 'g2048', 'memory']
+
 const GAMES: Array<{ id: GameId; name: string; text: string; unit: string; icon: typeof Gamepad2 }> = [
   { id: 'snake', name: 'Snake', text: 'Friss Äpfel, werde länger, stoß nirgends an.', unit: 'Äpfel', icon: Gamepad2 },
   { id: 'tetris', name: 'Tetris', text: 'Stapel die Blöcke und lösche Reihen.', unit: 'Punkte', icon: Blocks },
@@ -111,26 +113,52 @@ export default function Games() {
         Jede Runde kostet <b>{fee} Coins</b>. Es zählen die Bestwerte aller Spieler. Wer einen Rekord bricht, bekommt <b>{reward} Coins</b>.
       </Notice>
       {error && <div className="mt-4"><ErrorBox message={error} /></div>}
-      <div className="mt-5 grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
-        {GAMES.map((g) => (
-          <Card key={g.id} className="flex flex-col gap-3">
-            <g.icon className="text-accent-violet" size={30} />
-            <h2 className="text-xl font-semibold">{g.name}</h2>
-            <p className="flex-1 text-sm text-slate-400">{g.text}</p>
-            <button type="button" onClick={() => setBoardOf(g.id)} className="flex min-h-[44px] items-center gap-2 rounded-xl bg-white/5 px-3 text-left text-sm hover:bg-white/10">
-              <Crown size={16} className="shrink-0 text-amber-300" />
-              {boards.data?.[g.id]?.[0] ? (
-                <span className="min-w-0 truncate"><b className="font-mono text-accent-cyan">{boards.data[g.id][0].score}</b> {g.unit} · {boards.data[g.id][0].display_name}</span>
-              ) : (
-                <span className="text-slate-500">Noch kein Rekord – du kannst der Erste sein</span>
-              )}
-            </button>
-            <Button busy={busy === g.id} disabled={wallet.balance < fee} onClick={() => void start(g.id)}>
-              <CoinIcon size={16} /> Spielen · {fee}
-            </Button>
-          </Card>
-        ))}
-      </div>
+      <section className="mt-6" aria-label="Knobeln & Denken">
+        <h2 className="mb-2 text-sm font-semibold uppercase tracking-wide text-slate-400">Knobeln & Denken</h2>
+      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+          {GAMES.filter((g) => KNOBEL.includes(g.id)).map((g) => (
+            <Card key={g.id} className="flex flex-col gap-3">
+              <g.icon className="text-accent-violet" size={30} />
+              <h2 className="text-xl font-semibold">{g.name}</h2>
+              <p className="flex-1 text-sm text-slate-400">{g.text}</p>
+              <button type="button" onClick={() => setBoardOf(g.id)} className="flex min-h-[44px] items-center gap-2 rounded-xl bg-white/5 px-3 text-left text-sm hover:bg-white/10">
+                <Crown size={16} className="shrink-0 text-amber-300" />
+                {boards.data?.[g.id]?.[0] ? (
+                  <span className="min-w-0 truncate"><b className="font-mono text-accent-cyan">{boards.data[g.id][0].score}</b> {g.unit} · {boards.data[g.id][0].display_name}</span>
+                ) : (
+                  <span className="text-slate-500">Noch kein Rekord – du kannst der Erste sein</span>
+                )}
+              </button>
+              <Button busy={busy === g.id} disabled={wallet.balance < fee} onClick={() => void start(g.id)}>
+                <CoinIcon size={16} /> Spielen · {fee}
+              </Button>
+            </Card>
+          ))}
+        </div>
+      </section>
+      <section className="mt-6" aria-label="Geschick & Reaktion">
+        <h2 className="mb-2 text-sm font-semibold uppercase tracking-wide text-slate-400">Geschick & Reaktion</h2>
+      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+          {GAMES.filter((g) => !KNOBEL.includes(g.id)).map((g) => (
+            <Card key={g.id} className="flex flex-col gap-3">
+              <g.icon className="text-accent-violet" size={30} />
+              <h2 className="text-xl font-semibold">{g.name}</h2>
+              <p className="flex-1 text-sm text-slate-400">{g.text}</p>
+              <button type="button" onClick={() => setBoardOf(g.id)} className="flex min-h-[44px] items-center gap-2 rounded-xl bg-white/5 px-3 text-left text-sm hover:bg-white/10">
+                <Crown size={16} className="shrink-0 text-amber-300" />
+                {boards.data?.[g.id]?.[0] ? (
+                  <span className="min-w-0 truncate"><b className="font-mono text-accent-cyan">{boards.data[g.id][0].score}</b> {g.unit} · {boards.data[g.id][0].display_name}</span>
+                ) : (
+                  <span className="text-slate-500">Noch kein Rekord – du kannst der Erste sein</span>
+                )}
+              </button>
+              <Button busy={busy === g.id} disabled={wallet.balance < fee} onClick={() => void start(g.id)}>
+                <CoinIcon size={16} /> Spielen · {fee}
+              </Button>
+            </Card>
+          ))}
+        </div>
+      </section>
       {boardOf && (
         <Modal title={`Bestenliste · ${GAMES.find((x) => x.id === boardOf)?.name}`} onClose={() => setBoardOf(null)}>
           {(boards.data?.[boardOf] ?? []).length === 0 ? (

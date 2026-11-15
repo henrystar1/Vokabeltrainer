@@ -800,3 +800,8 @@ Tabelle `book_library_hidden`; `in_library` blendet ein veröffentlichtes Buch d
 - Melden: `ReportBtn` hat `locked`, `QuizRunner` zeigt „Vokabel melden“ erst nach der Antwort (Melden zeigt den Eintrag samt Lösung); Karteikarten erst nach dem Umdrehen, im Crashkurs-Test nie.
 - Buch eintragen (`pages/BookEntry.tsx`): große Unit/Seite-Schalter (− / +), Statusanzeige „Speichert … / n gespeichert / Fehler“, feste Spaltenköpfe, Knöpfe „Neue Zeile“ und „Nächste Seite“ unter der Liste, Foto/Gehe zu/Nächste Unit eingeklappt.
 - Tests: `lib/navigation.test.ts`, `features/cram/ReportBtn.test.tsx`, Kurventest in `track117.test.ts`.
+
+## Update 121 – Menü nach Themen, Karteikasten immer sichtbar
+- `lib/navigation.ts`: Gruppen Start · Lernen · Mehr üben · Wettkampf · Spiele (Spiele, Online-Spiele, Deathrun, Parkour, Autohaus, Gambling) · Coins & Belohnungen (Advent, Loot, Börse, Shop, 3D-Druck, Plus & Pro) · Community (Chat, Wer ist da?, Websites) · Konto. Test in `navigation.test.ts`.
+- `features/learning/CardBoxDock.tsx`: Karteikasten als feste Leiste rechts (ab 1280 px, einklappbar, Zustand in localStorage `vt-cardbox-dock`, `AppShell` schafft Platz mit `xl:pr-[236px]`); auf kleineren Bildschirmen ein Reiter am rechten Rand mit Schublade. Fach anklicken → `/lernen?fach=N` (Learn liest `fach`). Lädt höchstens einmal pro Minute neu; im Fokusmodus (Lernrunde) ausgeblendet.
+- Spiele-Seiten gegliedert: Online-Spiele „Brettspiele“ / „Action in 3D“, Spiele „Knobeln & Denken“ / „Geschick & Reaktion“.

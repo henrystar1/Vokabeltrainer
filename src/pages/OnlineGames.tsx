@@ -24,6 +24,8 @@ const GAMES: Array<{ kind: OgKind; text: string; players: string; icon: typeof H
   { kind: 'shooter', text: '3D-Arena (Maus und Tastatur oder Touch-Steuerung am iPad): wer zuerst 10 Treffer hat (oder die meisten nach 5 Minuten), gewinnt. Mit Panik-Knopf.', players: '2 bis 4 Personen · kostet den Ersteller beim Start 50 Coins', icon: Crosshair },
 ]
 
+const ACTION: OgKind[] = ['race', 'shooter']
+
 function statusText(g: OgListItem): string {
   if (g.my_state === 'invited') return `Einladung von ${g.host}`
   if (g.status === 'lobby') return 'Wartet auf Mitspieler'
@@ -46,17 +48,34 @@ export default function OnlineGames() {
   return (
     <div className="space-y-6">
       <PageHeader eyebrow="Gegeneinander spielen" title="Online-Spiele" />
+      <section aria-label="Brettspiele">
+        <h2 className="mb-2 text-sm font-semibold uppercase tracking-wide text-slate-400">Brettspiele</h2>
       <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-        {GAMES.map((g) => (
-          <Card key={g.kind} className="space-y-2">
-            <g.icon size={28} className="text-accent-cyan" aria-hidden />
-            <h2 className="font-semibold">{OG_NAMES[g.kind]}</h2>
-            <p className="text-sm text-slate-300">{g.text}</p>
-            <p className="text-xs text-slate-500">{g.players}</p>
-            <Button className="w-full" onClick={() => setPick(g.kind)}>Spiel starten</Button>
-          </Card>
-        ))}
-      </div>
+          {GAMES.filter((g) => !ACTION.includes(g.kind)).map((g) => (
+            <Card key={g.kind} className="space-y-2">
+              <g.icon size={28} className="text-accent-cyan" aria-hidden />
+              <h2 className="font-semibold">{OG_NAMES[g.kind]}</h2>
+              <p className="text-sm text-slate-300">{g.text}</p>
+              <p className="text-xs text-slate-500">{g.players}</p>
+              <Button className="w-full" onClick={() => setPick(g.kind)}>Spiel starten</Button>
+            </Card>
+          ))}
+        </div>
+      </section>
+      <section aria-label="Action in 3D">
+        <h2 className="mb-2 text-sm font-semibold uppercase tracking-wide text-slate-400">Action in 3D</h2>
+      <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+          {GAMES.filter((g) => ACTION.includes(g.kind)).map((g) => (
+            <Card key={g.kind} className="space-y-2">
+              <g.icon size={28} className="text-accent-cyan" aria-hidden />
+              <h2 className="font-semibold">{OG_NAMES[g.kind]}</h2>
+              <p className="text-sm text-slate-300">{g.text}</p>
+              <p className="text-xs text-slate-500">{g.players}</p>
+              <Button className="w-full" onClick={() => setPick(g.kind)}>Spiel starten</Button>
+            </Card>
+          ))}
+        </div>
+      </section>
 
       <section>
         <h2 className="mb-2 text-lg font-semibold">Deine Spiele</h2>

@@ -49,12 +49,10 @@ export const NAV_GROUPS: NavGroup[] = [
     { lock: 'gender', to: '/genus', label: 'le oder la?', icon: ArrowLeftRight, langs: ['fr'], menu: false, hub: 'Das richtige Geschlecht' },
     { lock: 'search', to: '/suche', label: 'Suche', icon: Search, hub: 'Vokabel in allen Büchern finden' },
   ]), langPicker: true },
-  g('Extras', [
+  g('Mehr üben', [
     { lock: 'math', to: '/mathe', label: 'Mathe', icon: Calculator },
     { to: '/schnelllesen', label: 'Schnelllesen', icon: ScanText },
     { lock: 'memorize', to: '/auswendig', label: 'Auswendig (Pi, Flaggen)', icon: Binary },
-    { lock: 'advent', to: '/advent', label: 'Adventskalender', icon: Gift },
-    { lock: 'loot', to: '/loot', label: 'Loot Drop', icon: Package },
   ]),
   g('Wettkampf', [
     { lock: 'quests', to: '/quests', label: 'Quests', icon: Target },
@@ -63,20 +61,26 @@ export const NAV_GROUPS: NavGroup[] = [
     { lock: 'ranking', to: '/rangliste', label: 'Rangliste', icon: Trophy },
     { lock: 'stats', to: '/statistik', label: 'Statistik', icon: BarChart3 },
   ]),
-  g('Spaß', [
+  g('Spiele', [
     { lock: 'games', to: '/spiele', label: 'Spiele', icon: Gamepad2 },
     { lock: 'online', to: '/mehrspieler', label: 'Online-Spiele', icon: Puzzle },
-    { lock: 'parkour', to: '/parkour', label: 'Parkour', icon: Mountain },
     { lock: 'duels', to: '/deathrun', label: 'Offene Deathrun-Lobby', icon: Skull },
-    { lock: 'cars', to: '/autohaus', label: 'Autohaus', icon: Car },
-    { lock: 'stocks', to: '/boerse', label: 'Börse', icon: TrendingUp },
+    { lock: 'parkour', to: '/parkour', label: 'Parkour', icon: Mountain },
+    { lock: 'cars', to: '/autohaus', label: 'Autohaus & Rennen', icon: Car },
     { lock: 'gambling', to: '/gambling', label: 'Gambling', icon: Dices },
+  ]),
+  g('Coins & Belohnungen', [
+    { lock: 'advent', to: '/advent', label: 'Adventskalender', icon: Gift },
+    { lock: 'loot', to: '/loot', label: 'Loot Drop', icon: Package },
+    { lock: 'stocks', to: '/boerse', label: 'Börse', icon: TrendingUp },
+    { lock: 'shop', to: '/shop', label: 'Shop', icon: ShoppingBag },
+    { lock: 'print', to: '/druckshop', label: '3D-Druck-Shop', icon: Printer },
+    { lock: 'plus', to: '/plus', label: 'Plus & Pro', icon: Crown, brand: true },
+  ]),
+  g('Community', [
     { lock: 'chat', to: '/chat', label: 'Chat', icon: MessagesSquare },
     { lock: 'presence', to: '/online', label: 'Wer ist da?', icon: Users },
     { lock: 'websites', to: '/websites', label: 'Websites', icon: Globe },
-    { lock: 'shop', to: '/shop', label: 'Shop', icon: ShoppingBag },
-    { lock: 'plus', to: '/plus', label: 'Plus & Pro', icon: Crown, brand: true },
-    { lock: 'print', to: '/druckshop', label: '3D-Druck-Shop', icon: Printer },
   ]),
   g('Konto', [
     { to: '/profil', label: 'Profil', icon: UserCircle },

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { hubItemsFor, navItemsFor } from './navigation'
+import { hubItemsFor, navGroupsFor, navItemsFor } from './navigation'
 
 describe('Menü und Lernen-Kacheln', () => {
   it('seltene Übungsarten stehen nicht im Menü, aber als Kachel auf der Lernen-Seite', () => {
@@ -16,5 +16,14 @@ describe('Menü und Lernen-Kacheln', () => {
     expect(hub).not.toContain('/konjugieren')
     expect(hub).not.toContain('/abschreiben')
     expect(hub).toContain('/crashkurs')
+  })
+  it('Menü ist nach Themen geordnet: alle Spiele zusammen, Geld/Shop zusammen, Gespräche zusammen', () => {
+    const by = Object.fromEntries(navGroupsFor(false).map((g) => [g.title, g.items.map((i) => i.to)]))
+    expect(by['Spiele']).toEqual(['/spiele', '/mehrspieler', '/deathrun', '/parkour', '/autohaus', '/gambling'])
+    expect(by['Coins & Belohnungen']).toEqual(['/advent', '/loot', '/boerse', '/shop', '/druckshop', '/plus'])
+    expect(by['Community']).toEqual(['/chat', '/online', '/websites'])
+    expect(by['Wettkampf']).toContain('/rangliste')
+    const all = navItemsFor(false).map((i) => i.to)
+    expect(new Set(all).size).toBe(all.length)
   })
 })

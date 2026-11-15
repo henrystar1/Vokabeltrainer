@@ -61,7 +61,7 @@ export default function Learn() {
   /** Wie viele automatische Wiederholungsrunden waren nötig (0 = Funktion aus oder keine Fehler). */
   const [autoRounds, setAutoRounds] = useState(0)
   const [mainTotal, setMainTotal] = useState(0)
-  const [fach, setFach] = useState<number | null>(null)
+  const [fach, setFach] = useState<number | null>(() => { const f = Number(params.get('fach')); return f >= 1 && f <= 5 ? f : null })
   const rulesQ = useAsync(() => getAppSettings().catch(() => ({}) as Record<string, number>), [])
 
   const directions = useMemo(() => activeDirections(settings), [settings])
@@ -370,6 +370,7 @@ export default function Learn() {
           </div>
           {books.loading && <Spinner label="Bücher laden …" />}
           <h2 className="pt-1 text-base font-semibold text-white">2 · Wie?</h2>
+          {fach !== null && !mistakeMode && <p className="rounded-lg bg-accent-cyan/10 px-3 py-2 text-sm text-accent-cyan">Nur Fach {fach} aus dem Karteikasten. <button type="button" className="underline" onClick={() => setFach(null)}>Alle Fächer</button></p>}
         <div role="tablist" className="glass inline-flex w-full rounded-xl p-1">
           {([[false, 'Normal lernen'], [true, 'Fehler-Training']] as const).map(([m, label]) => (
             <button

@@ -13,10 +13,12 @@ import PushPrompt from '../../features/push/PushPrompt'
 import LiveInviteWatcher from '../../features/duel/LiveInviteWatcher'
 import ProgressWatcher from '../../features/progress/ProgressWatcher'
 import VersionTag from '../ui/VersionTag'
+import CardBoxDock, { readDockOpen } from '../../features/learning/CardBoxDock'
 
 export default function AppShell() {
   const [collapsed, setCollapsed] = useState(false)
   const [focus, setFocus] = useState(false)
+  const [dock, setDock] = useState(readDockOpen)
   useEffect(() => installKeepFocusVisible(), [])
 
   return (
@@ -30,13 +32,14 @@ export default function AppShell() {
         <main
           className={`px-4 pt-8 transition-[padding] duration-300 md:px-8 md:pb-12 ${focus ? 'pb-12' : 'pb-28'} ${
             focus ? '' : collapsed ? 'md:pl-[108px]' : 'md:pl-[288px]'
-          }`}
+          } ${!focus && dock ? 'xl:pr-[236px]' : ''          }`}
         >
           <div className="mx-auto max-w-6xl animate-rise">
             <Outlet />
             <VersionTag className="mt-10" />
           </div>
         </main>
+        {!focus && <CardBoxDock open={dock} onOpen={setDock} />}
         <PanicButton />
         <PushPrompt />
         <LiveInviteWatcher />
