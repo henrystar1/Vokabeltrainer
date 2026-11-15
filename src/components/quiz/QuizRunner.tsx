@@ -211,7 +211,7 @@ export default function QuizRunner({ questions, caseSensitive, onAnswer, onFinis
             Hab ich gewusst ({Math.max(0, maxForgive - forgiven)}/{maxForgive})
           </button>
         )}
-        {reportable && (
+        {reportable && result !== null && (
           <button
             type="button"
             disabled={reported.has(q.vocabularyId)}

@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState, type FocusEvent, type FormEvent, type KeyboardEvent } from 'react'
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
-import { AlertCircle, ArrowLeft, Camera, Check, ChevronRight, Crown, Loader2, Plus, Trash2 } from 'lucide-react'
+import { AlertCircle, ArrowLeft, Camera, Check, ChevronLeft, ChevronRight, Crown, Loader2, Plus, Trash2 } from 'lucide-react'
 import { usePlus } from '../features/plus/PlusProvider'
 import ScanModal from '../components/ocr/ScanModal'
 import AccentBar, { accentsFor } from '../components/ui/AccentBar'
@@ -295,6 +295,8 @@ export default function BookEntry() {
   }
 
   const savedCount = rows.filter((r) => r.placementId).length
+  const unsaved = rows.some((r) => r.status === 'saving' || r.status === 'dirty')
+  const failed = rows.some((r) => r.status === 'error')
   const foreignLabel = LANGUAGE_NAME[bookLanguage] ?? 'Fremdsprache'
 
   return (
@@ -310,35 +312,52 @@ export default function BookEntry() {
         <ArrowLeft size={16} /> {bookName || 'Zurück zum Buch'}
       </Link>
 
-      <div className="glass sticky top-0 z-20 mb-4 flex flex-wrap items-end justify-between gap-3 rounded-2xl p-4">
-        <form onSubmit={jump} className="flex flex-wrap items-end gap-3">
-          <label className="block">
-            <span className="label-mono">Unit</span>
-            <input inputMode="numeric" className={`${inputClass} mt-1 w-24`} value={unitInput} onChange={(e) => setUnitInput(e.target.value)} />
-          </label>
-          <label className="block">
-            <span className="label-mono">Seite</span>
-            <input inputMode="numeric" className={`${inputClass} mt-1 w-24`} value={pageInput} onChange={(e) => setPageInput(e.target.value)} />
-          </label>
-          <Button type="submit" variant="secondary">Gehe zu</Button>
-        </form>
-        <div className="flex flex-wrap gap-2">
-          {plusInfo.ocrAllowed ? (
-            <Button variant="secondary" onClick={() => void openScan()}>
-              <Camera size={16} /> Foto einlesen
-            </Button>
-          ) : (
-            <Button variant="secondary" onClick={() => navigate('/plus')} title="Den Foto-Scan gibt es mit Vokabeltrainer Pro">
-              <Camera size={16} /> Foto einlesen <Crown size={14} className="text-amber-300" aria-hidden /> Pro
-            </Button>
-          )}
-          <Button variant="secondary" onClick={() => void go(unit, page + 1)}>
-            Nächste Seite <ChevronRight size={16} />
-          </Button>
-          <Button onClick={() => void go(unit + 1, page + 1)}>
-            Nächste Unit <ChevronRight size={16} />
-          </Button>
+      <div className="glass sticky top-0 z-20 mb-4 space-y-3 rounded-2xl p-4">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div className="flex flex-wrap items-center gap-4">
+            <Stepper label="Unit" value={unit} onPrev={unit > 0 ? () => void go(unit - 1, page) : undefined} onNext={() => void go(unit + 1, page)} />
+            <Stepper label="Seite" value={page} onPrev={page > 1 ? () => void go(unit, page - 1) : undefined} onNext={() => void go(unit, page + 1)} />
+          </div>
+          <div
+            role="status"
+            className={`inline-flex min-h-[36px] items-center gap-2 rounded-full px-3 text-sm font-medium ${
+              failed ? 'bg-rose-500/15 text-rose-300' : unsaved ? 'bg-amber-400/15 text-amber-200' : 'bg-emerald-400/15 text-emerald-300'
+            }`}
+          >
+            {failed ? <AlertCircle size={15} /> : unsaved ? <Loader2 size={15} className="animate-spin" /> : <Check size={15} />}
+            {failed ? 'Fehler – bitte prüfen' : unsaved ? 'Speichert …' : `${savedCount} gespeichert`}
+          </div>
         </div>
+        <details className="text-sm">
+          <summary className="cursor-pointer text-slate-400 hover:text-slate-200">Andere Seite, Foto oder nächste Unit</summary>
+          <div className="mt-3 flex flex-wrap items-end justify-between gap-3">
+            <form onSubmit={jump} className="flex flex-wrap items-end gap-3">
+              <label className="block">
+                <span className="label-mono">Unit</span>
+                <input inputMode="numeric" className={`${inputClass} mt-1 w-24`} value={unitInput} onChange={(e) => setUnitInput(e.target.value)} />
+              </label>
+              <label className="block">
+                <span className="label-mono">Seite</span>
+                <input inputMode="numeric" className={`${inputClass} mt-1 w-24`} value={pageInput} onChange={(e) => setPageInput(e.target.value)} />
+              </label>
+              <Button type="submit" variant="secondary">Gehe zu</Button>
+            </form>
+            <div className="flex flex-wrap gap-2">
+              {plusInfo.ocrAllowed ? (
+                <Button variant="secondary" onClick={() => void openScan()}>
+                  <Camera size={16} /> Foto einlesen
+                </Button>
+              ) : (
+                <Button variant="secondary" onClick={() => navigate('/plus')} title="Den Foto-Scan gibt es mit Vokabeltrainer Pro">
+                  <Camera size={16} /> Foto einlesen <Crown size={14} className="text-amber-300" aria-hidden /> Pro
+                </Button>
+              )}
+              <Button onClick={() => void go(unit + 1, page + 1)}>
+                Nächste Unit <ChevronRight size={16} />
+              </Button>
+            </div>
+          </div>
+        </details>
       </div>
 
       {conflict !== null && (
@@ -364,13 +383,10 @@ export default function BookEntry() {
         <Spinner />
       ) : (
         <div className="space-y-2">
-          <p className="label-mono px-1">
-            Unit {unit} · Seite {page} · {savedCount} gespeichert
-          </p>
-          <div className="hidden grid-cols-[2.5rem_1fr_1fr_5rem] gap-3 px-2 text-slate-500 md:grid">
+          <div className="hidden grid-cols-[2.5rem_1fr_1fr_5rem] gap-3 rounded-lg bg-white/5 px-2 py-2 md:grid">
             <span />
-            <span className="label-mono">{foreignLabel}</span>
-            <span className="label-mono">Deutsch</span>
+            <span className="text-sm font-semibold text-cyan-200">{foreignLabel}</span>
+            <span className="text-sm font-semibold text-cyan-200">Deutsch</span>
             <span />
           </div>
 
@@ -408,7 +424,7 @@ export default function BookEntry() {
                     onClick={() => addItem(row, side)}
                     className="inline-flex min-h-[36px] items-center gap-1 text-xs text-slate-400 hover:text-accent-cyan"
                   >
-                    <Plus size={13} /> Lösung hinzufügen
+                    <Plus size={13} /> weitere Lösung
                   </button>
                 </div>
               ))}
@@ -434,8 +450,12 @@ export default function BookEntry() {
               )}
             </div>
           ))}
-          <p className="px-1 pt-2 text-xs text-slate-500">
-            Enter springt weiter und speichert · Strg/⌘+Enter fügt eine weitere Lösung hinzu · Änderungen werden automatisch gespeichert.
+          <div className="flex flex-wrap items-center justify-between gap-3 pt-2">
+            <Button variant="secondary" onClick={() => setRows((rs) => [...rs, emptyRow()])}><Plus size={16} /> Neue Zeile</Button>
+            <Button onClick={() => void go(unit, page + 1)}>Nächste Seite <ChevronRight size={16} /></Button>
+          </div>
+          <p className="px-1 pt-1 text-xs text-slate-500">
+            Enter springt weiter und speichert · Änderungen werden automatisch gespeichert. Mehrere richtige Antworten: „+ weitere Lösung“ (oder Strg/⌘+Enter).
           </p>
         </div>
       )}
@@ -472,3 +492,18 @@ function StatusIcon({ row }: { row: EntryRow }) {
   return null
 }
 
+
+function Stepper({ label, value, onPrev, onNext }: { label: string; value: number; onPrev?: () => void; onNext: () => void }) {
+  return (
+    <div className="flex items-center gap-2">
+      <span className="label-mono">{label}</span>
+      <button type="button" aria-label={`${label} zurück`} disabled={!onPrev} onClick={onPrev} className="flex h-11 w-11 items-center justify-center rounded-xl border border-white/10 text-slate-300 transition hover:bg-white/10 disabled:opacity-30">
+        <ChevronLeft size={18} />
+      </button>
+      <span className="min-w-[2.5rem] text-center text-2xl font-bold tabular-nums text-white">{value}</span>
+      <button type="button" aria-label={`${label} weiter`} onClick={onNext} className="flex h-11 w-11 items-center justify-center rounded-xl border border-white/10 text-slate-300 transition hover:bg-white/10">
+        <ChevronRight size={18} />
+      </button>
+    </div>
+  )
+}

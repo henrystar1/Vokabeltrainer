@@ -164,7 +164,7 @@ export default function Flashcards() {
         <div className="flex flex-wrap gap-2">
           <Button variant="secondary" disabled={!flipped} onClick={() => go(false)}><RotateCcw size={16} /> Nochmal</Button>
           <Button disabled={!flipped} onClick={() => go(true)}><Check size={16} /> Gewusst</Button>
-          <ReportBtn v={v} rep={rep} />
+          <ReportBtn v={v} rep={rep} locked={!flipped} />
           <Button variant="ghost" onClick={() => setDeck(null)}>Beenden</Button>
         </div>
       </div>

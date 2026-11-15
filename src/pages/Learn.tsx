@@ -2,10 +2,11 @@ import { useMemo, useRef, useState } from 'react'
 import RewardPopup from '../components/ui/RewardPopup'
 import { accentsFor } from '../components/ui/AccentBar'
 import { Link, useSearchParams } from 'react-router-dom'
-import { ChevronsRight, Play, RotateCcw, Settings as SettingsIcon } from 'lucide-react'
+import { BookOpen, ChevronsRight, Play, RotateCcw, Settings as SettingsIcon } from 'lucide-react'
+import { hubItemsFor } from '../lib/navigation'
+import { useLocks } from '../features/locks/LocksProvider'
 import Button from '../components/ui/Button'
 import Card from '../components/ui/Card'
-import { Field, Select } from '../components/ui/Field'
 import PageHeader from '../components/ui/PageHeader'
 import { ErrorBox, Notice, Spinner } from '../components/ui/States'
 import QuizRunner from '../components/quiz/QuizRunner'
@@ -37,6 +38,7 @@ export default function Learn() {
   const [params] = useSearchParams()
   const { settings } = useSettings()
   const wallet = useWallet()
+  const { locked } = useLocks()
   const plus = usePlus()
   const [dueBusy, setDueBusy] = useState(false)
   const [dueMsg, setDueMsg] = useState<string | null>(null)
@@ -342,7 +344,32 @@ export default function Learn() {
     <div>
       <PageHeader eyebrow="Trainingsraum" title="Lernen" />
       {error && <div className="mb-4"><ErrorBox message={error} /></div>}
-      <Card className="mx-auto max-w-xl space-y-5">
+      <div className="mx-auto max-w-3xl space-y-6">
+        <Card className="space-y-5">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <h2 className="text-base font-semibold text-white">1 · Was möchtest du lernen?</h2>
+            <Link to={bookId ? `/buecher/${bookId}` : '/buecher'} className="inline-flex min-h-[36px] items-center gap-1 text-sm text-accent-cyan hover:underline">
+              <BookOpen size={15} /> {bookId ? 'Dieses Buch öffnen' : 'Bücher & Vokabeln eintragen'}
+            </Link>
+          </div>
+          <div className="grid max-h-80 gap-2 overflow-y-auto pr-1 sm:grid-cols-2" role="radiogroup" aria-label="Buch wählen">
+            {[{ id: '', name: `Alle Bücher (${settings.learn_language.toUpperCase()})`, sub: 'Alles zusammen üben', pct: null as number | null }, ...(books.data ?? []).map((b) => ({ id: b.id, name: b.name, sub: `${b.active_count} von ${b.vocab_count} Vokabeln aktiv`, pct: b.mastery_percent }))].map((b) => (
+              <button
+                key={b.id || 'alle'}
+                type="button"
+                role="radio"
+                aria-checked={bookId === b.id}
+                onClick={() => setBookId(b.id)}
+                className={`rounded-xl border p-3 text-left transition ${bookId === b.id ? 'border-accent-cyan bg-accent-cyan/10' : 'border-white/10 hover:bg-white/5'}`}
+              >
+                <span className="block truncate font-medium text-white">{b.name}</span>
+                <span className="block text-xs text-slate-400">{b.sub}</span>
+                {b.pct !== null && <span className="mt-2 block h-1.5 overflow-hidden rounded-full bg-white/10"><span className="block h-full rounded-full bg-accent-cyan" style={{ width: `${Math.min(100, Math.max(0, b.pct))}%` }} /></span>}
+              </button>
+            ))}
+          </div>
+          {books.loading && <Spinner label="Bücher laden …" />}
+          <h2 className="pt-1 text-base font-semibold text-white">2 · Wie?</h2>
         <div role="tablist" className="glass inline-flex w-full rounded-xl p-1">
           {([[false, 'Normal lernen'], [true, 'Fehler-Training']] as const).map(([m, label]) => (
             <button
@@ -361,14 +388,20 @@ export default function Learn() {
             Hier kommen nur Vokabeln dran, die du in den letzten 30 Tagen falsch hattest – die schwersten zuerst. Dein Lernstand wird wie sonst angepasst.
           </p>
         )}
-        <Field label="Was möchtest du lernen?">
-          <Select value={bookId} onChange={(e) => setBookId(e.target.value)}>
-            <option value="">Alle Bücher ({settings.learn_language.toUpperCase()})</option>
-            {books.data?.map((b) => (
-              <option key={b.id} value={b.id}>{b.name}</option>
-            ))}
-          </Select>
-        </Field>
+          <div className="rounded-xl border border-white/10 bg-space-900/50 p-3 text-sm text-slate-300">
+            <span className="font-mono text-accent-cyan">{settings.words_per_round}</span> Abfragen{bothDirections(bothDirs, settings.words_per_round)} · {directions.map((d) => (d === 'forward' ? 'Deutsch → Fremdsprache' : 'Fremdsprache → Deutsch')).join(' + ')}{settings.case_sensitive ? ' · Groß-/Kleinschreibung zählt' : ''}
+            <Link to="/einstellungen" className="ml-2 inline-flex items-center gap-1 text-accent-cyan hover:underline"><SettingsIcon size={14} /> ändern</Link>
+          </div>
+        <button type="button" onClick={() => void start()}
+          className="group relative w-full min-h-[60px] overflow-hidden rounded-2xl bg-gradient-to-r from-cyan-400 via-sky-400 to-fuchsia-500 px-6 text-lg font-extrabold text-space-950 shadow-[0_0_28px_rgb(34_211_238/0.35)] transition hover:scale-[1.01] hover:shadow-[0_0_40px_rgb(217_70_239/0.45)] active:scale-[0.99]">
+          <span className="relative z-10 inline-flex items-center justify-center gap-2"><Play size={20} className="transition group-hover:translate-x-0.5" /> {mistakeMode ? 'Fehler-Training starten' : fach ? `Fach ${fach} lernen` : 'Runde starten'}</span>
+          <span aria-hidden className="pointer-events-none absolute inset-y-0 -left-1/3 w-1/3 -skew-x-12 bg-white/40 opacity-0 blur-md transition group-hover:left-full group-hover:opacity-100 group-hover:duration-700" />
+        </button>
+        </Card>
+
+        <details className="glass rounded-2xl p-4">
+          <summary className="cursor-pointer font-medium text-slate-200">Weitere Optionen (Fach, Belohnung, Seiten freischalten)</summary>
+          <div className="mt-4 space-y-5">
         {!mistakeMode && <CardBoxPanel language={bookId ? null : settings.learn_language} bookId={bookId || null} fach={fach} onFach={setFach} />}
         {(() => {
           const st = plus.status
@@ -400,19 +433,6 @@ export default function Learn() {
             </div>
           )
         })()}
-        <div className="rounded-xl border border-white/10 bg-space-900/50 p-4 text-sm text-slate-300">
-          <p>
-            <span className="font-mono text-accent-cyan">{settings.words_per_round}</span> Abfragen
-            {bothDirections(bothDirs, settings.words_per_round)}
-          </p>
-          <p className="mt-1 text-slate-400">
-            {directions.map((d) => (d === 'forward' ? 'Deutsch → Fremdsprache' : 'Fremdsprache → Deutsch')).join(' + ')}
-            {settings.case_sensitive ? ' · Groß-/Kleinschreibung zählt' : ''}
-          </p>
-          <Link to="/einstellungen" className="mt-2 inline-flex items-center gap-1 text-accent-cyan hover:underline">
-            <SettingsIcon size={14} /> Einstellungen ändern
-          </Link>
-        </div>
         {selected && (
           <div className="rounded-xl border border-white/10 bg-space-900/50 p-4 text-sm">
             <p className="text-slate-300">
@@ -438,12 +458,21 @@ export default function Learn() {
           </Button>
           {dueMsg && <p className="mt-2 text-xs text-emerald-300">{dueMsg}</p>}
         </div>
-        <button type="button" onClick={() => void start()}
-          className="group relative w-full min-h-[60px] overflow-hidden rounded-2xl bg-gradient-to-r from-cyan-400 via-sky-400 to-fuchsia-500 px-6 text-lg font-extrabold text-space-950 shadow-[0_0_28px_rgb(34_211_238/0.35)] transition hover:scale-[1.01] hover:shadow-[0_0_40px_rgb(217_70_239/0.45)] active:scale-[0.99]">
-          <span className="relative z-10 inline-flex items-center justify-center gap-2"><Play size={20} className="transition group-hover:translate-x-0.5" /> {mistakeMode ? 'Fehler-Training starten' : fach ? `Fach ${fach} lernen` : 'Runde starten'}</span>
-          <span aria-hidden className="pointer-events-none absolute inset-y-0 -left-1/3 w-1/3 -skew-x-12 bg-white/40 opacity-0 blur-md transition group-hover:left-full group-hover:opacity-100 group-hover:duration-700" />
-        </button>
-      </Card>
+          </div>
+        </details>
+
+        <section aria-label="Andere Übungsarten">
+          <h2 className="mb-3 text-base font-semibold text-white">Andere Übungsarten</h2>
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+            {hubItemsFor(locked, settings.learn_language).map(({ to, label, icon: Icon, hub }) => (
+              <Link key={to} to={to} className="glass flex min-h-[64px] items-center gap-3 rounded-2xl p-4 transition hover:bg-white/10">
+                <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-accent-cyan/10 text-accent-cyan"><Icon size={20} /></span>
+                <span className="min-w-0"><span className="block font-medium text-white">{label}</span><span className="block text-xs text-slate-400">{hub}</span></span>
+              </Link>
+            ))}
+          </div>
+        </section>
+      </div>
       <PageRules title="Lernen" info="Richtige Antworten beim Lernen geben Ranglistenpunkte und, in Online-Büchern, Coins (je N richtige Antworten und für neu gelernte Vokabeln). Dazu kommt die Wartezeit, nach der eine Vokabel wieder dran ist." keys={['points_per_answer', 'points_daily_cap', 'points_active_day', 'points_accuracy_bonus', 'points_accuracy_min', 'learn_reward', 'learn_daily_cap', 'learn_coin_every', 'learn_coin_cap', 'learn_gap_l1', 'learn_gap_l2', 'learn_gap_l3', 'learn_gap_l4']} />
       <PlusHint ctx="learn" />
     </div>

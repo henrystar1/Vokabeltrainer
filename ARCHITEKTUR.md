@@ -792,3 +792,11 @@ Tabelle `book_library_hidden`; `in_library` blendet ein veröffentlichtes Buch d
 - `physics.ts`: neue optionale Car-Felder `y`, `vy`, `loop`, `lp`. Am Boden folgt das Auto der Rampenhöhe; hebt der Boden ab (Rampenende, Hügelkamm bei Tempo) fliegt es auf einer Wurfparabel (g = 9,8), Landung mit kleinem Schaden. Looping: Einfahrt ab 28 m/s (≈ 100 km/h) und gerader Ausrichtung am Einstieg, danach läuft `loopStep` die Wendel mit Energieerhaltung; oben zu langsam = Absturz mit Schaden.
 - `scene.ts` `buildStunt`: Keile für Rampen, Wendel mit Seitenwänden, Stützen, Zaun. `RaceView`: `carY` berücksichtigt `y`, `pitchOf` neigt die Nase (im Looping volle Drehung), Funkdaten `y`/`pt`, Autos auf unterschiedlicher Höhe stoßen nicht zusammen.
 - Tests: `stunt.test.ts`.
+
+## Update 120 – Lernen übersichtlicher, Kurven, Melden
+- Rennen: `buildTrack` entschärft zu enge Kurven (Radius ≥ halbe Breite + 9 m, Mittellinie wird geglättet), damit sich Randstein/Leitplanke nicht mehr überschlagen; die breiteren Kurven (`hw`) sind wieder gleich breit (Array bleibt für den Schotter-Code). Schotterfeld bleibt.
+- Lernen (`pages/Learn.tsx`): Schritt 1 Buch wählen (Kacheln mit Fortschritt, Link zu Büchern/Eintragen), Schritt 2 Modus + sofort der Start-Knopf; Fach, Belohnung, Seiten freischalten, „wieder fällig“ liegen in „Weitere Optionen“ (`<details>`); darunter Kacheln aller Übungsarten (`hubItemsFor` in `lib/navigation.ts`).
+- Menü: Gruppe „Lernen“ nur Lernen, Bücher, Karteikarten, Test, Hausaufgaben, Suche; Abschreiben, Crashkurs, Multiple Choice, Grammatik, Irreguläre Verben, Konjugieren, le/la sind `menu: false` (nur Kacheln); Mathe, Schnelllesen, Auswendig, Advent, Loot in neuer Gruppe „Extras“.
+- Melden: `ReportBtn` hat `locked`, `QuizRunner` zeigt „Vokabel melden“ erst nach der Antwort (Melden zeigt den Eintrag samt Lösung); Karteikarten erst nach dem Umdrehen, im Crashkurs-Test nie.
+- Buch eintragen (`pages/BookEntry.tsx`): große Unit/Seite-Schalter (− / +), Statusanzeige „Speichert … / n gespeichert / Fehler“, feste Spaltenköpfe, Knöpfe „Neue Zeile“ und „Nächste Seite“ unter der Liste, Foto/Gehe zu/Nächste Unit eingeklappt.
+- Tests: `lib/navigation.test.ts`, `features/cram/ReportBtn.test.tsx`, Kurventest in `track117.test.ts`.

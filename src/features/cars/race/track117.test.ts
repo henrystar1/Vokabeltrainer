@@ -47,19 +47,24 @@ describe('Ausgefüllte Fläche', () => {
 
 describe('Breite Kurven und Schotterfeld', () => {
   const normal = TRACKS.filter((d) => !d.mode)
-  it('Kurven sind bis 30 % breiter, nie schmaler; Schotter liegt nie an zwei Kurven hintereinander dicht beieinander', () => {
-    let anyWide = false, anyGravel = false
+  it('Fahrbahn bleibt gleich breit; Schotter an manchen Kurven außen, höchstens 16 m', () => {
+    let anyGravel = false
     for (const d of normal) {
       const t = buildTrack(d), half = d.width / 2
       for (let i = 0; i < t.n; i++) {
-        expect(t.hw[i]).toBeGreaterThanOrEqual(half - 1e-3)
-        expect(t.hw[i]).toBeLessThanOrEqual(half * 1.3 + 1e-3)
-        if (t.hw[i] > half * 1.05) anyWide = true
+        expect(t.hw[i]).toBeCloseTo(half, 3)
         if (t.gr[i] > 0) { anyGravel = true; expect(t.gs[i] === 1 || t.gs[i] === -1).toBe(true); expect(t.gr[i]).toBeLessThanOrEqual(16) }
       }
     }
-    expect(anyWide).toBe(true)
     expect(anyGravel).toBe(true)
+  })
+  it('keine Kurve ist enger als halbe Breite + 9 m (kein Überschlagen der Bänder)', () => {
+    for (const d of normal) {
+      const t = buildTrack(d), half = d.width / 2
+      let worst = Infinity
+      for (let i = 0; i < t.n; i++) if (Math.abs(t.k[i]) > 1e-6) worst = Math.min(worst, 1 / Math.abs(t.k[i]))
+      expect(worst, d.name).toBeGreaterThan(half + 4.5)
+    }
   })
   it('Schotter bremst stark, macht aber keinen Schaden und es gibt keine Wand davor', () => {
     const d = normal.find((x) => buildTrack(x).gr.some((g) => g > 8))!

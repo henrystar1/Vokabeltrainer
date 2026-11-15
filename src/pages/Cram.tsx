@@ -236,7 +236,7 @@ function Karten({ s, update, rep }: { s: CramSession; update: (s: CramSession) =
         <Button variant="secondary" onClick={() => { setReverse(!reverse); setFlipped(false) }}>Seite tauschen</Button>
         <Button variant="secondary" disabled={!flipped} onClick={() => go(false)}><RotateCcw size={16} /> Nochmal</Button>
         <Button disabled={!flipped} onClick={() => go(true)}><Check size={16} /> Gewusst</Button>
-        <ReportBtn v={v} rep={rep} />
+        <ReportBtn v={v} rep={rep} locked={!flipped} />
       </div>
     </div>
   )
@@ -276,7 +276,7 @@ function Abfrage({ s, update, rep }: { s: CramSession; update: (s: CramSession) 
       </Card>
       <div className="flex flex-wrap gap-2">
         <Button type="submit">{fb ? 'Weiter' : 'Prüfen'}</Button>
-        <ReportBtn v={s.vocab.find((x) => x.vocabulary_id === cur.id)} rep={rep} />
+        <ReportBtn v={s.vocab.find((x) => x.vocabulary_id === cur.id)} rep={rep} locked={!fb} />
         {fb && !fb.ok && (
           <Button variant="secondary" disabled={overridesLeft(s) === 0} onClick={() => setConfirm(true)}>
             <Check size={16} /> Hab ich gewusst ({overridesLeft(s)}/{MAX_OVERRIDES})
@@ -314,7 +314,7 @@ function TestRun({ s, update, rep }: { s: CramSession; update: (s: CramSession) 
       </Card>
       <div className="flex flex-wrap gap-2">
         <Button type="submit">{s.testPos + 1 >= s.test.length ? 'Abgeben' : 'Weiter'}</Button>
-        <ReportBtn v={s.vocab.find((x) => x.vocabulary_id === t.id)} rep={rep} />
+        <ReportBtn v={s.vocab.find((x) => x.vocabulary_id === t.id)} rep={rep} locked />
       </div>
     </form>
   )

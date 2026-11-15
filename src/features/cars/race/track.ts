@@ -104,7 +104,7 @@ export function buildTrack(def: TrackDef, step = 3): Track {
   for (let i = 1; i <= raw.length; i++) { const a = raw[i - 1], b = raw[i % raw.length]; cum.push(cum[i - 1] + Math.hypot(b[0] - a[0], b[1] - a[1])) }
   const total = cum[cum.length - 1]
   const n = Math.max(16, Math.round(total / step))
-  const len = total
+  let len = total
   const x = new Float32Array(n), z = new Float32Array(n), tx = new Float32Array(n), tz = new Float32Array(n), s = new Float32Array(n), k = new Float32Array(n)
   let j = 0
   for (let i = 0; i < n; i++) {
@@ -114,6 +114,26 @@ export function buildTrack(def: TrackDef, step = 3): Track {
     const seg = cum[j + 1] - cum[j] || 1
     const f = (d - cum[j]) / seg
     x[i] = a[0] + (b[0] - a[0]) * f; z[i] = a[1] + (b[1] - a[1]) * f; s[i] = d
+  }
+  if (!def.mode) {
+    // zu enge Kurven entschärfen: Radius mindestens halbe Breite + 9 m, damit Randstein und Leitplanke nie ineinander laufen
+    const w = Math.max(2, Math.round(10 / step)), rmin = def.width / 2 + 9
+    const mx = new Float32Array(n), mz = new Float32Array(n)
+    for (let it = 0; it < 120; it++) {
+      let moved = 0
+      for (let i = 0; i < n; i++) {
+        const a = (i + n - w) % n, b = (i + w) % n
+        const ax = x[i] - x[a], az = z[i] - z[a], bx = x[b] - x[i], bz = z[b] - z[i], cx = x[a] - x[b], cz = z[a] - z[b]
+        const cr = Math.abs(ax * bz - az * bx)
+        const r = cr < 1e-6 ? Infinity : (Math.hypot(ax, az) * Math.hypot(bx, bz) * Math.hypot(cx, cz)) / (2 * cr)
+        if (r < rmin) { mx[i] = ((x[a] + x[b]) / 2 - x[i]) * 0.4; mz[i] = ((z[a] + z[b]) / 2 - z[i]) * 0.4; moved++ } else { mx[i] = 0; mz[i] = 0 }
+      }
+      if (!moved) break
+      for (let i = 0; i < n; i++) { x[i] += mx[i]; z[i] += mz[i] }
+    }
+    let acc = 0
+    for (let i = 0; i < n; i++) { s[i] = acc; acc += Math.hypot(x[(i + 1) % n] - x[i], z[(i + 1) % n] - z[i]) }
+    len = acc
   }
   for (let i = 0; i < n; i++) {
     const a = (i + n - 1) % n, b = (i + 1) % n
@@ -200,12 +220,6 @@ function widen(x: Float32Array, z: Float32Array, k: Float32Array, n: number, len
   const W = Math.max(1, Math.round(45 / step))
   const cm = new Float32Array(n)
   for (let i = 0; i < n; i++) { let m = 0; for (let q = -W; q <= W; q++) m = Math.max(m, Math.abs(k[(i + q + n) % n])); cm[i] = m }
-  const lo = 1 / Math.max(300, 9 * half * 2), hi = 1 / Math.max(110, 4 * half * 2)
-  for (let i = 0; i < n; i++) {
-    const c = Math.max(0, Math.min(1, (cm[i] - lo) / (hi - lo)))
-    // innen darf die Fahrbahn nie über den Krümmungsmittelpunkt hinausragen
-    hw[i] = Math.min(half * (1 + 0.3 * c), Math.max(half, 0.8 / Math.max(cm[i], 1e-6)))
-  }
   // Kurven finden: zusammenhängende Stücke mit starker Krümmung
   const thr = 1 / Math.max(160, 7 * half * 2)
   const runs: Array<{ a: number; b: number; sg: number }> = []

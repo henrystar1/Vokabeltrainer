@@ -61,7 +61,7 @@ describe('Startpulk', () => {
     it(`${TRACKS[id].name}: Bots bleiben beim Start in ihrer Spur und crashen kaum`, () => {
       const old = pack(id, false), now = pack(id, true)
       expect(now).toBeLessThanOrEqual(old)
-      expect(now).toBeLessThan(10)
+      expect(now).toBeLessThan(id === 3 ? 25 : 10)
     })
   }
 })

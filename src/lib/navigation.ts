@@ -13,6 +13,10 @@ export interface NavItem {
   brand?: boolean
   /** Nur für diese Lernsprachen sichtbar (leer = alle). */
   langs?: string[]
+  /** Kurzbeschreibung für die Kachel auf der Lernen-Seite */
+  hub?: string
+  /** false = nicht im Menü, nur als Kachel auf der Lernen-Seite */
+  menu?: false
 }
 
 export interface NavGroup {
@@ -32,24 +36,26 @@ export const NAV_GROUPS: NavGroup[] = [
   ]),
   { ...g('Lernen', [
     { lock: 'learn', to: '/lernen', label: 'Lernen', icon: Brain },
-    { lock: 'copy', to: '/abschreiben', label: 'Abschreiben', icon: PenLine },
-    { lock: 'cards', to: '/karteikarten', label: 'Karteikarten', icon: Layers },
-    { lock: 'cram', to: '/crashkurs', label: 'Crashkurs', icon: Timer },
-    { lock: 'test', to: '/test', label: 'Test', icon: ClipboardCheck },
-    { lock: 'practice', to: '/ueben', label: 'Multiple Choice', icon: ListChecks },
-    { lock: 'grammar', to: '/grammatik', label: 'Grammatik', icon: Sparkles, plus: true },
-    { lock: 'irregular', to: '/unregelmaessig', label: 'Irreguläre Verben', icon: Shuffle, langs: ['en', 'fr'] },
-    { lock: 'conjugate', to: '/konjugieren', label: 'Konjugieren', icon: Languages, langs: ['fr'] },
-    { lock: 'gender', to: '/genus', label: 'le oder la?', icon: ArrowLeftRight, langs: ['fr'] },
     { lock: 'books', to: '/buecher', label: 'Bücher', icon: BookOpen },
-    { lock: 'search', to: '/suche', label: 'Suche', icon: Search },
+    { lock: 'cards', to: '/karteikarten', label: 'Karteikarten', icon: Layers, hub: 'Karten umdrehen und sortieren' },
+    { lock: 'test', to: '/test', label: 'Test', icon: ClipboardCheck, hub: 'Wissen prüfen, Auswertung am Ende' },
+    { lock: 'homework', to: '/hausaufgaben', label: 'Hausaufgaben', icon: ClipboardList },
+    { lock: 'copy', to: '/abschreiben', label: 'Abschreiben', icon: PenLine, menu: false, hub: 'Wörter abschreiben und einprägen' },
+    { lock: 'cram', to: '/crashkurs', label: 'Crashkurs', icon: Timer, menu: false, hub: 'Schnell vor der Arbeit: ansehen, Karten, Test' },
+    { lock: 'practice', to: '/ueben', label: 'Multiple Choice', icon: ListChecks, menu: false, hub: 'Antwort aus mehreren auswählen' },
+    { lock: 'grammar', to: '/grammatik', label: 'Grammatik', icon: Sparkles, plus: true, menu: false, hub: 'Regeln üben' },
+    { lock: 'irregular', to: '/unregelmaessig', label: 'Irreguläre Verben', icon: Shuffle, langs: ['en', 'fr'], menu: false, hub: 'Unregelmäßige Verbformen' },
+    { lock: 'conjugate', to: '/konjugieren', label: 'Konjugieren', icon: Languages, langs: ['fr'], menu: false, hub: 'Verben beugen' },
+    { lock: 'gender', to: '/genus', label: 'le oder la?', icon: ArrowLeftRight, langs: ['fr'], menu: false, hub: 'Das richtige Geschlecht' },
+    { lock: 'search', to: '/suche', label: 'Suche', icon: Search, hub: 'Vokabel in allen Büchern finden' },
+  ]), langPicker: true },
+  g('Extras', [
     { lock: 'math', to: '/mathe', label: 'Mathe', icon: Calculator },
     { to: '/schnelllesen', label: 'Schnelllesen', icon: ScanText },
     { lock: 'memorize', to: '/auswendig', label: 'Auswendig (Pi, Flaggen)', icon: Binary },
-    { lock: 'homework', to: '/hausaufgaben', label: 'Hausaufgaben', icon: ClipboardList },
     { lock: 'advent', to: '/advent', label: 'Adventskalender', icon: Gift },
     { lock: 'loot', to: '/loot', label: 'Loot Drop', icon: Package },
-  ]), langPicker: true },
+  ]),
   g('Wettkampf', [
     { lock: 'quests', to: '/quests', label: 'Quests', icon: Target },
     { lock: 'sprint', to: '/sprint', label: 'Sprint', icon: Zap },
@@ -86,7 +92,7 @@ export const STAFF_NAV_ITEM: NavItem = { to: '/verwaltung', label: 'Verwaltung',
 
 /** Gruppierte Menüeinträge; für Mods/Admins steht „Verwaltung“ in der Gruppe „Konto“. Gesperrte Funktionen fehlen. */
 export function navGroupsFor(isStaff: boolean, locked: ReadonlySet<LockKey> = new Set(), language = 'en'): NavGroup[] {
-  const base = NAV_GROUPS.map((grp) => ({ ...grp, items: grp.items.filter((i) => (!i.lock || !locked.has(i.lock)) && (!i.langs || i.langs.includes(language))) })).filter((grp) => grp.items.length > 0)
+  const base = NAV_GROUPS.map((grp) => ({ ...grp, items: grp.items.filter((i) => i.menu !== false && (!i.lock || !locked.has(i.lock)) && (!i.langs || i.langs.includes(language))) })).filter((grp) => grp.items.length > 0)
   if (!isStaff) return base
   return base.map((grp) =>
     grp.title === 'Konto' ? { ...grp, items: [grp.items[0], STAFF_NAV_ITEM, ...grp.items.slice(1)] } : grp,
@@ -104,3 +110,8 @@ export const NAV_LANGS: { id: string; label: string; short: string }[] = [
   { id: 'es', label: 'Spanisch', short: 'ES' },
   { id: 'la', label: 'Latein', short: 'LA' },
 ]
+
+/** Kacheln auf der Lernen-Seite: alle Übungsarten (auch die, die nicht im Menü stehen). */
+export function hubItemsFor(locked: ReadonlySet<LockKey> = new Set(), language = 'en'): NavItem[] {
+  return NAV_ITEMS.filter((i) => i.hub && (!i.lock || !locked.has(i.lock)) && (!i.langs || i.langs.includes(language)))
+}
