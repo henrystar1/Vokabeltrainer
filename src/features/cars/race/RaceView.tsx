@@ -6,7 +6,7 @@ import { TRACKS, buildTrack, curveAhead, isOpen, pointAt, project, trackKey, typ
 import { assistSteer, buildRaceLine } from './line'
 import { createFx } from './fx'
 import { canFly, flyHeight, flyRoll, isBike, kindDims } from '../stats'
-import { bridgeH } from './city'
+import { BRIDGES, CITY, bridgeH, city, inPark } from './city'
 import type { Up } from '../tuning'
 import { raceReward, raceSubmit } from '../../../services/cars'
 import { useWalletOptional } from '../../koins/WalletProvider'
@@ -16,7 +16,7 @@ const TOP_MIN = 20
 type Key = 'gas' | 'brake' | 'left' | 'right' | 'fly'
 export interface RaceStanding { name: string; ms: number | null; me?: boolean }
 /** Höhe über dem Boden: Flug oder Brücke (der höhere Wert zählt). */
-const carY = (c: { fly: number; lvl?: number; x: number; y?: number }): number => Math.max(flyHeight(c.fly), c.lvl ? bridgeH(c.x) : 0, c.y ?? 0)
+const carY = (c: { fly: number; lvl?: number; x: number; z: number; y?: number }): number => Math.max(flyHeight(c.fly), c.lvl ? bridgeH(c.x, c.z) : 0, c.y ?? 0)
 /** Neigung der Nase: im Looping eine volle Drehung, sonst nach Steigen/Fallen (Rampen, Sprünge) */
 const pitchOf = (c: { loop?: number; vy?: number; v: number }): number => (c.loop ?? 0) > 0 ? -(c.loop ?? 0) : -Math.max(-0.6, Math.min(0.6, Math.atan2(c.vy ?? 0, Math.max(Math.abs(c.v), 8))))
 
@@ -36,9 +36,11 @@ interface Props {
   onExit?: () => void
 }
 
-interface Remote { id: string; name: string; kind: string; color: string; x: number; z: number; h: number; v: number; tx: number; tz: number; th: number; total: number; ft: number | null; seen: number; dmg: number; slip: number; fl: number; lv?: number; yy?: number; pt?: number; mesh?: import('three').Group }
+interface Remote { id: string; name: string; kind: string; color: string; x: number; z: number; h: number; v: number; tx: number; tz: number; th: number; total: number; ft: number | null; seen: number; dmg: number; slip: number; fl: number; lv?: number; yy?: number; pt?: number; hd?: boolean; mesh?: import('three').Group }
 
 const COUNT_MS = 4500
+/** Offene Felder: Wartezeit zwischen zwei Reparaturen (ohne Totalschaden) */
+const REPAIR_CD_MS = 12000
 const fmt = (ms: number) => { const m = Math.floor(ms / 60000); const s = ms / 1000 - m * 60; return `${m}:${s.toFixed(2).padStart(5, '0')}` }
 const lapKey = (key: string) => `race-best-${key}`
 
@@ -46,6 +48,8 @@ const lapKey = (key: string) => `race-best-${key}`
 export default function RaceView({ trackId, custom, laps, me, assistOk = false, bots = [], online, onFinish, onAgain, onExit }: Props) {
   const mount = useRef<HTMLDivElement>(null)
   const mini = useRef<HTMLCanvasElement>(null)
+  const cmini = useRef<HTMLCanvasElement>(null)
+  const toggleHide = useRef<() => void>(() => undefined)
   const inp = useRef<Record<Key, boolean>>({ gas: false, brake: false, left: false, right: false, fly: false })
   const resetReq = useRef(false)
   const camRef = useRef<0 | 1 | 2>((() => { try { const c = localStorage.getItem('vt-race-cam'); return c === '1' ? 1 : c === '2' ? 2 : 0 } catch { return 0 } })())
@@ -62,6 +66,14 @@ export default function RaceView({ trackId, custom, laps, me, assistOk = false, 
   const assistRef = useRef(false)
   const [assist, setAssist] = useState(false)
   const setTopRef = useRef<((k: number) => void) | undefined>(undefined)
+  const accRef = useRef(1)
+  const setAccRefresh = useRef<() => void>(() => undefined)
+  const applyAcc = (m: number) => { accRef.current = m; setAccMul(m); setAccRefresh.current() }
+  const [accMul, setAccMul] = useState(1)
+  const [rep, setRep] = useState({ hold: 0, cd: 0 })
+  const [hidden, setHiddenUi] = useState(false)
+  const hiddenRef = useRef(false)
+  const [inBush, setInBush] = useState(false)
   const maxTop = me.top ?? 300
   const [topKmh, setTopKmh] = useState(maxTop)
   /** Höchstgeschwindigkeit des Supercars im Rennen ändern (zwischen 20 km/h und dem freigegebenen Wert) */
@@ -147,8 +159,11 @@ export default function RaceView({ trackId, custom, laps, me, assistOk = false, 
       }
 
       // Fahrzeuge
-      let myStats: CarStats = statsFor(me.kind, me.top, me.up)
-      setTopRef.current = (k: number) => { myStats = statsFor(me.kind, k, me.up) }
+      let topNow = me.top
+      const mkStats = (): CarStats => { const st0 = statsFor(me.kind, topNow, me.up); return accRef.current === 1 ? st0 : { ...st0, acc: st0.acc * accRef.current } }
+      let myStats: CarStats = mkStats()
+      setTopRef.current = (k: number) => { topNow = k; myStats = mkStats() }
+      setAccRefresh.current = () => { myStats = mkStats() }
       const line = buildRaceLine(track)
       const bike = isBike(me.kind)
       let slot = 0
@@ -168,7 +183,7 @@ export default function RaceView({ trackId, custom, laps, me, assistOk = false, 
 
       // Tastatur
       const keyMap: Record<string, Key> = { ArrowLeft: 'left', a: 'left', A: 'left', ArrowRight: 'right', d: 'right', D: 'right', ArrowUp: 'gas', w: 'gas', W: 'gas', ArrowDown: 'brake', s: 'brake', S: 'brake', ' ': 'brake', e: 'fly', E: 'fly' }
-      const kd = (e: KeyboardEvent) => { const k = keyMap[e.key]; if (k) { inp.current[k] = true; e.preventDefault() } else if (e.key === 'r' || e.key === 'R') resetReq.current = true; else if (e.key === 'c' || e.key === 'C') toggleRef.current(); else if (e.key === 'f' || e.key === 'F') assistToggleRef.current() }
+      const kd = (e: KeyboardEvent) => { const k = keyMap[e.key]; if (k) { inp.current[k] = true; e.preventDefault() } else if (e.key === 'r' || e.key === 'R') resetReq.current = true; else if (e.key === 'c' || e.key === 'C') toggleRef.current(); else if (e.key === 'f' || e.key === 'F') assistToggleRef.current(); else if (e.key === 'h' || e.key === 'H') toggleHide.current() }
       const ku = (e: KeyboardEvent) => { const k = keyMap[e.key]; if (k) { inp.current[k] = false; e.preventDefault() } }
       window.addEventListener('keydown', kd); window.addEventListener('keyup', ku)
       cleanups.push(() => { window.removeEventListener('keydown', kd); window.removeEventListener('keyup', ku) })
@@ -187,7 +202,7 @@ export default function RaceView({ trackId, custom, laps, me, assistOk = false, 
             remotes.set(payload.u, r)
           }
           if (!r) return
-          r.lv = Number(payload.lv) || 0; r.yy = Number(payload.y) || 0; r.pt = Number(payload.pt) || 0
+          r.hd = payload.hd === 1; r.lv = Number(payload.lv) || 0; r.yy = Number(payload.y) || 0; r.pt = Number(payload.pt) || 0
           r.tx = Number(payload.x) || 0; r.tz = Number(payload.z) || 0; r.th = Number(payload.h) || 0; r.v = Number(payload.v) || 0
           r.dmg = Number(payload.d) || 0; r.slip = Number(payload.sl) || 0; r.fl = Number(payload.fl) || 0
           r.total = Number(payload.t) || 0; r.ft = typeof payload.f === 'number' ? payload.f : null; r.seen = performance.now()
@@ -208,6 +223,10 @@ export default function RaceView({ trackId, custom, laps, me, assistOk = false, 
       let raceBest = 0, usedAssist = false
       let camH = car.h
       let lastSend = 0, lastHud = 0
+      let lastRepair = -REPAIR_CD_MS
+      const isCity = def.mode === 'city'
+      let hiddenNow = false
+      toggleHide.current = () => { if (!isCity) return; hiddenRef.current = !hiddenRef.current; setHiddenUi(hiddenRef.current) }
       // Übungsfeld: Drift-Punkte (Serie zählt, solange man quer fährt; nach kurzer Pause wird sie gutgeschrieben)
       let dTotal = 0, dCombo = 0, dBest = (() => { try { return Number(localStorage.getItem('vt-race-driftbest')) || 0 } catch { return 0 } })(), dIdle = 0
       let prev = performance.now()
@@ -234,6 +253,38 @@ export default function RaceView({ trackId, custom, laps, me, assistOk = false, 
         dot(car.x, car.z, '#22d3ee', 5)
       }
 
+      // Stadtkarte: Hintergrund einmal zeichnen, dann nur noch Punkte (versteckte Fahrer fehlen)
+      let cityBg: HTMLCanvasElement | null = null
+      const drawCityMap = () => {
+        const c = cmini.current
+        const g = c?.getContext('2d')
+        if (!isCity || !c || !g) return
+        const W = c.width, Hh = c.height, sc = W / (CITY.half * 2)
+        if (!cityBg) {
+          cityBg = document.createElement('canvas'); cityBg.width = W; cityBg.height = Hh
+          const b = cityBg.getContext('2d')
+          if (b) {
+            b.fillStyle = '#2b2f36'; b.fillRect(0, 0, W, Hh)
+            const cd = city()
+            b.fillStyle = '#2f6b3a'; for (const p of cd.parks) b.fillRect((p.x - p.size / 2 + CITY.half) * sc, (p.z - p.size / 2 + CITY.half) * sc, p.size * sc, p.size * sc)
+            b.fillStyle = '#8b93a1'; for (const bl of cd.buildings) b.fillRect((bl.x - bl.w / 2 + CITY.half) * sc, (bl.z - bl.d / 2 + CITY.half) * sc, bl.w * sc, bl.d * sc)
+            b.fillStyle = '#111827'; for (const t of cd.tunnels) b.fillRect((t.x - t.w / 2 + CITY.half) * sc, (t.z - t.d / 2 + CITY.half) * sc, t.w * sc, t.d * sc)
+            b.strokeStyle = '#facc15'; b.lineWidth = 2.5
+            for (const br of BRIDGES) { b.beginPath(); b.moveTo((br.bx0 + CITY.half) * sc, (br.bz + CITY.half) * sc); b.lineTo((br.bx1 + CITY.half) * sc, (br.bz + CITY.half) * sc); b.stroke() }
+          }
+        }
+        g.clearRect(0, 0, W, Hh)
+        if (cityBg) g.drawImage(cityBg, 0, 0)
+        const dot = (x: number, z: number, col: string, r: number) => { const a = (x + CITY.half) * sc, b2 = (z + CITY.half) * sc; g.fillStyle = '#000'; g.beginPath(); g.arc(a, b2, r + 1.5, 0, 7); g.fill(); g.fillStyle = col; g.beginPath(); g.arc(a, b2, r, 0, 7); g.fill() }
+        for (const b of botList) dot(b.car.x, b.car.z, b.color, 3)
+        const nowT = performance.now()
+        for (const r of remotes.values()) if (nowT - r.seen < 4000 && !r.hd) dot(r.x, r.z, r.color, 3.5)
+        if (!hiddenNow) dot(car.x, car.z, '#22d3ee', 4.5)
+        else { g.strokeStyle = '#22d3ee'; g.setLineDash([3, 3]); g.beginPath(); g.arc((car.x + CITY.half) * sc, (car.z + CITY.half) * sc, 5, 0, 7); g.stroke(); g.setLineDash([]) }
+        // Blickrichtung
+        g.strokeStyle = '#fff'; g.lineWidth = 2; g.beginPath(); g.moveTo((car.x + CITY.half) * sc, (car.z + CITY.half) * sc); g.lineTo((car.x + Math.sin(car.h) * 70 + CITY.half) * sc, (car.z + Math.cos(car.h) * 70 + CITY.half) * sc); g.stroke()
+      }
+
       const total = laps * track.length
       const rankNow = () => {
         const all: Array<{ t: number; ft: number | null; me?: boolean }> = [{ t: car.total, ft: finishedMs, me: true }]
@@ -254,10 +305,19 @@ export default function RaceView({ trackId, custom, laps, me, assistOk = false, 
 
         if (resetReq.current) {
           resetReq.current = false
-          const p = pointAt(track, track.s[car.idx], 0)
-          // Zurücksetzen = Werkstatt: Auto wird repariert, steht aber 3 Sekunden
-          car = { ...car, x: p.x, z: p.z, h: Math.atan2(p.hx, p.hz), v: 0, steer: 0, slip: 0, dmg: 0, hold: go ? 3 : 0, hit: 0 }
+          if (isFree) {
+            // Offene Spielfelder: Reparatur auf der Stelle (Auto bleibt stehen, wo es ist), danach Wartezeit bis zur nächsten
+            if (car.dmg >= 100 || now - lastRepair >= REPAIR_CD_MS) {
+              lastRepair = now
+              car = { ...car, v: 0, steer: 0, slip: 0, dmg: 0, hold: 3, hit: 0 }
+            }
+          } else {
+            const p = pointAt(track, track.s[car.idx], 0)
+            // Zurücksetzen = Werkstatt: Auto wird repariert, steht aber 3 Sekunden
+            car = { ...car, x: p.x, z: p.z, h: Math.atan2(p.hx, p.hz), v: 0, steer: 0, slip: 0, dmg: 0, hold: go ? 3 : 0, hit: 0 }
+          }
         }
+        hiddenNow = isCity && (hiddenRef.current || inPark(car.x, car.z))
         const prevTotal = car.total
         const canDrive = go && finishedMs === null
         let input: Input = finishedMs === null ? inp.current : { gas: car.v < 25, brake: false, left: false, right: false }
@@ -338,7 +398,7 @@ export default function RaceView({ trackId, custom, laps, me, assistOk = false, 
         // Modelle
         const place = (m: import('three').Group, x: number, z: number, h: number, v: number, steer: number, dmg = 0, slip = 0, fly = 0, lv = 0, yy = 0, pitch = 0) => {
           rs.damageCar(m, dmg, slip, v, now / 1000)
-          m.rotation.order = 'YXZ'; m.position.set(x, carY({ fly, lvl: lv, x, y: yy }), z); m.rotation.y = h; m.rotation.x = pitch
+          m.rotation.order = 'YXZ'; m.position.set(x, carY({ fly, lvl: lv, x, z, y: yy }), z); m.rotation.y = h; m.rotation.x = pitch
           const lean = m.userData.lean as import('three').Group | undefined
           if (lean) { m.rotation.z = 0; lean.rotation.z += ((-Math.max(-0.85, Math.min(0.85, steer * Math.min(1, Math.abs(v) / 20) * 0.9 + slip * 0.5))) - lean.rotation.z) * Math.min(1, dt * 9) }
           else m.rotation.z = -steer * Math.min(1, Math.abs(v) / 40) * 0.05 - flyRoll(fly)
@@ -357,7 +417,7 @@ export default function RaceView({ trackId, custom, laps, me, assistOk = false, 
           r.x += (r.tx + Math.sin(r.th) * r.v * 0.05 - r.x) * k; r.z += (r.tz + Math.cos(r.th) * r.v * 0.05 - r.z) * k
           let dh = r.th - r.h; while (dh > Math.PI) dh -= Math.PI * 2; while (dh < -Math.PI) dh += Math.PI * 2
           r.h += dh * k
-          r.mesh.visible = now - r.seen < 5000
+          r.mesh.visible = now - r.seen < 5000 && !r.hd
           place(r.mesh, r.x, r.z, r.h, r.v, 0, r.dmg, r.slip, r.fl, r.lv ?? 0, r.yy ?? 0, r.pt ?? 0)
           if (online?.open && now - r.seen > 15000) { scene.remove(r.mesh); remotes.delete(r.id) }
           if (r.mesh.visible) carFx(r.kind, r.x, r.z, r.h, r.v, r.slip, r.fl, r.v > 5, dt)
@@ -415,7 +475,7 @@ export default function RaceView({ trackId, custom, laps, me, assistOk = false, 
 
         if (online && now - lastSend > 55) {
           lastSend = now
-          send({ u: online.userId, x: car.x, z: car.z, h: car.h, v: car.v, t: car.total, k: me.kind, c: me.color, f: finishedMs, d: Math.round(car.dmg), sl: Math.round(car.slip * 100) / 100, fl: Math.round(car.fly * 100) / 100, lv: car.lvl ?? 0, y: Math.round((car.y ?? 0) * 10) / 10, pt: Math.round(pitchOf(car) * 100) / 100, n: online.name ?? me.name })
+          send({ u: online.userId, x: car.x, z: car.z, h: car.h, v: car.v, t: car.total, k: me.kind, c: me.color, f: finishedMs, d: Math.round(car.dmg), sl: Math.round(car.slip * 100) / 100, fl: Math.round(car.fly * 100) / 100, lv: car.lvl ?? 0, y: Math.round((car.y ?? 0) * 10) / 10, pt: Math.round(pitchOf(car) * 100) / 100, n: online.name ?? me.name, hd: hiddenNow ? 1 : 0 })
         }
         if (now - lastHud > 110) {
           lastHud = now
@@ -424,7 +484,10 @@ export default function RaceView({ trackId, custom, laps, me, assistOk = false, 
           const ca = curveAhead(track, pr.i, 110)
           const count = go ? 0 : Math.ceil((startAt - now) / 1000)
           setHud({ speed: Math.round(Math.abs(car.v) * 3.6), lap: Math.min(laps, Math.max(1, lapNow + 1)), pos: rankNow(), of: 1 + botList.length + remotes.size, ms: finishedMs ?? raceMs, count, wrong: !isFree && dot < -0.3 && car.v > 4, curve: !isFree && Math.abs(ca.k) > 0.004 ? Math.sign(ca.k) : 0, curveDist: Math.round(ca.dist / 10) * 10, offroad: car.offroad, best: bestLap, dmg: Math.round(car.dmg), drift: Math.abs(car.slip) > 0.2 && car.v > 10, dp: dTotal, dc: Math.round(dCombo), db: Math.round(dBest), fly: Math.round(car.fly * 10) / 10, cool: Math.ceil(car.cool) })
+          setInBush((o) => { const v = isCity && inPark(car.x, car.z); return o === v ? o : v })
+          setRep((o) => { const hold = Math.ceil(car.hold ?? 0), cd = Math.max(0, Math.ceil((lastRepair + REPAIR_CD_MS - now) / 1000)); return o.hold === hold && o.cd === cd ? o : { hold, cd } })
           drawMini()
+          drawCityMap()
           if (finishedMs !== null) {
             const fin = finishedMs
             const st: RaceStanding[] = [{ name: me.name, ms: fin, me: true }, ...botList.map((b) => ({ name: b.name, ms: b.finished })), ...[...remotes.values()].map((r) => ({ name: r.name, ms: r.ft }))]
@@ -497,6 +560,7 @@ export default function RaceView({ trackId, custom, laps, me, assistOk = false, 
           </>
         )}
       </div>
+      {def.mode === 'city' && <canvas ref={cmini} width={240} height={240} className="pointer-events-none absolute right-2 top-2 h-[120px] w-[120px] rounded-xl border border-white/20 bg-black/40 sm:h-[180px] sm:w-[180px]" aria-label="Stadtkarte" />}
       {!isFreeUi && <canvas ref={mini} width={220} height={160} className="pointer-events-none absolute right-2 top-2 h-[84px] w-[116px] rounded-xl bg-black/35 sm:h-[120px] sm:w-[165px]" aria-label="Streckenkarte" />}
       <div className="pointer-events-none absolute right-3 top-[100px] text-right text-white [text-shadow:0_1px_3px_#000] sm:top-[135px]">
         <p className="text-3xl font-black leading-none">{hud.speed}</p><p className="text-xs">km/h</p>
@@ -517,7 +581,7 @@ export default function RaceView({ trackId, custom, laps, me, assistOk = false, 
       {hud.count === 0 && hud.ms < 1200 && <p className="pointer-events-none absolute inset-0 grid place-items-center text-7xl font-black text-emerald-300 [text-shadow:0_3px_12px_#000]">LOS!</p>}
       <div className="absolute left-3 top-[118px] flex flex-col items-start gap-1.5">
         <button type="button" onClick={toggleCam} className="rounded-lg bg-black/45 px-3 py-1.5 text-xs text-white">{camMode === 0 ? 'Cockpit' : camMode === 1 ? 'Von unten' : 'Außenansicht'} (C)</button>
-        <button type="button" onClick={() => { resetReq.current = true }} className="rounded-lg bg-black/45 px-3 py-1.5 text-xs text-white">Zurücksetzen / Reparieren (R)</button>
+        <button type="button" onClick={() => { resetReq.current = true }} className="rounded-lg bg-black/45 px-3 py-1.5 text-xs text-white">{isFreeUi ? (rep.hold > 0 ? `Werkstatt: noch ${rep.hold} s` : rep.cd > 0 && hud.dmg < 100 ? `Reparieren (R) in ${rep.cd} s` : 'Reparieren (R)') : 'Zurücksetzen / Reparieren (R)'}</button>
         {me.kind === 'supercar' && (
           <div className="w-52 rounded-lg bg-black/45 px-3 py-2 text-xs text-white" role="group" aria-label="Höchstgeschwindigkeit">
             <p className="mb-1 flex justify-between"><span>Höchstgeschw.</span><b className="tabular-nums">{topKmh.toLocaleString('de-DE')} km/h</b></p>
@@ -528,7 +592,14 @@ export default function RaceView({ trackId, custom, laps, me, assistOk = false, 
               <button type="button" onClick={() => applyTop(topKmh * 2)} className="flex-1 rounded bg-white/15 py-1">×2</button>
               <button type="button" onClick={() => applyTop(maxTop)} className="flex-1 rounded bg-white/15 py-1">Max</button>
             </div>
+            <p className="mb-1 mt-2 flex justify-between"><span>Beschleunigung</span><b className="tabular-nums">×{accMul.toLocaleString('de-DE')}</b></p>
+            <div className="flex gap-1" role="group" aria-label="Beschleunigung">
+              {[0.25, 0.5, 1, 2, 5, 20].map((m) => <button key={m} type="button" onClick={() => applyAcc(m)} aria-pressed={accMul === m} className={`flex-1 rounded py-1 ${accMul === m ? 'bg-cyan-500 font-bold text-slate-950' : 'bg-white/15'}`}>{m.toLocaleString('de-DE')}</button>)}
+            </div>
           </div>
+        )}
+        {def.mode === 'city' && (
+          <button type="button" onClick={() => toggleHide.current()} aria-pressed={hidden || inBush} className={`rounded-lg px-3 py-1.5 text-xs font-bold ${hidden || inBush ? 'bg-violet-500 text-white' : 'bg-black/45 text-white'}`}>{inBush ? 'Im Gebüsch versteckt' : hidden ? 'Versteckt – zeigen (H)' : 'Verstecken (H)'}</button>
         )}
         {assistOk && <button type="button" onClick={toggleAssist} aria-pressed={assist} className={`rounded-lg px-3 py-1.5 text-xs font-bold ${assist ? 'bg-emerald-500 text-slate-950' : 'bg-black/45 text-white'}`}>Fahrassistent {assist ? 'AN' : 'aus'} (F)</button>}
       </div>

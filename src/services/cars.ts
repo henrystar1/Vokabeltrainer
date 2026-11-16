@@ -15,10 +15,12 @@ export interface CarBoardRow { name: string; kind: string; color: string; top: n
 export const raceBoard = (track: string) => rpc<BoardRow[]>('race_board', { p_track: track })
 export const raceCarBoard = (track: string) => rpc<CarBoardRow[]>('race_car_board', { p_track: track })
 export const raceSuperOk = () => rpc<boolean>('race_super_ok')
-export interface SuperRow { id: string; name: string; role: string; granted: boolean; /** wirksames Tempo (km/h) */ kmh: number; /** eigenes Tempo gesetzt (sonst Standard) */ custom: boolean }
+export interface SuperRow { id: string; name: string; role: string; granted: boolean; /** wirksames Tempo (km/h) */ kmh: number; /** eigenes Tempo gesetzt (sonst Standard) */ custom: boolean; /** hat den Fahrassistenten */ assist?: boolean }
 export const adminSuperList = () => rpc<SuperRow[]>('admin_super_list')
 export const adminSuperSet = (user: string, on: boolean) => rpc<void>('admin_super_set', { p_user: user, p_on: on })
 export const adminSuperSpeed = (kmh: number) => rpc<void>('admin_super_speed', { p_kmh: kmh })
+/** Fahrassistent für eine Person mit Supercar-Zugang an/aus. */
+export const adminSuperAssist = (user: string, on: boolean) => rpc<void>('admin_super_assist', { p_user: user, p_on: on })
 /** Tempo des Supercars für einen Nutzer (null = Standard). */
 export const adminSuperUserSpeed = (user: string, kmh: number | null) => rpc<void>('admin_super_user_speed', { p_user: user, p_kmh: kmh })
 export interface SuperInfo { ok: boolean; kmh: number; /** Fahrassistent (nur Admins) */ assist: boolean; /** Flug-Einstellungen des Admins (Sekunden; Rolle an/aus) */ fly?: { sec: number; cool: number; roll: boolean } }

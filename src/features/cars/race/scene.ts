@@ -2,7 +2,7 @@ import type * as T from 'three'
 import { isBike } from '../stats'
 import { RoundedBoxGeometry } from 'three/examples/jsm/geometries/RoundedBoxGeometry.js'
 import { roadProximity, type Track } from './track'
-import { CITY, bridgeH, city } from './city'
+import { BRIDGES, CITY, bridgeH, city } from './city'
 import { RAMPS, STUNT, loopPoint } from './stunt'
 
 type THREE = typeof import('three')
@@ -626,10 +626,10 @@ function buildCity(THREE: THREE, scene: T.Scene, ground: T.Mesh, night: boolean)
   const P = CITY.pitch
   // Mittelstriche: gestrichelt, ein Instanz-Mesh
   const seg = Math.floor((CITY.half * 2) / 10)
-  const dash = new THREE.InstancedMesh(new THREE.BoxGeometry(0.35, 0.02, 4), new THREE.MeshBasicMaterial({ color: 0xe5e7eb }), 9 * seg * 2)
+  const dash = new THREE.InstancedMesh(new THREE.BoxGeometry(0.35, 0.02, 4), new THREE.MeshBasicMaterial({ color: 0xe5e7eb }), (2 * CITY.K + 1) * seg * 2)
   const m4 = new THREE.Matrix4(), q = new THREE.Quaternion(), qy = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), Math.PI / 2)
   let n = 0
-  for (let k = -4; k <= 4; k++) for (let i = 0; i < seg; i++) {
+  for (let k = -CITY.K; k <= CITY.K; k++) for (let i = 0; i < seg; i++) {
     const t = -CITY.half + 5 + i * 10
     m4.compose(new THREE.Vector3(k * P, 0.04, t), q.identity(), new THREE.Vector3(1, 1, 1)); dash.setMatrixAt(n++, m4)
     m4.compose(new THREE.Vector3(t, 0.04, k * P), qy, new THREE.Vector3(1, 1, 1)); dash.setMatrixAt(n++, m4)
@@ -670,27 +670,50 @@ function buildCity(THREE: THREE, scene: T.Scene, ground: T.Mesh, night: boolean)
 
   // Gehwege unter jedem Block (hellgrau, leicht erhöht) und Parks
   const walk = new THREE.MeshStandardMaterial({ color: night ? 0x5b6270 : 0x9ca3af, roughness: 1 })
-  for (let kx = -4; kx <= 3; kx++) for (let kz = -4; kz <= 3; kz++) {
+  for (let kx = -CITY.K; kx < CITY.K; kx++) for (let kz = -CITY.K; kz < CITY.K; kz++) {
     const cx = P * kx + P / 2, cz = P * kz + P / 2
     const park = parks.some((p) => p.x === cx && p.z === cz)
     const m = new THREE.Mesh(new THREE.BoxGeometry(96, 0.3, 96), park ? new THREE.MeshStandardMaterial({ color: night ? 0x1f4a2a : 0x4d9a4a, roughness: 1 }) : walk)
     m.position.set(cx, 0.1, cz); scene.add(m)
   }
-  const treeG = new THREE.ConeGeometry(2.4, 6, 7)
-  const trees = new THREE.InstancedMesh(treeG, new THREE.MeshStandardMaterial({ color: night ? 0x14532d : 0x15803d, roughness: 1 }), parks.length * 14)
-  let tn = 0
-  parks.forEach((p, pi) => { for (let i = 0; i < 14; i++) { const a = Math.sin(pi * 12.9 + i * 78.2) * 43758.5, b = Math.sin(pi * 4.1 + i * 12.7) * 24634.6; m4.compose(new THREE.Vector3(p.x + ((a - Math.floor(a)) - 0.5) * 80, 3.3, p.z + ((b - Math.floor(b)) - 0.5) * 80), q.identity(), new THREE.Vector3(1, 1, 1)); trees.setMatrixAt(tn++, m4) } })
-  trees.count = tn; scene.add(trees)
+  // Wäldchen: viele Bäume (Stamm + Krone) und Büsche, darin ist man versteckt
+  const NT = 38, NB = 26
+  const crownG = new THREE.ConeGeometry(2.6, 7, 7), trunkG = new THREE.CylinderGeometry(0.35, 0.45, 2.4, 6), bushG = new THREE.SphereGeometry(1.5, 7, 5)
+  const crowns = new THREE.InstancedMesh(crownG, new THREE.MeshStandardMaterial({ color: night ? 0x14532d : 0x15803d, roughness: 1 }), parks.length * NT)
+  const trunks = new THREE.InstancedMesh(trunkG, new THREE.MeshStandardMaterial({ color: night ? 0x3a2a1c : 0x78512e, roughness: 1 }), parks.length * NT)
+  const bushes = new THREE.InstancedMesh(bushG, new THREE.MeshStandardMaterial({ color: night ? 0x1c5a2a : 0x2f9a45, roughness: 1 }), parks.length * NB)
+  let tn = 0, bn = 0
+  const hash = (a: number, b: number) => { const v = Math.sin(a * 12.9898 + b * 78.233) * 43758.5453; return v - Math.floor(v) }
+  parks.forEach((p, pi) => {
+    for (let i = 0; i < NT; i++) {
+      const x = p.x + (hash(pi, i * 2) - 0.5) * (p.size - 10), z = p.z + (hash(pi, i * 2 + 1) - 0.5) * (p.size - 10), sc = 0.8 + hash(i, pi) * 0.9
+      m4.compose(new THREE.Vector3(x, 1.2 * sc + 0.3, z), q.identity(), new THREE.Vector3(sc, sc, sc)); trunks.setMatrixAt(tn, m4)
+      m4.compose(new THREE.Vector3(x, 2.4 * sc + 3.2 * sc, z), q.identity(), new THREE.Vector3(sc, sc, sc)); crowns.setMatrixAt(tn++, m4)
+    }
+    for (let i = 0; i < NB; i++) {
+      const x = p.x + (hash(pi + 7, i * 3) - 0.5) * (p.size - 8), z = p.z + (hash(pi + 7, i * 3 + 1) - 0.5) * (p.size - 8), sc = 0.7 + hash(pi, i + 40) * 0.9
+      m4.compose(new THREE.Vector3(x, 0.9 * sc, z), q.identity(), new THREE.Vector3(sc * 1.3, sc, sc * 1.3)); bushes.setMatrixAt(bn++, m4)
+    }
+  })
+  crowns.count = tn; trunks.count = tn; bushes.count = bn
+  scene.add(crowns, trunks, bushes)
+  // Tunnel: Dach über der Röhre (Wände sind die beiden Häuser daneben), Einfahrten mit Lampen
+  const roofM = new THREE.MeshStandardMaterial({ color: 0x4b5563, roughness: 0.9 })
+  for (const tu of city().tunnels) {
+    const roof = new THREE.Mesh(new THREE.BoxGeometry(tu.w, 1.2, tu.d), roofM); roof.position.set(tu.x, CITY.th + 0.6, tu.z); scene.add(roof)
+    const lamp = new THREE.Mesh(new THREE.BoxGeometry(tu.w > tu.d ? tu.w - 6 : 1, 0.2, tu.w > tu.d ? 1 : tu.d - 6), new THREE.MeshBasicMaterial({ color: night ? 0xfde68a : 0xfff7d6 })); lamp.position.set(tu.x, CITY.th - 0.1, tu.z); scene.add(lamp)
+  }
 
-  // Brücke
-  const step = 5, cnt = Math.round((CITY.bx1 - CITY.bx0) / step)
+  // Brücken
+  for (const br of BRIDGES) {
+  const step = 5, cnt = Math.round((br.bx1 - br.bx0) / step)
   const bp: number[] = [], bi: number[] = []
   const quad = (a: number[], b: number[], c: number[], d: number[]) => { const o = bp.length / 3; bp.push(...a, ...b, ...c, ...d); bi.push(o, o + 1, o + 2, o, o + 2, o + 3) }
   const rp: number[] = [], ri: number[] = []
   const rquad = (a: number[], b: number[], c: number[], d: number[]) => { const o = rp.length / 3; rp.push(...a, ...b, ...c, ...d); ri.push(o, o + 1, o + 2, o, o + 2, o + 3) }
-  const zc = CITY.bz, w = CITY.bw
+  const zc = br.bz, w = CITY.bw
   for (let i = 0; i < cnt; i++) {
-    const xa = CITY.bx0 + i * step, xb = xa + step, ya = bridgeH(xa), yb = bridgeH(xb)
+    const xa = br.bx0 + i * step, xb = xa + step, ya = bridgeH(xa, zc), yb = bridgeH(xb, zc)
     quad([xa, ya + 0.05, zc - w], [xa, ya + 0.05, zc + w], [xb, yb + 0.05, zc + w], [xb, yb + 0.05, zc - w])
     quad([xa, ya - 0.8, zc + w], [xa, ya + 0.05, zc + w], [xb, yb + 0.05, zc + w], [xb, yb - 0.8, zc + w])
     quad([xa, ya + 0.05, zc - w], [xa, ya - 0.8, zc - w], [xb, yb - 0.8, zc - w], [xb, yb + 0.05, zc - w])
@@ -704,16 +727,17 @@ function buildCity(THREE: THREE, scene: T.Scene, ground: T.Mesh, night: boolean)
   scene.add(new THREE.Mesh(dg, new THREE.MeshStandardMaterial({ color: 0x4b5563, roughness: 0.9, side: THREE.DoubleSide })))
   const rg = new THREE.BufferGeometry(); rg.setAttribute('position', new THREE.Float32BufferAttribute(rp, 3)); rg.setIndex(ri); rg.computeVertexNormals()
   scene.add(new THREE.Mesh(rg, new THREE.MeshStandardMaterial({ color: 0xfacc15, roughness: 0.6, side: THREE.DoubleSide })))
-  for (let x = CITY.bx0 + 40; x < CITY.bx1 - 30; x += 40) for (const sg of [-1, 1]) {
-    const hh = bridgeH(x) - 0.8
+  for (let x = br.bx0 + 40; x < br.bx1 - 30; x += 40) for (const sg of [-1, 1]) {
+    const hh = bridgeH(x, zc) - 0.8
     if (hh < 1) continue
     const pil = new THREE.Mesh(new THREE.BoxGeometry(1.2, hh, 1.2), new THREE.MeshStandardMaterial({ color: 0x6b7280, roughness: 1 }))
     pil.position.set(x, hh / 2, zc + sg * (w - 1.2)); scene.add(pil)
   }
   // Mittelstrich auf der Brücke
-  for (let x = CITY.bx0 + 10; x < CITY.bx1 - 10; x += 8) {
+  for (let x = br.bx0 + 10; x < br.bx1 - 10; x += 8) {
     const d = new THREE.Mesh(new THREE.BoxGeometry(4, 0.03, 0.3), new THREE.MeshBasicMaterial({ color: 0xf8fafc }))
-    d.position.set(x, bridgeH(x) + 0.08, zc); scene.add(d)
+    d.position.set(x, bridgeH(x, zc) + 0.08, zc); scene.add(d)
+  }
   }
 }
 

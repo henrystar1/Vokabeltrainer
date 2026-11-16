@@ -1,6 +1,6 @@
 import { advance, inPolygon, pointAt, project, type Track } from './track'
 import { canFly, carKmh, flyConfig, flyHeight, isBike, kindDims, kindStats } from '../stats'
-import { CITY, bridgeH, cityPush, onDeck } from './city'
+import { CITY, bridgeAt, bridgeH, cityPush, onDeck } from './city'
 import { G, STUNT, arenaPush, groundH, loopPoint } from './stunt'
 import { upFactors, type Up } from '../tuning'
 import { boxHit, corners, impactDamage, type Box } from './collide'
@@ -177,14 +177,15 @@ export function stepCar(c: Car, inp: Input, dt: number, t: Track, st: CarStats, 
     // Brücke: Rampe hinauf (längs fahren) oder im Flug von der Seite landen; oben Geländer
     if (lvl === 0) {
       if (onDeck(x, z)) {
-        const H = bridgeH(x)
+        const H = bridgeH(x, z)
         if (flying ? flyHeight(fly) <= H + 0.2 && H > 1.5 : H < 1.5 && Math.abs(Math.sin(moveH)) > 0.75 && Math.abs(v) > 3) lvl = 1
       }
     } else if (!onDeck(x, z)) lvl = 0
-    if (lvl === 1 && bridgeH(x) > 1.5) {
-      const dz = z - CITY.bz, lim = CITY.bw - 0.8
+    const br = lvl === 1 ? bridgeAt(x, z) : null
+    if (br && bridgeH(x, z) > 1.5) {
+      const dz = z - br.bz, lim = CITY.bw - 0.8
       if (Math.abs(dz) > lim) {
-        z = CITY.bz + Math.sign(dz) * lim
+        z = br.bz + Math.sign(dz) * lim
         const vn = Math.abs(v) * Math.abs(Math.cos(moveH))
         dmg = Math.min(DMG_MAX, dmg + impactDamage(vn))
         v *= 1 - Math.min(0.9, (2.2 + vn * 0.04) * dt); bump = Math.max(bump, Math.min(1, Math.abs(v) / 30)); hit = Math.max(hit, Math.min(1, vn / 25))

@@ -77,6 +77,7 @@ export default function RaceMenu({ car, assistOk = false }: { car: RaceCarInfo; 
   const card = (on: boolean) => `w-full rounded-xl border p-2 text-left ${on ? 'border-accent-cyan bg-white/10' : 'border-white/10 hover:bg-white/5'}`
   return (
     <div className="space-y-4">
+      {auth?.user && <button type="button" onClick={() => setOpenLobby(true)} className="min-h-[48px] w-full rounded-xl border border-accent-cyan px-6 text-lg font-semibold text-accent-cyan sm:w-auto">Offene Stadt-Lobby: sofort mitfahren</button>}
       <div>
         <h3 className="mb-2 font-semibold">Strecke</h3>
         <ul className="grid grid-cols-2 gap-3 sm:grid-cols-3">
@@ -122,7 +123,6 @@ export default function RaceMenu({ car, assistOk = false }: { car: RaceCarInfo; 
         <div className="flex flex-wrap items-center gap-2"><span className="text-sm text-slate-300">Schwierigkeit:</span>{LEVELS.map((l) => <button key={l.id} type="button" className={chip(level === l.id)} onClick={() => setLevel(l.id)}>{l.label}</button>)}<span className="text-xs text-slate-400">Profi fährt starke Autos exakt auf der Ideallinie.</span></div>
       </>)}
       {!isOpen(def) && <div className="flex flex-wrap items-center gap-2"><span className="text-sm text-slate-300">Runden:</span>{[1, 2, 3, 5].map((n) => <button key={n} type="button" className={chip(laps === n)} onClick={() => setLaps(n)}>{n}</button>)}</div>}
-      {auth?.user && <button type="button" onClick={() => setOpenLobby(true)} className="min-h-[48px] rounded-xl border border-accent-cyan px-6 text-lg font-semibold text-accent-cyan">Offene Stadt-Lobby: sofort mitfahren</button>}
       <button type="button" onClick={() => setRun({ key: 1 })} className="min-h-[48px] rounded-xl bg-accent-cyan px-6 text-lg font-bold text-slate-950">{isOpen(def) ? 'Üben starten' : 'Rennen starten'}</button>
       <p className="text-xs text-slate-400">Steuerung: links ◀ ▶, rechts Gas und Bremse (am iPad mit den Fingern, am Computer Pfeiltasten oder WASD, Leertaste bremst, R repariert und setzt das Auto zurück). Driften: Bremse und Lenken gleichzeitig. Wände und andere Autos machen Schaden. Online gegen Freunde: unter Mehrspieler → Rennen.</p>
     </div>

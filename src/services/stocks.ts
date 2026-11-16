@@ -15,4 +15,9 @@ export const adminStockSave = (symbol: string, name: string, price: number) => r
 export interface StockTune { symbol: string; name: string; driver: 'gambling' | 'shop' | null; trend: number | null; mult: number }
 export const adminStockTuneList = () => rpc<StockTune[]>('admin_stock_tune_list')
 export const adminStockTune = (symbol: string, trend: number | null, mult: number) => rpc<void>('admin_stock_tune', { p_symbol: symbol, p_trend: trend, p_mult: mult })
+export interface StockHolder { user_id: string; name: string; symbol: string; shares: number; cost: number; price_cents: number | null }
+/** Admin: alle Depots (ohne Nutzer) oder das einer Person. */
+export const adminStockHoldings = (userId: string | null = null) => rpc<StockHolder[]>('admin_stock_holdings', { p_user: userId })
+/** Admin: Aktien vergeben (Plus) oder abziehen (Minus). Gibt den neuen Bestand zurück. */
+export const adminStockAdjust = (userId: string, symbol: string, delta: number) => rpc<number>('admin_stock_adjust', { p_user: userId, p_symbol: symbol, p_delta: delta })
 export const adminStockRemove = (symbol: string) => rpc<number>('admin_stock_remove', { p_symbol: symbol })

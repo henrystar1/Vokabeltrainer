@@ -12,6 +12,7 @@ import { randomPassword } from '../../pages/admin/AccountsTab'
 import { adminAdjustPoints, adminSetPassword } from '../../services/admin'
 import { parkourJumpsList, parkourJumpsSet, parkourLearnOffList, parkourLearnSet } from '../../services/play'
 import { adminGrantChips } from '../../services/chips'
+import { adminStockAdjust, adminStockHoldings, stockList } from '../../services/stocks'
 import { adminGrantItem, adminGrantKoins, adminListItems, adminListUserItems, adminRevokeItem } from '../../services/koins'
 
 
@@ -30,7 +31,7 @@ export function ManageButton({ userId, name, onChanged }: { userId: string; name
   )
 }
 
-type Tab = 'coins' | 'chips' | 'items' | 'points' | 'parkour' | 'password'
+type Tab = 'coins' | 'chips' | 'stocks' | 'items' | 'points' | 'parkour' | 'password'
 
 /** Schnellaktionen für eine Person: Coins buchen (auch sehr hohe Beträge auf einmal), Artikel schenken/entziehen, Punkte. */
 export default function ManageUser({ userId, name, onClose, onChanged }: { userId: string; name: string; onClose: () => void; onChanged?: () => void }) {
@@ -72,7 +73,7 @@ export default function ManageUser({ userId, name, onClose, onChanged }: { userI
   const n = parseCoins(amount)
   const validAmount = Number.isSafeInteger(n) && n !== 0 && Math.abs(n) <= MAX
   const p = Number.parseInt(pts, 10)
-  const tabs: Array<[Tab, string]> = [['coins', 'Coins'], ['chips', 'Chips'], ['items', 'Artikel'], ['points', 'Punkte'], ['parkour', 'Parkour'], ['password', 'Kennwort']]
+  const tabs: Array<[Tab, string]> = [['coins', 'Coins'], ['chips', 'Chips'], ['stocks', 'Aktien'], ['items', 'Artikel'], ['points', 'Punkte'], ['parkour', 'Parkour'], ['password', 'Kennwort']]
 
   return (
     <Modal title={`${name} verwalten`} onClose={onClose}>
@@ -107,6 +108,8 @@ export default function ManageUser({ userId, name, onClose, onChanged }: { userI
           </Button>
         </div>
       )}
+
+      {tab === 'stocks' && <StocksPane userId={userId} name={name} busy={busy} run={run} />}
 
       {tab === 'items' && (
         <div className="space-y-4">
@@ -179,5 +182,45 @@ export default function ManageUser({ userId, name, onClose, onChanged }: { userI
         </div>
       )}
     </Modal>
+  )
+}
+
+/** Depot einer Person: Bestand ansehen, Aktien vergeben oder abziehen. */
+function StocksPane({ userId, name, busy, run }: { userId: string; name: string; busy: boolean; run: (fn: () => Promise<unknown>, ok: string) => Promise<void> }) {
+  const hold = useAsync(() => adminStockHoldings(userId), [userId])
+  const syms = useAsync(stockList, [])
+  const [sym, setSym] = useState('')
+  const [cnt, setCnt] = useState('')
+  const n = Number.parseInt(cnt, 10)
+  const ok = Number.isSafeInteger(n) && n !== 0 && sym !== ''
+  const apply = (symbol: string, delta: number) => void run(async () => { await adminStockAdjust(userId, symbol, delta); await hold.reload() }, `${name}: ${delta > 0 ? '+' : ''}${delta.toLocaleString('de-DE')} ${symbol}.`)
+  return (
+    <div className="space-y-4">
+      <div>
+        <h3 className="mb-2 text-sm font-semibold">Depot von {name}</h3>
+        {hold.data && hold.data.length === 0 && <p className="text-sm text-slate-400">Keine Aktien.</p>}
+        <ul className="divide-y divide-white/5 text-sm">
+          {hold.data?.map((h) => (
+            <li key={h.symbol} className="flex flex-wrap items-center gap-2 py-2">
+              <span className="w-20 font-semibold">{h.symbol}</span>
+              <span className="flex-1 tabular-nums">{h.shares.toLocaleString('de-DE')} Stück</span>
+              <button type="button" disabled={busy} onClick={() => apply(h.symbol, -h.shares)} className="min-h-[40px] rounded-lg border border-rose-400/40 px-3 text-xs text-rose-300 hover:bg-rose-500/10">Alle abziehen</button>
+            </li>
+          ))}
+        </ul>
+      </div>
+      <div className="space-y-2">
+        <Field label="Aktie">
+          <Select value={sym} onChange={(e) => setSym(e.target.value)}>
+            <option value="">– Aktie wählen –</option>
+            {syms.data?.map((s) => <option key={s.symbol} value={s.symbol}>{s.symbol} – {s.name}</option>)}
+          </Select>
+        </Field>
+        <Field label="Anzahl" hint="Plus = schenken, Minus = abziehen (höchstens bis 0). Es gibt dafür keine Coins zurück.">
+          <TextInput inputMode="numeric" value={cnt} onChange={(e) => setCnt(e.target.value)} placeholder="z. B. 10 oder -5" />
+        </Field>
+        <Button disabled={busy || !ok} onClick={() => apply(sym, n)}>{n < 0 ? 'Abziehen' : 'Vergeben'}{ok ? ` (${n.toLocaleString('de-DE')})` : ''}</Button>
+      </div>
+    </div>
   )
 }

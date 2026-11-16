@@ -37,7 +37,7 @@ export const TRACKS: TrackDef[] = [
     pts: R(48, (i) => { const a = (i / 48) * Math.PI * 2; return [Math.cos(a) * 120, Math.sin(a) * 120] }) },
   { id: 12, name: 'Drift-Kreis', text: 'Riesige runde Asphaltfläche, die Mitte ist komplett Straße, ohne Barrieren: Kreise driften, quer durchfahren, Runden sammeln.', width: 304, laps: 5, theme: 'wueste', mode: 'disc', lineMax: 45,
     pts: R(96, (i) => { const a = (i / 96) * Math.PI * 2; return [Math.cos(a) * 150, Math.sin(a) * 150] }) },
-  { id: 13, name: 'Stadt', text: 'Offene Stadt mit Häuserblöcken, Straßen, engen Gassen, Parks und einer Brücke (Rampen oder mit dem Flugauto). Frei herumfahren, kein Ziel.', width: 24, laps: 1, theme: 'stadt', mode: 'city',
+  { id: 13, name: 'Stadt', text: 'Große offene Stadt mit Häuserblöcken, Gassen, Tunneln, fünf Brücken und Wäldchen zum Verstecken. Mit Verstecken-Knopf und Stadtkarte. Frei herumfahren, kein Ziel.', width: 24, laps: 1, theme: 'stadt', mode: 'city',
     pts: R(48, (i) => { const a = (i / 48) * Math.PI * 2; return [Math.cos(a) * 120, Math.sin(a) * 120] }) },
   { id: 14, name: 'Stunt-Park', text: 'Looping (ab 100 km/h), Hügel, Schanzen mit Landerampen und eine riesige Sprungrampe auf offener Fläche. Kein Ziel.', width: 24, laps: 1, theme: 'wueste', mode: 'stunt',
     pts: R(48, (i) => { const a = (i / 48) * Math.PI * 2; return [Math.cos(a) * 120, Math.sin(a) * 120] }) },

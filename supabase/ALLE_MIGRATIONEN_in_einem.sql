@@ -27121,3 +27121,99 @@ begin
   end loop;
 end;
 $$;
+
+
+-- ===== 0106_admin_stock_holdings.sql =====
+-- 0106: Admin sieht alle Aktien-Depots und kann Aktien vergeben oder abziehen. Wiederholbar. Nach 0105 ausführen.
+
+-- p_user = null: alle Depots, sonst nur das dieser Person
+create or replace function public.admin_stock_holdings(p_user uuid default null)
+returns jsonb language plpgsql stable security definer set search_path = public as $$
+begin
+  perform public._require_admin();
+  return coalesce((
+    select jsonb_agg(jsonb_build_object('user_id', h.user_id, 'name', p.display_name, 'symbol', h.symbol, 'shares', h.shares, 'cost', h.cost, 'price_cents', q.price_cents)
+                     order by h.symbol, h.shares desc, p.display_name)
+      from public.stock_holdings h
+      join public.profiles p on p.id = h.user_id
+      left join public.stock_quotes q on q.symbol = h.symbol
+     where h.shares > 0 and (p_user is null or h.user_id = p_user)), '[]'::jsonb);
+end;
+$$;
+
+-- Aktien vergeben (Plus) oder abziehen (Minus, höchstens bis 0); Einstandswert sinkt anteilig mit
+create or replace function public.admin_stock_adjust(p_user uuid, p_symbol text, p_delta bigint)
+returns bigint language plpgsql security definer set search_path = public as $$
+declare v_sym text := upper(p_symbol); h public.stock_holdings; v_new bigint; v_cost bigint;
+begin
+  perform public._require_admin();
+  if p_delta is null or p_delta = 0 or abs(p_delta) > 1000000000000 then raise exception 'Ungültige Anzahl Aktien.' using errcode = '22023'; end if;
+  if not exists (select 1 from public.stock_symbols where symbol = v_sym) then raise exception 'Aktie nicht gefunden.' using errcode = 'P0002'; end if;
+  if not exists (select 1 from public.profiles where id = p_user) then raise exception 'Nutzer nicht gefunden.' using errcode = 'P0002'; end if;
+  select * into h from public.stock_holdings where user_id = p_user and symbol = v_sym for update;
+  if h.user_id is null then
+    if p_delta < 0 then raise exception 'Die Person besitzt diese Aktie nicht.' using errcode = '22023'; end if;
+    insert into public.stock_holdings (user_id, symbol, shares, cost) values (p_user, v_sym, p_delta, 0);
+    return p_delta;
+  end if;
+  v_new := greatest(h.shares + p_delta, 0);
+  v_cost := case when h.shares > 0 then (h.cost::numeric * v_new / h.shares)::bigint else 0 end;
+  if p_delta > 0 then v_cost := h.cost; end if;
+  update public.stock_holdings set shares = v_new, cost = v_cost where user_id = p_user and symbol = v_sym;
+  return v_new;
+end;
+$$;
+
+do $$
+declare r record;
+begin
+  for r in select p.oid::regprocedure as sig from pg_proc p where p.pronamespace = 'public'::regnamespace and p.proname in ('admin_stock_holdings', 'admin_stock_adjust') loop
+    execute format('revoke all on function %s from public, anon', r.sig);
+    execute format('grant execute on function %s to authenticated', r.sig);
+  end loop;
+end;
+$$;
+
+
+-- ===== 0107_super_assist_grant.sql =====
+-- 0107: Fahrassistent kann der Admin auch anderen mit Supercar-Zugang geben. Wiederholbar. Nach 0106 ausführen.
+alter table public.race_super_access add column if not exists assist boolean not null default false;
+
+create or replace function public._race_assist(p_user uuid)
+returns boolean language sql stable security definer set search_path = public as $$
+  select coalesce((select (p.role = 'admin' or (p.role in ('mod', 'alphamod') and exists (select 1 from public.race_super_access a where a.user_id = p.id and a.assist))) and not p.blocked
+                     from public.profiles p where p.id = p_user), false)
+$$;
+
+create or replace function public.admin_super_assist(p_user uuid, p_on boolean)
+returns void language plpgsql security definer set search_path = public as $$
+begin
+  perform public._require_admin();
+  if not exists (select 1 from public.race_super_access where user_id = p_user) then raise exception 'Erst das Supercar freigeben.' using errcode = '22023'; end if;
+  update public.race_super_access set assist = coalesce(p_on, false) where user_id = p_user;
+end;
+$$;
+
+drop function if exists public.admin_super_list();
+create or replace function public.admin_super_list()
+returns jsonb language plpgsql stable security definer set search_path = public as $$
+begin
+  perform public._require_admin();
+  return coalesce((
+    select jsonb_agg(jsonb_build_object('id', p.id, 'name', coalesce(p.display_name, '?'), 'role', p.role, 'granted', p.role = 'admin' or a.user_id is not null,
+                                        'kmh', public._race_super_kmh(p.id), 'custom', a.kmh is not null,
+                                        'assist', p.role = 'admin' or coalesce(a.assist, false)) order by p.role, p.display_name)
+    from public.profiles p left join public.race_super_access a on a.user_id = p.id
+    where p.role in ('mod', 'alphamod', 'admin') and not p.blocked), '[]'::jsonb);
+end;
+$$;
+
+do $$
+declare r record;
+begin
+  for r in select p.oid::regprocedure as sig, p.proname from pg_proc p where p.pronamespace = 'public'::regnamespace and p.proname in ('_race_assist', 'admin_super_assist', 'admin_super_list') loop
+    execute format('revoke all on function %s from public, anon, authenticated', r.sig);
+    if left(r.proname, 1) <> '_' then execute format('grant execute on function %s to authenticated', r.sig); end if;
+  end loop;
+end;
+$$;

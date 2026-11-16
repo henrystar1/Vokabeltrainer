@@ -818,3 +818,16 @@ Tabelle `book_library_hidden`; `in_library` blendet ein veröffentlichtes Buch d
 - Rangliste: neuer Reiter „Chips“ (`ChipBoard`, `get_chip_leaderboard`, `get_my_chip_rank`, Migration 0105).
 - Gambling: Einstellung `gambling_payout_percent` (100 = normal, 0 = −100 %, 150 = +50 %); `_pay_adj` wird per Funktionstext-Patch vor jede Abrechnung gesetzt (Würfeln, Roulette, Rad, Slots, Black Jack), also stimmen Anzeige und Guthaben überein.
 - Börse: je Aktie `trend_percent` (leer = global, negativ = sinkt) und `driver_mult_percent` (Stärke von BANK/SHOPX; SHOPX Standard jetzt 25 %). Admin: `admin_stock_tune`, `admin_stock_tune_list`, Bereich „Kurs-Trend je Aktie“ in `StocksTab`; globale Treiber-Werte stehen zusätzlich unter „Zahlen“.
+
+
+## Update 124
+- Admin-Aktienverwaltung (Migration 0106): `admin_stock_holdings(p_user)` zeigt alle Depots oder das einer Person, `admin_stock_adjust(p_user, p_symbol, p_delta)` vergibt oder zieht Aktien ab (Einstandswert sinkt anteilig, keine Coins zurück). UI: Reiter „Aktien“ in `ManageUser`, Liste „Wer hat welche Aktien?“ in `StocksTab`.
+
+
+## Update 125
+- Fahrassistent: Admin kann ihn Mods mit Supercar-Zugang geben (`race_super_access.assist`, `admin_super_assist`, Migration 0107; Haken „Fahrassistent“ in `CarsTab`).
+- Supercar: Beschleunigung wählbar (×0,25 bis ×20) neben dem Tempo-Regler (`accRef`, `mkStats`).
+- Offene Felder: Reparatur (R) auf der Stelle, 3 s Werkstatt, danach 12 s Wartezeit (`REPAIR_CD_MS`), beides im Knopf angezeigt; Rennstrecken setzen weiter zurück.
+- Stadt (Strecke 13) größer: 12 × 12 Blöcke (`CITY.K`, half 720), fünf Brücken (`BRIDGES`, `bridgeAt(x,z)`, `bridgeH(x,z)`), Tunnel (zwei Häuser + Dach, `city().tunnels`), Wäldchen mit Bäumen und Büschen (`inPark`).
+- Verstecken: Knopf/Taste H oder automatisch im Wäldchen; Broadcast-Feld `hd` – versteckte Fahrer sind für andere unsichtbar (kein Namensschild) und fehlen auf der neuen Stadtkarte (`cmini`).
+- Die Stadt-Lobby steht jetzt oben im Rennen-Menü.
