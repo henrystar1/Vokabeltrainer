@@ -49,7 +49,7 @@ describe('#Menü/Unterpunkt', () => {
     expect(to('#Rangliste/Unsinn')).toBe('/rangliste')
   })
   it('schlägt Reiter vor', () => {
-    expect([...tagSuggestions('Rangliste/p')].sort()).toEqual(['Rangliste/Parkour', 'Rangliste/Pi'])
+    expect([...tagSuggestions('Rangliste/pa')].sort()).toEqual(['Rangliste/Parkour'])
     expect(tagSuggestions('Gambling/')).toContain('Gambling/Roulette')
   })
 })

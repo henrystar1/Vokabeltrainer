@@ -1,18 +1,19 @@
 import { useState } from 'react'
 import { useAsync } from '../../lib/useAsync'
 import { errorMessage } from '../../lib/errors'
-import { adminStockRemove, adminStockSave, stockList } from '../../services/stocks'
+import { adminStockRemove, adminStockSave, adminStockTune, adminStockTuneList, stockList, type StockTune } from '../../services/stocks'
 
 /** Admin: die handelbaren Spiel-Aktien (Startpreis in Coins). */
 export default function StocksTab() {
   const list = useAsync(stockList, [])
+  const tune = useAsync(adminStockTuneList, [])
   const [price, setPrice] = useState('1000')
   const [sym, setSym] = useState('')
   const [name, setName] = useState('')
   const [msg, setMsg] = useState<string | null>(null)
   async function run(f: () => Promise<unknown>, ok: string) {
     setMsg(null)
-    try { await f(); setMsg(ok); await list.reload() } catch (e) { setMsg(errorMessage(e)) }
+    try { await f(); setMsg(ok); await list.reload(); await tune.reload() } catch (e) { setMsg(errorMessage(e)) }
   }
   return (
     <div className="max-w-2xl space-y-5">
@@ -36,7 +37,37 @@ export default function StocksTab() {
           ))}
         </ul>
       </section>
+      <section className="glass space-y-3 rounded-2xl p-4">
+        <h2 className="font-semibold">Kurs-Trend je Aktie</h2>
+        <p className="text-xs text-slate-400">Trend in % pro Woche: leer = der allgemeine Wert (Standard 50), negativ = der Kurs sinkt langsam (z. B. −10). Der Multiplikator in % regelt, wie stark BANK (Gewinn der Spielbank) und SHOPX (Ausgaben im Shop) auf ihren Treiber reagieren: 100 = normal, 25 = ein Viertel, 0 = gar nicht.</p>
+        <ul className="divide-y divide-white/5 text-sm">
+          {tune.data?.map((t) => <TuneRow key={`${t.symbol}-${t.trend}-${t.mult}`} t={t} onSave={(trend, mult) => void run(() => adminStockTune(t.symbol, trend, mult), `${t.symbol}: gespeichert.`)} />)}
+        </ul>
+      </section>
       {msg && <p className="text-sm text-slate-300" role="status">{msg}</p>}
     </div>
+  )
+}
+
+function TuneRow({ t, onSave }: { t: StockTune; onSave: (trend: number | null, mult: number) => void }) {
+  const [trend, setTrend] = useState(t.trend === null ? '' : String(t.trend))
+  const [mult, setMult] = useState(String(t.mult))
+  const parse = () => { const tr = trend.trim() === '' ? null : Number(trend.replace(',', '.')); return { tr, m: Number(mult.replace(',', '.')) } }
+  const save = (trOverride?: number | null) => { const { tr, m } = parse(); onSave(trOverride === undefined ? tr : trOverride, Number.isFinite(m) ? m : 100) }
+  return (
+    <li className="flex flex-wrap items-center gap-2 py-2">
+      <span className="w-20 font-semibold">{t.symbol}</span>
+      <label className="flex items-center gap-1 text-xs text-slate-400">Trend %/Woche
+        <input value={trend} onChange={(e) => setTrend(e.target.value)} inputMode="decimal" placeholder="normal" aria-label={`Trend ${t.symbol}`} className="min-h-[40px] w-24 rounded-lg border border-white/15 bg-space-900/60 px-2 text-white" />
+      </label>
+      {t.driver && (
+        <label className="flex items-center gap-1 text-xs text-slate-400">Multiplikator %
+          <input value={mult} onChange={(e) => setMult(e.target.value)} inputMode="decimal" aria-label={`Multiplikator ${t.symbol}`} className="min-h-[40px] w-20 rounded-lg border border-white/15 bg-space-900/60 px-2 text-white" />
+        </label>
+      )}
+      <button type="button" onClick={() => save()} className="min-h-[40px] rounded-lg bg-accent-cyan px-3 text-xs font-semibold text-slate-950">Speichern</button>
+      <button type="button" onClick={() => { setTrend('-10'); save(-10) }} className="min-h-[40px] rounded-lg border border-white/15 px-2 text-xs hover:bg-white/10">Langsam sinken (−10 %)</button>
+      <button type="button" onClick={() => { setTrend(''); save(null) }} className="min-h-[40px] rounded-lg border border-white/15 px-2 text-xs hover:bg-white/10">Normal</button>
+    </li>
   )
 }

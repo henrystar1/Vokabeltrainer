@@ -18,6 +18,8 @@ export const SECTIONS: Array<{ title: string; text?: string; rules: Rule[] }> = 
     rules: [
       { key: 'stock_weekly_growth_percent', label: 'Durchschnittlicher Anstieg pro Woche in %', hint: 'Standard 50. Die Kurse steigen im Schnitt so stark und schwanken zufällig darum' },
       { key: 'stock_volatility_permille', label: 'Schwankung pro Minute in ‰ (2 = rund 0,2 %)', hint: 'Höher = wilderer Kurs' },
+      { key: 'stock_driver_strength_permille', label: 'Treiber-Stärke je Schub in ‰ (60 = bis zu 6 %)', hint: 'Für BANK und SHOPX. Pro Aktie stellst du zusätzlich den Multiplikator unter „Börse“ ein' },
+      { key: 'stock_driver_scale', label: 'Treiber-Skala (Coins)', hint: 'Je höher, desto mehr Umsatz braucht der Treiber für einen starken Schub' },
       { key: 'stock_fee_permille', label: 'Gebühr in ‰ (10 = 1 %)', hint: 'Bei Kauf und Verkauf' },
     ],
   },
@@ -74,6 +76,7 @@ export const SECTIONS: Array<{ title: string; text?: string; rules: Rule[] }> = 
     title: 'Gambling',
     text: 'Chancen in Promille (1000 = immer). Erwartung pro Einsatz = Gewinnchance × Faktor + Jackpot × Jackpot-Faktor; unter 1000 ‰ Summe bleibt es ein Verlustgeschäft.',
     rules: [
+      { key: 'gambling_payout_percent', label: 'Auszahlung in % des Normalen', hint: '100 = normal, 50 = −50 %, 0 = −100 % (alle Gewinne fallen weg), 150 = +50 %. Gilt für alle Spiele sofort' },
       { key: 'gambling_win_permille', label: 'Gewinnchance (‰)', hint: 'Drei gleiche Symbole' },
       { key: 'gambling_jackpot_permille', label: 'Jackpot-Chance (‰)', hint: 'Dreimal die 7' },
       { key: 'gambling_mult_win', label: 'Gewinn-Faktor', hint: 'Einsatz × Faktor' },

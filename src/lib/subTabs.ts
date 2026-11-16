@@ -4,7 +4,7 @@ export interface SubTab { id: string; label: string }
 export const SUB_TABS: Record<string, SubTab[]> = {
   '/rangliste': [
     { id: 'week', label: 'Woche' }, { id: 'month', label: 'Monat' }, { id: 'all', label: 'Gesamt' }, { id: 'league', label: 'Liga' },
-    { id: 'coins', label: 'Coins' }, { id: 'gambling', label: 'Gambling' }, { id: 'parkour', label: 'Parkour' }, { id: 'pi', label: 'Pi' }, { id: 'flags', label: 'Flaggen' },
+    { id: 'coins', label: 'Coins' }, { id: 'chips', label: 'Chips' }, { id: 'gambling', label: 'Gambling' }, { id: 'parkour', label: 'Parkour' }, { id: 'pi', label: 'Pi' }, { id: 'flags', label: 'Flaggen' },
   ],
   '/auswendig': [{ id: 'pi', label: 'Pi' }, { id: 'pow', label: 'Hochzahlen' }, { id: 'flags', label: 'Flaggen' }],
   '/gambling': [

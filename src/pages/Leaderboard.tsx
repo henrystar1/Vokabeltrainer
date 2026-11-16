@@ -11,24 +11,26 @@ import { getLeaderboard } from '../services/stats'
 import type { LeaderboardPeriod } from '../types'
 import LeagueView from './LeagueView'
 import CoinBoard from './CoinBoard'
+import ChipBoard from './ChipBoard'
 import GamblingBoard from './GamblingBoard'
 import ParkourBoard from './ParkourBoard'
 import MemoBoard from './MemoBoard'
 import PlusHint from '../features/plus/PlusHint'
 
-type Tab = LeaderboardPeriod | 'league' | 'coins' | 'gambling' | 'parkour' | 'pi' | 'flags'
+type Tab = LeaderboardPeriod | 'league' | 'coins' | 'chips' | 'gambling' | 'parkour' | 'pi' | 'flags'
 const PERIODS: Array<{ id: Tab; label: string }> = [
   { id: 'week', label: 'Woche' },
   { id: 'month', label: 'Monat' },
   { id: 'all', label: 'Gesamt' },
   { id: 'league', label: 'Liga' },
   { id: 'coins', label: 'Coins' },
+  { id: 'chips', label: 'Chips' },
   { id: 'gambling', label: 'Gambling' },
   { id: 'parkour', label: 'Parkour' },
   { id: 'pi', label: 'Pi' },
   { id: 'flags', label: 'Flaggen' },
 ]
-const SPECIAL: Tab[] = ['league', 'coins', 'gambling', 'parkour', 'pi', 'flags']
+const SPECIAL: Tab[] = ['league', 'coins', 'chips', 'gambling', 'parkour', 'pi', 'flags']
 
 const MEDAL = ['text-amber-300', 'text-slate-300', 'text-orange-400']
 
@@ -58,6 +60,7 @@ export default function Leaderboard() {
 
       {period === 'league' && <LeagueView />}
       {period === 'coins' && <CoinBoard />}
+      {period === 'chips' && <ChipBoard />}
       {period === 'gambling' && <GamblingBoard />}
       {period === 'parkour' && <ParkourBoard />}
       {period === 'pi' && <MemoBoard game="pi" />}

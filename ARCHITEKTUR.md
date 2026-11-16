@@ -812,3 +812,9 @@ Tabelle `book_library_hidden`; `in_library` blendet ein veröffentlichtes Buch d
 - Ego-Shooter: Zielen (Rechtsklick/F, Touch-Knopf „ZIELEN“) mit Zoom (Scharfschütze FOV 16 mit Zielfernrohr-Overlay, sonst 55, Empfindlichkeit skaliert); prozedurale Canvas-Texturen für Boden, Wände, Kisten, Sternenhimmel.
 - Admin: `admin_grant_chips` (Migration 0104, unbegrenzt, auch negativ), Chips-Kauf ohne Limit für Admins (`_chip_buy_max`), Tab „Chips vergeben“ in `ManageUser`.
 - Menü: `Spiele` und `Shop` sind je ein Eintrag; Sammelseiten `/spielen` und `/laden` (`pages/HubPage.tsx`, `hubPageFor`, `NavItem.hubOf/hubGroup`). Schnelllesen steht in der Gruppe Lernen.
+
+
+## Update 123
+- Rangliste: neuer Reiter „Chips“ (`ChipBoard`, `get_chip_leaderboard`, `get_my_chip_rank`, Migration 0105).
+- Gambling: Einstellung `gambling_payout_percent` (100 = normal, 0 = −100 %, 150 = +50 %); `_pay_adj` wird per Funktionstext-Patch vor jede Abrechnung gesetzt (Würfeln, Roulette, Rad, Slots, Black Jack), also stimmen Anzeige und Guthaben überein.
+- Börse: je Aktie `trend_percent` (leer = global, negativ = sinkt) und `driver_mult_percent` (Stärke von BANK/SHOPX; SHOPX Standard jetzt 25 %). Admin: `admin_stock_tune`, `admin_stock_tune_list`, Bereich „Kurs-Trend je Aktie“ in `StocksTab`; globale Treiber-Werte stehen zusätzlich unter „Zahlen“.

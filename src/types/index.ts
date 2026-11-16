@@ -346,6 +346,13 @@ export interface CoinRow extends Flair {
   koins: number
 }
 
+export interface ChipRow extends Flair {
+  rank: number
+  user_id: string
+  display_name: string
+  chips: number
+}
+
 export interface BoardPost {
   id: string
   title: string
