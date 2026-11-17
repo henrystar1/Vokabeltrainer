@@ -1,12 +1,12 @@
-/** Offene Stadt: Häuserblöcke mit Straßen und Gassen, Parks mit Wäldchen (zum Verstecken), Tunnel unter Häuserblöcken, Stadtmauer und mehrere Brücken (Rampen an beiden Enden, mit Flugautos auch von der Seite erreichbar). */
+/** Offene Stadt: Häuserblöcke mit Straßen und Gassen, Parks mit Wäldchen (zum Verstecken), Tunnel unter der Erde, Stadtmauer und mehrere Brücken (Rampen an beiden Enden, mit Flugautos auch von der Seite erreichbar). */
 export const CITY = {
   pitch: 120, street: 24, half: 720,
   /** Blöcke je Richtung: von -K bis K-1 */
   K: 6,
   /** Brücken: Fahrbahn ±bw breit, Höhe bh, Rampenlänge ramp */
   bw: 8, bh: 5, ramp: 60,
-  /** Tunnel: Breite der Röhre und lichte Höhe */
-  tw: 14, th: 6,
+  /** Tunnel: Breite der Röhre und Tiefe unter der Straße */
+  tw: 14, td: 6,
 }
 
 /** Brücken über den Straßen z = bz, von bx0 bis bx1 (Enden liegen auf Kreuzungen, damit Querstraßen frei bleiben). */
@@ -19,8 +19,7 @@ export const BRIDGES: ReadonlyArray<{ bz: number; bx0: number; bx1: number }> = 
 ]
 
 export interface Bld { x: number; z: number; w: number; d: number; h: number; /** Farbvariante 0–5 */ c: number }
-export interface Tunnel { x: number; z: number; w: number; d: number }
-export interface CityData { buildings: Bld[]; parks: Array<{ x: number; z: number; size: number }>; tunnels: Tunnel[]; grid: Map<string, number[]> }
+export interface CityData { buildings: Bld[]; parks: Array<{ x: number; z: number; size: number }>; grid: Map<string, number[]> }
 
 const CELL = 40
 let cache: CityData | null = null
@@ -30,22 +29,13 @@ function rng(seed: number) { let a = seed >>> 0; return () => { a = (a + 0x6d2b7
 export function city(): CityData {
   if (cache) return cache
   const r = rng(20261115)
-  const buildings: Bld[] = [], parks: CityData['parks'] = [], tunnels: Tunnel[] = []
+  const buildings: Bld[] = [], parks: CityData['parks'] = []
   const SZ = 90, ALLEY = 8
   for (let kx = -CITY.K; kx < CITY.K; kx++) for (let kz = -CITY.K; kz < CITY.K; kz++) {
     const cx = CITY.pitch * kx + CITY.pitch / 2, cz = CITY.pitch * kz + CITY.pitch / 2
     const t = r()
     const hgt = () => Math.round(10 + r() * r() * 50)
     if (t < 0.17) { parks.push({ x: cx, z: cz, size: SZ }); continue }
-    if (t < 0.24) {
-      // Tunnel: zwei Hochhäuser mit einer überdachten Durchfahrt (Röhre) dazwischen
-      const alongX = r() < 0.5, side = (SZ - CITY.tw) / 2
-      for (const s of [-1, 1]) buildings.push(alongX
-        ? { x: cx, z: cz + s * (CITY.tw / 2 + side / 2), w: SZ, d: side, h: 20 + Math.round(r() * 25), c: Math.floor(r() * 6) }
-        : { x: cx + s * (CITY.tw / 2 + side / 2), z: cz, w: side, d: SZ, h: 20 + Math.round(r() * 25), c: Math.floor(r() * 6) })
-      tunnels.push(alongX ? { x: cx, z: cz, w: SZ, d: CITY.tw } : { x: cx, z: cz, w: CITY.tw, d: SZ })
-      continue
-    }
     if (t < 0.38) { buildings.push({ x: cx, z: cz, w: SZ - 10, d: SZ - 10, h: 25 + Math.round(r() * 40), c: Math.floor(r() * 6) }); continue }
     const lot = (SZ - ALLEY) / 2
     if (t < 0.65) {
@@ -66,7 +56,7 @@ export function city(): CityData {
         const k = `${gx},${gz}`; const a = grid.get(k); if (a) a.push(i); else grid.set(k, [i])
       }
   })
-  cache = { buildings, parks, tunnels, grid }
+  cache = { buildings, parks, grid }
   return cache
 }
 
@@ -99,6 +89,29 @@ export function bridgeH(x: number, z: number): number {
   if (!b) return 0
   const t = Math.min(1, Math.min(x - b.bx0, b.bx1 - x) / CITY.ramp)
   return CITY.bh * t * t * (3 - 2 * t)
+}
+/** Tunnel unter der Stadt: Einfahrten (Rampen nach unten) auf den Straßen z = tz, dazwischen die Röhre unter Häusern und Kreuzungen. */
+export const TUNNELS: ReadonlyArray<{ tz: number; x0: number; x1: number }> = [
+  { tz: 120, x0: -480, x1: 480 },
+  { tz: -120, x0: -240, x1: 600 },
+  { tz: 360, x0: -600, x1: 240 },
+  { tz: -360, x0: -360, x1: 600 },
+]
+export function tunnelAt(x: number, z: number): { tz: number; x0: number; x1: number } | null {
+  for (const t of TUNNELS) if (x >= t.x0 && x <= t.x1 && Math.abs(z - t.tz) <= CITY.tw / 2) return t
+  return null
+}
+/** Tunnel, aber nur im Rampenbereich an den Enden (dort ist die Straße offen); in der Mitte fährt man oben ganz normal über ihn. */
+export function tunnelRamp(x: number, z: number): { tz: number; x0: number; x1: number } | null {
+  const t = tunnelAt(x, z)
+  return t && (x - t.x0 < CITY.ramp || t.x1 - x < CITY.ramp) ? t : null
+}
+/** Tiefe der Tunnelsohle unter der Straße bei (x, z): 0 außerhalb, an den Enden Rampen, dazwischen eben. */
+export function tunnelD(x: number, z: number): number {
+  const t = tunnelAt(x, z)
+  if (!t) return 0
+  const u = Math.min(1, Math.min(x - t.x0, t.x1 - x) / CITY.ramp)
+  return CITY.td * u * u * (3 - 2 * u)
 }
 export const onDeck = (x: number, z: number): boolean => bridgeAt(x, z) !== null
 /** Liegt der Punkt in einem Park (Wäldchen)? Dort ist man zwischen den Bäumen versteckt. */

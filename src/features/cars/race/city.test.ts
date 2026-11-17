@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { BRIDGES, CITY, bridgeAt, bridgeH, city, cityPush, inPark, onDeck } from './city'
+import { BRIDGES, CITY, TUNNELS, bridgeAt, bridgeH, city, cityPush, inPark, onDeck, tunnelAt, tunnelD, tunnelRamp } from './city'
 import { TRACKS, buildTrack, isOpen } from './track'
 import { startCar, statsFor, stepCar, type Car } from './physics'
 import { FLY_SECONDS } from '../stats'
@@ -73,11 +73,14 @@ describe('Brücke', () => {
     for (let i = 0; i < 30 * 4; i++) { car = stepCar(car, { ...none, gas: true }, dt, t, st, true); expect(car.lvl ?? 0).toBe(0) }
     expect(car.z).toBeGreaterThan(bz + 8)
   })
-  it('Geländer: oben kommt man nicht seitlich herunter', () => {
+  it('von der Brücke seitlich herunterfahren: Fall bis zur Straße', () => {
     let car: Car = { ...startCar(t, 0), x: 0, z: bz, h: 0.5, v: 20, lvl: 1 }
-    for (let i = 0; i < 30 * 3; i++) car = stepCar(car, { ...none, gas: true }, dt, t, st, true)
-    expect(car.lvl).toBe(1)
-    expect(Math.abs(car.z - bz)).toBeLessThanOrEqual(CITY.bw)
+    let maxY = 0
+    for (let i = 0; i < 30 * 4; i++) { car = stepCar(car, { ...none, gas: true }, dt, t, st, true); maxY = Math.max(maxY, car.y ?? 0) }
+    expect(car.lvl ?? 0).toBe(0)
+    expect(maxY).toBeGreaterThan(2)
+    expect(car.y ?? 0).toBe(0)
+    expect(car.z).toBeGreaterThan(bz + CITY.bw)
   })
   it('mit dem Flugauto von der Seite auf die Brücke landen', () => {
     let car: Car = { ...startCar(t, 0), x: 0, z: bz + CITY.bw + 1.5, h: Math.PI, v: 1.8 }
@@ -99,29 +102,41 @@ describe('Mehrere Brücken, Tunnel, Wäldchen', () => {
     expect(new Set(BRIDGES.map((b) => b.bz)).size).toBe(BRIDGES.length)
     expect(bridgeAt(0, 100)).toBeNull()
   })
-  it('Stadt ist groß (12 × 12 Blöcke) und hat Tunnel und Parks', () => {
+  it('Stadt ist groß (12 × 12 Blöcke) und hat Parks', () => {
     expect(CITY.half).toBe(CITY.pitch * 6)
-    const c = city()
-    expect(c.tunnels.length).toBeGreaterThanOrEqual(3)
-    expect(c.parks.length).toBeGreaterThanOrEqual(8)
+    expect(city().parks.length).toBeGreaterThanOrEqual(8)
   })
-  it('Tunnel: man fährt hindurch, die Seitenwände sind Häuser', () => {
-    const t0 = city().tunnels[0]
-    const alongX = t0.w > t0.d
-    expect(cityPush(t0.x, t0.z)).toBeNull()
-    expect(cityPush(t0.x + (alongX ? 0 : t0.w / 2 + 3), t0.z + (alongX ? t0.d / 2 + 3 : 0))).not.toBeNull()
+  it('Tunnel: Rampen an den Enden, dazwischen eben und tief unter der Straße', () => {
+    expect(TUNNELS.length).toBeGreaterThanOrEqual(3)
+    for (const tu of TUNNELS) {
+      for (const v of [tu.tz, tu.x0, tu.x1]) expect(Math.abs(v % CITY.pitch)).toBe(0)
+      expect(tunnelD(tu.x0, tu.tz)).toBe(0); expect(tunnelD(tu.x1, tu.tz)).toBe(0)
+      expect(tunnelD((tu.x0 + tu.x1) / 2, tu.tz)).toBe(CITY.td)
+      expect(tunnelRamp((tu.x0 + tu.x1) / 2, tu.tz)).toBeNull()
+      expect(tunnelAt(tu.x0 + 5, tu.tz + 30)).toBeNull()
+    }
+    for (const tu of TUNNELS) for (const b of BRIDGES) expect(tu.tz).not.toBe(b.bz)
+  })
+  it('in den Tunnel hinunter, unter der Stadt entlang und wieder hinaus', () => {
+    const tu = TUNNELS[0]
+    const st2 = statsFor('roadster', 200)
+    let car: Car = { ...startCar(t, 0), x: tu.x0 - 10, z: tu.tz, h: Math.PI / 2, v: 15 }
+    let minD = 0, under = 0
+    for (let i = 0; i < 30 * 70 && car.x < tu.x1 + 20; i++) { car = stepCar(car, { ...none, gas: true }, dt, t, st2, true); minD = Math.max(minD, tunnelD(car.x, car.z) * (car.lvl === -1 ? 1 : 0)); if (car.lvl === -1) under++ }
+    expect(minD).toBe(CITY.td)
+    expect(under).toBeGreaterThan(30 * 10)
+    expect(car.x).toBeGreaterThan(tu.x1)
+    expect(car.lvl ?? 0).toBe(0)
+    expect(car.dmg).toBe(0)
+  })
+  it('oben über dem Tunnel fährt man normal weiter (bleibt oben)', () => {
+    const tu = TUNNELS[0], st2 = statsFor('roadster', 200)
+    let car: Car = { ...startCar(t, 0), x: tu.x0 + CITY.ramp + 60, z: tu.tz, h: Math.PI / 2, v: 15 }
+    for (let i = 0; i < 30 * 3; i++) { car = stepCar(car, { ...none, gas: true }, dt, t, st2, true); expect(car.lvl ?? 0).toBe(0) }
   })
   it('Park: im Wäldchen ist man versteckt, auf der Straße nicht', () => {
     const p = city().parks[0]
     expect(inPark(p.x, p.z)).toBe(true)
     expect(inPark(p.x + p.size / 2 + 12, p.z)).toBe(false)
-  })
-  it('durch den Tunnel fahren ohne Schaden', () => {
-    const tu = city().tunnels[0], alongX = tu.w > tu.d
-    const st = statsFor('roadster', 200)
-    let car: Car = { ...startCar(t, 0), x: tu.x - (alongX ? tu.w / 2 + 15 : 0), z: tu.z - (alongX ? 0 : tu.d / 2 + 15), h: alongX ? Math.PI / 2 : 0, v: 12 }
-    for (let i = 0; i < 30 * 5; i++) car = stepCar(car, { ...none, gas: true }, dt, t, st, true)
-    expect(car.dmg).toBe(0)
-    expect(alongX ? car.x : car.z).toBeGreaterThan((alongX ? tu.x + tu.w / 2 : tu.z + tu.d / 2))
   })
 })

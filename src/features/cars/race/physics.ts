@@ -1,6 +1,6 @@
 import { advance, inPolygon, pointAt, project, type Track } from './track'
 import { canFly, carKmh, flyConfig, flyHeight, isBike, kindDims, kindStats } from '../stats'
-import { CITY, bridgeAt, bridgeH, cityPush, onDeck } from './city'
+import { CITY, bridgeH, cityPush, onDeck, tunnelAt, tunnelD, tunnelRamp } from './city'
 import { G, STUNT, arenaPush, groundH, loopPoint } from './stunt'
 import { upFactors, type Up } from '../tuning'
 import { boxHit, corners, impactDamage, type Box } from './collide'
@@ -174,29 +174,36 @@ export function stepCar(c: Car, inp: Input, dt: number, t: Track, st: CarStats, 
   }
   let lvl = c.lvl ?? 0
   if (city) {
-    // Brücke: Rampe hinauf (längs fahren) oder im Flug von der Seite landen; oben Geländer
+    // Brücke: Rampe hinauf (längs fahren) oder im Flug von der Seite landen; seitlich kann man herunterfahren (Fall).
+    // Tunnel: Rampe hinunter (längs fahren), unten (lvl -1) nur Röhrenwände, kein Haus im Weg.
     if (lvl === 0) {
       if (onDeck(x, z)) {
         const H = bridgeH(x, z)
         if (flying ? flyHeight(fly) <= H + 0.2 && H > 1.5 : H < 1.5 && Math.abs(Math.sin(moveH)) > 0.75 && Math.abs(v) > 3) lvl = 1
       }
-    } else if (!onDeck(x, z)) lvl = 0
-    const br = lvl === 1 ? bridgeAt(x, z) : null
-    if (br && bridgeH(x, z) > 1.5) {
-      const dz = z - br.bz, lim = CITY.bw - 0.8
+      const rt = tunnelRamp(x, z), D = rt ? tunnelD(x, z) : 0
+      if (!flying && rt && D > 0.05) {
+        if (Math.abs(Math.sin(moveH)) > 0.75 && Math.abs(v) > 3) lvl = -1
+        else if (D >= 1.5) { z = rt.tz + (Math.sign(z - rt.tz) || 1) * (CITY.tw / 2 + 0.3); v *= 0.8 }
+      }
+    } else if (lvl === 1 && !onDeck(x, z)) lvl = 0
+    else if (lvl === -1 && !tunnelAt(x, z)) lvl = 0
+    const tu = lvl === -1 ? tunnelAt(x, z) : null
+    if (tu && tunnelD(x, z) > 1.5) {
+      const dz = z - tu.tz, lim = CITY.tw / 2 - 0.8
       if (Math.abs(dz) > lim) {
-        z = br.bz + Math.sign(dz) * lim
+        z = tu.tz + Math.sign(dz) * lim
         const vn = Math.abs(v) * Math.abs(Math.cos(moveH))
         dmg = Math.min(DMG_MAX, dmg + impactDamage(vn))
         v *= 1 - Math.min(0.9, (2.2 + vn * 0.04) * dt); bump = Math.max(bump, Math.min(1, Math.abs(v) / 30)); hit = Math.max(hit, Math.min(1, vn / 25))
       }
     }
-    // Häuser und Stadtmauer (auf der Brücke fährt man darüber)
-    if (lvl === 0) {
+    // Häuser und Stadtmauer (auf der Brücke fährt man darüber, im Tunnel darunter; die Mauer gilt überall)
+    if (lvl <= 0) {
       let bd = 0, bnx = 0, bnz = 0
       for (const [cx, cz] of corners({ x, z, h, l: st.len, w: st.wid })) {
         const p = cityPush(cx, cz)
-        if (p && p.depth > bd) { bd = p.depth; bnx = p.nx; bnz = p.nz }
+        if (p && (lvl === 0 || Math.abs(cx) > CITY.half || Math.abs(cz) > CITY.half) && p.depth > bd) { bd = p.depth; bnx = p.nx; bnz = p.nz }
       }
       if (bd > 0) {
         x += bnx * bd; z += bnz * bd
@@ -208,6 +215,14 @@ export function stepCar(c: Car, inp: Input, dt: number, t: Track, st: CarStats, 
     }
   }
   let y = c.y ?? 0, vy = c.vy ?? 0, loop = 0
+  if (city) {
+    // von der Brücke seitlich heruntergefahren: freier Fall bis zur Straße
+    if ((c.lvl ?? 0) === 1 && lvl === 0) { y = bridgeH(c.x, c.z); vy = 0 }
+    if (lvl === 0 && y > 0) {
+      vy -= G * dt; y += vy * dt
+      if (y <= 0) { if (vy < -6) { dmg = Math.min(DMG_MAX, dmg + impactDamage(-vy * 0.7)); bump = Math.max(bump, Math.min(1, -vy / 15)) } y = 0; vy = 0 }
+    } else if (lvl !== 0) { y = 0; vy = 0 }
+  }
   let lp: Car['lp']
   if (stunt) {
     // Arenagrenze

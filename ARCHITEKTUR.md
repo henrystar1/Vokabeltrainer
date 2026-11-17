@@ -831,3 +831,10 @@ Tabelle `book_library_hidden`; `in_library` blendet ein veröffentlichtes Buch d
 - Stadt (Strecke 13) größer: 12 × 12 Blöcke (`CITY.K`, half 720), fünf Brücken (`BRIDGES`, `bridgeAt(x,z)`, `bridgeH(x,z)`), Tunnel (zwei Häuser + Dach, `city().tunnels`), Wäldchen mit Bäumen und Büschen (`inPark`).
 - Verstecken: Knopf/Taste H oder automatisch im Wäldchen; Broadcast-Feld `hd` – versteckte Fahrer sind für andere unsichtbar (kein Namensschild) und fehlen auf der neuen Stadtkarte (`cmini`).
 - Die Stadt-Lobby steht jetzt oben im Rennen-Menü.
+
+
+## Update 126
+- Stadt: vier echte Untergrund-Tunnel (`TUNNELS`, `tunnelAt/tunnelRamp/tunnelD`, Ebene `lvl = -1`): Einfahrt über Rampen (Löcher im Boden `ShapeGeometry`), Röhre unter Häusern und Kreuzungen, oben fährt man normal drüber. Die alten überdachten Block-Tunnel entfallen.
+- Brücken: kein Geländer mehr; seitlich herunterfahren = freier Fall (`y/vy` im City-Zweig von `stepCar`).
+- Sichtbare Stadtgrenze (rot-weiße Sperre plus Zaun). Verstecken blendet nur noch Namensschild und Kartenpunkt aus, das Auto bleibt sichtbar.
+- Polizeijagd (`race/chase.ts`, `ChasePanel.tsx`, in `RaceView`): Menüknopf in der offenen Stadt-Lobby, Einladung per Broadcast-Ereignis `ch` (`inv`/`ans`/`go`/`end`), Ersteller wählt Bandit und Polizei-Bots (0–6). Bandit: schnelles schwarzes fliegendes Auto (Roadster 255), immer auf der Karte; Polizei: weiße Autos mit Blaulicht, langsamer (215, Admin-Fahrer fliegender Roadster). Fangen = Berührung auf gleicher Ebene (`caught`, 4,6 m); nach 6 Minuten gewinnt der Bandit. Bots rechnet nur der Ersteller (`copDrive`, Straßen-Routing, Tunnel/Brücke-Ausfahrt, Stuck-Reset) und sendet sie als `pb-…`-Fahrer.

@@ -2,7 +2,7 @@ import type * as T from 'three'
 import { isBike } from '../stats'
 import { RoundedBoxGeometry } from 'three/examples/jsm/geometries/RoundedBoxGeometry.js'
 import { roadProximity, type Track } from './track'
-import { BRIDGES, CITY, bridgeH, city } from './city'
+import { BRIDGES, CITY, TUNNELS, bridgeH, city, tunnelD } from './city'
 import { RAMPS, STUNT, loopPoint } from './stunt'
 
 type THREE = typeof import('three')
@@ -83,6 +83,10 @@ export interface RaceScene {
   focus?: (x: number, z: number) => void
   /** Schaden (0–100), Driftwinkel und Zeit sichtbar machen: dunkler, verbeult, Rauch, Reifenqualm. */
   damageCar: (g: T.Group, dmg: number, slip: number, v: number, time: number) => void
+  /** Blaulicht aufs Dach setzen (Polizei). */
+  addSiren: (g: T.Group) => void
+  /** Blaulicht blinken lassen (Zeit in ms). */
+  tickSiren: (g: T.Group, ms: number) => void
 }
 
 export function buildScene(THREE: THREE, t: Track): RaceScene {
@@ -297,7 +301,7 @@ export function buildScene(THREE: THREE, t: Track): RaceScene {
     scene.add(ln)
   }
   const makeCar = (kind: string, color: string, name: string, isMe: boolean) => buildCar(THREE, kind, color, name, isMe)
-  return { scene, sun, theme: th, makeCar, follow, focus, damageCar: (g, dmg, slip, v, time) => damageCar(THREE, g, dmg, slip, v, time) }
+  return { scene, sun, theme: th, makeCar, follow, focus, damageCar: (g, dmg, slip, v, time) => damageCar(THREE, g, dmg, slip, v, time), addSiren: (g) => addSiren(THREE, g), tickSiren }
 }
 
 interface Body { len: number; wid: number; hgt: number; cabLen: number; cabH: number; cabZ: number; wheelR: number; spoiler?: boolean; bed?: boolean; open?: boolean; tall?: boolean; cage?: boolean; scoop?: boolean; formula?: boolean; track?: number; wheelW?: number; stripe?: boolean }
@@ -697,11 +701,58 @@ function buildCity(THREE: THREE, scene: T.Scene, ground: T.Mesh, night: boolean)
   })
   crowns.count = tn; trunks.count = tn; bushes.count = bn
   scene.add(crowns, trunks, bushes)
-  // Tunnel: Dach über der Röhre (Wände sind die beiden Häuser daneben), Einfahrten mit Lampen
-  const roofM = new THREE.MeshStandardMaterial({ color: 0x4b5563, roughness: 0.9 })
-  for (const tu of city().tunnels) {
-    const roof = new THREE.Mesh(new THREE.BoxGeometry(tu.w, 1.2, tu.d), roofM); roof.position.set(tu.x, CITY.th + 0.6, tu.z); scene.add(roof)
-    const lamp = new THREE.Mesh(new THREE.BoxGeometry(tu.w > tu.d ? tu.w - 6 : 1, 0.2, tu.w > tu.d ? 1 : tu.d - 6), new THREE.MeshBasicMaterial({ color: night ? 0xfde68a : 0xfff7d6 })); lamp.position.set(tu.x, CITY.th - 0.1, tu.z); scene.add(lamp)
+  // Tunnel unter der Stadt: Boden mit Rampen, Seitenwände, Lampen; die Decke ist die Unterseite des Bodens
+  {
+    const lp: number[] = [], li: number[] = []
+    const q4 = (a: number[], b: number[], c: number[], d: number[]) => { const o = lp.length / 3; lp.push(...a, ...b, ...c, ...d); li.push(o, o + 1, o + 2, o, o + 2, o + 3) }
+    const hw = CITY.tw / 2
+    for (const tu of TUNNELS) {
+      for (let x = tu.x0; x < tu.x1; x += 5) {
+        const xa = x, xb = Math.min(tu.x1, x + 5), da = -tunnelD(xa, tu.tz), db = -tunnelD(xb, tu.tz)
+        q4([xa, da, tu.tz - hw], [xb, db, tu.tz - hw], [xb, db, tu.tz + hw], [xa, da, tu.tz + hw])
+        q4([xa, 0, tu.tz - hw], [xb, 0, tu.tz - hw], [xb, db, tu.tz - hw], [xa, da, tu.tz - hw])
+        q4([xb, 0, tu.tz + hw], [xa, 0, tu.tz + hw], [xa, da, tu.tz + hw], [xb, db, tu.tz + hw])
+      }
+    }
+    const lg = new THREE.BufferGeometry()
+    lg.setAttribute('position', new THREE.Float32BufferAttribute(lp, 3)); lg.setIndex(li); lg.computeVertexNormals()
+    scene.add(new THREE.Mesh(lg, new THREE.MeshStandardMaterial({ color: night ? 0x1f2937 : 0x3b4250, roughness: 0.95, side: THREE.DoubleSide })))
+    // Lampen an der Decke und Einfahrtsschilder
+    const lampM = new THREE.MeshBasicMaterial({ color: night ? 0xfde68a : 0xfff7d6 })
+    for (const tu of TUNNELS) {
+      for (let x = tu.x0 + CITY.ramp; x <= tu.x1 - CITY.ramp; x += 16) { const l = new THREE.Mesh(new THREE.BoxGeometry(2.5, 0.12, 1.2), lampM); l.position.set(x, -0.3, tu.tz); scene.add(l) }
+      for (const [x, sg] of [[tu.x0, 1], [tu.x1, -1]] as const) {
+        for (const side of [-1, 1]) { const post = new THREE.Mesh(new THREE.BoxGeometry(0.6, 4, 0.6), new THREE.MeshStandardMaterial({ color: 0xf59e0b })); post.position.set(x - sg * 1.5, 2, tu.tz + side * (hw + 1)); scene.add(post) }
+        const bar = new THREE.Mesh(new THREE.BoxGeometry(0.6, 0.8, CITY.tw + 3), new THREE.MeshBasicMaterial({ color: 0xf59e0b })); bar.position.set(x - sg * 1.5, 4.2, tu.tz); scene.add(bar)
+      }
+    }
+    // Boden mit Löchern über den Rampen (sonst sähe man die Einfahrt nicht)
+    const SZ = 4500, shape = new THREE.Shape()
+    shape.moveTo(-SZ, SZ); shape.lineTo(SZ, SZ); shape.lineTo(SZ, -SZ); shape.lineTo(-SZ, -SZ); shape.lineTo(-SZ, SZ)
+    for (const tu of TUNNELS) for (const [xa, xb] of [[tu.x0, tu.x0 + CITY.ramp], [tu.x1 - CITY.ramp, tu.x1]] as const) {
+      const hole = new THREE.Path()
+      hole.moveTo(xa, -(tu.tz - hw)); hole.lineTo(xb, -(tu.tz - hw)); hole.lineTo(xb, -(tu.tz + hw)); hole.lineTo(xa, -(tu.tz + hw)); hole.lineTo(xa, -(tu.tz - hw))
+      shape.holes.push(hole)
+    }
+    ground.geometry.dispose()
+    ground.geometry = new THREE.ShapeGeometry(shape)
+    ;(ground.material as T.MeshStandardMaterial).side = THREE.DoubleSide
+    ground.parent?.remove(ground); ground.position.set(0, -0.05, 0); scene.add(ground)
+  }
+  // Stadtgrenze: gestreifte Sperre rundherum, damit man nicht aus Versehen dagegen fährt
+  {
+    const cv = document.createElement('canvas'); cv.width = 128; cv.height = 32
+    const cg = cv.getContext('2d')!
+    for (let i = 0; i < 8; i++) { cg.fillStyle = i % 2 ? '#f8fafc' : '#dc2626'; cg.fillRect(i * 16, 0, 16, 32) }
+    const bt = new THREE.CanvasTexture(cv); bt.wrapS = THREE.RepeatWrapping; bt.colorSpace = THREE.SRGBColorSpace
+    const H = CITY.half, len = H * 2 + 8
+    for (const [x, z, ry] of [[0, -H - 1, 0], [0, H + 1, 0], [-H - 1, 0, Math.PI / 2], [H + 1, 0, Math.PI / 2]] as const) {
+      const t2 = bt.clone(); t2.needsUpdate = true; t2.repeat.set(len / 8, 1)
+      const wall = new THREE.Mesh(new THREE.BoxGeometry(len, 3, 1.2), new THREE.MeshStandardMaterial({ map: t2, emissive: 0xdc2626, emissiveIntensity: night ? 0.5 : 0.18, roughness: 0.7 }))
+      wall.position.set(x, 1.5, z); wall.rotation.y = ry; scene.add(wall)
+      const fence = new THREE.Mesh(new THREE.PlaneGeometry(len, 9), new THREE.MeshBasicMaterial({ color: 0xef4444, transparent: true, opacity: 0.16, side: THREE.DoubleSide, depthWrite: false }))
+      fence.position.set(x, 7.5, z); fence.rotation.y = ry; scene.add(fence)
+    }
   }
 
   // Brücken
@@ -791,4 +842,29 @@ function buildStunt(THREE: THREE, scene: T.Scene, ground: T.Mesh) {
   }
   // Anfahrstreifen
   const strip = new THREE.Mesh(new THREE.PlaneGeometry(2 * w, 160), new THREE.MeshBasicMaterial({ color: 0x1f2937 })); strip.rotation.x = -Math.PI / 2; strip.position.set(L.x, 0.03, L.z - 100); scene.add(strip)
+}
+
+interface Siren { red: T.Mesh; blue: T.Mesh }
+const SIREN = 'siren'
+/** Blaulicht-Balken auf das Dach (Dachhöhe aus den Karosserie-Teilen, ohne Namensschild). */
+function addSiren(THREE: THREE, g: T.Group) {
+  if (g.userData[SIREN]) return
+  const bb = new THREE.Box3()
+  g.traverse((o) => { if ((o as T.Mesh).isMesh) bb.expandByObject(o) })
+  const top = Number.isFinite(bb.max.y) ? bb.max.y : 1.3
+  const w = Math.max(0.5, Math.min(1.1, (bb.max.x - bb.min.x) * 0.55))
+  const base = new THREE.Mesh(new THREE.BoxGeometry(w, 0.1, 0.34), new THREE.MeshStandardMaterial({ color: 0x111827 }))
+  base.position.set(0, top + 0.05, 0)
+  const red = new THREE.Mesh(new THREE.BoxGeometry(w / 2 - 0.02, 0.14, 0.3), new THREE.MeshBasicMaterial({ color: 0xff2a2a }))
+  const blue = new THREE.Mesh(new THREE.BoxGeometry(w / 2 - 0.02, 0.14, 0.3), new THREE.MeshBasicMaterial({ color: 0x2a6bff }))
+  red.position.set(-w / 4, top + 0.14, 0); blue.position.set(w / 4, top + 0.14, 0)
+  g.add(base, red, blue)
+  g.userData[SIREN] = { red, blue } as Siren
+}
+function tickSiren(g: T.Group, ms: number) {
+  const s = g.userData[SIREN] as Siren | undefined
+  if (!s) return
+  const ph = Math.floor(ms / 120) % 6
+  s.red.visible = ph === 0 || ph === 1 || ph === 4
+  s.blue.visible = ph === 2 || ph === 3 || ph === 5
 }
