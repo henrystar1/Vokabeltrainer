@@ -132,6 +132,15 @@ describe('Mehrere Brücken, Tunnel, Wäldchen', () => {
     expect(car.z).toBeLessThan(140)
     expect(car.dmg).toBe(0)
   })
+  it('Garage: auch im Schritttempo (kaum Fahrt) fährt man hinunter, keine unsichtbare Wand', () => {
+    const g = GARAGES[0], st2 = statsFor('roadster', 200)
+    let car: Car = { ...startCar(t, 0), x: g.out.x, z: g.out.z - 14, h: 0, v: 0 }
+    car = { ...car, z: g.out.z, h: Math.PI, v: 1 }
+    let under = false
+    for (let i = 0; i < 30 * 8 && !under; i++) { car = stepCar(car, { ...none, gas: true }, dt, t, st2, true); if (car.lvl === -1) under = true }
+    expect(under).toBe(true)
+    expect(car.dmg).toBe(0)
+  })
   it('geschlossene Straßen-Tunnelenden: man fährt dort nicht hinunter', () => {
     const tu = TUNNELS[0], st2 = statsFor('roadster', 200)
     let car: Car = { ...startCar(t, 0), x: tu.a0 - 10, z: tu.c, h: Math.PI / 2, v: 15 }

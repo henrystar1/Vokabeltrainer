@@ -1,7 +1,7 @@
 import { advance, inPolygon, pointAt, project, type Track } from './track'
 import { canFly, carKmh, flyConfig, flyHeight, isBike, kindDims, kindStats } from '../stats'
 import { hillH, hillSlope } from './mountains'
-import { parkPush, parkSurfaces } from './parkhaus'
+import { PARK_TOP, inParkXZ, parkPush, parkSurfaces } from './parkhaus'
 import { CITY, bridgeH, cityPush, onDeck, roofH, tunnelAt, tunnelClamp, tunnelD, tunnelRamp } from './city'
 import { G, STUNT, arenaPush, groundH, loopPoint } from './stunt'
 import { upFactors, type Up } from '../tuning'
@@ -200,7 +200,7 @@ export function stepCar(c: Car, inp: Input, dt: number, t: Track, st: CarStats, 
       const rt = tunnelRamp(x, z), D = rt ? tunnelD(x, z) : 0
       if (!flying && rt && D > 0.05) {
         const al = Math.abs(rt.dir === 'x' ? Math.sin(moveH) : Math.cos(moveH))
-        if (al > 0.75 && Math.abs(v) > 3) lvl = -1
+        if (al > 0.75 && Math.abs(v) > 0.3) lvl = -1
         else if (D >= 1.5) {
           const off = (CITY.tw / 2 + 0.3)
           if (rt.dir === 'x') z = rt.c + (Math.sign(z - rt.c) || 1) * off
@@ -249,7 +249,8 @@ export function stepCar(c: Car, inp: Input, dt: number, t: Track, st: CarStats, 
         vy = Math.min(17, Math.max(vy, 0) + 30 * dt)
         y += vy * dt
         // Höhengrenze über dem Untergrund (in der Polizeijagd niedriger)
-        const ceil = gh + (inp.chase ? 10 : 80)
+        // (in der Jagd um das Parkhaus herum höher, damit man oben auf dem Dach landen kann)
+        const ceil = inp.chase ? Math.max(gh + 10, inParkXZ(x, z, 45) ? PARK_TOP + 10 : 0) : gh + 80
         if (y > ceil) { y = ceil; vy = Math.min(vy, 0) }
       } else if (wasOn && y - gh < 1.4) { y = gh; vy = 0 }
       else if (y > gh) {

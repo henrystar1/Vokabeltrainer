@@ -869,3 +869,10 @@ Tabelle `book_library_hidden`; `in_library` blendet ein veröffentlichtes Buch d
 - Parkhaus (`parkhaus.ts`, Block bei (-180,-180)): Metall, 4 Ebenen à 4,5 m, Rampenspur im Westen (Zick-Zack: Rampe k steigt nach Norden, Wenden am Südende der Ebene, Platte der Gegenspur), Einfahrt von Süden. `parkSurfaces(x,z)` liefert die Flächenhöhen, `parkPush` die Wände; Physik: `surfAt(x,z,y,chase)` = max(Gelände, Dach, Parkhausflächen), jeweils nur wenn ≤ y+1,4 m. Minimap zeichnet das Parkhaus blau.
 - Polizei-Bots: `entranceFor` → beste Garage (`bestGarage`), erst zur Straße vor dem Tor, vor dem Tor auf Schritttempo, dann geradeaus hinein; unten Bremsen vor Querröhren (`cross`), Ausgang bei Bandit oben über die beste Garage.
 - Enthält alle Änderungen von Update 130.
+- Hotfix: mkStats nutzte isCity vor der Deklaration (TDZ, leerer Bildschirm); jetzt def.mode.
+
+## Update 132
+- Garagen: Gehweg des Garagen-Blocks hat ein Loch über der Rampe (sonst grauer Boden von oben); „Mauer“ vor dem Tunnel war das seitliche Wegschieben bei Tempo ≤ 3 in der Rampe – jetzt fährt man bei Ausrichtung (>0,75) auch im Schritttempo hinunter. Minimap: orange Punkte mit Pfeil an jeder Garage, Parkhaus blau mit weißem Rand.
+- Parkhaus: Cockpit-Kamera automatisch (wie im Tunnel) unter dem Dach; `PARK_TOP` = 19 (Brüstung des Dachs), darüber keine Wand; `inParkXZ`. Jagd-Flughöhe um das Parkhaus (45 m Rand) bis PARK_TOP+10, damit man oben landen kann.
+- Bots: `parkNav` (chase.ts) – von außen zur Straße vor der Einfahrt, dann geradeaus hinein, im Zick-Zack hinauf/hinunter (Ostspur zurück nach Süden), Schritttempo; Bots fliegen am Parkhaus nicht mehr (`inParkXZ` in `want`).
+- Admin-Supercar: Schalter „In der Stadt fliegen erlauben“ im Supercar-Feld (localStorage `vt-race-supfly`).

@@ -1,3 +1,4 @@
+import { PARK, inParkXZ } from './parkhaus'
 import { CITY, GARAGES, TUNNELS, bridgeAt, cityPush, type TunnelSeg } from './city'
 import { flyHeight } from '../stats'
 import type { Car, Input } from './physics'
@@ -97,13 +98,49 @@ function entranceFor(car: Car, tgt: { x: number; z: number }): { x: number; z: n
   return { ...g.out }
 }
 
+/**
+ * Fahr-KI im Parkhaus: rauf im Zick-Zack (Rampe auf der Westspur nach Norden, oben auf der Ostspur zurück nach Süden, am Südende wieder auf die Rampe),
+ * runter spiegelbildlich. `direct`: geradeaus zum Ziel (gleiche Ebene) bzw. in die Einfahrt hinein; sonst Straßenpunkt vor dem Tor.
+ */
+export function parkNav(car: Car, tgt: { x: number; z: number; y?: number }): { x: number; z: number; direct?: boolean; slow?: boolean } | null {
+  const { x0, x1, z0, laneW, ramp } = PARK
+  const xA = x0 + laneW / 2, xm = x0 + laneW, xB = (xm + x1) / 2
+  const carIn = inParkXZ(car.x, car.z, 1), tIn = inParkXZ(tgt.x, tgt.z, 2)
+  if (!carIn && !tIn) return null
+  const y = car.y ?? 0, ty = tgt.y ?? 0, s = car.z - z0, laneA = car.x < xm
+  if (!carIn) {
+    // von außen: erst zur Straße vor der Einfahrt, dann geradeaus hinein
+    const out = { x: xA, z: z0 - 16 }, rx = car.x - out.x, rz = car.z - out.z
+    if (Math.hypot(rx, rz) < 8 || (car.z < z0 && car.z > z0 - 30 && Math.abs(rx) < 9)) return { x: xA, z: z0 + 12, direct: true, slow: true }
+    return { x: out.x, z: -240 }
+  }
+  if (!tIn) {
+    // Ziel ist draußen: unten (Erdgeschoss) einfach nach Süden hinaus, oben erst nach unten
+    if (y < 2) return { x: car.x, z: z0 - 30, direct: true, slow: true }
+  } else if (Math.abs(y - ty) < 2.2 && !(laneA && s < ramp && !(tgt.x < xm && tgt.z - z0 < ramp))) {
+    return { x: tgt.x, z: tgt.z, direct: true, slow: true }
+  }
+  const up = tIn && ty > y
+  if (up) {
+    if (laneA && s < ramp) return { x: xA, z: z0 + ramp + 14, direct: true, slow: true }       // Rampe hinauf
+    if (laneA) return { x: xB, z: z0 + ramp + 8, direct: true, slow: true }                      // oben angekommen: auf die Ostspur
+    if (s > 12) return { x: xB, z: z0 + 6, direct: true, slow: true }                           // Ostspur nach Süden
+    return { x: xA, z: z0 + 6, direct: true, slow: true }                                        // am Südende: nach Westen auf die Rampenspur
+  }
+  // runter
+  if (laneA && s < ramp) return s > 9 ? { x: xA, z: z0 + 2, direct: true, slow: true } : { x: xB, z: z0 + 5, direct: true, slow: true }
+  if (laneA) return { x: xA, z: z0 + ramp - 14, direct: true, slow: true }                      // oben auf der Rampe angekommen: hinunter
+  return s < ramp + 4 ? { x: xB, z: z0 + ramp + 8, direct: true, slow: true } : { x: xA, z: z0 + ramp + 6, direct: true, slow: true }   // Ostspur nach Norden, dann nach Westen zur Rampe
+}
+
 /** Fahr-KI eines Polizei-Bots: fährt über die Straßen (und durch die Tunnel) auf `tgt` (den Bandit) zu, repariert sich selbst und löst sich, wenn er hängt. */
-export function copDrive(car: Car, tgt0: { x: number; z: number; lvl?: number }, mem: BotMem, dt: number): BotDrive {
+export function copDrive(car: Car, tgt0: { x: number; z: number; lvl?: number; y?: number }, mem: BotMem, dt: number): BotDrive {
   const P = CITY.pitch, K = CITY.K
   const node = (v: number) => Math.max(-K, Math.min(K, Math.round(v / P)))
   const lvl = car.lvl ?? 0
   // Bandit unter der Erde und Bot oben: erst zum Eingang fahren
-  const ent = lvl === 0 && (tgt0.lvl ?? 0) === -1 ? entranceFor(car, tgt0) : null
+  const pk = lvl === 0 && (tgt0.lvl ?? 0) !== -1 ? parkNav(car, tgt0 as { x: number; z: number; y?: number }) : null
+  const ent = lvl === 0 && (tgt0.lvl ?? 0) === -1 ? entranceFor(car, tgt0) : pk
   // Außenbereich hinter dem Tor: nur durchs Tor (x = 0) erreichbar
   const HH = CITY.half, carOut = car.z > HH + 4, tgtOut = tgt0.z > HH + 4
   const gateTgt = carOut !== tgtOut ? (carOut ? { x: 0, z: HH - 40 } : { x: 0, z: HH + 40 }) : null
@@ -153,8 +190,9 @@ export function copDrive(car: Car, tgt0: { x: number; z: number; lvl?: number },
   }
   // Garagen-Zufahrt: vor dem Tor auf Schritttempo, damit er die Kurve in die Einfahrt schafft
   const gApproach = lvl === 0 && !gateTgt && !!ent && !entDirect
-  const slow = (nodeWp && dist < 55 && car.v > 21) || exitBrake || (gApproach && dist < 60 && car.v > 12) || (cross !== undefined && cross < 90 && car.v > 17)
-  const brake = car.v > 9 && ((gApproach && dist < 40 && car.v > 9) || (cross !== undefined && cross < 60 && car.v > 20) || Math.abs(diff) > 1.0 || (sharp && dist < 38 && car.v > 15) || (nodeWp && dist < 45 && car.v > 26) || (exitBrake && car.v > 28))
+  const parkSlow = !!pk?.slow
+  const slow = (nodeWp && dist < 55 && car.v > 21) || exitBrake || (parkSlow && car.v > 11) || (gApproach && dist < 60 && car.v > 12) || (cross !== undefined && cross < 90 && car.v > 17)
+  const brake = car.v > 9 && ((parkSlow && car.v > 15) || (gApproach && dist < 40 && car.v > 9) || (cross !== undefined && cross < 60 && car.v > 20) || Math.abs(diff) > 1.0 || (sharp && dist < 38 && car.v > 15) || (nodeWp && dist < 45 && car.v > 26) || (exitBrake && car.v > 28))
   const inp: Input = { gas: !brake && !slow && (Math.abs(diff) < 1.3 || car.v < 6), brake, left: diff > 0.07, right: diff < -0.07 }
   // Selbstreparatur: bei Schaden kurz stehen bleiben, dann ist das Auto wieder heil
   if ((mem.fix ?? 0) > 0) {

@@ -8,7 +8,9 @@ export const PARK = {
   laneW: 26, ramp: 36, floorH: 4.5, floors: 4,
 }
 /** Obere Kante der Außenwand/Brüstung. */
-export const PARK_TOP = PARK.floorH * PARK.floors + 2.5
+export const PARK_TOP = PARK.floorH * PARK.floors + 1
+/** Liegt (x, z) im Parkhaus-Grundriss (m = Rand, der dazugezählt wird)? */
+export const inParkXZ = (x: number, z: number, m = 0): boolean => x >= PARK.x0 - m && x <= PARK.x1 + m && z >= PARK.z0 - m && z <= PARK.z1 + m
 
 /**
  * Höhen aller befahrbaren Flächen bei (x, z), von unten nach oben: Boden, dann je Ebene Rampe (Spur im Westen, s = 0…ramp) bzw. Platte.

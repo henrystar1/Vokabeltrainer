@@ -680,6 +680,22 @@ function buildCity(THREE: THREE, scene: T.Scene, ground: T.Mesh, night: boolean)
   for (let kx = -CITY.K; kx < CITY.K; kx++) for (let kz = -CITY.K; kz < CITY.K; kz++) {
     const cx = P * kx + P / 2, cz = P * kz + P / 2
     const park = parks.some((p) => p.x === cx && p.z === cz)
+    const gar = GARAGES.find((g) => g.bx === cx && g.bz === cz)
+    if (gar) {
+      // Garagen-Block: Gehweg mit Loch über der Rampe, sonst sähe man die Einfahrt nicht
+      const sh = new THREE.Shape(), q = (x: number, z: number): [number, number] => [x - cx, -(z - cz)]
+      sh.moveTo(...q(cx - 48, cz - 48)); sh.lineTo(...q(cx + 48, cz - 48)); sh.lineTo(...q(cx + 48, cz + 48)); sh.lineTo(...q(cx - 48, cz + 48)); sh.lineTo(...q(cx - 48, cz - 48))
+      const tu = TUNNELS[gar.seg], hw2 = CITY.tw / 2
+      const [r0, r1] = tu.r0 !== false ? [tu.a0, tu.a0 + CITY.ramp] : [tu.a1 - CITY.ramp, tu.a1]
+      const [hx0, hx1, hz0, hz1] = tu.dir === 'x' ? [r0, r1, tu.c - hw2, tu.c + hw2] : [tu.c - hw2, tu.c + hw2, r0, r1]
+      const hole = new THREE.Path()
+      hole.moveTo(...q(hx0, hz0)); hole.lineTo(...q(hx0, hz1)); hole.lineTo(...q(hx1, hz1)); hole.lineTo(...q(hx1, hz0)); hole.lineTo(...q(hx0, hz0))
+      sh.holes.push(hole)
+      const eg = new THREE.ExtrudeGeometry(sh, { depth: 0.3, bevelEnabled: false })
+      eg.rotateX(-Math.PI / 2)
+      const m = new THREE.Mesh(eg, walk); m.position.set(cx, -0.05, cz); scene.add(m)
+      continue
+    }
     const m = new THREE.Mesh(new THREE.BoxGeometry(96, 0.3, 96), park ? new THREE.MeshStandardMaterial({ color: night ? 0x1f4a2a : 0x4d9a4a, roughness: 1 }) : walk)
     m.position.set(cx, 0.1, cz); scene.add(m)
   }

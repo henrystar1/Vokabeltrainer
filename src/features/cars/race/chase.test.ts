@@ -116,4 +116,28 @@ describe('Polizei-Bot fährt zum Bandit', () => {
     }
     expect(up).toBe(true)
   })
+  const parkRun = (car0: Car, tgt: { x: number; z: number; lvl: number; y: number }, secs: number, stop: (c: Car) => boolean): { car: Car; resets: number } => {
+    const st = statsFor('roadster', 215)
+    let car = car0, resets = 0
+    const mem: BotMem = { stuck: 0 }
+    for (let i = 0; i < 30 * secs && !stop(car); i++) {
+      const d = copDrive(car, tgt, mem, dt)
+      if (d.reset) { resets++; car = { ...car, x: d.reset.x, z: d.reset.z, h: d.reset.h, v: 0, dmg: 0, lvl: 0, y: 0 } }
+      if (d.repair) car = { ...car, dmg: 0, hold: 0 }
+      car = stepCar(car, { ...d.inp, chase: true }, dt, t, st, true)
+    }
+    return { car, resets }
+  }
+  it('Bot fährt im Parkhaus Rampe für Rampe nach oben aufs Dach, ohne zu fliegen', () => {
+    const tgt = { x: -160, z: -170, lvl: 0, y: 18 }
+    const r = parkRun({ ...startCar(t, 0), x: -120, z: -240, h: -Math.PI / 2, v: 10, lvl: 0 }, tgt, 90, (c) => Math.hypot(c.x - tgt.x, c.z - tgt.z) < 5 && (c.y ?? 0) > 17)
+    expect(r.car.y ?? 0).toBeGreaterThan(17)
+    expect(r.resets).toBe(0)
+  })
+  it('Bot fährt vom Dach hinunter und aus dem Parkhaus zum Bandit auf der Straße', () => {
+    const tgt = { x: -120, z: -300, lvl: 0, y: 0 }
+    const r = parkRun({ ...startCar(t, 0), x: -180, z: -170, h: 0, v: 0, lvl: 0, y: 18 }, tgt, 120, (c) => Math.hypot(c.x - tgt.x, c.z - tgt.z) < 12)
+    expect(Math.hypot(r.car.x - tgt.x, r.car.z - tgt.z)).toBeLessThan(15)
+    expect(r.car.y ?? 0).toBeLessThan(1)
+  })
 })

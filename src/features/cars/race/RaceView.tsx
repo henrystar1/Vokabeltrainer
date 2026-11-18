@@ -6,8 +6,8 @@ import { TRACKS, buildTrack, curveAhead, isOpen, pointAt, project, trackKey, typ
 import { assistSteer, buildRaceLine } from './line'
 import { createFx } from './fx'
 import { canFly, flyHeight, flyRoll, isBike, kindDims } from '../stats'
-import { PARK } from './parkhaus'
-import { BRIDGES, CITY, TUNNELS, bridgeH, city, inPark, roofH, tunnelD } from './city'
+import { PARK, inParkXZ } from './parkhaus'
+import { BRIDGES, CITY, GARAGES, TUNNELS, bridgeH, city, inPark, roofH, tunnelD } from './city'
 import { MOUNTAINS, WORLD, hillH, hillSlope, outRoads } from './mountains'
 import { CHASE_MAX_MS, caught, chaseCar, copDrive, copSpawn, type BotMem, type Role } from './chase'
 import ChasePanel, { type ChaseApi, type ChaseUi, type Peer } from './ChasePanel'
@@ -92,6 +92,10 @@ export default function RaceView({ trackId, custom, laps, me, assistOk = false, 
   const assistRef = useRef(false)
   const [assist, setAssist] = useState(false)
   const setTopRef = useRef<((k: number) => void) | undefined>(undefined)
+  // Admin-Supercar: Fliegen in der Stadt ist frei schaltbar (Schalter im Supercar-Feld, wird im Browser gemerkt)
+  const [supFly, setSupFly] = useState<boolean>(() => { try { return localStorage.getItem('vt-race-supfly') === '1' } catch { return false } })
+  const supFlyRef = useRef(supFly); supFlyRef.current = supFly
+  const applySupFly = (on: boolean) => { supFlyRef.current = on; setSupFly(on); try { localStorage.setItem('vt-race-supfly', on ? '1' : '0') } catch { /* ignorieren */ } setAccRefresh.current() }
   const accRef = useRef(1)
   const setAccRefresh = useRef<() => void>(() => undefined)
   const applyAcc = (m: number) => { accRef.current = m; setAccMul(m); setAccRefresh.current() }
@@ -119,7 +123,7 @@ export default function RaceView({ trackId, custom, laps, me, assistOk = false, 
   const [reward, setReward] = useState<{ coins: number; capped: boolean } | null>(null)
   const [done, setDone] = useState<{ ms: number; best: number; standings: RaceStanding[] } | null>(null)
   // Admin-Supercar fliegt in der Stadt nicht (in der Jagd fährt es als Roadster)
-  const flyer = canFly(chaseKind ?? me.kind) && !(def.mode === 'city' && !chaseKind && me.kind === 'supercar')
+  const flyer = canFly(chaseKind ?? me.kind) && !(def.mode === 'city' && !chaseKind && me.kind === 'supercar' && !supFly)
   const bikeUi = isBike(chaseKind ?? me.kind)
   const [loadErr, setLoadErr] = useState<string | null>(null)
 
@@ -203,7 +207,7 @@ export default function RaceView({ trackId, custom, laps, me, assistOk = false, 
       let userTop = me.top
       let myRole: Role | null = null
       const eff: { kind: string; color: string; up: typeof me.up } = { kind: me.kind, color: me.color, up: me.up }
-      const mkStats = (): CarStats => { const st1 = statsFor(eff.kind, topNow, eff.up); const st0 = def.mode === 'city' && eff.kind === 'supercar' ? { ...st1, fly: false } : st1; return accRef.current === 1 ? st0 : { ...st0, acc: st0.acc * accRef.current } }
+      const mkStats = (): CarStats => { const st1 = statsFor(eff.kind, topNow, eff.up); const st0 = def.mode === 'city' && eff.kind === 'supercar' && !supFlyRef.current ? { ...st1, fly: false } : st1; return accRef.current === 1 ? st0 : { ...st0, acc: st0.acc * accRef.current } }
       let myStats: CarStats = mkStats()
       setTopRef.current = (k: number) => { userTop = k; if (!myRole) { topNow = k; myStats = mkStats() } }
       setAccRefresh.current = () => { myStats = mkStats() }
@@ -472,6 +476,16 @@ export default function RaceView({ trackId, custom, laps, me, assistOk = false, 
         g.strokeStyle = '#a78bfa'; g.lineWidth = Math.max(3, 2 / k); g.setLineDash([14 / k, 10 / k]); g.stroke(mapGeo.tun); g.setLineDash([])
         g.strokeStyle = '#facc15'; g.lineWidth = Math.max(4, 2.5 / k); g.stroke(mapGeo.brg)
         g.fillStyle = '#3b82f6'; g.fillRect(PARK.x0, PARK.z0, PARK.x1 - PARK.x0, PARK.z1 - PARK.z0)
+        g.strokeStyle = '#fff'; g.lineWidth = Math.max(2, 1.5 / k); g.strokeRect(PARK.x0, PARK.z0, PARK.x1 - PARK.x0, PARK.z1 - PARK.z0)
+        // Tunnel-Einfahrten (Garagen): auffällige orange Punkte mit weißem Rand und Pfeil in Fahrtrichtung nach unten
+        const gr = Math.max(14, 7 / k)
+        for (const ga of GARAGES) {
+          g.fillStyle = '#f97316'; g.strokeStyle = '#fff'; g.lineWidth = Math.max(3, 2 / k)
+          g.beginPath(); g.arc(ga.door.x, ga.door.z, gr, 0, 7); g.fill(); g.stroke()
+          const dx = ga.inn.x - ga.out.x, dz = ga.inn.z - ga.out.z, dl = Math.hypot(dx, dz)
+          g.strokeStyle = '#fff'; g.lineWidth = Math.max(3, 2 / k); g.beginPath()
+          g.moveTo(ga.door.x - (dx / dl) * gr * 0.5, ga.door.z - (dz / dl) * gr * 0.5); g.lineTo(ga.door.x + (dx / dl) * gr * 0.5, ga.door.z + (dz / dl) * gr * 0.5); g.stroke()
+        }
         g.setTransform(1, 0, 0, 1, 0, 0)
         // Punkte: innerhalb des Kreises an der Stelle, sonst klein am Rand
         const dot = (x: number, z: number, col: string, r: number) => {
@@ -549,7 +563,8 @@ export default function RaceView({ trackId, custom, laps, me, assistOk = false, 
               if (d.reset) pb.car = { ...pb.car, x: d.reset.x, z: d.reset.z, h: d.reset.h, v: 0, steer: 0, slip: 0, dmg: 0, hold: 0, lvl: 0, y: 0 }
               if (d.repair) pb.car = { ...pb.car, dmg: 0, hold: 0 }
               // Bots fliegen hoch, wenn der Bandit höher ist, und lassen sich sinken, wenn er tiefer ist
-              const want = (tg.y ?? 0) > (pb.car.y ?? 0) + 2.5
+              // (am Parkhaus nicht: dort fahren sie die Rampen, sonst knallen sie von außen gegen die Wand)
+              const want = (tg.y ?? 0) > (pb.car.y ?? 0) + 2.5 && !inParkXZ(tg.x, tg.z, 8) && !inParkXZ(pb.car.x, pb.car.z, 8)
               pb.car = stepCar(pb.car, { ...d.inp, fly: want, chase: true }, dt, track, pb.st, true)
               for (const bd of bands) if (chase && caught({ x: pb.car.x, z: pb.car.z, lvl: pb.car.lvl ?? 0, fly: 0, y: pb.car.y }, bd)) markCaught(bd.id, true)
             }
@@ -671,7 +686,9 @@ export default function RaceView({ trackId, custom, laps, me, assistOk = false, 
         const sp = Math.max(0, car.v)
         const camRoll = flyRoll(car.fly)
         // im Tunnel automatisch Ego-Ansicht (Cockpit), danach wieder die gewählte Ansicht
-        const camEff: 0 | 1 | 2 = isCity && car.lvl === -1 ? 1 : camRef.current
+        // Im Tunnel und im Parkhaus (unter dem Dach) automatisch Cockpit
+        const inGarage = isCity && ((car.lvl ?? 0) === -1 || ((car.lvl ?? 0) === 0 && inParkXZ(car.x, car.z, 1) && (car.y ?? 0) < PARK.floorH * PARK.floors - 0.8))
+        const camEff: 0 | 1 | 2 = inGarage ? 1 : camRef.current
         if (camEff !== lastCamEff) { lastCamEff = camEff; setCamMode(camEff) }
         if (camEff === 1) {
           myMesh.visible = false
@@ -876,6 +893,7 @@ export default function RaceView({ trackId, custom, laps, me, assistOk = false, 
               <button type="button" onClick={() => applyTop(topKmh * 2)} className="flex-1 rounded bg-white/15 py-1">×2</button>
               <button type="button" onClick={() => applyTop(maxTop)} className="flex-1 rounded bg-white/15 py-1">Max</button>
             </div>
+            {def.mode === 'city' && <label className="mt-2 flex items-center gap-2"><input type="checkbox" checked={supFly} onChange={(e) => applySupFly(e.target.checked)} /> In der Stadt fliegen erlauben</label>}
             <p className="mb-1 mt-2 flex justify-between"><span>Beschleunigung</span><b className="tabular-nums">×{accMul.toLocaleString('de-DE')}</b></p>
             <div className="flex gap-1" role="group" aria-label="Beschleunigung">
               {[0.25, 0.5, 1, 2, 5, 20].map((m) => <button key={m} type="button" onClick={() => applyAcc(m)} aria-pressed={accMul === m} className={`flex-1 rounded py-1 ${accMul === m ? 'bg-cyan-500 font-bold text-slate-950' : 'bg-white/15'}`}>{m.toLocaleString('de-DE')}</button>)}
