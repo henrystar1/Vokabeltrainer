@@ -203,7 +203,7 @@ export default function RaceView({ trackId, custom, laps, me, assistOk = false, 
       let userTop = me.top
       let myRole: Role | null = null
       const eff: { kind: string; color: string; up: typeof me.up } = { kind: me.kind, color: me.color, up: me.up }
-      const mkStats = (): CarStats => { const st1 = statsFor(eff.kind, topNow, eff.up); const st0 = isCity && eff.kind === 'supercar' ? { ...st1, fly: false } : st1; return accRef.current === 1 ? st0 : { ...st0, acc: st0.acc * accRef.current } }
+      const mkStats = (): CarStats => { const st1 = statsFor(eff.kind, topNow, eff.up); const st0 = def.mode === 'city' && eff.kind === 'supercar' ? { ...st1, fly: false } : st1; return accRef.current === 1 ? st0 : { ...st0, acc: st0.acc * accRef.current } }
       let myStats: CarStats = mkStats()
       setTopRef.current = (k: number) => { userTop = k; if (!myRole) { topNow = k; myStats = mkStats() } }
       setAccRefresh.current = () => { myStats = mkStats() }
