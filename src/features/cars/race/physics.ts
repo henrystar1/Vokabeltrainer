@@ -1,6 +1,7 @@
 import { advance, inPolygon, pointAt, project, type Track } from './track'
 import { canFly, carKmh, flyConfig, flyHeight, isBike, kindDims, kindStats } from '../stats'
 import { hillH, hillSlope } from './mountains'
+import { parkPush, parkSurfaces } from './parkhaus'
 import { CITY, bridgeH, cityPush, onDeck, roofH, tunnelAt, tunnelClamp, tunnelD, tunnelRamp } from './city'
 import { G, STUNT, arenaPush, groundH, loopPoint } from './stunt'
 import { upFactors, type Up } from '../tuning'
@@ -88,6 +89,15 @@ export function addDamage(c: Car, amount: number, cap = DMG_MAX): Car {
 
 /** Ein Zeitschritt. Arcade-Fahrverhalten: Lenkung hängt vom Tempo ab, Gras bremst, Leitplanken (mit Hitbox) fangen ab und beschädigen.
  *  Driften: Bremse + Lenken bei Tempo schiebt das Heck raus (`drift` = erlaubt). */
+/** Höhe der Fläche, auf der das Auto bei (x, z) steht: Gelände, Dächer und Parkhaus-Ebenen, die höchstens 1,4 m über dem Auto liegen (man steigt nicht auf Häuser, aber Rampen hinauf). */
+function surfAt(x: number, z: number, y: number, chase: boolean): number {
+  let g = hillH(x, z)
+  const r = chase ? 0 : roofH(x, z)
+  if (r > 0 && r <= y + 1.4) g = Math.max(g, r)
+  for (const h of parkSurfaces(x, z)) if (h <= y + 1.4) g = Math.max(g, h)
+  return g
+}
+
 export function stepCar(c: Car, inp: Input, dt: number, t: Track, st: CarStats, canDrive = true, drift = true): Car {
   if (t.def.mode === 'stunt' && (c.loop ?? 0) > 0 && c.lp) return loopStep(c, dt)
   const d = c.dmg / DMG_MAX
@@ -96,7 +106,7 @@ export function stepCar(c: Car, inp: Input, dt: number, t: Track, st: CarStats, 
   let fly = c.fly, cool = c.cool
   const cityMode = t.def.mode === 'city'
   // Stadt: stufenloser Flug (Taste halten = steigen, loslassen = langsam sinken, auch auf Häusern landen); sonst der zeitlich begrenzte Flug
-  const surf0 = cityMode ? Math.max(hillH(c.x, c.z), inp.chase ? 0 : roofH(c.x, c.z)) : 0
+  const surf0 = cityMode ? surfAt(c.x, c.z, c.y ?? 0, !!inp.chase) : 0
   if (!cityMode) {
     if (fly <= 0 && cool > 0) cool = Math.max(0, cool - dt)
     if (st.fly && inp.fly && canDrive && !wrecked && !waiting && fly <= 0 && cool <= 0) fly = flyConfig.sec
@@ -214,8 +224,8 @@ export function stepCar(c: Car, inp: Input, dt: number, t: Track, st: CarStats, 
     if (lvl <= 0) {
       let bd = 0, bnx = 0, bnz = 0
       for (const [cx, cz] of corners({ x, z, h, l: st.len, w: st.wid })) {
-        const p = cityPush(cx, cz)
-        if (p && (lvl === 0 || Math.abs(cx) > CITY.half || Math.abs(cz) > CITY.half) && (p.top === undefined || inp.chase || (c.y ?? 0) < p.top - 0.4 || lvl !== 0) && p.depth > bd) { bd = p.depth; bnx = p.nx; bnz = p.nz }
+        const p = cityPush(cx, cz) ?? (lvl === 0 ? parkPush(cx, cz, c.y ?? 0) : null)
+        if (p && !((p as { lo?: number }).lo !== undefined && (c.y ?? 0) + 2 < ((p as { lo?: number }).lo as number)) && (lvl === 0 || Math.abs(cx) > CITY.half || Math.abs(cz) > CITY.half) && (('top' in p ? p.top : undefined) === undefined || inp.chase || (c.y ?? 0) < (('top' in p ? p.top : 0) as number) - 0.4 || lvl !== 0) && p.depth > bd) { bd = p.depth; bnx = p.nx; bnz = p.nz }
       }
       if (bd > 0) {
         x += bnx * bd; z += bnz * bd
@@ -232,14 +242,14 @@ export function stepCar(c: Car, inp: Input, dt: number, t: Track, st: CarStats, 
     if ((c.lvl ?? 0) === 1 && lvl === 0) { y = bridgeH(c.x, c.z); vy = 0 }
     if (lvl === 0) {
       // Untergrund: Gelände (Berge) oder Hausdach; am Boden folgt das Auto der Oberfläche, in der Luft gilt der Flug
-      const gh = Math.max(hillH(x, z), inp.chase ? 0 : roofH(x, z)), gPrev = surf0
+      const gh = surfAt(x, z, c.y ?? 0, !!inp.chase), gPrev = surf0
       const wasOn = (c.lvl ?? 0) === 0 && (c.y ?? 0) <= gPrev + 0.02
       const climb = st.fly && inp.fly && canDrive && !wrecked && !waiting
       if (climb) {
         vy = Math.min(17, Math.max(vy, 0) + 30 * dt)
         y += vy * dt
         // Höhengrenze über dem Untergrund (in der Polizeijagd niedriger)
-        const ceil = gh + (inp.chase ? 30 : 80)
+        const ceil = gh + (inp.chase ? 10 : 80)
         if (y > ceil) { y = ceil; vy = Math.min(vy, 0) }
       } else if (wasOn && y - gh < 1.4) { y = gh; vy = 0 }
       else if (y > gh) {

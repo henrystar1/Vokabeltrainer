@@ -2,7 +2,8 @@ import type * as T from 'three'
 import { isBike } from '../stats'
 import { RoundedBoxGeometry } from 'three/examples/jsm/geometries/RoundedBoxGeometry.js'
 import { roadProximity, type Track } from './track'
-import { BRIDGES, CITY, TUNNELS, bridgeH, city, tunnelD } from './city'
+import { BRIDGES, CITY, GARAGES, TUNNELS, bridgeH, city, tunnelD } from './city'
+import { PARK, PARK_TOP } from './parkhaus'
 import { GATE, MOUNTAINS, OUT, hillH, outRoads } from './mountains'
 import { RAMPS, STUNT, loopPoint } from './stunt'
 
@@ -660,12 +661,13 @@ function buildCity(THREE: THREE, scene: T.Scene, ground: T.Mesh, night: boolean)
     idx.push(b, b + 1, b + 2, b, b + 2, b + 3)
   }
   for (const b of buildings) {
-    const x0 = b.x - b.w / 2, x1 = b.x + b.w / 2, z0 = b.z - b.d / 2, z1 = b.z + b.d / 2, h = b.h, c = pal[b.c]
-    const tw = b.w / 6, td = b.d / 6, th = h / 6
-    face([[x0, 0, z1], [x1, 0, z1], [x1, h, z1], [x0, h, z1]], [0, 0, 1], tw, th, c)
-    face([[x1, 0, z0], [x0, 0, z0], [x0, h, z0], [x1, h, z0]], [0, 0, -1], tw, th, c)
-    face([[x1, 0, z1], [x1, 0, z0], [x1, h, z0], [x1, h, z1]], [1, 0, 0], td, th, c)
-    face([[x0, 0, z0], [x0, 0, z1], [x0, h, z1], [x0, h, z0]], [-1, 0, 0], td, th, c)
+    const x0 = b.x - b.w / 2, x1 = b.x + b.w / 2, z0 = b.z - b.d / 2, z1 = b.z + b.d / 2, h = b.h, c = pal[b.c], y0 = b.lo ?? 0
+    const tw = b.w / 6, td = b.d / 6, th = (h - y0) / 6
+    face([[x0, y0, z1], [x1, y0, z1], [x1, h, z1], [x0, h, z1]], [0, 0, 1], tw, th, c)
+    face([[x1, y0, z0], [x0, y0, z0], [x0, h, z0], [x1, h, z0]], [0, 0, -1], tw, th, c)
+    face([[x1, y0, z1], [x1, y0, z0], [x1, h, z0], [x1, h, z1]], [1, 0, 0], td, th, c)
+    face([[x0, y0, z0], [x0, y0, z1], [x0, h, z1], [x0, h, z0]], [-1, 0, 0], td, th, c)
+    if (y0 > 0) face([[x0, y0, z0], [x1, y0, z0], [x1, y0, z1], [x0, y0, z1]], [0, -1, 0], 0.01, 0.01, c.clone().multiplyScalar(0.4))
     face([[x0, h, z1], [x1, h, z1], [x1, h, z0], [x0, h, z0]], [0, 1, 0], 0.01, 0.01, c.clone().multiplyScalar(0.55))
   }
   const bg = new THREE.BufferGeometry()
@@ -723,6 +725,14 @@ function buildCity(THREE: THREE, scene: T.Scene, ground: T.Mesh, night: boolean)
         }
       }
     }
+    // Stirnwände an geschlossenen Enden, die nicht in einer anderen Röhre münden
+    for (const tu of TUNNELS) for (const [a, closed, sg] of [[tu.a0, tu.r0 === false, -1], [tu.a1, tu.r1 === false, 1]] as const) {
+      if (!closed) continue
+      const ox = tu.dir === 'x' ? a + sg * 1.5 : tu.c, oz = tu.dir === 'x' ? tu.c : a + sg * 1.5
+      if (tunnelD(ox, oz) > 0) continue
+      const d = tunnelD(tu.dir === 'x' ? a - sg * 3 : tu.c, tu.dir === 'x' ? tu.c : a - sg * 3)
+      q4(P3(tu, a, tu.c - hw, 0), P3(tu, a, tu.c + hw, 0), P3(tu, a, tu.c + hw, -d), P3(tu, a, tu.c - hw, -d))
+    }
     const lg = new THREE.BufferGeometry()
     lg.setAttribute('position', new THREE.Float32BufferAttribute(lp, 3)); lg.setIndex(li); lg.computeVertexNormals()
     scene.add(new THREE.Mesh(lg, new THREE.MeshStandardMaterial({ color: night ? 0x1f2937 : 0x3b4250, roughness: 0.95, side: THREE.DoubleSide })))
@@ -731,7 +741,8 @@ function buildCity(THREE: THREE, scene: T.Scene, ground: T.Mesh, night: boolean)
     for (const tu of TUNNELS) {
       const w = (a: number, p: number): [number, number] => tu.dir === 'x' ? [a, p] : [p, a]
       for (let a = tu.a0 + CITY.ramp; a <= tu.a1 - CITY.ramp; a += 16) { const l = new THREE.Mesh(new THREE.BoxGeometry(tu.dir === 'x' ? 2.5 : 1.2, 0.12, tu.dir === 'x' ? 1.2 : 2.5), lampM); const [lx, lz] = w(a, tu.c); l.position.set(lx, -0.3, lz); scene.add(l) }
-      for (const [a, sg] of [[tu.a0, 1], [tu.a1, -1]] as const) {
+      for (const [a, sg, on] of [[tu.a0, 1, tu.r0 !== false], [tu.a1, -1, tu.r1 !== false]] as const) {
+        if (!on) continue
         for (const side of [-1, 1]) { const post = new THREE.Mesh(new THREE.BoxGeometry(0.6, 4, 0.6), new THREE.MeshStandardMaterial({ color: 0xf59e0b })); const [px, pz] = w(a - sg * 1.5, tu.c + side * (hw + 1)); post.position.set(px, 2, pz); scene.add(post) }
         const bar = new THREE.Mesh(new THREE.BoxGeometry(tu.dir === 'x' ? 0.6 : CITY.tw + 3, 0.8, tu.dir === 'x' ? CITY.tw + 3 : 0.6), new THREE.MeshBasicMaterial({ color: 0xf59e0b })); const [bx, bz] = w(a - sg * 1.5, tu.c); bar.position.set(bx, 4.2, bz); scene.add(bar)
       }
@@ -739,7 +750,7 @@ function buildCity(THREE: THREE, scene: T.Scene, ground: T.Mesh, night: boolean)
     // Boden mit Löchern über den Rampen (sonst sähe man die Einfahrt nicht)
     const SZ = 4500, shape = new THREE.Shape()
     shape.moveTo(-SZ, SZ); shape.lineTo(SZ, SZ); shape.lineTo(SZ, -SZ); shape.lineTo(-SZ, -SZ); shape.lineTo(-SZ, SZ)
-    for (const tu of TUNNELS) for (const [a0, a1] of [[tu.a0, tu.a0 + CITY.ramp], [tu.a1 - CITY.ramp, tu.a1]] as const) {
+    for (const tu of TUNNELS) for (const [a0, a1] of [...(tu.r0 !== false ? [[tu.a0, tu.a0 + CITY.ramp]] : []), ...(tu.r1 !== false ? [[tu.a1 - CITY.ramp, tu.a1]] : [])] as Array<[number, number]>) {
       const [x0, x1, z0, z1] = tu.dir === 'x' ? [a0, a1, tu.c - hw, tu.c + hw] : [tu.c - hw, tu.c + hw, a0, a1]
       const hole = new THREE.Path()
       hole.moveTo(x0, -z0); hole.lineTo(x1, -z0); hole.lineTo(x1, -z1); hole.lineTo(x0, -z1); hole.lineTo(x0, -z0)
@@ -749,6 +760,46 @@ function buildCity(THREE: THREE, scene: T.Scene, ground: T.Mesh, night: boolean)
     ground.geometry = new THREE.ShapeGeometry(shape)
     ;(ground.material as T.MeshStandardMaterial).side = THREE.DoubleSide
     ground.parent?.remove(ground); ground.position.set(0, -0.05, 0); scene.add(ground)
+  }
+  // Garagentore: gelbes Schild über jeder Einfahrt
+  for (const g of GARAGES) {
+    const bar = new THREE.Mesh(new THREE.BoxGeometry(14, 1.1, 0.5), new THREE.MeshBasicMaterial({ color: 0xf59e0b }))
+    bar.position.set(g.door.x, 5.4, g.door.z); if (Math.abs(g.inn.x - g.out.x) > Math.abs(g.inn.z - g.out.z)) bar.rotation.y = Math.PI / 2
+    scene.add(bar)
+  }
+  // Parkhaus aus Metall: Ebenen, Rampenspur (Zick-Zack), Stützen, Brüstungen, P-Schild
+  {
+    const steel = new THREE.MeshStandardMaterial({ color: night ? 0x64748b : 0x94a3b8, roughness: 0.5, metalness: 0.35 })
+    const dark = new THREE.MeshStandardMaterial({ color: 0x334155, roughness: 0.6, metalness: 0.3 })
+    const { x0, x1, z0, z1, laneW, ramp, floorH, floors } = PARK
+    const box = (w: number, h: number, d: number, x: number, y: number, z: number, m: T.Material = steel) => { const b = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), m); b.position.set(x, y, z); scene.add(b); return b }
+    const xm = x0 + laneW, W = x1 - x0, D = z1 - z0
+    for (let k = 1; k <= floors; k++) {
+      const y = floorH * k
+      box(x1 - xm, 0.5, D, (xm + x1) / 2, y - 0.25, (z0 + z1) / 2)
+      box(laneW, 0.5, D - ramp, x0 + laneW / 2, y - 0.25, z0 + ramp + (D - ramp) / 2)
+      box(W, 0.12, 0.4, (x0 + x1) / 2, y - 0.56, (z0 + z1) / 2, new THREE.MeshBasicMaterial({ color: 0xfff7d6 }))
+      // Brüstung rund herum (Süden nur über Ebene 1 geschlossen genug: überall 1 m)
+      box(W, 1, 0.5, (x0 + x1) / 2, y + 0.5, z1); box(0.5, 1, D, x0, y + 0.5, (z0 + z1) / 2); box(0.5, 1, D, x1, y + 0.5, (z0 + z1) / 2); box(W, 1, 0.5, (x0 + x1) / 2, y + 0.5, z0)
+    }
+    // Rampen (geneigte Platten) auf der Westspur
+    const ang = Math.atan2(floorH, ramp), rl = Math.hypot(floorH, ramp)
+    for (let k = 0; k < floors; k++) {
+      const r = box(laneW, 0.5, rl, x0 + laneW / 2, floorH * k + floorH / 2 - 0.25, z0 + ramp / 2); r.rotation.x = -ang
+      box(0.5, 1, rl, x0, floorH * k + floorH / 2 + 0.5, z0 + ramp / 2).rotation.x = -ang
+    }
+    // Stützen
+    for (let x = x0; x <= x1 + 0.1; x += W / 4) for (let z = z0; z <= z1 + 0.1; z += D / 4) box(1, floorH * floors, 1, x, (floorH * floors) / 2, z, dark)
+    // Außenwand im Erdgeschoss (Westen, Osten, Norden); Süden bleibt offen
+    for (const [w, d, x, z] of [[0.6, D, x0, (z0 + z1) / 2], [0.6, D, x1, (z0 + z1) / 2], [W, 0.6, (x0 + x1) / 2, z1]] as const) box(w, floorH, d, x, floorH / 2, z, steel)
+    // Einfahrt-Sturz mit P-Schild
+    const cv = document.createElement('canvas'); cv.width = 128; cv.height = 128
+    const cg = cv.getContext('2d')!
+    cg.fillStyle = '#1d4ed8'; cg.fillRect(0, 0, 128, 128); cg.fillStyle = '#fff'; cg.font = 'bold 100px sans-serif'; cg.textAlign = 'center'; cg.textBaseline = 'middle'; cg.fillText('P', 64, 70)
+    const tex = new THREE.CanvasTexture(cv)
+    const sign = new THREE.Mesh(new THREE.PlaneGeometry(8, 8), new THREE.MeshBasicMaterial({ map: tex, side: THREE.DoubleSide }))
+    sign.position.set(x0 + laneW / 2, PARK_TOP + 5, z0 - 0.5); scene.add(sign)
+    box(0.5, 5, 0.5, x0 + laneW / 2, PARK_TOP + 2.5, z0 - 0.5, dark)
   }
   // Stadtgrenze: gestreifte Sperre rundherum, damit man nicht aus Versehen dagegen fährt
   {

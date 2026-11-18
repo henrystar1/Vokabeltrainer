@@ -1,4 +1,4 @@
-import { CITY, TUNNELS, bridgeAt, cityPush, tunnelAt, type TunnelSeg } from './city'
+import { CITY, GARAGES, TUNNELS, bridgeAt, cityPush, type TunnelSeg } from './city'
 import { flyHeight } from '../stats'
 import type { Car, Input } from './physics'
 
@@ -50,7 +50,7 @@ function segOf(car: Car): TunnelSeg | null {
   return best
 }
 /** Ziel unter der Erde: zum Bandit abbiegen (Kreuzungen), sonst zum Ausgang in Fahrtrichtung. */
-function tunnelWaypoint(car: Car, tgt: { x: number; z: number; lvl?: number }): { x: number; z: number } {
+function tunnelWaypoint(car: Car, tgt: { x: number; z: number; lvl?: number }): { x: number; z: number; cross?: number } {
   const t = segOf(car)
   if (!t) return { x: tgt.x, z: tgt.z }
   const along = (x: number, z: number) => (t.dir === 'x' ? x : z), perp = (x: number, z: number) => (t.dir === 'x' ? z : x)
@@ -75,16 +75,26 @@ function tunnelWaypoint(car: Car, tgt: { x: number; z: number; lvl?: number }): 
   }
   if (!bj) return exit
   if (Math.abs(bj.c - ca) < 9) return mk(bj.c, t.c + Math.sign(tp - t.c) * 60)  // in der Kreuzung: abbiegen
-  return lead(bj.c)
+  return { ...lead(bj.c), cross: Math.abs(bj.c - ca) }
 }
-/** Eingang zur Röhre, in der der Bandit unten fährt: die näheste Rampenmitte in der Straße. */
-function entranceFor(car: Car, tgt: { x: number; z: number }): { x: number; z: number } | null {
-  const t = tunnelAt(tgt.x, tgt.z)
-  if (!t) return null
-  const mk = (a: number, p: number) => (t.dir === 'x' ? { x: a, z: p } : { x: p, z: a })
-  const ca = t.dir === 'x' ? car.x : car.z
-  const e = Math.abs(ca - t.a0) < Math.abs(ca - t.a1) ? t.a0 + 30 : t.a1 - 30
-  return mk(e, t.c)
+/** Garage, über die man am besten zu `to` kommt (Einfahrt nah am Auto, Ausfahrt nah am Ziel). */
+function bestGarage(from: { x: number; z: number }, to: { x: number; z: number }, inward: boolean): (typeof GARAGES)[number] {
+  let best = GARAGES[0], bd = Infinity
+  for (const g of GARAGES) {
+    const d = inward ? Math.hypot(g.out.x - from.x, g.out.z - from.z) + Math.hypot(g.inn.x - to.x, g.inn.z - to.z) : Math.hypot(g.inn.x - from.x, g.inn.z - from.z) + Math.hypot(g.out.x - to.x, g.out.z - to.z)
+    if (d < bd) { bd = d; best = g }
+  }
+  return best
+}
+/** Eingang zum Tunnelnetz: die nächste Garage – erst zur Straße vor dem Tor, dann (ab 45 m) direkt hinein. */
+function entranceFor(car: Car, tgt: { x: number; z: number }): { x: number; z: number; direct?: boolean } {
+  const g = bestGarage(car, tgt, true)
+  // schon in der Einfahrt (zwischen Straße und Garage, auf der Achse) oder an der Straße vor dem Tor: geradeaus hinein
+  const ax = g.inn.x - g.out.x, az = g.inn.z - g.out.z, al = Math.hypot(ax, az)
+  const rx = car.x - g.out.x, rz = car.z - g.out.z
+  const t = (rx * ax + rz * az) / (al * al), off = Math.abs(rx * az - rz * ax) / al
+  if (Math.hypot(rx, rz) < 8 || (t > 0 && t < 1.4 && off < 8)) return { ...g.inn, direct: true }
+  return { ...g.out }
 }
 
 /** Fahr-KI eines Polizei-Bots: fährt über die Straßen (und durch die Tunnel) auf `tgt` (den Bandit) zu, repariert sich selbst und löst sich, wenn er hängt. */
@@ -98,13 +108,19 @@ export function copDrive(car: Car, tgt0: { x: number; z: number; lvl?: number },
   const HH = CITY.half, carOut = car.z > HH + 4, tgtOut = tgt0.z > HH + 4
   const gateTgt = carOut !== tgtOut ? (carOut ? { x: 0, z: HH - 40 } : { x: 0, z: HH + 40 }) : null
   const tgt = gateTgt ?? ent ?? tgt0
+  const entDirect = !gateTgt && !!ent && (ent as { direct?: boolean }).direct
   const ci = node(car.x), cj = node(car.z), ti = node(tgt.x), tj = node(tgt.z)
-  let wx = tgt.x, wz = tgt.z
+  let wx = tgt.x, wz = tgt.z, cross: number | undefined
   if (lvl === -1) {
-    const w = tunnelWaypoint(car, tgt0); wx = w.x; wz = w.z
+    // Bandit oben: unten zur Ausfahrt der besten Garage (Röhrenmitte vor dem Tor)
+    const up = (tgt0.lvl ?? 0) !== -1
+    const gx = up ? bestGarage(car, tgt0, false) : null
+    const w = tunnelWaypoint(car, gx ? { x: gx.out.x, z: gx.out.z, lvl: -1 } : tgt0); wx = w.x; wz = w.z; cross = w.cross
   } else if (lvl === 1) {
     const b = bridgeAt(car.x, car.z)
     if (b) { wx = Math.sin(car.h) >= 0 ? b.bx1 + 8 : b.bx0 - 8; wz = b.bz }
+  } else if (entDirect) {
+    wx = tgt.x; wz = tgt.z
   } else if (carOut && !gateTgt) {
     wx = tgt.x; wz = tgt.z  // draußen frei fahren
   } else if (!(Math.hypot(tgt.x - car.x, tgt.z - car.z) < 70 && clearLine(car.x, car.z, tgt.x, tgt.z))) {
@@ -135,8 +151,10 @@ export function copDrive(car: Car, tgt0: { x: number; z: number; lvl?: number },
     const sg = segOf(car)
     if (sg) { const ca = sg.dir === 'x' ? car.x : car.z, f = (sg.dir === 'x' ? Math.sin(car.h) : Math.cos(car.h)) >= 0; exitBrake = (f ? sg.a1 - ca : ca - sg.a0) < 110 && car.v > 24 }
   }
-  const slow = (nodeWp && dist < 55 && car.v > 21) || exitBrake
-  const brake = car.v > 9 && (Math.abs(diff) > 1.0 || (sharp && dist < 38 && car.v > 15) || (nodeWp && dist < 45 && car.v > 26) || (exitBrake && car.v > 28))
+  // Garagen-Zufahrt: vor dem Tor auf Schritttempo, damit er die Kurve in die Einfahrt schafft
+  const gApproach = lvl === 0 && !gateTgt && !!ent && !entDirect
+  const slow = (nodeWp && dist < 55 && car.v > 21) || exitBrake || (gApproach && dist < 60 && car.v > 12) || (cross !== undefined && cross < 90 && car.v > 17)
+  const brake = car.v > 9 && ((gApproach && dist < 40 && car.v > 9) || (cross !== undefined && cross < 60 && car.v > 20) || Math.abs(diff) > 1.0 || (sharp && dist < 38 && car.v > 15) || (nodeWp && dist < 45 && car.v > 26) || (exitBrake && car.v > 28))
   const inp: Input = { gas: !brake && !slow && (Math.abs(diff) < 1.3 || car.v < 6), brake, left: diff > 0.07, right: diff < -0.07 }
   // Selbstreparatur: bei Schaden kurz stehen bleiben, dann ist das Auto wieder heil
   if ((mem.fix ?? 0) > 0) {

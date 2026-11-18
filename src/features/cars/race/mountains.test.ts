@@ -127,11 +127,11 @@ describe('Flug in der Stadt (stufenlos, Häuser)', () => {
 describe('Flug-Grenzen und Polizeijagd', () => {
   const st = statsFor('roadster', 215)
   const b = city().buildings.find((x) => x.h > 20 && x.w > 20 && x.d > 20)!
-  it('Höhengrenze: normal 80 m, in der Jagd 30 m über dem Untergrund', () => {
+  it('Höhengrenze: normal 80 m, in der Jagd 10 m über dem Untergrund', () => {
     let a: Car = { ...startCar(t, 0), x: 0, z: 0, h: 0, v: 20 }, c: Car = { ...a }
     for (let i = 0; i < 30 * 15; i++) { a = stepCar(a, { ...none, gas: true, fly: true }, dt, t, st, true); c = stepCar(c, { ...none, gas: true, fly: true, chase: true }, dt, t, st, true) }
     expect(a.y ?? 0).toBeCloseTo(80, 0)
-    expect(c.y ?? 0).toBeCloseTo(30, 0)
+    expect(c.y ?? 0).toBeCloseTo(10, 0)
   })
   it('in der Jagd keine Landung auf Häusern: Haus ist eine Wand, auch in der Luft', () => {
     let car: Car = { ...startCar(t, 0), x: b.x, z: b.z - b.d / 2 - 12, h: 0, v: 20, y: 25 }

@@ -6,6 +6,7 @@ import { TRACKS, buildTrack, curveAhead, isOpen, pointAt, project, trackKey, typ
 import { assistSteer, buildRaceLine } from './line'
 import { createFx } from './fx'
 import { canFly, flyHeight, flyRoll, isBike, kindDims } from '../stats'
+import { PARK } from './parkhaus'
 import { BRIDGES, CITY, TUNNELS, bridgeH, city, inPark, roofH, tunnelD } from './city'
 import { MOUNTAINS, WORLD, hillH, hillSlope, outRoads } from './mountains'
 import { CHASE_MAX_MS, caught, chaseCar, copDrive, copSpawn, type BotMem, type Role } from './chase'
@@ -20,13 +21,14 @@ type Key = 'gas' | 'brake' | 'left' | 'right' | 'fly'
 export interface RaceStanding { name: string; ms: number | null; me?: boolean }
 /** Höhe über dem Boden: Flug oder Brücke (der höhere Wert zählt). */
 let levelAir = false  // Stadt: Auto bleibt in der Luft gerade
-const camGround = (x: number, z: number): number => Math.max(hillH(x, z), roofH(x, z))
+// Gelände/Dächer gibt es nur in der Stadt (Rennstrecken nutzen dieselben Koordinaten ohne Berge und Häuser)
+const camGround = (x: number, z: number): number => (levelAir ? Math.max(hillH(x, z), roofH(x, z)) : 0)
 const carY = (c: { fly: number; lvl?: number; x: number; z: number; y?: number }): number => c.lvl === -1 ? -tunnelD(c.x, c.z) : Math.max(flyHeight(c.fly), c.lvl ? bridgeH(c.x, c.z) : 0, c.y ?? 0)
 /** Neigung der Nase: im Looping eine volle Drehung, sonst nach Steigen/Fallen (Rampen, Sprünge) */
 const pitchOf = (c: { loop?: number; vy?: number; v: number; x?: number; z?: number; h?: number; y?: number; lvl?: number }): number => {
   if ((c.loop ?? 0) > 0) return -(c.loop ?? 0)
   // am Berg: Nase folgt der Steigung
-  if (c.x !== undefined && c.z !== undefined && c.h !== undefined && (c.lvl ?? 0) === 0 && (c.y ?? 0) <= hillH(c.x, c.z) + 0.35 && hillH(c.x, c.z) > 0.05) return -Math.atan(hillSlope(c.x, c.z, c.h))
+  if (c.x !== undefined && c.z !== undefined && c.h !== undefined && (c.lvl ?? 0) === 0 && levelAir && (c.y ?? 0) <= hillH(c.x, c.z) + 0.35 && hillH(c.x, c.z) > 0.05) return -Math.atan(hillSlope(c.x, c.z, c.h))
   // Stadt: in der Luft bleibt das Auto gerade (nicht nach oben/unten kippen)
   if (c.x !== undefined && c.z !== undefined && (c.y ?? 0) > camGround(c.x, c.z) + 0.6 && levelAir) return 0
   return -Math.max(-0.6, Math.min(0.6, Math.atan2(c.vy ?? 0, Math.max(Math.abs(c.v), 8))))
@@ -116,7 +118,8 @@ export default function RaceView({ trackId, custom, laps, me, assistOk = false, 
   const walletRef = useRef(wallet); walletRef.current = wallet
   const [reward, setReward] = useState<{ coins: number; capped: boolean } | null>(null)
   const [done, setDone] = useState<{ ms: number; best: number; standings: RaceStanding[] } | null>(null)
-  const flyer = canFly(chaseKind ?? me.kind)
+  // Admin-Supercar fliegt in der Stadt nicht (in der Jagd fährt es als Roadster)
+  const flyer = canFly(chaseKind ?? me.kind) && !(def.mode === 'city' && !chaseKind && me.kind === 'supercar')
   const bikeUi = isBike(chaseKind ?? me.kind)
   const [loadErr, setLoadErr] = useState<string | null>(null)
 
@@ -200,7 +203,7 @@ export default function RaceView({ trackId, custom, laps, me, assistOk = false, 
       let userTop = me.top
       let myRole: Role | null = null
       const eff: { kind: string; color: string; up: typeof me.up } = { kind: me.kind, color: me.color, up: me.up }
-      const mkStats = (): CarStats => { const st0 = statsFor(eff.kind, topNow, eff.up); return accRef.current === 1 ? st0 : { ...st0, acc: st0.acc * accRef.current } }
+      const mkStats = (): CarStats => { const st1 = statsFor(eff.kind, topNow, eff.up); const st0 = isCity && eff.kind === 'supercar' ? { ...st1, fly: false } : st1; return accRef.current === 1 ? st0 : { ...st0, acc: st0.acc * accRef.current } }
       let myStats: CarStats = mkStats()
       setTopRef.current = (k: number) => { userTop = k; if (!myRole) { topNow = k; myStats = mkStats() } }
       setAccRefresh.current = () => { myStats = mkStats() }
@@ -468,6 +471,7 @@ export default function RaceView({ trackId, custom, laps, me, assistOk = false, 
         g.fillStyle = '#8b93a1'; g.fill(mapGeo.bld)
         g.strokeStyle = '#a78bfa'; g.lineWidth = Math.max(3, 2 / k); g.setLineDash([14 / k, 10 / k]); g.stroke(mapGeo.tun); g.setLineDash([])
         g.strokeStyle = '#facc15'; g.lineWidth = Math.max(4, 2.5 / k); g.stroke(mapGeo.brg)
+        g.fillStyle = '#3b82f6'; g.fillRect(PARK.x0, PARK.z0, PARK.x1 - PARK.x0, PARK.z1 - PARK.z0)
         g.setTransform(1, 0, 0, 1, 0, 0)
         // Punkte: innerhalb des Kreises an der Stelle, sonst klein am Rand
         const dot = (x: number, z: number, col: string, r: number) => {
@@ -639,7 +643,7 @@ export default function RaceView({ trackId, custom, laps, me, assistOk = false, 
           if (lean) { m.rotation.z = 0; lean.rotation.z += ((-Math.max(-0.85, Math.min(0.85, steer * Math.min(1, Math.abs(v) / 20) * 0.9 + slip * 0.5))) - lean.rotation.z) * Math.min(1, dt * 9) }
           else m.rotation.z = -steer * Math.min(1, Math.abs(v) / 40) * 0.05 - flyRoll(fly)
           const jets = m.userData.jets as import('three').Group | undefined
-          if (jets) jets.visible = fly > 0 || (lv === 0 && yy > camGround(x, z) + 1)
+          if (jets) jets.visible = fly > 0 || (levelAir && lv === 0 && yy > camGround(x, z) + 1)
           const wh = m.userData.wheels as import('three').Group[] | undefined
           if (wh) for (const w of wh) { w.children.forEach((c) => { c.rotation.x += (v * dt) / (m.userData.wheelR as number) }); if (w.name === 'front') w.rotation.y = steer * 0.45 }
         }
@@ -687,7 +691,7 @@ export default function RaceView({ trackId, custom, laps, me, assistOk = false, 
           camH += dh * Math.min(1, dt * 4.5)
           const back = Math.min(30, 11 + sp * 0.03)
           const cxx = car.x - Math.sin(camH) * back, czz = car.z - Math.cos(camH) * back
-          camera.position.set(cxx, Math.max(0.8 + camGround(cxx, czz), carY(car) - 5), czz)
+          camera.position.set(cxx, isCity ? Math.max(0.8 + camGround(cxx, czz), carY(car) - 5) : 0.8, czz)
           camera.lookAt(car.x, carY(car) + 1.3, car.z)
           if (camRoll) camera.rotateZ(-camRoll)
           camera.fov += ((68 + Math.min(14, sp * 0.15)) - camera.fov) * Math.min(1, dt * 3)
@@ -698,10 +702,16 @@ export default function RaceView({ trackId, custom, laps, me, assistOk = false, 
           const back = Math.min(40, 9.5 + sp * 0.06), up = Math.min(12, 4.3 + sp * 0.018)
           // Kamera hängt hinten oben über dem Auto und folgt Berg, Dach und Flughöhe; nie unter dem Gelände
           const cxx = car.x - Math.sin(camH) * back, czz = car.z - Math.cos(camH) * back
-          const wantY = Math.max(carY(car) + up, camGround(cxx, czz) + 2)
-          camY = camY === 0 || car.lvl === -1 ? wantY : camY + (wantY - camY) * Math.min(1, dt * 6)
-          camera.position.set(cxx, Math.max(camY, camGround(cxx, czz) + 1.5), czz)
-          camera.lookAt(car.x + Math.sin(camH) * 22, carY(car) + 1.4, car.z + Math.cos(camH) * 22)
+          if (isCity) {
+            const wantY = Math.max(carY(car) + up, camGround(cxx, czz) + 2)
+            camY = camY === 0 || car.lvl === -1 ? wantY : camY + (wantY - camY) * Math.min(1, dt * 6)
+            camera.position.set(cxx, Math.max(camY, camGround(cxx, czz) + 1.5), czz)
+            camera.lookAt(car.x + Math.sin(camH) * 22, carY(car) + 1.4, car.z + Math.cos(camH) * 22)
+          } else {
+            // Rennstrecken: Kamera wie immer (fest hinter dem Auto)
+            camera.position.set(cxx, up + carY(car) * 0.8, czz)
+            camera.lookAt(car.x + Math.sin(camH) * 22, 1.4, car.z + Math.cos(camH) * 22)
+          }
           if (bike) camera.rotateZ(Math.max(-0.7, Math.min(0.7, car.steer * Math.min(1, sp / 20) * 0.8)) * 0.5)
           if (camRoll) camera.rotateZ(-camRoll)
           camera.fov += ((62 + Math.min(18, sp * 0.22)) - camera.fov) * Math.min(1, dt * 3)

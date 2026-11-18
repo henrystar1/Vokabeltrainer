@@ -86,7 +86,7 @@ describe('Polizei-Bot fährt zum Bandit', () => {
   })
   it('fährt unter der Erde durch Kreuzungen zum Bandit in einer anderen Röhre', () => {
     const st = statsFor('sportwagen', 195)
-    let car: Car = { ...startCar(t, 0), x: -480 - 20, z: 120, h: Math.PI / 2, v: 10, lvl: 0 }
+    let car: Car = { ...startCar(t, 0), x: 120, z: 330, h: Math.PI, v: 10, lvl: 0 }
     const tgt = { x: 240, z: 300, lvl: -1 }
     const mem: BotMem = { stuck: 0 }
     let best = Infinity, under = 0
@@ -100,5 +100,20 @@ describe('Polizei-Bot fährt zum Bandit', () => {
     }
     expect(under).toBeGreaterThan(30 * 5)
     expect(best).toBeLessThan(CATCH_DIST + 10)
+  })
+  it('kommt unter der Erde über eine Garage wieder nach oben, wenn der Bandit oben fährt', () => {
+    const st = statsFor('sportwagen', 195)
+    let car: Car = { ...startCar(t, 0), x: 60, z: 150, h: 0, v: 8, lvl: -1 }
+    const tgt = { x: 60, z: 600, lvl: 0 }
+    const mem: BotMem = { stuck: 0 }
+    let up = false
+    for (let i = 0; i < 30 * 60 && !up; i++) {
+      const d = copDrive(car, tgt, mem, dt)
+      if (d.reset) car = { ...car, x: d.reset.x, z: d.reset.z, h: d.reset.h, v: 0, dmg: 0, lvl: 0, y: 0 }
+      if (d.repair) car = { ...car, dmg: 0, hold: 0 }
+      car = stepCar(car, d.inp, dt, t, st, true)
+      if ((car.lvl ?? 0) === 0 && car.z > 235 && Math.abs(car.x - 60) < 8) up = true
+    }
+    expect(up).toBe(true)
   })
 })

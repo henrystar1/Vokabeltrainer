@@ -859,3 +859,13 @@ Tabelle `book_library_hidden`; `in_library` blendet ein veröffentlichtes Buch d
 - Flug-Grenzen (Stadt): Höhengrenze 80 m über dem Untergrund, in der Polizeijagd 30 m (`Input.chase`). In der Jagd zählen Häuser als Wände in jeder Höhe, Dächer sind keine Landefläche (`roofH` wird ignoriert) – der Bandit kann nicht auf einem Haus warten.
 - Polizei fährt in der Jagd einen Roadster (fliegt); Bots steigen auf, wenn der Bandit mehr als 2,5 m höher ist, und sinken sonst.
 - Auto bleibt in der Luft gerade (`levelAir`, kein Nicken), Düsenstrahl/Rauch folgt der echten Flughöhe und reicht nur ~5 m unter das Auto (`carFx(..., alt)`).
+
+## Update 130
+- Fix: Gelände-/Dach-Höhen (`camGround`, Hang-Neigung, Düsen) gelten nur in der Stadt (`levelAir`); auf Rennstrecken sind dieselben Koordinaten ohne Berge/Häuser – dort wechselte die Kamera in Kurven ständig die Höhe. Rennstrecken-Kamera wieder wie vor Update 128.
+- Admin-Supercar fliegt in der Stadt nicht mehr (Stats `fly:false`, kein FLIEGEN-Knopf); in der Polizeijagd Höhengrenze für alle 10 m (`Input.chase`).
+
+## Update 131
+- Tunnel-Zufahrten: die Straßen-Tunnel sind an den Enden geschlossen (`r0/r1: false` in `TunnelSeg`, kein Abtauchen mitten auf der Straße). Einfahrten sind 7 Garagen (`GARAGES` in `city.ts`, Stichröhren Index 8–14): Man fährt von der Straße durch ein Tor unter einem Sturz (`Bld.lo`, Unterkante 6 m; Auto passt darunter durch, `cityPush` liefert `lo`) in ein Haus und dort die Rampe hinunter. Scene: Ground-Löcher/Schilder nur an offenen Enden, Stirnwände an geschlossenen Enden, gelbes Torschild.
+- Parkhaus (`parkhaus.ts`, Block bei (-180,-180)): Metall, 4 Ebenen à 4,5 m, Rampenspur im Westen (Zick-Zack: Rampe k steigt nach Norden, Wenden am Südende der Ebene, Platte der Gegenspur), Einfahrt von Süden. `parkSurfaces(x,z)` liefert die Flächenhöhen, `parkPush` die Wände; Physik: `surfAt(x,z,y,chase)` = max(Gelände, Dach, Parkhausflächen), jeweils nur wenn ≤ y+1,4 m. Minimap zeichnet das Parkhaus blau.
+- Polizei-Bots: `entranceFor` → beste Garage (`bestGarage`), erst zur Straße vor dem Tor, vor dem Tor auf Schritttempo, dann geradeaus hinein; unten Bremsen vor Querröhren (`cross`), Ausgang bei Bandit oben über die beste Garage.
+- Enthält alle Änderungen von Update 130.

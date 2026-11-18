@@ -18,7 +18,8 @@ export const BRIDGES: ReadonlyArray<{ bz: number; bx0: number; bx1: number }> = 
   { bz: 0, bx0: -240, bx1: 240 },
 ]
 
-export interface Bld { x: number; z: number; w: number; d: number; h: number; /** Farbvariante 0–5 */ c: number }
+export interface Bld { x: number; z: number; w: number; d: number; h: number; /** Unterkante (Sturz über einer Garageneinfahrt): darunter kann man durchfahren */ lo?: number; /** Farbvariante 0–5 */ c: number }
+import { PARK } from './parkhaus'
 export interface CityData { buildings: Bld[]; parks: Array<{ x: number; z: number; size: number }>; grid: Map<string, number[]> }
 
 const CELL = 40
@@ -49,6 +50,21 @@ export function city(): CityData {
     // vier Gebäude, Gassen kreuzen sich in der Mitte
     for (const sx of [-1, 1]) for (const sz of [-1, 1]) buildings.push({ x: cx + sx * (ALLEY / 2 + lot / 2), z: cz + sz * (ALLEY / 2 + lot / 2), w: lot, d: lot, h: hgt(), c: Math.floor(r() * 6) })
   }
+  // Garagen-Häuser (Einfahrt mit Sturz über der Rampe) und Parkhaus-Block: die zufälligen Häuser dort werden ersetzt
+  const clearBlock = (bx: number, bz: number) => {
+    for (let i = buildings.length - 1; i >= 0; i--) if (Math.abs(buildings[i].x - bx) < 46 && Math.abs(buildings[i].z - bz) < 46) buildings.splice(i, 1)
+    for (let i = parks.length - 1; i >= 0; i--) if (parks[i].x === bx && parks[i].z === bz) parks.splice(i, 1)
+  }
+  for (const g of GARAGES) {
+    clearBlock(g.bx, g.bz)
+    const t = TUNNELS[g.seg], hw = 9, S = 45, hgt = 22
+    if (t.dir === 'z') {
+      buildings.push({ x: (g.bx - S + t.c - hw) / 2, z: g.bz, w: t.c - hw - (g.bx - S), d: 2 * S, h: hgt, c: 0 }, { x: (t.c + hw + g.bx + S) / 2, z: g.bz, w: g.bx + S - (t.c + hw), d: 2 * S, h: hgt, c: 0 }, { x: t.c, z: g.bz, w: 2 * hw, d: 2 * S, h: hgt, lo: 6, c: 0 })
+    } else {
+      buildings.push({ x: g.bx, z: (g.bz - S + t.c - hw) / 2, w: 2 * S, d: t.c - hw - (g.bz - S), h: hgt, c: 0 }, { x: g.bx, z: (t.c + hw + g.bz + S) / 2, w: 2 * S, d: g.bz + S - (t.c + hw), h: hgt, c: 0 }, { x: g.bx, z: t.c, w: 2 * S, d: 2 * hw, h: hgt, lo: 6, c: 0 })
+    }
+  }
+  clearBlock(PARK.cx, PARK.cz)
   const grid = new Map<string, number[]>()
   buildings.forEach((b, i) => {
     for (let gx = Math.floor((b.x - b.w / 2) / CELL); gx <= Math.floor((b.x + b.w / 2) / CELL); gx++)
@@ -75,7 +91,7 @@ export function roofH(x: number, z: number): number {
 export const OUTLAND = { x1: 900, z1: 2150, gate: 14 }
 
 /** Liegt der Punkt in einem Gebäude (oder jenseits der Stadtmauer)? Gibt die Richtung nach draußen (Normale) und die Eindringtiefe zurück. */
-export function cityPush(x: number, z: number): { nx: number; nz: number; depth: number; /** Dachhöhe bei Häusern: oberhalb davon ist nichts im Weg */ top?: number } | null {
+export function cityPush(x: number, z: number): { nx: number; nz: number; depth: number; /** Dachhöhe bei Häusern: oberhalb davon ist nichts im Weg */ top?: number; /** Unterkante (Sturz): darunter kann man durchfahren */ lo?: number } | null {
   const H = CITY.half
   const o = OUTLAND
   // Außenbereich hinter dem Tor: eigene Grenzen; die Stadtmauer (Dicke 4 m) trennt ihn von der Stadt, nur das Tor ist offen
@@ -97,7 +113,7 @@ export function cityPush(x: number, z: number): { nx: number; nz: number; depth:
   for (const i of list) {
     const b = c.buildings[i]
     const px = b.w / 2 - Math.abs(x - b.x), pz = b.d / 2 - Math.abs(z - b.z)
-    if (px > 0 && pz > 0) return px < pz ? { nx: Math.sign(x - b.x) || 1, nz: 0, depth: px, top: b.h } : { nx: 0, nz: Math.sign(z - b.z) || 1, depth: pz, top: b.h }
+    if (px > 0 && pz > 0) return px < pz ? { nx: Math.sign(x - b.x) || 1, nz: 0, depth: px, top: b.h, lo: b.lo } : { nx: 0, nz: Math.sign(z - b.z) || 1, depth: pz, top: b.h, lo: b.lo }
   }
   return null
 }
@@ -115,16 +131,36 @@ export function bridgeH(x: number, z: number): number {
   return CITY.bh * t * t * (3 - 2 * t)
 }
 /** Untergrund-Netz unter der Stadt: Röhren in Ost-West (dir 'x', c = z) und Nord-Süd (dir 'z', c = x) mit Kreuzungen; Einfahrten (Rampen) an den Enden. */
-export interface TunnelSeg { dir: 'x' | 'z'; c: number; a0: number; a1: number }
+/** r0/r1 = false: Ende ohne Rampe (geschlossen bzw. mündet in eine andere Röhre). Zufahrten gibt es nur als Garagen (siehe GARAGES). */
+export interface TunnelSeg { dir: 'x' | 'z'; c: number; a0: number; a1: number; r0?: boolean; r1?: boolean }
+const CLOSED = { r0: false, r1: false } as const
 export const TUNNELS: ReadonlyArray<TunnelSeg> = [
-  { dir: 'x', c: 120, a0: -480, a1: 480 },
-  { dir: 'x', c: -120, a0: -240, a1: 600 },
-  { dir: 'x', c: 360, a0: -600, a1: 120 },
-  { dir: 'x', c: -360, a0: -240, a1: 600 },
-  { dir: 'z', c: -360, a0: -600, a1: 600 },
-  { dir: 'z', c: -120, a0: -600, a1: 600 },
-  { dir: 'z', c: 0, a0: -600, a1: 600 },
-  { dir: 'z', c: 240, a0: -600, a1: 600 },
+  { dir: 'x', c: 120, a0: -480, a1: 480, ...CLOSED },
+  { dir: 'x', c: -120, a0: -240, a1: 600, ...CLOSED },
+  { dir: 'x', c: 360, a0: -600, a1: 120, ...CLOSED },
+  { dir: 'x', c: -360, a0: -240, a1: 600, ...CLOSED },
+  { dir: 'z', c: -360, a0: -600, a1: 600, ...CLOSED },
+  { dir: 'z', c: -120, a0: -600, a1: 600, ...CLOSED },
+  { dir: 'z', c: 0, a0: -600, a1: 600, ...CLOSED },
+  { dir: 'z', c: 240, a0: -600, a1: 600, ...CLOSED },
+  // Garagen: Einfahrt in ein Haus (Block), Rampe unter dem Haus nach unten, mündet in eine Straßenröhre
+  { dir: 'z', c: 60, a0: 113, a1: 225, r0: false },
+  { dir: 'z', c: -180, a0: 15, a1: 127, r1: false },
+  { dir: 'z', c: 300, a0: -225, a1: -113, r1: false },
+  { dir: 'z', c: -420, a0: 353, a1: 465, r0: false },
+  { dir: 'z', c: 420, a0: -465, a1: -353, r1: false },
+  { dir: 'x', c: -300, a0: -7, a1: 105, r0: false },
+  { dir: 'x', c: 180, a0: -353, a1: -255, r0: false },
+]
+/** Garagen-Häuser: Block (Mitte), Achse und Tür (Blockkante, an der man von der Straße hineinfährt). */
+export const GARAGES: ReadonlyArray<{ bx: number; bz: number; seg: number; door: { x: number; z: number }; out: { x: number; z: number }; inn: { x: number; z: number } }> = [
+  { bx: 60, bz: 180, seg: 8, door: { x: 60, z: 225 }, out: { x: 60, z: 240 }, inn: { x: 60, z: 190 } },
+  { bx: -180, bz: 60, seg: 9, door: { x: -180, z: 15 }, out: { x: -180, z: 0 }, inn: { x: -180, z: 50 } },
+  { bx: 300, bz: -180, seg: 10, door: { x: 300, z: -225 }, out: { x: 300, z: -240 }, inn: { x: 300, z: -190 } },
+  { bx: -420, bz: 420, seg: 11, door: { x: -420, z: 465 }, out: { x: -420, z: 480 }, inn: { x: -420, z: 430 } },
+  { bx: 420, bz: -420, seg: 12, door: { x: 420, z: -465 }, out: { x: 420, z: -480 }, inn: { x: 420, z: -430 } },
+  { bx: 60, bz: -300, seg: 13, door: { x: 105, z: -300 }, out: { x: 120, z: -300 }, inn: { x: 70, z: -300 } },
+  { bx: -300, bz: 180, seg: 14, door: { x: -255, z: 180 }, out: { x: -240, z: 180 }, inn: { x: -290, z: 180 } },
 ]
 const segIn = (t: TunnelSeg, x: number, z: number, m = 0): boolean => {
   const a = t.dir === 'x' ? x : z, p = t.dir === 'x' ? z : x
@@ -137,7 +173,7 @@ export function tunnelAt(x: number, z: number): TunnelSeg | null {
 }
 const segU = (t: TunnelSeg, x: number, z: number): number => {
   const a = t.dir === 'x' ? x : z
-  const u = Math.min(1, Math.min(a - t.a0, t.a1 - a) / CITY.ramp)
+  const u = Math.min(1, t.r0 === false ? 1 : (a - t.a0) / CITY.ramp, t.r1 === false ? 1 : (t.a1 - a) / CITY.ramp)
   return u * u * (3 - 2 * u)
 }
 /** Röhre, aber nur im Rampenbereich an den Enden (dort ist die Straße offen); in der Mitte fährt man oben ganz normal über sie. */
@@ -145,7 +181,7 @@ export function tunnelRamp(x: number, z: number): TunnelSeg | null {
   for (const t of TUNNELS) {
     if (!segIn(t, x, z)) continue
     const a = t.dir === 'x' ? x : z
-    if (a - t.a0 < CITY.ramp || t.a1 - a < CITY.ramp) return t
+    if ((t.r0 !== false && a - t.a0 < CITY.ramp) || (t.r1 !== false && t.a1 - a < CITY.ramp)) return t
   }
   return null
 }
