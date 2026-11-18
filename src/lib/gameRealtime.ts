@@ -54,7 +54,8 @@ export const getGameSlot = () => current
  * „aktuelle“ Datenbank (Monatsbudget) gerade verschieden ist. Sonst sehen sie sich gegenseitig nicht.
  */
 export function slotForKey(key: string): number {
-  if (list.length <= 1) return 0
+  // Offene Lobbys (z. B. 'open-city') immer auf Datenbank 0: die Zahl der Datenbanken kann je Gerät verschieden sein (Cache, eingebaute Liste), dann würde der Hash auseinanderlaufen
+  if (list.length <= 1 || key.startsWith('open-')) return 0
   let h = 2166136261
   for (let i = 0; i < key.length; i++) { h ^= key.charCodeAt(i); h = Math.imul(h, 16777619) }
   return (h >>> 0) % list.length

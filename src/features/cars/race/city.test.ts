@@ -106,32 +106,62 @@ describe('Mehrere Brücken, Tunnel, Wäldchen', () => {
     expect(CITY.half).toBe(CITY.pitch * 6)
     expect(city().parks.length).toBeGreaterThanOrEqual(8)
   })
-  it('Tunnel: Rampen an den Enden, dazwischen eben und tief unter der Straße', () => {
-    expect(TUNNELS.length).toBeGreaterThanOrEqual(3)
+  it('Tunnel-Netz: Ost-West- und Nord-Süd-Röhren, Rampen an den Enden, dazwischen tief', () => {
+    expect(TUNNELS.filter((x) => x.dir === 'x').length).toBeGreaterThanOrEqual(3)
+    expect(TUNNELS.filter((x) => x.dir === 'z').length).toBeGreaterThanOrEqual(3)
+    const pt = (tu: typeof TUNNELS[number], a: number, p = 0) => (tu.dir === 'x' ? [a, tu.c + p] : [tu.c + p, a]) as [number, number]
     for (const tu of TUNNELS) {
-      for (const v of [tu.tz, tu.x0, tu.x1]) expect(Math.abs(v % CITY.pitch)).toBe(0)
-      expect(tunnelD(tu.x0, tu.tz)).toBe(0); expect(tunnelD(tu.x1, tu.tz)).toBe(0)
-      expect(tunnelD((tu.x0 + tu.x1) / 2, tu.tz)).toBe(CITY.td)
-      expect(tunnelRamp((tu.x0 + tu.x1) / 2, tu.tz)).toBeNull()
-      expect(tunnelAt(tu.x0 + 5, tu.tz + 30)).toBeNull()
+      for (const v of [tu.c, tu.a0, tu.a1]) expect(Math.abs(v % CITY.pitch)).toBe(0)
+      expect(tunnelD(...pt(tu, tu.a0))).toBe(0); expect(tunnelD(...pt(tu, tu.a1))).toBe(0)
+      expect(tunnelD(...pt(tu, (tu.a0 + tu.a1) / 2))).toBe(CITY.td)
+      expect(tunnelRamp(...pt(tu, (tu.a0 + tu.a1) / 2))).toBeNull()
+      expect(tunnelAt(...pt(tu, tu.a0 + 5, 30))).toBeNull()
     }
-    for (const tu of TUNNELS) for (const b of BRIDGES) expect(tu.tz).not.toBe(b.bz)
+    // Rampen anderer Röhren überlappen keine Röhre
+    for (const tu of TUNNELS) for (const o of TUNNELS) {
+      if (o === tu) continue
+      for (const e of [tu.a0 + CITY.ramp / 2, tu.a1 - CITY.ramp / 2]) { const q = pt(tu, e); expect(tunnelAt(q[0], q[1])).toBe(tu) }
+    }
+    for (const tu of TUNNELS) if (tu.dir === 'x') for (const b of BRIDGES) expect(tu.c).not.toBe(b.bz)
   })
   it('in den Tunnel hinunter, unter der Stadt entlang und wieder hinaus', () => {
     const tu = TUNNELS[0]
     const st2 = statsFor('roadster', 200)
-    let car: Car = { ...startCar(t, 0), x: tu.x0 - 10, z: tu.tz, h: Math.PI / 2, v: 15 }
+    let car: Car = { ...startCar(t, 0), x: tu.a0 - 10, z: tu.c, h: Math.PI / 2, v: 15 }
     let minD = 0, under = 0
-    for (let i = 0; i < 30 * 70 && car.x < tu.x1 + 20; i++) { car = stepCar(car, { ...none, gas: true }, dt, t, st2, true); minD = Math.max(minD, tunnelD(car.x, car.z) * (car.lvl === -1 ? 1 : 0)); if (car.lvl === -1) under++ }
+    for (let i = 0; i < 30 * 70 && car.x < tu.a1 + 20; i++) { car = stepCar(car, { ...none, gas: true }, dt, t, st2, true); minD = Math.max(minD, tunnelD(car.x, car.z) * (car.lvl === -1 ? 1 : 0)); if (car.lvl === -1) under++ }
     expect(minD).toBe(CITY.td)
     expect(under).toBeGreaterThan(30 * 10)
-    expect(car.x).toBeGreaterThan(tu.x1)
+    expect(car.x).toBeGreaterThan(tu.a1)
     expect(car.lvl ?? 0).toBe(0)
     expect(car.dmg).toBe(0)
   })
+  it('Nord-Süd-Röhre: hinein und unten durch, an der Kreuzung abbiegen geht', () => {
+    const tz = TUNNELS.find((x) => x.dir === 'z' && x.c === 0)!, st2 = statsFor('roadster', 200)
+    let car: Car = { ...startCar(t, 0), x: 0, z: tz.a0 - 10, h: 0, v: 15 }
+    let under = 0
+    for (let i = 0; i < 30 * 12; i++) { car = stepCar(car, { ...none, gas: true }, dt, t, st2, true); if (car.lvl === -1) under++ }
+    expect(under).toBeGreaterThan(30 * 5)
+    expect(car.z).toBeGreaterThan(tz.a0 + 100)
+    // unten auf der Kreuzung mit der Ost-West-Röhre z = 120 abbiegen (Kurs +x)
+    car = { ...startCar(t, 0), x: 0, z: 60, h: 0, v: 14, lvl: -1 }
+    for (let i = 0; i < 30 * 8; i++) {
+      const turn = car.z >= 100 && Math.sin(car.h) < 0.95 ? { ...none, gas: true, left: true } : { ...none, gas: true }
+      car = stepCar(car, turn, dt, t, st2, true)
+      if (Math.sin(car.h) > 0.95) break
+    }
+    expect(car.lvl).toBe(-1)
+    expect(Math.sin(car.h)).toBeGreaterThan(0.9)
+  })
+  it('Tunnelwände halten das Auto in der Röhre', () => {
+    const tz = TUNNELS.find((x) => x.dir === 'z' && x.c === 240)!, st2 = statsFor('roadster', 200)
+    let car: Car = { ...startCar(t, 0), x: 240, z: -300, h: 0.35, v: 20, lvl: -1 }
+    for (let i = 0; i < 30 * 3; i++) { car = stepCar(car, { ...none, gas: true }, dt, t, st2, true); expect(Math.abs(car.x - tz.c)).toBeLessThanOrEqual(CITY.tw / 2 + 0.01) }
+    expect(car.lvl).toBe(-1)
+  })
   it('oben über dem Tunnel fährt man normal weiter (bleibt oben)', () => {
     const tu = TUNNELS[0], st2 = statsFor('roadster', 200)
-    let car: Car = { ...startCar(t, 0), x: tu.x0 + CITY.ramp + 60, z: tu.tz, h: Math.PI / 2, v: 15 }
+    let car: Car = { ...startCar(t, 0), x: tu.a0 + CITY.ramp + 60, z: tu.c, h: Math.PI / 2, v: 15 }
     for (let i = 0; i < 30 * 3; i++) { car = stepCar(car, { ...none, gas: true }, dt, t, st2, true); expect(car.lvl ?? 0).toBe(0) }
   })
   it('Park: im Wäldchen ist man versteckt, auf der Straße nicht', () => {

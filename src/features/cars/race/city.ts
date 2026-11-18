@@ -60,9 +60,22 @@ export function city(): CityData {
   return cache
 }
 
+/** Außenbereich hinter der Nordmauer (Maße; Details und Berge in mountains.ts). */
+export const OUTLAND = { x1: 900, z1: 2150, gate: 14 }
+
 /** Liegt der Punkt in einem Gebäude (oder jenseits der Stadtmauer)? Gibt die Richtung nach draußen (Normale) und die Eindringtiefe zurück. */
 export function cityPush(x: number, z: number): { nx: number; nz: number; depth: number } | null {
   const H = CITY.half
+  const o = OUTLAND
+  // Außenbereich hinter dem Tor: eigene Grenzen; die Stadtmauer (Dicke 4 m) trennt ihn von der Stadt, nur das Tor ist offen
+  if (z > H - 2 && Math.abs(x) <= o.x1 && z <= o.z1) {
+    if (Math.abs(x) > o.gate && z < H + 2) return z >= H ? { nx: 0, nz: 1, depth: H + 2 - z } : { nx: 0, nz: -1, depth: z - (H - 2) }
+    if (z > H) return null
+  }
+  if (z > H && Math.abs(x) <= o.x1 && z <= o.z1) return null
+  if (z > H && Math.abs(x) <= o.x1) return { nx: 0, nz: -1, depth: z - o.z1 }
+  if (z > H && x > o.x1) return { nx: -1, nz: 0, depth: x - o.x1 }
+  if (z > H && x < -o.x1) return { nx: 1, nz: 0, depth: -o.x1 - x }
   if (Math.abs(x) > H || Math.abs(z) > H) {
     if (Math.abs(x) - H > Math.abs(z) - H) return { nx: -Math.sign(x), nz: 0, depth: Math.abs(x) - H }
     return { nx: 0, nz: -Math.sign(z), depth: Math.abs(z) - H }
@@ -90,28 +103,58 @@ export function bridgeH(x: number, z: number): number {
   const t = Math.min(1, Math.min(x - b.bx0, b.bx1 - x) / CITY.ramp)
   return CITY.bh * t * t * (3 - 2 * t)
 }
-/** Tunnel unter der Stadt: Einfahrten (Rampen nach unten) auf den Straßen z = tz, dazwischen die Röhre unter Häusern und Kreuzungen. */
-export const TUNNELS: ReadonlyArray<{ tz: number; x0: number; x1: number }> = [
-  { tz: 120, x0: -480, x1: 480 },
-  { tz: -120, x0: -240, x1: 600 },
-  { tz: 360, x0: -600, x1: 240 },
-  { tz: -360, x0: -360, x1: 600 },
+/** Untergrund-Netz unter der Stadt: Röhren in Ost-West (dir 'x', c = z) und Nord-Süd (dir 'z', c = x) mit Kreuzungen; Einfahrten (Rampen) an den Enden. */
+export interface TunnelSeg { dir: 'x' | 'z'; c: number; a0: number; a1: number }
+export const TUNNELS: ReadonlyArray<TunnelSeg> = [
+  { dir: 'x', c: 120, a0: -480, a1: 480 },
+  { dir: 'x', c: -120, a0: -240, a1: 600 },
+  { dir: 'x', c: 360, a0: -600, a1: 120 },
+  { dir: 'x', c: -360, a0: -240, a1: 600 },
+  { dir: 'z', c: -360, a0: -600, a1: 600 },
+  { dir: 'z', c: -120, a0: -600, a1: 600 },
+  { dir: 'z', c: 0, a0: -600, a1: 600 },
+  { dir: 'z', c: 240, a0: -600, a1: 600 },
 ]
-export function tunnelAt(x: number, z: number): { tz: number; x0: number; x1: number } | null {
-  for (const t of TUNNELS) if (x >= t.x0 && x <= t.x1 && Math.abs(z - t.tz) <= CITY.tw / 2) return t
+const segIn = (t: TunnelSeg, x: number, z: number, m = 0): boolean => {
+  const a = t.dir === 'x' ? x : z, p = t.dir === 'x' ? z : x
+  return a >= t.a0 && a <= t.a1 && Math.abs(p - t.c) <= CITY.tw / 2 - m
+}
+/** Röhre (irgendeine), in der der Punkt liegt. */
+export function tunnelAt(x: number, z: number): TunnelSeg | null {
+  for (const t of TUNNELS) if (segIn(t, x, z)) return t
   return null
 }
-/** Tunnel, aber nur im Rampenbereich an den Enden (dort ist die Straße offen); in der Mitte fährt man oben ganz normal über ihn. */
-export function tunnelRamp(x: number, z: number): { tz: number; x0: number; x1: number } | null {
-  const t = tunnelAt(x, z)
-  return t && (x - t.x0 < CITY.ramp || t.x1 - x < CITY.ramp) ? t : null
+const segU = (t: TunnelSeg, x: number, z: number): number => {
+  const a = t.dir === 'x' ? x : z
+  const u = Math.min(1, Math.min(a - t.a0, t.a1 - a) / CITY.ramp)
+  return u * u * (3 - 2 * u)
 }
-/** Tiefe der Tunnelsohle unter der Straße bei (x, z): 0 außerhalb, an den Enden Rampen, dazwischen eben. */
+/** Röhre, aber nur im Rampenbereich an den Enden (dort ist die Straße offen); in der Mitte fährt man oben ganz normal über sie. */
+export function tunnelRamp(x: number, z: number): TunnelSeg | null {
+  for (const t of TUNNELS) {
+    if (!segIn(t, x, z)) continue
+    const a = t.dir === 'x' ? x : z
+    if (a - t.a0 < CITY.ramp || t.a1 - a < CITY.ramp) return t
+  }
+  return null
+}
+/** Tiefe der Tunnelsohle unter der Straße bei (x, z): 0 außerhalb, an den Enden Rampen, dazwischen eben (tiefste aller Röhren am Punkt). */
 export function tunnelD(x: number, z: number): number {
-  const t = tunnelAt(x, z)
-  if (!t) return 0
-  const u = Math.min(1, Math.min(x - t.x0, t.x1 - x) / CITY.ramp)
-  return CITY.td * u * u * (3 - 2 * u)
+  let d = 0
+  for (const t of TUNNELS) if (segIn(t, x, z)) d = Math.max(d, CITY.td * segU(t, x, z))
+  return d
+}
+/** Wandbegrenzung unter der Erde: nächster erlaubter Punkt innerhalb der Vereinigung aller Röhren (0.8 m Wandabstand); null wenn der Punkt schon frei ist. */
+export function tunnelClamp(x: number, z: number): { x: number; z: number } | null {
+  let best: { x: number; z: number } | null = null, bd = Infinity
+  for (const t of TUNNELS) {
+    const hw = CITY.tw / 2 - 0.8
+    const ax = t.dir === 'x' ? Math.max(t.a0, Math.min(t.a1, x)) : Math.max(t.c - hw, Math.min(t.c + hw, x))
+    const az = t.dir === 'z' ? Math.max(t.a0, Math.min(t.a1, z)) : Math.max(t.c - hw, Math.min(t.c + hw, z))
+    const d = Math.hypot(ax - x, az - z)
+    if (d < bd) { bd = d; best = { x: ax, z: az } }
+  }
+  return bd > 1e-6 ? best : null
 }
 export const onDeck = (x: number, z: number): boolean => bridgeAt(x, z) !== null
 /** Liegt der Punkt in einem Park (Wäldchen)? Dort ist man zwischen den Bäumen versteckt. */

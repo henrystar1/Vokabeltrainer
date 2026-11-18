@@ -9,7 +9,7 @@ describe('ChasePanel', () => {
   it('Menü: zeigt nur andere Spieler aus der Stadt, Bandit-Wahl und Bots', () => {
     const h = renderToStaticMarkup(<ChasePanel {...base} ui={{}} />)
     expect(h).toContain('Anna')
-    expect(h).toContain('Wer ist der Bandit?')
+    expect(h).toContain('Wer sind die Banditen?')
     expect(h).toContain('Polizei-Bots')
     expect(h.match(/Ich/g)?.length).toBeGreaterThan(0)
   })
@@ -26,11 +26,18 @@ describe('ChasePanel', () => {
   })
   it('Ergebnis', () => {
     const h = renderToStaticMarkup(<ChasePanel {...base} open={false} ui={{ over: { win: 'police', mine: true } }} />)
-    expect(h).toContain('Die Polizei hat den Bandit gefangen!')
+    expect(h).toContain('Die Polizei hat alle Banditen gefangen!')
   })
   it('Ersteller sieht Antworten', () => {
-    const h = renderToStaticMarkup(<ChasePanel {...base} ui={{ lobby: { id: 'x', bandit: 'me', invited: { a: 'yes' }, bots: 1 } }} />)
+    const h = renderToStaticMarkup(<ChasePanel {...base} ui={{ lobby: { id: 'x', bandits: ['me'], invited: { a: 'yes' }, bots: 1 } }} />)
     expect(h).toContain('dabei')
     expect(h).toContain('Jagd starten')
+  })
+  it('mehrere Banditen: Auswahl per Knöpfen, Lobby nennt alle', () => {
+    const h = renderToStaticMarkup(<ChasePanel {...base} ui={{ lobby: { id: 'x', bandits: ['me', 'a'], invited: { a: 'yes' }, bots: 1 } }} />)
+    expect(h).toContain('Banditen')
+    const m = renderToStaticMarkup(<ChasePanel {...base} ui={{}} />)
+    expect(m).toContain('mehrere möglich')
+    expect(m).toContain('aria-pressed')
   })
 })

@@ -1,6 +1,7 @@
 import { advance, inPolygon, pointAt, project, type Track } from './track'
 import { canFly, carKmh, flyConfig, flyHeight, isBike, kindDims, kindStats } from '../stats'
-import { CITY, bridgeH, cityPush, onDeck, tunnelAt, tunnelD, tunnelRamp } from './city'
+import { hillH, hillSlope } from './mountains'
+import { CITY, bridgeH, cityPush, onDeck, tunnelAt, tunnelClamp, tunnelD, tunnelRamp } from './city'
 import { G, STUNT, arenaPush, groundH, loopPoint } from './stunt'
 import { upFactors, type Up } from '../tuning'
 import { boxHit, corners, impactDamage, type Box } from './collide'
@@ -183,17 +184,23 @@ export function stepCar(c: Car, inp: Input, dt: number, t: Track, st: CarStats, 
       }
       const rt = tunnelRamp(x, z), D = rt ? tunnelD(x, z) : 0
       if (!flying && rt && D > 0.05) {
-        if (Math.abs(Math.sin(moveH)) > 0.75 && Math.abs(v) > 3) lvl = -1
-        else if (D >= 1.5) { z = rt.tz + (Math.sign(z - rt.tz) || 1) * (CITY.tw / 2 + 0.3); v *= 0.8 }
+        const al = Math.abs(rt.dir === 'x' ? Math.sin(moveH) : Math.cos(moveH))
+        if (al > 0.75 && Math.abs(v) > 3) lvl = -1
+        else if (D >= 1.5) {
+          const off = (CITY.tw / 2 + 0.3)
+          if (rt.dir === 'x') z = rt.c + (Math.sign(z - rt.c) || 1) * off
+          else x = rt.c + (Math.sign(x - rt.c) || 1) * off
+          v *= 0.8
+        }
       }
     } else if (lvl === 1 && !onDeck(x, z)) lvl = 0
     else if (lvl === -1 && !tunnelAt(x, z)) lvl = 0
-    const tu = lvl === -1 ? tunnelAt(x, z) : null
-    if (tu && tunnelD(x, z) > 1.5) {
-      const dz = z - tu.tz, lim = CITY.tw / 2 - 0.8
-      if (Math.abs(dz) > lim) {
-        z = tu.tz + Math.sign(dz) * lim
-        const vn = Math.abs(v) * Math.abs(Math.cos(moveH))
+    if (lvl === -1 && tunnelD(x, z) > 1.5) {
+      const cp = tunnelClamp(x, z)
+      if (cp) {
+        const nx = x - cp.x, nz = z - cp.z, nl = Math.hypot(nx, nz) || 1
+        x = cp.x; z = cp.z
+        const vn = Math.abs(v) * Math.abs(Math.sin(moveH) * nx / nl + Math.cos(moveH) * nz / nl)
         dmg = Math.min(DMG_MAX, dmg + impactDamage(vn))
         v *= 1 - Math.min(0.9, (2.2 + vn * 0.04) * dt); bump = Math.max(bump, Math.min(1, Math.abs(v) / 30)); hit = Math.max(hit, Math.min(1, vn / 25))
       }
@@ -218,10 +225,17 @@ export function stepCar(c: Car, inp: Input, dt: number, t: Track, st: CarStats, 
   if (city) {
     // von der Brücke seitlich heruntergefahren: freier Fall bis zur Straße
     if ((c.lvl ?? 0) === 1 && lvl === 0) { y = bridgeH(c.x, c.z); vy = 0 }
-    if (lvl === 0 && y > 0) {
-      vy -= G * dt; y += vy * dt
-      if (y <= 0) { if (vy < -6) { dmg = Math.min(DMG_MAX, dmg + impactDamage(-vy * 0.7)); bump = Math.max(bump, Math.min(1, -vy / 15)) } y = 0; vy = 0 }
-    } else if (lvl !== 0) { y = 0; vy = 0 }
+    if (lvl === 0) {
+      // Gelände (Berge hinter der Stadt): am Boden folgt das Auto der Oberfläche, sonst freier Fall bis dahin
+      const gh = hillH(x, z), wasOn = (c.lvl ?? 0) === 0 && (c.y ?? 0) <= hillH(c.x, c.z) + 0.02
+      if (wasOn && y - gh < 1.4) { y = gh; vy = 0 }
+      else if (y > gh) {
+        vy -= G * dt; y += vy * dt
+        if (y <= gh) { if (vy < -6) { dmg = Math.min(DMG_MAX, dmg + impactDamage(-vy * 0.7)); bump = Math.max(bump, Math.min(1, -vy / 15)) } y = gh; vy = 0 }
+      } else { y = gh; vy = 0 }
+      // Steigung bremst bergauf und beschleunigt bergab
+      if (gh > 0.05 && y <= gh + 0.3 && !flying) v -= G * 0.55 * hillSlope(x, z, h) * Math.sign(v || 1) * Math.min(1, Math.abs(v) / 3) * dt
+    } else { y = 0; vy = 0 }
   }
   let lp: Car['lp']
   if (stunt) {

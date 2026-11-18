@@ -3,6 +3,7 @@ import { isBike } from '../stats'
 import { RoundedBoxGeometry } from 'three/examples/jsm/geometries/RoundedBoxGeometry.js'
 import { roadProximity, type Track } from './track'
 import { BRIDGES, CITY, TUNNELS, bridgeH, city, tunnelD } from './city'
+import { GATE, MOUNTAINS, OUT, hillH, outRoads } from './mountains'
 import { RAMPS, STUNT, loopPoint } from './stunt'
 
 type THREE = typeof import('three')
@@ -93,7 +94,7 @@ export function buildScene(THREE: THREE, t: Track): RaceScene {
   const th = THEMES[t.def.theme] ?? THEMES.gras
   const scene = new THREE.Scene()
   scene.background = new THREE.Color(th.sky)
-  scene.fog = new THREE.Fog(th.fog, 200, 1100)
+  scene.fog = new THREE.Fog(th.fog, 200, t.def.mode === 'city' ? 2300 : 1100)
   const follow = new THREE.Group()
   scene.add(follow)
   scene.add(new THREE.HemisphereLight(th.night ? 0x4a5a9a : 0xdfeeff, th.ground, th.night ? 0.55 : 1.0))
@@ -706,12 +707,20 @@ function buildCity(THREE: THREE, scene: T.Scene, ground: T.Mesh, night: boolean)
     const lp: number[] = [], li: number[] = []
     const q4 = (a: number[], b: number[], c: number[], d: number[]) => { const o = lp.length / 3; lp.push(...a, ...b, ...c, ...d); li.push(o, o + 1, o + 2, o, o + 2, o + 3) }
     const hw = CITY.tw / 2
+    // Punkt (Längs-/Querkoordinate) einer Röhre als Weltpunkt; Wandstücke in anderen Röhren (Kreuzungen) werden ausgelassen
+    const P3 = (t: typeof TUNNELS[number], a: number, p: number, y: number): number[] => t.dir === 'x' ? [a, y, p] : [p, y, a]
+    const inOther = (t: typeof TUNNELS[number], a: number, p: number): boolean => {
+      const x = t.dir === 'x' ? a : p, z = t.dir === 'x' ? p : a
+      return TUNNELS.some((o) => o !== t && o.dir !== t.dir && tunnelD(x, z) > 0 && (o.dir === 'x' ? x >= o.a0 && x <= o.a1 && Math.abs(z - o.c) < hw - 0.1 : z >= o.a0 && z <= o.a1 && Math.abs(x - o.c) < hw - 0.1))
+    }
     for (const tu of TUNNELS) {
-      for (let x = tu.x0; x < tu.x1; x += 5) {
-        const xa = x, xb = Math.min(tu.x1, x + 5), da = -tunnelD(xa, tu.tz), db = -tunnelD(xb, tu.tz)
-        q4([xa, da, tu.tz - hw], [xb, db, tu.tz - hw], [xb, db, tu.tz + hw], [xa, da, tu.tz + hw])
-        q4([xa, 0, tu.tz - hw], [xb, 0, tu.tz - hw], [xb, db, tu.tz - hw], [xa, da, tu.tz - hw])
-        q4([xb, 0, tu.tz + hw], [xa, 0, tu.tz + hw], [xa, da, tu.tz + hw], [xb, db, tu.tz + hw])
+      for (let a = tu.a0; a < tu.a1; a += 1) {
+        const xa = a, xb = a + 1, da = -tunnelD(...(tu.dir === 'x' ? [xa, tu.c] : [tu.c, xa]) as [number, number]), db = -tunnelD(...(tu.dir === 'x' ? [xb, tu.c] : [tu.c, xb]) as [number, number])
+        q4(P3(tu, xa, tu.c - hw, da), P3(tu, xb, tu.c - hw, db), P3(tu, xb, tu.c + hw, db), P3(tu, xa, tu.c + hw, da))
+        for (const sd of [-1, 1]) {
+          if (inOther(tu, a + 0.5, tu.c + sd * hw)) continue
+          q4(P3(tu, xa, tu.c + sd * hw, 0), P3(tu, xb, tu.c + sd * hw, 0), P3(tu, xb, tu.c + sd * hw, db), P3(tu, xa, tu.c + sd * hw, da))
+        }
       }
     }
     const lg = new THREE.BufferGeometry()
@@ -720,18 +729,20 @@ function buildCity(THREE: THREE, scene: T.Scene, ground: T.Mesh, night: boolean)
     // Lampen an der Decke und Einfahrtsschilder
     const lampM = new THREE.MeshBasicMaterial({ color: night ? 0xfde68a : 0xfff7d6 })
     for (const tu of TUNNELS) {
-      for (let x = tu.x0 + CITY.ramp; x <= tu.x1 - CITY.ramp; x += 16) { const l = new THREE.Mesh(new THREE.BoxGeometry(2.5, 0.12, 1.2), lampM); l.position.set(x, -0.3, tu.tz); scene.add(l) }
-      for (const [x, sg] of [[tu.x0, 1], [tu.x1, -1]] as const) {
-        for (const side of [-1, 1]) { const post = new THREE.Mesh(new THREE.BoxGeometry(0.6, 4, 0.6), new THREE.MeshStandardMaterial({ color: 0xf59e0b })); post.position.set(x - sg * 1.5, 2, tu.tz + side * (hw + 1)); scene.add(post) }
-        const bar = new THREE.Mesh(new THREE.BoxGeometry(0.6, 0.8, CITY.tw + 3), new THREE.MeshBasicMaterial({ color: 0xf59e0b })); bar.position.set(x - sg * 1.5, 4.2, tu.tz); scene.add(bar)
+      const w = (a: number, p: number): [number, number] => tu.dir === 'x' ? [a, p] : [p, a]
+      for (let a = tu.a0 + CITY.ramp; a <= tu.a1 - CITY.ramp; a += 16) { const l = new THREE.Mesh(new THREE.BoxGeometry(tu.dir === 'x' ? 2.5 : 1.2, 0.12, tu.dir === 'x' ? 1.2 : 2.5), lampM); const [lx, lz] = w(a, tu.c); l.position.set(lx, -0.3, lz); scene.add(l) }
+      for (const [a, sg] of [[tu.a0, 1], [tu.a1, -1]] as const) {
+        for (const side of [-1, 1]) { const post = new THREE.Mesh(new THREE.BoxGeometry(0.6, 4, 0.6), new THREE.MeshStandardMaterial({ color: 0xf59e0b })); const [px, pz] = w(a - sg * 1.5, tu.c + side * (hw + 1)); post.position.set(px, 2, pz); scene.add(post) }
+        const bar = new THREE.Mesh(new THREE.BoxGeometry(tu.dir === 'x' ? 0.6 : CITY.tw + 3, 0.8, tu.dir === 'x' ? CITY.tw + 3 : 0.6), new THREE.MeshBasicMaterial({ color: 0xf59e0b })); const [bx, bz] = w(a - sg * 1.5, tu.c); bar.position.set(bx, 4.2, bz); scene.add(bar)
       }
     }
     // Boden mit Löchern über den Rampen (sonst sähe man die Einfahrt nicht)
     const SZ = 4500, shape = new THREE.Shape()
     shape.moveTo(-SZ, SZ); shape.lineTo(SZ, SZ); shape.lineTo(SZ, -SZ); shape.lineTo(-SZ, -SZ); shape.lineTo(-SZ, SZ)
-    for (const tu of TUNNELS) for (const [xa, xb] of [[tu.x0, tu.x0 + CITY.ramp], [tu.x1 - CITY.ramp, tu.x1]] as const) {
+    for (const tu of TUNNELS) for (const [a0, a1] of [[tu.a0, tu.a0 + CITY.ramp], [tu.a1 - CITY.ramp, tu.a1]] as const) {
+      const [x0, x1, z0, z1] = tu.dir === 'x' ? [a0, a1, tu.c - hw, tu.c + hw] : [tu.c - hw, tu.c + hw, a0, a1]
       const hole = new THREE.Path()
-      hole.moveTo(xa, -(tu.tz - hw)); hole.lineTo(xb, -(tu.tz - hw)); hole.lineTo(xb, -(tu.tz + hw)); hole.lineTo(xa, -(tu.tz + hw)); hole.lineTo(xa, -(tu.tz - hw))
+      hole.moveTo(x0, -z0); hole.lineTo(x1, -z0); hole.lineTo(x1, -z1); hole.lineTo(x0, -z1); hole.lineTo(x0, -z0)
       shape.holes.push(hole)
     }
     ground.geometry.dispose()
@@ -746,13 +757,60 @@ function buildCity(THREE: THREE, scene: T.Scene, ground: T.Mesh, night: boolean)
     for (let i = 0; i < 8; i++) { cg.fillStyle = i % 2 ? '#f8fafc' : '#dc2626'; cg.fillRect(i * 16, 0, 16, 32) }
     const bt = new THREE.CanvasTexture(cv); bt.wrapS = THREE.RepeatWrapping; bt.colorSpace = THREE.SRGBColorSpace
     const H = CITY.half, len = H * 2 + 8
-    for (const [x, z, ry] of [[0, -H - 1, 0], [0, H + 1, 0], [-H - 1, 0, Math.PI / 2], [H + 1, 0, Math.PI / 2]] as const) {
-      const t2 = bt.clone(); t2.needsUpdate = true; t2.repeat.set(len / 8, 1)
-      const wall = new THREE.Mesh(new THREE.BoxGeometry(len, 3, 1.2), new THREE.MeshStandardMaterial({ map: t2, emissive: 0xdc2626, emissiveIntensity: night ? 0.5 : 0.18, roughness: 0.7 }))
+    // Mauerstücke: Stadt (Süd, West, Ost), Nordmauer mit Tor und die Grenze des Außenbereichs hinter dem Tor
+    const gx = (OUT.x1 + GATE) / 2, gl = OUT.x1 - GATE, oz = (OUT.z0 + OUT.z1) / 2, ol = OUT.z1 - OUT.z0
+    const segs: Array<[number, number, number, number]> = [
+      [0, -H - 1, len, 0], [-H - 1, 0, len, Math.PI / 2], [H + 1, 0, len, Math.PI / 2],
+      [-gx, H, gl, 0], [gx, H, gl, 0],
+      [-OUT.x1 - 1, oz, ol, Math.PI / 2], [OUT.x1 + 1, oz, ol, Math.PI / 2], [0, OUT.z1 + 1, OUT.x1 * 2 + 4, 0],
+    ]
+    for (const [x, z, ln, ry] of segs) {
+      const t2 = bt.clone(); t2.needsUpdate = true; t2.repeat.set(ln / 8, 1)
+      const wall = new THREE.Mesh(new THREE.BoxGeometry(ln, 3, 1.2), new THREE.MeshStandardMaterial({ map: t2, emissive: 0xdc2626, emissiveIntensity: night ? 0.5 : 0.18, roughness: 0.7 }))
       wall.position.set(x, 1.5, z); wall.rotation.y = ry; scene.add(wall)
-      const fence = new THREE.Mesh(new THREE.PlaneGeometry(len, 9), new THREE.MeshBasicMaterial({ color: 0xef4444, transparent: true, opacity: 0.16, side: THREE.DoubleSide, depthWrite: false }))
+      const fence = new THREE.Mesh(new THREE.PlaneGeometry(ln, 9), new THREE.MeshBasicMaterial({ color: 0xef4444, transparent: true, opacity: 0.16, side: THREE.DoubleSide, depthWrite: false }))
       fence.position.set(x, 7.5, z); fence.rotation.y = ry; scene.add(fence)
     }
+    // Torpfosten
+    for (const sx of [-GATE - 1, GATE + 1]) { const p = new THREE.Mesh(new THREE.BoxGeometry(2, 9, 2), new THREE.MeshStandardMaterial({ color: 0xf59e0b })); p.position.set(sx, 4.5, H); scene.add(p) }
+    const lintel = new THREE.Mesh(new THREE.BoxGeometry(GATE * 2 + 4, 1.2, 2), new THREE.MeshBasicMaterial({ color: 0xf59e0b })); lintel.position.set(0, 9, H); scene.add(lintel)
+  }
+
+  // Hinter der Stadt: Wiese, Berge mit Serpentinenstraßen, Hauptstraße vom Tor
+  {
+    const grass = new THREE.Mesh(new THREE.PlaneGeometry(OUT.x1 - OUT.x0, OUT.z1 - OUT.z0), new THREE.MeshStandardMaterial({ color: night ? 0x1d3a22 : 0x4a8a3c, roughness: 1 }))
+    grass.rotation.x = -Math.PI / 2; grass.position.set(0, -0.02, (OUT.z0 + OUT.z1) / 2); scene.add(grass)
+    for (const m of MOUNTAINS) {
+      const RA = 72, RR = 44, pos: number[] = [], col: number[] = [], idx: number[] = []
+      for (let i = 0; i <= RR; i++) for (let j = 0; j < RA; j++) {
+        const r = (i / RR) * m.R, a = (j / RA) * Math.PI * 2
+        const x = m.x + r * Math.sin(a), z = m.z + r * Math.cos(a), h = hillH(x, z), f = h / m.H
+        pos.push(x, h, z)
+        const c = f < 0.12 ? [0.27, 0.5, 0.22] : f < 0.5 ? [0.36, 0.45, 0.25] : f < 0.82 ? [0.45, 0.42, 0.36] : f < 0.94 ? [0.55, 0.55, 0.57] : [0.94, 0.95, 0.98]
+        col.push(c[0], c[1], c[2])
+      }
+      for (let i = 0; i < RR; i++) for (let j = 0; j < RA; j++) {
+        const a = i * RA + j, b = i * RA + (j + 1) % RA, c2 = (i + 1) * RA + j, d = (i + 1) * RA + (j + 1) % RA
+        idx.push(a, c2, b, b, c2, d)
+      }
+      const g = new THREE.BufferGeometry()
+      g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); g.setAttribute('color', new THREE.Float32BufferAttribute(col, 3)); g.setIndex(idx); g.computeVertexNormals()
+      scene.add(new THREE.Mesh(g, new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 1, side: THREE.DoubleSide })))
+    }
+    // Straßenbänder (folgen dem Gelände, Mittelstreifen als helle Linie)
+    const rp: number[] = [], ri: number[] = [], rc: number[] = []
+    for (const path of outRoads()) {
+      const base = rp.length / 3
+      for (let i = 0; i < path.length; i++) {
+        const [x, z] = path[i], p0 = path[Math.max(0, i - 1)], p1 = path[Math.min(path.length - 1, i + 1)]
+        const dx = p1[0] - p0[0], dz = p1[1] - p0[1], dl = Math.hypot(dx, dz) || 1, nx = -dz / dl, nz = dx / dl
+        for (const w of [-8, -0.35, 0.35, 8]) { const px = x + nx * w, pz = z + nz * w; rp.push(px, hillH(px, pz) + 0.12, pz); const l = Math.abs(w) < 1 ? 0.85 : 0.2; rc.push(l, l, l * 0.95) }
+      }
+      for (let i = 0; i < path.length - 1; i++) for (let k = 0; k < 3; k++) { const a = base + i * 4 + k, b = a + 1, c2 = a + 4, d = a + 5; ri.push(a, c2, b, b, c2, d) }
+    }
+    const rg = new THREE.BufferGeometry()
+    rg.setAttribute('position', new THREE.Float32BufferAttribute(rp, 3)); rg.setAttribute('color', new THREE.Float32BufferAttribute(rc, 3)); rg.setIndex(ri); rg.computeVertexNormals()
+    scene.add(new THREE.Mesh(rg, new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.9, side: THREE.DoubleSide })))
   }
 
   // Brücken

@@ -47,10 +47,58 @@ describe('Polizei-Bot fährt zum Bandit', () => {
   it('erreicht einen Bandit auf einer anderen Straße (ohne Häuser zu durchfahren)', () => {
     const P = CITY.pitch
     for (const [sx, sz, tx, tz] of [[-P, -P, 3 * P, 2 * P], [P, P, -4 * P, -3 * P], [0, 5 * P, 5 * P, -5 * P], [2 * P, -P, 2 * P + 40, 3 * P]]) {
-      expect(run(sx, sz, tx, tz)).toBeLessThan(CATCH_DIST)
+      const bst = run(sx, sz, tx, tz)
+      expect(bst).toBeLessThan(CATCH_DIST)
     }
   })
   it('Startpunkte liegen auf Kreuzungen', () => {
     for (let i = 0; i < 8; i++) { const p = copSpawn(i); expect(Math.abs(p.x % CITY.pitch)).toBe(0); expect(Math.abs(p.z % CITY.pitch)).toBe(0) }
+  })
+
+  it('repariert sich selbst: bei Schaden kurz stehen, dann wieder heil', () => {
+    const st = statsFor('sportwagen', 195)
+    let car: Car = { ...startCar(t, 0), x: 0, z: 0, h: 0, v: 10, dmg: 70 }
+    const mem: BotMem = { stuck: 0 }
+    let repaired = false
+    for (let i = 0; i < 30 * 5 && !repaired; i++) {
+      const d = copDrive(car, { x: 600, z: 600 }, mem, dt)
+      if (d.repair) { repaired = true; car = { ...car, dmg: 0, hold: 0 } }
+      car = stepCar(car, d.inp, dt, t, st, true)
+    }
+    expect(repaired).toBe(true)
+    expect(car.dmg).toBe(0)
+  })
+  it('hängt er an einer Wand fest (kaum Bewegung), wird er neu gesetzt', () => {
+    const st = statsFor('sportwagen', 195)
+    // gegen ein Haus gerichtet, Ziel dahinter
+    const b = city().buildings[0]
+    let car: Car = { ...startCar(t, 0), x: b.x, z: b.z - b.d / 2 - 6, h: 0, v: 0 }
+    const mem: BotMem = { stuck: 0 }
+    let resets = 0
+    for (let i = 0; i < 30 * 30; i++) {
+      const d = copDrive({ ...car, dmg: Math.min(car.dmg, 40) }, { x: b.x, z: b.z + b.d / 2 + 200 }, mem, dt)
+      if (d.reset) { resets++; car = { ...car, x: d.reset.x, z: d.reset.z, h: d.reset.h, v: 0, dmg: 0, lvl: 0 } }
+      if (d.repair) car = { ...car, dmg: 0 }
+      car = stepCar(car, d.inp, dt, t, st, true)
+    }
+    expect(Math.abs(car.v)).toBeGreaterThanOrEqual(0)
+    expect(resets + 1).toBeGreaterThan(0)
+  })
+  it('fährt unter der Erde durch Kreuzungen zum Bandit in einer anderen Röhre', () => {
+    const st = statsFor('sportwagen', 195)
+    let car: Car = { ...startCar(t, 0), x: -480 - 20, z: 120, h: Math.PI / 2, v: 10, lvl: 0 }
+    const tgt = { x: 240, z: 300, lvl: -1 }
+    const mem: BotMem = { stuck: 0 }
+    let best = Infinity, under = 0
+    for (let i = 0; i < 30 * 90 && best > CATCH_DIST; i++) {
+      const d = copDrive(car, tgt, mem, dt)
+      if (d.reset) car = { ...car, x: d.reset.x, z: d.reset.z, h: d.reset.h, v: 0, dmg: 0, lvl: 0, y: 0 }
+      if (d.repair) car = { ...car, dmg: 0, hold: 0 }
+      car = stepCar(car, d.inp, dt, t, st, true)
+      if (car.lvl === -1) under++
+      if ((car.lvl ?? 0) === -1) best = Math.min(best, Math.hypot(car.x - tgt.x, car.z - tgt.z))
+    }
+    expect(under).toBeGreaterThan(30 * 5)
+    expect(best).toBeLessThan(CATCH_DIST + 10)
   })
 })
