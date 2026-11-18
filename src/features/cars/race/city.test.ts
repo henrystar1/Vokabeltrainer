@@ -2,7 +2,6 @@ import { describe, expect, it } from 'vitest'
 import { BRIDGES, CITY, TUNNELS, bridgeAt, bridgeH, city, cityPush, inPark, onDeck, tunnelAt, tunnelD, tunnelRamp } from './city'
 import { TRACKS, buildTrack, isOpen } from './track'
 import { startCar, statsFor, stepCar, type Car } from './physics'
-import { FLY_SECONDS } from '../stats'
 
 const dt = 1 / 30
 const none = { gas: false, brake: false, left: false, right: false }
@@ -83,9 +82,8 @@ describe('Brücke', () => {
     expect(car.z).toBeGreaterThan(bz + CITY.bw)
   })
   it('mit dem Flugauto von der Seite auf die Brücke landen', () => {
-    let car: Car = { ...startCar(t, 0), x: 0, z: bz + CITY.bw + 1.5, h: Math.PI, v: 1.8 }
-    let first = true
-    for (let i = 0; i < 30 * (FLY_SECONDS + 3); i++) { car = stepCar(car, { ...none, fly: first }, dt, t, st, true); first = false }
+    let car: Car = { ...startCar(t, 0), x: 0, z: bz + CITY.bw + 1.5, h: Math.PI, v: 6 }
+    for (let i = 0; i < 30 * 8; i++) car = stepCar(car, { ...none, fly: i < 6 }, dt, t, st, true)
     expect(car.fly).toBe(0)
     expect(car.lvl).toBe(1)
   })

@@ -60,11 +60,22 @@ export function city(): CityData {
   return cache
 }
 
+/** Dachhöhe des Hauses an diesem Punkt (0 = kein Haus): darauf kann man mit dem Flugmodus landen und fahren. */
+export function roofH(x: number, z: number): number {
+  if (Math.abs(x) > CITY.half || Math.abs(z) > CITY.half) return 0
+  const c = city()
+  const list = c.grid.get(`${Math.floor(x / CELL)},${Math.floor(z / CELL)}`)
+  if (!list) return 0
+  let top = 0
+  for (const i of list) { const b = c.buildings[i]; if (Math.abs(x - b.x) < b.w / 2 && Math.abs(z - b.z) < b.d / 2) top = Math.max(top, b.h) }
+  return top
+}
+
 /** Außenbereich hinter der Nordmauer (Maße; Details und Berge in mountains.ts). */
 export const OUTLAND = { x1: 900, z1: 2150, gate: 14 }
 
 /** Liegt der Punkt in einem Gebäude (oder jenseits der Stadtmauer)? Gibt die Richtung nach draußen (Normale) und die Eindringtiefe zurück. */
-export function cityPush(x: number, z: number): { nx: number; nz: number; depth: number } | null {
+export function cityPush(x: number, z: number): { nx: number; nz: number; depth: number; /** Dachhöhe bei Häusern: oberhalb davon ist nichts im Weg */ top?: number } | null {
   const H = CITY.half
   const o = OUTLAND
   // Außenbereich hinter dem Tor: eigene Grenzen; die Stadtmauer (Dicke 4 m) trennt ihn von der Stadt, nur das Tor ist offen
@@ -86,7 +97,7 @@ export function cityPush(x: number, z: number): { nx: number; nz: number; depth:
   for (const i of list) {
     const b = c.buildings[i]
     const px = b.w / 2 - Math.abs(x - b.x), pz = b.d / 2 - Math.abs(z - b.z)
-    if (px > 0 && pz > 0) return px < pz ? { nx: Math.sign(x - b.x) || 1, nz: 0, depth: px } : { nx: 0, nz: Math.sign(z - b.z) || 1, depth: pz }
+    if (px > 0 && pz > 0) return px < pz ? { nx: Math.sign(x - b.x) || 1, nz: 0, depth: px, top: b.h } : { nx: 0, nz: Math.sign(z - b.z) || 1, depth: pz, top: b.h }
   }
   return null
 }

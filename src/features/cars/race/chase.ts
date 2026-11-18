@@ -15,12 +15,13 @@ export function chaseCar(role: Role, isAdminCar: boolean, bot = false): { kind: 
 export const CATCH_DIST = 4.6
 export const CHASE_MAX_MS = 6 * 60 * 1000
 
-type Pos = { x: number; z: number; lvl?: number; fly?: number }
+type Pos = { x: number; z: number; lvl?: number; fly?: number; y?: number }
 /** Gefangen: Polizeiauto rammt den Bandit (gleiche Ebene, ähnliche Höhe, Auto an Auto). */
 export function caught(cop: Pos, bandit: Pos): boolean {
   if ((cop.lvl ?? 0) !== (bandit.lvl ?? 0)) return false
   if (Math.hypot(cop.x - bandit.x, cop.z - bandit.z) > CATCH_DIST) return false
-  return Math.abs(flyHeight(cop.fly ?? 0) - flyHeight(bandit.fly ?? 0)) < 3
+  const alt = (p: Pos) => (p.y !== undefined ? p.y : flyHeight(p.fly ?? 0))
+  return Math.abs(alt(cop) - alt(bandit)) < 3
 }
 
 const wrap = (d: number) => { while (d > Math.PI) d -= Math.PI * 2; while (d < -Math.PI) d += Math.PI * 2; return d }

@@ -6,7 +6,7 @@ import { TRACKS, buildTrack, curveAhead, isOpen, pointAt, project, trackKey, typ
 import { assistSteer, buildRaceLine } from './line'
 import { createFx } from './fx'
 import { canFly, flyHeight, flyRoll, isBike, kindDims } from '../stats'
-import { BRIDGES, CITY, TUNNELS, bridgeH, city, inPark, tunnelD } from './city'
+import { BRIDGES, CITY, TUNNELS, bridgeH, city, inPark, roofH, tunnelD } from './city'
 import { MOUNTAINS, WORLD, hillH, hillSlope, outRoads } from './mountains'
 import { CHASE_MAX_MS, caught, chaseCar, copDrive, copSpawn, type BotMem, type Role } from './chase'
 import ChasePanel, { type ChaseApi, type ChaseUi, type Peer } from './ChasePanel'
@@ -19,6 +19,7 @@ const TOP_MIN = 20
 type Key = 'gas' | 'brake' | 'left' | 'right' | 'fly'
 export interface RaceStanding { name: string; ms: number | null; me?: boolean }
 /** Höhe über dem Boden: Flug oder Brücke (der höhere Wert zählt). */
+const camGround = (x: number, z: number): number => Math.max(hillH(x, z), roofH(x, z))
 const carY = (c: { fly: number; lvl?: number; x: number; z: number; y?: number }): number => c.lvl === -1 ? -tunnelD(c.x, c.z) : Math.max(flyHeight(c.fly), c.lvl ? bridgeH(c.x, c.z) : 0, c.y ?? 0)
 /** Neigung der Nase: im Looping eine volle Drehung, sonst nach Steigen/Fallen (Rampen, Sprünge) */
 const pitchOf = (c: { loop?: number; vy?: number; v: number; x?: number; z?: number; h?: number; y?: number; lvl?: number }): number => {
@@ -107,7 +108,7 @@ export default function RaceView({ trackId, custom, laps, me, assistOk = false, 
   const toggleAssist = () => { if (!assistOk) return; assistRef.current = !assistRef.current; setAssist(assistRef.current) }
   const assistToggleRef = useRef(toggleAssist)
   assistToggleRef.current = toggleAssist
-  const [hud, setHud] = useState({ speed: 0, lap: 1, pos: 1, of: 1 + bots.length + (online ? online.players.length - 1 : 0), ms: 0, count: 4, wrong: false, curve: 0, curveDist: 0, offroad: false, best: 0, dmg: 0, drift: false, dp: 0, dc: 0, db: 0, fly: 0, cool: 0 })
+  const [hud, setHud] = useState({ alt: 0, speed: 0, lap: 1, pos: 1, of: 1 + bots.length + (online ? online.players.length - 1 : 0), ms: 0, count: 4, wrong: false, curve: 0, curveDist: 0, offroad: false, best: 0, dmg: 0, drift: false, dp: 0, dc: 0, db: 0, fly: 0, cool: 0 })
   const wallet = useWalletOptional()
   const walletRef = useRef(wallet); walletRef.current = wallet
   const [reward, setReward] = useState<{ coins: number; capped: boolean } | null>(null)
@@ -256,6 +257,7 @@ export default function RaceView({ trackId, custom, laps, me, assistOk = false, 
       let lastLap = 0, lapStart = 0, bestLap = Number(localStorage.getItem(lapKey(trackKey(def)))) || 0
       let raceBest = 0, usedAssist = false
       let camH = car.h
+      let camY = 0
       let lastSend = 0, lastHud = 0
       let lastRepair = -REPAIR_CD_MS
       let peersKey = ''
@@ -518,12 +520,12 @@ export default function RaceView({ trackId, custom, laps, me, assistOk = false, 
         if (chase && !chase.over && online) {
           const nowT = performance.now()
           // Positionen der noch freien Banditen
-          const bands: Array<{ id: string; x: number; z: number; lvl: number; fly: number }> = []
+          const bands: Array<{ id: string; x: number; z: number; lvl: number; fly: number; y?: number }> = []
           for (const bid of chase.bandits) {
             if (chase.got.has(bid)) continue
-            if (bid === online.userId) { bands.push({ id: bid, x: car.x, z: car.z, lvl: car.lvl ?? 0, fly: car.fly }); continue }
+            if (bid === online.userId) { bands.push({ id: bid, x: car.x, z: car.z, lvl: car.lvl ?? 0, fly: car.fly, y: car.y }); continue }
             const br = remotes.get(bid)
-            if (br && nowT - br.seen < 6000) bands.push({ id: bid, x: br.x, z: br.z, lvl: br.lv ?? 0, fly: br.fl })
+            if (br && nowT - br.seen < 6000) bands.push({ id: bid, x: br.x, z: br.z, lvl: br.lv ?? 0, fly: br.fl, y: br.yy })
           }
           for (const pb of pbots) {
             if (bands.length && go) {
@@ -533,11 +535,11 @@ export default function RaceView({ trackId, custom, laps, me, assistOk = false, 
               if (d.reset) pb.car = { ...pb.car, x: d.reset.x, z: d.reset.z, h: d.reset.h, v: 0, steer: 0, slip: 0, dmg: 0, hold: 0, lvl: 0, y: 0 }
               if (d.repair) pb.car = { ...pb.car, dmg: 0, hold: 0 }
               pb.car = stepCar(pb.car, d.inp, dt, track, pb.st, true)
-              for (const bd of bands) if (chase && caught({ x: pb.car.x, z: pb.car.z, lvl: pb.car.lvl ?? 0, fly: 0 }, bd)) markCaught(bd.id, true)
+              for (const bd of bands) if (chase && caught({ x: pb.car.x, z: pb.car.z, lvl: pb.car.lvl ?? 0, fly: 0, y: pb.car.y }, bd)) markCaught(bd.id, true)
             }
           }
-          if (chase && myRole === 'cop') for (const bd of bands) if (chase && caught({ x: car.x, z: car.z, lvl: car.lvl ?? 0, fly: car.fly }, bd)) markCaught(bd.id, true)
-          if (chase && myRole === 'bandit' && !iCaught) for (const r of remotes.values()) if (r.ro === 'c' && nowT - r.seen < 2500 && caught({ x: r.x, z: r.z, lvl: r.lv ?? 0, fly: r.fl }, { x: car.x, z: car.z, lvl: car.lvl ?? 0, fly: car.fly })) { markCaught(online.userId, true); break }
+          if (chase && myRole === 'cop') for (const bd of bands) if (chase && caught({ x: car.x, z: car.z, lvl: car.lvl ?? 0, fly: car.fly, y: car.y }, bd)) markCaught(bd.id, true)
+          if (chase && myRole === 'bandit' && !iCaught) for (const r of remotes.values()) if (r.ro === 'c' && nowT - r.seen < 2500 && caught({ x: r.x, z: r.z, lvl: r.lv ?? 0, fly: r.fl, y: r.yy }, { x: car.x, z: car.z, lvl: car.lvl ?? 0, fly: car.fly, y: car.y })) { markCaught(online.userId, true); break }
           if (chase && nowT - chase.t0 > CHASE_MAX_MS) finishChase('bandit', chase.from === online.userId)
         }
         const prevTotal = car.total
@@ -625,12 +627,12 @@ export default function RaceView({ trackId, custom, laps, me, assistOk = false, 
           if (lean) { m.rotation.z = 0; lean.rotation.z += ((-Math.max(-0.85, Math.min(0.85, steer * Math.min(1, Math.abs(v) / 20) * 0.9 + slip * 0.5))) - lean.rotation.z) * Math.min(1, dt * 9) }
           else m.rotation.z = -steer * Math.min(1, Math.abs(v) / 40) * 0.05 - flyRoll(fly)
           const jets = m.userData.jets as import('three').Group | undefined
-          if (jets) jets.visible = fly > 0
+          if (jets) jets.visible = fly > 0 || (lv === 0 && yy > camGround(x, z) + 1)
           const wh = m.userData.wheels as import('three').Group[] | undefined
           if (wh) for (const w of wh) { w.children.forEach((c) => { c.rotation.x += (v * dt) / (m.userData.wheelR as number) }); if (w.name === 'front') w.rotation.y = steer * 0.45 }
         }
         place(myMesh, car.x, car.z, car.h, car.v, car.steer, car.dmg, car.slip, car.fly, car.lvl ?? 0, car.y ?? 0, pitchOf(car))
-        carFx(eff.kind, car.x, car.z, car.h, car.v, car.slip, car.fly, input.gas, dt)
+        carFx(eff.kind, car.x, car.z, car.h, car.v, car.slip, isCity && (car.lvl ?? 0) === 0 && (car.y ?? 0) > camGround(car.x, car.z) + 1 ? 1 : car.fly, input.gas, dt)
         if (myRole === 'cop') rs.tickSiren(myMesh, now)
         for (const pb of pbots) { place(pb.mesh, pb.car.x, pb.car.z, pb.car.h, pb.car.v, pb.car.steer, pb.car.dmg, pb.car.slip, 0, pb.car.lvl ?? 0, pb.car.y ?? 0, 0); rs.tickSiren(pb.mesh, now) }
         botList.forEach((b, i) => place(botMeshes[i], b.car.x, b.car.z, b.car.h, b.car.v, b.car.steer, b.car.dmg, b.car.slip))
@@ -672,7 +674,8 @@ export default function RaceView({ trackId, custom, laps, me, assistOk = false, 
           let dh = car.h - camH; while (dh > Math.PI) dh -= Math.PI * 2; while (dh < -Math.PI) dh += Math.PI * 2
           camH += dh * Math.min(1, dt * 4.5)
           const back = Math.min(30, 11 + sp * 0.03)
-          camera.position.set(car.x - Math.sin(camH) * back, 0.8, car.z - Math.cos(camH) * back)
+          const cxx = car.x - Math.sin(camH) * back, czz = car.z - Math.cos(camH) * back
+          camera.position.set(cxx, Math.max(0.8 + camGround(cxx, czz), carY(car) - 5), czz)
           camera.lookAt(car.x, carY(car) + 1.3, car.z)
           if (camRoll) camera.rotateZ(-camRoll)
           camera.fov += ((68 + Math.min(14, sp * 0.15)) - camera.fov) * Math.min(1, dt * 3)
@@ -681,8 +684,12 @@ export default function RaceView({ trackId, custom, laps, me, assistOk = false, 
           let dh = car.h - camH; while (dh > Math.PI) dh -= Math.PI * 2; while (dh < -Math.PI) dh += Math.PI * 2
           camH += dh * Math.min(1, dt * 4.5)
           const back = Math.min(40, 9.5 + sp * 0.06), up = Math.min(12, 4.3 + sp * 0.018)
-          camera.position.set(car.x - Math.sin(camH) * back, up + carY(car) * 0.8, car.z - Math.cos(camH) * back)
-          camera.lookAt(car.x + Math.sin(camH) * 22, 1.4, car.z + Math.cos(camH) * 22)
+          // Kamera hängt hinten oben über dem Auto und folgt Berg, Dach und Flughöhe; nie unter dem Gelände
+          const cxx = car.x - Math.sin(camH) * back, czz = car.z - Math.cos(camH) * back
+          const wantY = Math.max(carY(car) + up, camGround(cxx, czz) + 2)
+          camY = camY === 0 || car.lvl === -1 ? wantY : camY + (wantY - camY) * Math.min(1, dt * 6)
+          camera.position.set(cxx, Math.max(camY, camGround(cxx, czz) + 1.5), czz)
+          camera.lookAt(car.x + Math.sin(camH) * 22, carY(car) + 1.4, car.z + Math.cos(camH) * 22)
           if (bike) camera.rotateZ(Math.max(-0.7, Math.min(0.7, car.steer * Math.min(1, sp / 20) * 0.8)) * 0.5)
           if (camRoll) camera.rotateZ(-camRoll)
           camera.fov += ((62 + Math.min(18, sp * 0.22)) - camera.fov) * Math.min(1, dt * 3)
@@ -713,7 +720,7 @@ export default function RaceView({ trackId, custom, laps, me, assistOk = false, 
           const dot = Math.sin(car.h) * track.tx[pr.i] + Math.cos(car.h) * track.tz[pr.i]
           const ca = curveAhead(track, pr.i, 110)
           const count = go ? 0 : Math.ceil((startAt - now) / 1000)
-          setHud({ speed: Math.round(Math.abs(car.v) * 3.6), lap: Math.min(laps, Math.max(1, lapNow + 1)), pos: rankNow(), of: 1 + botList.length + remotes.size, ms: finishedMs ?? raceMs, count, wrong: !isFree && dot < -0.3 && car.v > 4, curve: !isFree && Math.abs(ca.k) > 0.004 ? Math.sign(ca.k) : 0, curveDist: Math.round(ca.dist / 10) * 10, offroad: car.offroad, best: bestLap, dmg: Math.round(car.dmg), drift: Math.abs(car.slip) > 0.2 && car.v > 10, dp: dTotal, dc: Math.round(dCombo), db: Math.round(dBest), fly: Math.round(car.fly * 10) / 10, cool: Math.ceil(car.cool) })
+          setHud({ alt: isCity ? Math.round(car.y ?? 0) : 0, speed: Math.round(Math.abs(car.v) * 3.6), lap: Math.min(laps, Math.max(1, lapNow + 1)), pos: rankNow(), of: 1 + botList.length + remotes.size, ms: finishedMs ?? raceMs, count, wrong: !isFree && dot < -0.3 && car.v > 4, curve: !isFree && Math.abs(ca.k) > 0.004 ? Math.sign(ca.k) : 0, curveDist: Math.round(ca.dist / 10) * 10, offroad: car.offroad, best: bestLap, dmg: Math.round(car.dmg), drift: Math.abs(car.slip) > 0.2 && car.v > 10, dp: dTotal, dc: Math.round(dCombo), db: Math.round(dBest), fly: Math.round(car.fly * 10) / 10, cool: Math.ceil(car.cool) })
           if (chaseOn) {
             const list = [...remotes.values()].filter((r) => !r.id.startsWith('pb-') && now - r.seen < 4000).map((r) => ({ id: r.id, name: r.name }))
             const key = list.map((x) => x.id + x.name).join('|')
@@ -821,7 +828,8 @@ export default function RaceView({ trackId, custom, laps, me, assistOk = false, 
         <div className="ml-auto mt-1 h-2 w-20 overflow-hidden rounded bg-black/50" role="img" aria-label={`Schaden ${hud.dmg} Prozent`}><div className={`h-full ${hud.dmg > 70 ? 'bg-rose-500' : hud.dmg > 35 ? 'bg-amber-400' : 'bg-emerald-400'}`} style={{ width: `${hud.dmg}%` }} /></div>
         <p className="text-[10px]">Schaden {hud.dmg}%</p>
         {hud.drift && <p className="text-xs font-bold text-amber-200">DRIFT!</p>}
-        {flyer && <p className={`text-xs font-bold ${hud.fly > 0 ? 'text-cyan-300' : hud.cool > 0 ? 'text-slate-300' : 'text-emerald-300'}`}>{hud.fly > 0 ? `FLUG ${hud.fly.toFixed(1)} s` : hud.cool > 0 ? `Laden ${hud.cool} s` : 'Flug bereit (E)'}</p>}
+        {flyer && def.mode === 'city' && <p className={`text-xs font-bold ${hud.alt > 1 ? 'text-cyan-300' : 'text-emerald-300'}`}>{hud.alt > 1 ? `Höhe ${hud.alt} m` : 'Fliegen: Taste halten (E)'}</p>}
+        {flyer && def.mode !== 'city' && <p className={`text-xs font-bold ${hud.fly > 0 ? 'text-cyan-300' : hud.cool > 0 ? 'text-slate-300' : 'text-emerald-300'}`}>{hud.fly > 0 ? `FLUG ${hud.fly.toFixed(1)} s` : hud.cool > 0 ? `Laden ${hud.cool} s` : 'Flug bereit (E)'}</p>}
       </div>
       {hud.dmg >= 100 && <p className="pointer-events-none absolute top-14 left-1/2 -translate-x-1/2 rounded-lg bg-rose-700 px-3 py-1 text-sm font-bold text-white">Totalschaden! R = Werkstatt (3 s Pause)</p>}
       {hud.curve !== 0 && hud.count === 0 && (

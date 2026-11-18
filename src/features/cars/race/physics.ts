@@ -1,7 +1,7 @@
 import { advance, inPolygon, pointAt, project, type Track } from './track'
 import { canFly, carKmh, flyConfig, flyHeight, isBike, kindDims, kindStats } from '../stats'
 import { hillH, hillSlope } from './mountains'
-import { CITY, bridgeH, cityPush, onDeck, tunnelAt, tunnelClamp, tunnelD, tunnelRamp } from './city'
+import { CITY, bridgeH, cityPush, onDeck, roofH, tunnelAt, tunnelClamp, tunnelD, tunnelRamp } from './city'
 import { G, STUNT, arenaPush, groundH, loopPoint } from './stunt'
 import { upFactors, type Up } from '../tuning'
 import { boxHit, corners, impactDamage, type Box } from './collide'
@@ -94,10 +94,15 @@ export function stepCar(c: Car, inp: Input, dt: number, t: Track, st: CarStats, 
   const wrecked = c.dmg >= DMG_MAX
   const waiting = c.hold > 0
   let fly = c.fly, cool = c.cool
-  if (fly <= 0 && cool > 0) cool = Math.max(0, cool - dt)
-  if (st.fly && inp.fly && canDrive && !wrecked && !waiting && fly <= 0 && cool <= 0) fly = flyConfig.sec
-  const flying = fly > 0
-  if (flying) { fly = Math.max(0, fly - dt); if (fly === 0) cool = flyConfig.cool }
+  const cityMode = t.def.mode === 'city'
+  // Stadt: stufenloser Flug (Taste halten = steigen, loslassen = langsam sinken, auch auf Häusern landen); sonst der zeitlich begrenzte Flug
+  const surf0 = cityMode ? Math.max(hillH(c.x, c.z), roofH(c.x, c.z)) : 0
+  if (!cityMode) {
+    if (fly <= 0 && cool > 0) cool = Math.max(0, cool - dt)
+    if (st.fly && inp.fly && canDrive && !wrecked && !waiting && fly <= 0 && cool <= 0) fly = flyConfig.sec
+  } else { fly = 0; cool = 0 }
+  const flying = cityMode ? (c.lvl ?? 0) === 0 && (c.y ?? 0) > surf0 + 0.6 : fly > 0
+  if (!cityMode && flying) { fly = Math.max(0, fly - dt); if (fly === 0) cool = flyConfig.cool }
   const can = canDrive && !wrecked && !waiting
   const gas = can && inp.gas, brake = canDrive && inp.brake && !waiting
   let v = c.v
@@ -180,7 +185,7 @@ export function stepCar(c: Car, inp: Input, dt: number, t: Track, st: CarStats, 
     if (lvl === 0) {
       if (onDeck(x, z)) {
         const H = bridgeH(x, z)
-        if (flying ? flyHeight(fly) <= H + 0.2 && H > 1.5 : H < 1.5 && Math.abs(Math.sin(moveH)) > 0.75 && Math.abs(v) > 3) lvl = 1
+        if (flying ? (cityMode ? (c.y ?? 0) <= H + 0.3 && (c.vy ?? 0) <= 0.5 : flyHeight(fly) <= H + 0.2) && H > 1.5 : H < 1.5 && Math.abs(Math.sin(moveH)) > 0.75 && Math.abs(v) > 3) lvl = 1
       }
       const rt = tunnelRamp(x, z), D = rt ? tunnelD(x, z) : 0
       if (!flying && rt && D > 0.05) {
@@ -193,7 +198,7 @@ export function stepCar(c: Car, inp: Input, dt: number, t: Track, st: CarStats, 
           v *= 0.8
         }
       }
-    } else if (lvl === 1 && !onDeck(x, z)) lvl = 0
+    } else if (lvl === 1 && (!onDeck(x, z) || (st.fly && inp.fly && canDrive && !wrecked && !waiting))) lvl = 0
     else if (lvl === -1 && !tunnelAt(x, z)) lvl = 0
     if (lvl === -1 && tunnelD(x, z) > 1.5) {
       const cp = tunnelClamp(x, z)
@@ -210,7 +215,7 @@ export function stepCar(c: Car, inp: Input, dt: number, t: Track, st: CarStats, 
       let bd = 0, bnx = 0, bnz = 0
       for (const [cx, cz] of corners({ x, z, h, l: st.len, w: st.wid })) {
         const p = cityPush(cx, cz)
-        if (p && (lvl === 0 || Math.abs(cx) > CITY.half || Math.abs(cz) > CITY.half) && p.depth > bd) { bd = p.depth; bnx = p.nx; bnz = p.nz }
+        if (p && (lvl === 0 || Math.abs(cx) > CITY.half || Math.abs(cz) > CITY.half) && (p.top === undefined || (c.y ?? 0) < p.top - 0.4 || lvl !== 0) && p.depth > bd) { bd = p.depth; bnx = p.nx; bnz = p.nz }
       }
       if (bd > 0) {
         x += bnx * bd; z += bnz * bd
@@ -226,15 +231,24 @@ export function stepCar(c: Car, inp: Input, dt: number, t: Track, st: CarStats, 
     // von der Brücke seitlich heruntergefahren: freier Fall bis zur Straße
     if ((c.lvl ?? 0) === 1 && lvl === 0) { y = bridgeH(c.x, c.z); vy = 0 }
     if (lvl === 0) {
-      // Gelände (Berge hinter der Stadt): am Boden folgt das Auto der Oberfläche, sonst freier Fall bis dahin
-      const gh = hillH(x, z), wasOn = (c.lvl ?? 0) === 0 && (c.y ?? 0) <= hillH(c.x, c.z) + 0.02
-      if (wasOn && y - gh < 1.4) { y = gh; vy = 0 }
+      // Untergrund: Gelände (Berge) oder Hausdach; am Boden folgt das Auto der Oberfläche, in der Luft gilt der Flug
+      const gh = Math.max(hillH(x, z), roofH(x, z)), gPrev = surf0
+      const wasOn = (c.lvl ?? 0) === 0 && (c.y ?? 0) <= gPrev + 0.02
+      const climb = st.fly && inp.fly && canDrive && !wrecked && !waiting
+      if (climb) {
+        vy = Math.min(17, Math.max(vy, 0) + 30 * dt)
+        y += vy * dt
+        if (y > 320) { y = 320; vy = 0 }
+      } else if (wasOn && y - gh < 1.4) { y = gh; vy = 0 }
       else if (y > gh) {
-        vy -= G * dt; y += vy * dt
-        if (y <= gh) { if (vy < -6) { dmg = Math.min(DMG_MAX, dmg + impactDamage(-vy * 0.7)); bump = Math.max(bump, Math.min(1, -vy / 15)) } y = gh; vy = 0 }
+        // Flug-Autos sinken langsam (loslassen = Gleiten nach unten), alle anderen fallen
+        if (st.fly) vy += Math.max(-12 * dt, Math.min(20 * dt, -5.5 - vy)); else vy -= G * dt
+        y += vy * dt
+        if (y <= gh) { if (vy < -9) { dmg = Math.min(DMG_MAX, dmg + impactDamage(-vy * 0.7)); bump = Math.max(bump, Math.min(1, -vy / 15)) } y = gh; vy = 0 }
       } else { y = gh; vy = 0 }
+      if (y < gh) { y = gh; vy = Math.max(vy, 0) }
       // Steigung bremst bergauf und beschleunigt bergab
-      if (gh > 0.05 && y <= gh + 0.3 && !flying) v -= G * 0.55 * hillSlope(x, z, h) * Math.sign(v || 1) * Math.min(1, Math.abs(v) / 3) * dt
+      if (hillH(x, z) > 0.05 && y <= gh + 0.3 && !flying) v -= G * 0.55 * hillSlope(x, z, h) * Math.sign(v || 1) * Math.min(1, Math.abs(v) / 3) * dt
     } else { y = 0; vy = 0 }
   }
   let lp: Car['lp']

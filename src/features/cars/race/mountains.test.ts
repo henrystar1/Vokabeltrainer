@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { CITY, cityPush } from './city'
+import { CITY, city, cityPush } from './city'
 import { GATE, MOUNTAINS, OUT, hillH, inOutland, outRoads, spiral } from './mountains'
 import { TRACKS, buildTrack } from './track'
 import { startCar, statsFor, stepCar, type Car } from './physics'
@@ -84,3 +84,42 @@ describe('Berge hinter der Stadt', () => {
   })
 })
 function H0() { return OUT.z0 }
+
+describe('Flug in der Stadt (stufenlos, Häuser)', () => {
+  const st = statsFor('roadster', 215)
+  const b = city().buildings.find((x) => x.h > 20 && x.w > 20 && x.d > 20)!
+  it('Taste halten steigt, loslassen sinkt langsam; kein Zeitlimit', () => {
+    let car: Car = { ...startCar(t, 0), x: 0, z: 0, h: 0, v: 20 }
+    for (let i = 0; i < 30 * 6; i++) car = stepCar(car, { ...none, gas: true, fly: true }, dt, t, st, true)
+    expect(car.y ?? 0).toBeGreaterThan(60)
+    for (let i = 0; i < 30 * 3; i++) car = stepCar(car, { ...none, gas: true }, dt, t, st, true)  // erst ausschwingen
+    const y1 = car.y ?? 0
+    for (let i = 0; i < 30 * 2; i++) car = stepCar(car, { ...none, gas: true }, dt, t, st, true)
+    const drop = y1 - (car.y ?? 0)
+    expect(drop).toBeGreaterThan(5)
+    expect(drop).toBeLessThan(13)  // sinkt langsam (~5,5 m/s)
+    for (let i = 0; i < 30 * 40 && (car.y ?? 0) > 0; i++) car = stepCar(car, { ...none, gas: true }, dt, t, st, true)
+    expect(car.y ?? 0).toBe(0)
+    expect(car.dmg).toBe(0)
+  })
+  it('auf ein Haus fliegen, landen und oben bleiben; Auto am Boden kommt nicht durch', () => {
+    const top = b.h
+    let car: Car = { ...startCar(t, 0), x: b.x, z: b.z, h: 0, v: 0, y: top + 30 }
+    for (let i = 0; i < 30 * 15 && (car.y ?? 0) > top + 0.01; i++) car = stepCar(car, { ...none }, dt, t, st, true)
+    expect(car.y).toBeCloseTo(top, 1)
+    for (let i = 0; i < 30; i++) car = stepCar(car, { ...none }, dt, t, st, true)
+    expect(car.y).toBeCloseTo(top, 1)
+    expect(car.dmg).toBe(0)
+    // Auto am Boden fährt nicht ins Haus
+    let g: Car = { ...startCar(t, 0), x: b.x, z: b.z - b.d / 2 - 12, h: 0, v: 18 }
+    for (let i = 0; i < 30 * 3; i++) g = stepCar(g, { ...none, gas: true }, dt, t, st, true)
+    expect(g.z).toBeLessThan(b.z - b.d / 2 + 0.5)
+    expect(g.y ?? 0).toBe(0)
+  })
+  it('hoch genug fliegen: über das Haus hinweg, ohne Schaden', () => {
+    let car: Car = { ...startCar(t, 0), x: b.x, z: b.z - b.d / 2 - 15, h: 0, v: 20, y: b.h + 6 }
+    for (let i = 0; i < 30 * 3; i++) car = stepCar(car, { ...none, gas: true, fly: true }, dt, t, st, true)
+    expect(car.z).toBeGreaterThan(b.z - b.d / 2 + 5)
+    expect(car.dmg).toBe(0)
+  })
+})
