@@ -19,7 +19,7 @@ export const statsFor = (kind: string, kmh?: number | null, up?: Up | null): Car
 }
 export const STATS: Record<string, CarStats> = Object.fromEntries(['kleinwagen', 'limousine', 'kombi', 'suv', 'pickup', 'cabrio', 'sportwagen', 'bus', 'oldtimer', 'buggy', 'monstertruck', 'muscle', 'rallye', 'gt', 'hypercar', 'rennwagen'].map((k) => [k, statsFor(k)]))
 
-export interface Input { gas: boolean; brake: boolean; left: boolean; right: boolean; /** Flug starten (nur Roadster) */ fly?: boolean; /** Auto-Drift des Fahrassistenten: driftet ohne Bremsen und ohne Tempoverlust */ drift?: boolean; /** Gewünschte Drehrate der Fahrtrichtung (rad/s) beim Auto-Drift */ turn?: number }
+export interface Input { gas: boolean; brake: boolean; left: boolean; right: boolean; /** Flug starten (nur Roadster) */ fly?: boolean; /** Polizeijagd läuft: Häuser sind solide Wände (nicht auf Dächer landen), niedrigere Flughöhengrenze */ chase?: boolean; /** Auto-Drift des Fahrassistenten: driftet ohne Bremsen und ohne Tempoverlust */ drift?: boolean; /** Gewünschte Drehrate der Fahrtrichtung (rad/s) beim Auto-Drift */ turn?: number }
 export interface Car {
   x: number; z: number
   /** Fahrtrichtung in Bogenmaß: 0 = nach +z, wächst gegen den Uhrzeigersinn von oben (dx = sin h, dz = cos h) */
@@ -96,7 +96,7 @@ export function stepCar(c: Car, inp: Input, dt: number, t: Track, st: CarStats, 
   let fly = c.fly, cool = c.cool
   const cityMode = t.def.mode === 'city'
   // Stadt: stufenloser Flug (Taste halten = steigen, loslassen = langsam sinken, auch auf Häusern landen); sonst der zeitlich begrenzte Flug
-  const surf0 = cityMode ? Math.max(hillH(c.x, c.z), roofH(c.x, c.z)) : 0
+  const surf0 = cityMode ? Math.max(hillH(c.x, c.z), inp.chase ? 0 : roofH(c.x, c.z)) : 0
   if (!cityMode) {
     if (fly <= 0 && cool > 0) cool = Math.max(0, cool - dt)
     if (st.fly && inp.fly && canDrive && !wrecked && !waiting && fly <= 0 && cool <= 0) fly = flyConfig.sec
@@ -215,7 +215,7 @@ export function stepCar(c: Car, inp: Input, dt: number, t: Track, st: CarStats, 
       let bd = 0, bnx = 0, bnz = 0
       for (const [cx, cz] of corners({ x, z, h, l: st.len, w: st.wid })) {
         const p = cityPush(cx, cz)
-        if (p && (lvl === 0 || Math.abs(cx) > CITY.half || Math.abs(cz) > CITY.half) && (p.top === undefined || (c.y ?? 0) < p.top - 0.4 || lvl !== 0) && p.depth > bd) { bd = p.depth; bnx = p.nx; bnz = p.nz }
+        if (p && (lvl === 0 || Math.abs(cx) > CITY.half || Math.abs(cz) > CITY.half) && (p.top === undefined || inp.chase || (c.y ?? 0) < p.top - 0.4 || lvl !== 0) && p.depth > bd) { bd = p.depth; bnx = p.nx; bnz = p.nz }
       }
       if (bd > 0) {
         x += bnx * bd; z += bnz * bd
@@ -232,13 +232,15 @@ export function stepCar(c: Car, inp: Input, dt: number, t: Track, st: CarStats, 
     if ((c.lvl ?? 0) === 1 && lvl === 0) { y = bridgeH(c.x, c.z); vy = 0 }
     if (lvl === 0) {
       // Untergrund: Gelände (Berge) oder Hausdach; am Boden folgt das Auto der Oberfläche, in der Luft gilt der Flug
-      const gh = Math.max(hillH(x, z), roofH(x, z)), gPrev = surf0
+      const gh = Math.max(hillH(x, z), inp.chase ? 0 : roofH(x, z)), gPrev = surf0
       const wasOn = (c.lvl ?? 0) === 0 && (c.y ?? 0) <= gPrev + 0.02
       const climb = st.fly && inp.fly && canDrive && !wrecked && !waiting
       if (climb) {
         vy = Math.min(17, Math.max(vy, 0) + 30 * dt)
         y += vy * dt
-        if (y > 320) { y = 320; vy = 0 }
+        // Höhengrenze über dem Untergrund (in der Polizeijagd niedriger)
+        const ceil = gh + (inp.chase ? 30 : 80)
+        if (y > ceil) { y = ceil; vy = Math.min(vy, 0) }
       } else if (wasOn && y - gh < 1.4) { y = gh; vy = 0 }
       else if (y > gh) {
         // Flug-Autos sinken langsam (loslassen = Gleiten nach unten), alle anderen fallen

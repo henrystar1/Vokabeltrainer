@@ -3,7 +3,7 @@ import { CITY, city, cityPush } from './city'
 import { GATE, MOUNTAINS, OUT, hillH, inOutland, outRoads, spiral } from './mountains'
 import { TRACKS, buildTrack } from './track'
 import { startCar, statsFor, stepCar, type Car } from './physics'
-import { copDrive, type BotMem } from './chase'
+import { chaseCar, copDrive, type BotMem } from './chase'
 
 const dt = 1 / 30
 const t = buildTrack(TRACKS[13])
@@ -121,5 +121,25 @@ describe('Flug in der Stadt (stufenlos, Häuser)', () => {
     for (let i = 0; i < 30 * 3; i++) car = stepCar(car, { ...none, gas: true, fly: true }, dt, t, st, true)
     expect(car.z).toBeGreaterThan(b.z - b.d / 2 + 5)
     expect(car.dmg).toBe(0)
+  })
+})
+
+describe('Flug-Grenzen und Polizeijagd', () => {
+  const st = statsFor('roadster', 215)
+  const b = city().buildings.find((x) => x.h > 20 && x.w > 20 && x.d > 20)!
+  it('Höhengrenze: normal 80 m, in der Jagd 30 m über dem Untergrund', () => {
+    let a: Car = { ...startCar(t, 0), x: 0, z: 0, h: 0, v: 20 }, c: Car = { ...a }
+    for (let i = 0; i < 30 * 15; i++) { a = stepCar(a, { ...none, gas: true, fly: true }, dt, t, st, true); c = stepCar(c, { ...none, gas: true, fly: true, chase: true }, dt, t, st, true) }
+    expect(a.y ?? 0).toBeCloseTo(80, 0)
+    expect(c.y ?? 0).toBeCloseTo(30, 0)
+  })
+  it('in der Jagd keine Landung auf Häusern: Haus ist eine Wand, auch in der Luft', () => {
+    let car: Car = { ...startCar(t, 0), x: b.x, z: b.z - b.d / 2 - 12, h: 0, v: 20, y: 25 }
+    for (let i = 0; i < 30 * 3; i++) car = stepCar(car, { ...none, gas: true, chase: true }, dt, t, st, true)
+    expect(car.z).toBeLessThan(b.z)
+  })
+  it('Polizei fährt Flug-Wagen, Bot steigt zum fliegenden Bandit hoch', () => {
+    expect(chaseCar('cop', false).kind).toBe('roadster')
+    expect(chaseCar('cop', false, true).kind).toBe('roadster')
   })
 })

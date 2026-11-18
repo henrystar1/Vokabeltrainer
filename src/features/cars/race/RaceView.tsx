@@ -19,6 +19,7 @@ const TOP_MIN = 20
 type Key = 'gas' | 'brake' | 'left' | 'right' | 'fly'
 export interface RaceStanding { name: string; ms: number | null; me?: boolean }
 /** Höhe über dem Boden: Flug oder Brücke (der höhere Wert zählt). */
+let levelAir = false  // Stadt: Auto bleibt in der Luft gerade
 const camGround = (x: number, z: number): number => Math.max(hillH(x, z), roofH(x, z))
 const carY = (c: { fly: number; lvl?: number; x: number; z: number; y?: number }): number => c.lvl === -1 ? -tunnelD(c.x, c.z) : Math.max(flyHeight(c.fly), c.lvl ? bridgeH(c.x, c.z) : 0, c.y ?? 0)
 /** Neigung der Nase: im Looping eine volle Drehung, sonst nach Steigen/Fallen (Rampen, Sprünge) */
@@ -26,6 +27,8 @@ const pitchOf = (c: { loop?: number; vy?: number; v: number; x?: number; z?: num
   if ((c.loop ?? 0) > 0) return -(c.loop ?? 0)
   // am Berg: Nase folgt der Steigung
   if (c.x !== undefined && c.z !== undefined && c.h !== undefined && (c.lvl ?? 0) === 0 && (c.y ?? 0) <= hillH(c.x, c.z) + 0.35 && hillH(c.x, c.z) > 0.05) return -Math.atan(hillSlope(c.x, c.z, c.h))
+  // Stadt: in der Luft bleibt das Auto gerade (nicht nach oben/unten kippen)
+  if (c.x !== undefined && c.z !== undefined && (c.y ?? 0) > camGround(c.x, c.z) + 0.6 && levelAir) return 0
   return -Math.max(-0.6, Math.min(0.6, Math.atan2(c.vy ?? 0, Math.max(Math.abs(c.v), 8))))
 }
 
@@ -151,21 +154,28 @@ export default function RaceView({ trackId, custom, laps, me, assistOk = false, 
       cleanups.push(() => { ro.disconnect(); renderer.dispose(); renderer.domElement.remove() })
 
       // Effekte: Wolken beim Fliegen, Auspuff-Feuer (Supercar), Reifenspuren beim Driften
+      levelAir = def.mode === 'city'
       const fx = createFx(THREE, rs.scene)
       cleanups.push(() => fx.dispose())
       let fxTick = 0
-      const carFx = (kind: string, x: number, z: number, h: number, v: number, slip: number, fly: number, gas: boolean, dt2: number) => {
+      const carFx = (kind: string, x: number, z: number, h: number, v: number, slip: number, fly: number, gas: boolean, dt2: number, alt = 0) => {
         const fxv = Math.sin(h), fzv = Math.cos(h), rx = Math.cos(h), rz = -Math.sin(h)
         const d = kindDims(kind), sp = Math.abs(v)
-        const y0 = flyHeight(fly)
-        if (fly > 0 && canFly(kind)) {
+        // Stadt: echte Flughöhe `alt`; der Strahl reicht nur etwa 5 m unter das Auto und bleibt mit ihm in der Höhe
+        const y0 = alt > 0 ? alt : flyHeight(fly), short = alt > 0
+        if ((fly > 0 || alt > 0) && canFly(kind)) {
           // Düsenstrahl nach unten: Wolken schießen zum Boden und breiten sich dort aus
           fxTick++
           for (const sz of fxTick % 2 ? [-1, 1] : [1, -1]) {
             const nz = (fxTick % 4 < 2 ? -0.28 : 0.22) * d.len
             const px = x + rx * sz * d.wid * 0.3 + fxv * nz, pz = z + rz * sz * d.wid * 0.3 + fzv * nz
+            if (short) {
+              fx.emit('cloud', px, y0 - 0.3, pz, fxv * v * 0.9 + (Math.random() - 0.5) * 2, -6 - Math.random() * 2, fzv * v * 0.9 + (Math.random() - 0.5) * 2, 0.6 + Math.random() * 0.2)
+              fx.emit('fire', px, y0 - 0.5, pz, fxv * v * 0.9, -5, fzv * v * 0.9, 0.7)
+            } else {
             fx.emit('cloud', px, y0 - 0.3, pz, fxv * v * 0.55 + (Math.random() - 0.5) * 3, -13 - Math.random() * 5, fzv * v * 0.55 + (Math.random() - 0.5) * 3, 1.5 + Math.random() * 0.8)
             fx.emit('fire', px, y0 - 0.5, pz, 0, -9, 0, 1.2)
+            }
           }
         }
         if (kind === 'supercar' && fly <= 0 && gas && sp > 2) {
@@ -534,7 +544,9 @@ export default function RaceView({ trackId, custom, laps, me, assistOk = false, 
               const d = copDrive(pb.car, tg, pb.mem, dt)
               if (d.reset) pb.car = { ...pb.car, x: d.reset.x, z: d.reset.z, h: d.reset.h, v: 0, steer: 0, slip: 0, dmg: 0, hold: 0, lvl: 0, y: 0 }
               if (d.repair) pb.car = { ...pb.car, dmg: 0, hold: 0 }
-              pb.car = stepCar(pb.car, d.inp, dt, track, pb.st, true)
+              // Bots fliegen hoch, wenn der Bandit höher ist, und lassen sich sinken, wenn er tiefer ist
+              const want = (tg.y ?? 0) > (pb.car.y ?? 0) + 2.5
+              pb.car = stepCar(pb.car, { ...d.inp, fly: want, chase: true }, dt, track, pb.st, true)
               for (const bd of bands) if (chase && caught({ x: pb.car.x, z: pb.car.z, lvl: pb.car.lvl ?? 0, fly: 0, y: pb.car.y }, bd)) markCaught(bd.id, true)
             }
           }
@@ -556,7 +568,7 @@ export default function RaceView({ trackId, custom, laps, me, assistOk = false, 
         let bumped = false
         const nSub = Math.max(1, Math.min(240, Math.ceil(Math.abs(car.v) * dt / 1.6)))
         for (let k = 0; k < nSub; k++) {
-          car = stepCar(car, input, dt / nSub, track, myStats, go, true)
+          car = stepCar(car, chase && !chase.over ? { ...input, chase: true } : input, dt / nSub, track, myStats, go, true)
           if (car.fly > 0) continue
           for (const b of botList) {
             const pre = car
@@ -632,7 +644,7 @@ export default function RaceView({ trackId, custom, laps, me, assistOk = false, 
           if (wh) for (const w of wh) { w.children.forEach((c) => { c.rotation.x += (v * dt) / (m.userData.wheelR as number) }); if (w.name === 'front') w.rotation.y = steer * 0.45 }
         }
         place(myMesh, car.x, car.z, car.h, car.v, car.steer, car.dmg, car.slip, car.fly, car.lvl ?? 0, car.y ?? 0, pitchOf(car))
-        carFx(eff.kind, car.x, car.z, car.h, car.v, car.slip, isCity && (car.lvl ?? 0) === 0 && (car.y ?? 0) > camGround(car.x, car.z) + 1 ? 1 : car.fly, input.gas, dt)
+        carFx(eff.kind, car.x, car.z, car.h, car.v, car.slip, car.fly, input.gas, dt, isCity && (car.lvl ?? 0) === 0 && (car.y ?? 0) > camGround(car.x, car.z) + 1 ? car.y ?? 0 : 0)
         if (myRole === 'cop') rs.tickSiren(myMesh, now)
         for (const pb of pbots) { place(pb.mesh, pb.car.x, pb.car.z, pb.car.h, pb.car.v, pb.car.steer, pb.car.dmg, pb.car.slip, 0, pb.car.lvl ?? 0, pb.car.y ?? 0, 0); rs.tickSiren(pb.mesh, now) }
         botList.forEach((b, i) => place(botMeshes[i], b.car.x, b.car.z, b.car.h, b.car.v, b.car.steer, b.car.dmg, b.car.slip))
@@ -648,7 +660,7 @@ export default function RaceView({ trackId, custom, laps, me, assistOk = false, 
           for (const ch of r.mesh.children) if ((ch as { isSprite?: boolean }).isSprite) ch.visible = !r.hd || r.ro === 'b'
           place(r.mesh, r.x, r.z, r.h, r.v, 0, r.dmg, r.slip, r.fl, r.lv ?? 0, r.yy ?? 0, r.pt ?? 0)
           if (online?.open && now - r.seen > 15000) { scene.remove(r.mesh); remotes.delete(r.id) }
-          if (r.mesh.visible) carFx(r.kind, r.x, r.z, r.h, r.v, r.slip, r.fl, r.v > 5, dt)
+          if (r.mesh.visible) carFx(r.kind, r.x, r.z, r.h, r.v, r.slip, r.fl, r.v > 5, dt, isCity && (r.lv ?? 0) === 0 && (r.yy ?? 0) > camGround(r.x, r.z) + 1 ? r.yy ?? 0 : 0)
         }
 
         // Kamera: Verfolger von hinten oder Cockpit (Blick aus dem Fenster)

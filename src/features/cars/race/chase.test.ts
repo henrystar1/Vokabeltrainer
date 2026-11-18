@@ -14,7 +14,7 @@ describe('Polizeijagd: Autos und Fangen', () => {
     expect(carKmh(b.kind, b.top)).toBeGreaterThan(carKmh(c.kind, c.top))
     expect(carKmh(b.kind, b.top)).toBeGreaterThan(carKmh(ca.kind, ca.top))
     expect(cb.top).toBeLessThan(c.top)
-    expect(canFly(b.kind)).toBe(true); expect(canFly(ca.kind)).toBe(true); expect(canFly(c.kind)).toBe(false)
+    expect(canFly(b.kind)).toBe(true); expect(canFly(ca.kind)).toBe(true); expect(canFly(c.kind)).toBe(true)
   })
   it('gefangen nur bei Berührung auf gleicher Ebene und Höhe', () => {
     expect(caught({ x: 0, z: 0 }, { x: CATCH_DIST - 0.5, z: 0 })).toBe(true)

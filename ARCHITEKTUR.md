@@ -854,3 +854,8 @@ Tabelle `book_library_hidden`; `in_library` blendet ein veröffentlichtes Buch d
 - Flug in der Stadt (`physics.ts`, nur `mode === 'city'`): stufenlos – Flug-Taste halten steigt (bis ~17 m/s, max. 320 m), loslassen = langsames Sinken (~5,5 m/s), kein Zeitlimit/Laden mehr (`fly`/`cool` bleiben 0, die Höhe steckt in `y`/`vy`). Andere Modi behalten den zeitlich begrenzten Flug. Untergrund = max(Gelände, Hausdach `roofH`): man landet und fährt auf Dächern, vom Dach herunter sinkt man langsam; Häuser blockieren nur, wenn man unterhalb des Dachs ist (`cityPush` liefert `top`). Brücke: im Sinkflug auf dem Deck landen (`vy ≤ 0,5`), mit Flug-Taste wieder abheben.
 - `caught` vergleicht echte Höhen (`y`), Hinweis im HUD „Höhe x m“, Düsen/Flammen bei Höhe > 1 m.
 - Kamera (Verfolger): hängt hinten oben über dem Auto und folgt Berg, Dach und Flughöhe (geglättet, nie unter dem Gelände); „Von unten“-Ansicht ebenfalls geländebewusst.
+
+## Update 129
+- Flug-Grenzen (Stadt): Höhengrenze 80 m über dem Untergrund, in der Polizeijagd 30 m (`Input.chase`). In der Jagd zählen Häuser als Wände in jeder Höhe, Dächer sind keine Landefläche (`roofH` wird ignoriert) – der Bandit kann nicht auf einem Haus warten.
+- Polizei fährt in der Jagd einen Roadster (fliegt); Bots steigen auf, wenn der Bandit mehr als 2,5 m höher ist, und sinken sonst.
+- Auto bleibt in der Luft gerade (`levelAir`, kein Nicken), Düsenstrahl/Rauch folgt der echten Flughöhe und reicht nur ~5 m unter das Auto (`carFx(..., alt)`).

@@ -9,7 +9,8 @@ export type Role = 'bandit' | 'cop'
 export function chaseCar(role: Role, isAdminCar: boolean, bot = false): { kind: string; color: string; top: number } {
   if (role === 'bandit') return { kind: 'roadster', color: '#111827', top: 255 }
   if (isAdminCar) return { kind: 'roadster', color: '#f8fafc', top: 215 }
-  return { kind: 'sportwagen', color: '#f8fafc', top: bot ? 195 : 215 }
+  // Polizei fährt ebenfalls einen Flug-Wagen (sonst käme sie nicht an einen fliegenden Banditen)
+  return { kind: 'roadster', color: '#f8fafc', top: bot ? 195 : 215 }
 }
 
 export const CATCH_DIST = 4.6
