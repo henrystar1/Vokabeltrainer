@@ -1,7 +1,8 @@
 import { advance, inPolygon, pointAt, project, type Track } from './track'
 import { canFly, carKmh, flyConfig, flyHeight, isBike, kindDims, kindStats } from '../stats'
 import { hillH, hillSlope } from './mountains'
-import { PARK_TOP, inParkXZ, parkPush, parkSurfaces } from './parkhaus'
+import { treePush } from './forest'
+import { PARK, PARK_TOP, inParkXZ, parkPush, parkSurfaces } from './parkhaus'
 import { CITY, bridgeH, cityPush, onDeck, roofH, tunnelAt, tunnelClamp, tunnelD, tunnelRamp } from './city'
 import { G, STUNT, arenaPush, groundH, loopPoint } from './stunt'
 import { upFactors, type Up } from '../tuning'
@@ -91,11 +92,12 @@ export function addDamage(c: Car, amount: number, cap = DMG_MAX): Car {
  *  Driften: Bremse + Lenken bei Tempo schiebt das Heck raus (`drift` = erlaubt). */
 /** Höhe der Fläche, auf der das Auto bei (x, z) steht: Gelände, Dächer und Parkhaus-Ebenen, die höchstens 1,4 m über dem Auto liegen (man steigt nicht auf Häuser, aber Rampen hinauf). */
 function surfAt(x: number, z: number, y: number, chase: boolean): number {
-  let g = hillH(x, z)
+  const inP = inParkXZ(x, z)
+  let g = inP ? -Infinity : hillH(x, z)
   const r = chase ? 0 : roofH(x, z)
   if (r > 0 && r <= y + 1.4) g = Math.max(g, r)
   for (const h of parkSurfaces(x, z)) if (h <= y + 1.4) g = Math.max(g, h)
-  return g
+  return g === -Infinity ? hillH(x, z) : g
 }
 
 export function stepCar(c: Car, inp: Input, dt: number, t: Track, st: CarStats, canDrive = true, drift = true): Car {
@@ -224,7 +226,7 @@ export function stepCar(c: Car, inp: Input, dt: number, t: Track, st: CarStats, 
     if (lvl <= 0) {
       let bd = 0, bnx = 0, bnz = 0
       for (const [cx, cz] of corners({ x, z, h, l: st.len, w: st.wid })) {
-        const p = cityPush(cx, cz) ?? (lvl === 0 ? parkPush(cx, cz, c.y ?? 0) : null)
+        const p = cityPush(cx, cz) ?? (lvl === 0 && (c.y ?? 0) < 6 + hillH(cx, cz) ? treePush(cx, cz) : null) ?? (lvl === 0 ? parkPush(cx, cz, c.y ?? 0, c.x, c.z) : null)
         if (p && !((p as { lo?: number }).lo !== undefined && (c.y ?? 0) + 2 < ((p as { lo?: number }).lo as number)) && (lvl === 0 || Math.abs(cx) > CITY.half || Math.abs(cz) > CITY.half) && (('top' in p ? p.top : undefined) === undefined || inp.chase || (c.y ?? 0) < (('top' in p ? p.top : 0) as number) - 0.4 || lvl !== 0) && p.depth > bd) { bd = p.depth; bnx = p.nx; bnz = p.nz }
       }
       if (bd > 0) {
@@ -244,7 +246,9 @@ export function stepCar(c: Car, inp: Input, dt: number, t: Track, st: CarStats, 
       // Untergrund: Gelände (Berge) oder Hausdach; am Boden folgt das Auto der Oberfläche, in der Luft gilt der Flug
       const gh = surfAt(x, z, c.y ?? 0, !!inp.chase), gPrev = surf0
       const wasOn = (c.lvl ?? 0) === 0 && (c.y ?? 0) <= gPrev + 0.02
-      const climb = st.fly && inp.fly && canDrive && !wrecked && !waiting
+      // im Parkhaus (unter dem Dach) kann man nicht abheben – man würde durch die Decken steigen
+      const inGarage = inParkXZ(x, z, 0) && y < PARK.floorH * PARK.floors - 0.4
+      const climb = st.fly && inp.fly && canDrive && !wrecked && !waiting && !inGarage
       if (climb) {
         vy = Math.min(17, Math.max(vy, 0) + 30 * dt)
         y += vy * dt

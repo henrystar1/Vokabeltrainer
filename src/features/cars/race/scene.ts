@@ -5,7 +5,8 @@ import { RoundedBoxGeometry } from 'three/examples/jsm/geometries/RoundedBoxGeom
 import { roadProximity, type Track } from './track'
 import { BRIDGES, CITY, GARAGES, TUNNELS, bridgeH, city, tunnelD } from './city'
 import { PARK, PARK_TOP } from './parkhaus'
-import { GATE, MOUNTAINS, OUT, hillH, outRoads } from './mountains'
+import { GATE, MOUNTAINS, OUT, RING, hillH, outRoads, ringPath } from './mountains'
+import { trees } from './forest'
 import { RAMPS, STUNT, loopPoint } from './stunt'
 
 type THREE = typeof import('three')
@@ -688,6 +689,18 @@ function buildCity(THREE: THREE, scene: T.Scene, ground: T.Mesh, night: boolean)
   for (let kx = -CITY.K; kx < CITY.K; kx++) for (let kz = -CITY.K; kz < CITY.K; kz++) {
     const cx = P * kx + P / 2, cz = P * kz + P / 2
     const park = parks.some((p) => p.x === cx && p.z === cz)
+    if (cx === PARK.cx && cz === PARK.cz) {
+      // Parkhaus-Block: Gehweg mit Loch über der Tiefgarage
+      const sh = new THREE.Shape(), q = (x: number, z: number): [number, number] => [x - cx, -(z - cz)]
+      sh.moveTo(...q(cx - 48, cz - 48)); sh.lineTo(...q(cx + 48, cz - 48)); sh.lineTo(...q(cx + 48, cz + 48)); sh.lineTo(...q(cx - 48, cz + 48)); sh.lineTo(...q(cx - 48, cz - 48))
+      const hole = new THREE.Path()
+      hole.moveTo(...q(PARK.x0, PARK.z0)); hole.lineTo(...q(PARK.x0, PARK.z1)); hole.lineTo(...q(PARK.x1, PARK.z1)); hole.lineTo(...q(PARK.x1, PARK.z0)); hole.lineTo(...q(PARK.x0, PARK.z0))
+      sh.holes.push(hole)
+      const eg = new THREE.ExtrudeGeometry(sh, { depth: 0.3, bevelEnabled: false })
+      eg.rotateX(-Math.PI / 2)
+      const m = new THREE.Mesh(eg, walk); m.position.set(cx, -0.05, cz); scene.add(m)
+      continue
+    }
     const gar = GARAGES.find((g) => g.bx === cx && g.bz === cz)
     if (gar) {
       // Garagen-Block: Gehweg mit Loch über der Rampe, sonst sähe man die Einfahrt nicht
@@ -780,6 +793,7 @@ function buildCity(THREE: THREE, scene: T.Scene, ground: T.Mesh, night: boolean)
       hole.moveTo(x0, -z0); hole.lineTo(x1, -z0); hole.lineTo(x1, -z1); hole.lineTo(x0, -z1); hole.lineTo(x0, -z0)
       shape.holes.push(hole)
     }
+    { const ph = new THREE.Path(); ph.moveTo(PARK.x0, -PARK.z0); ph.lineTo(PARK.x1, -PARK.z0); ph.lineTo(PARK.x1, -PARK.z1); ph.lineTo(PARK.x0, -PARK.z1); ph.lineTo(PARK.x0, -PARK.z0); shape.holes.push(ph) }
     ground.geometry.dispose()
     ground.geometry = new THREE.ShapeGeometry(shape)
     ;(ground.material as T.MeshStandardMaterial).side = THREE.DoubleSide
@@ -795,25 +809,30 @@ function buildCity(THREE: THREE, scene: T.Scene, ground: T.Mesh, night: boolean)
   {
     const steel = new THREE.MeshStandardMaterial({ color: night ? 0x64748b : 0x94a3b8, roughness: 0.5, metalness: 0.35 })
     const dark = new THREE.MeshStandardMaterial({ color: 0x334155, roughness: 0.6, metalness: 0.3 })
-    const { x0, x1, z0, z1, laneW, ramp, floorH, floors } = PARK
+    const { x0, x1, z0, z1, laneW, ramp, floorH, floors, under } = PARK
+    const conc = new THREE.MeshStandardMaterial({ color: night ? 0x3b4252 : 0x6b7280, roughness: 0.9 })
     const box = (w: number, h: number, d: number, x: number, y: number, z: number, m: T.Material = steel) => { const b = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), m); b.position.set(x, y, z); scene.add(b); return b }
     const xm = x0 + laneW, W = x1 - x0, D = z1 - z0
-    for (let k = 1; k <= floors; k++) {
+    for (let k = -under; k <= floors; k++) {
       const y = floorH * k
       box(x1 - xm, 0.5, D, (xm + x1) / 2, y - 0.25, (z0 + z1) / 2)
       box(laneW, 0.5, D - ramp, x0 + laneW / 2, y - 0.25, z0 + ramp + (D - ramp) / 2)
       box(W, 0.12, 0.4, (x0 + x1) / 2, y - 0.56, (z0 + z1) / 2, new THREE.MeshBasicMaterial({ color: 0xfff7d6 }))
+      if (k <= 0) continue
       // Brüstung rund herum (Süden nur über Ebene 1 geschlossen genug: überall 1 m)
       box(W, 1, 0.5, (x0 + x1) / 2, y + 0.5, z1); box(0.5, 1, D, x0, y + 0.5, (z0 + z1) / 2); box(0.5, 1, D, x1, y + 0.5, (z0 + z1) / 2); box(W, 1, 0.5, (x0 + x1) / 2, y + 0.5, z0)
     }
     // Rampen (geneigte Platten) auf der Westspur
     const ang = Math.atan2(floorH, ramp), rl = Math.hypot(floorH, ramp)
-    for (let k = 0; k < floors; k++) {
+    for (let k = -under; k < floors; k++) {
       const r = box(laneW, 0.5, rl, x0 + laneW / 2, floorH * k + floorH / 2 - 0.25, z0 + ramp / 2); r.rotation.x = -ang
       box(0.5, 1, rl, x0, floorH * k + floorH / 2 + 0.5, z0 + ramp / 2).rotation.x = -ang
     }
-    // Stützen
-    for (let x = x0; x <= x1 + 0.1; x += W / 4) for (let z = z0; z <= z1 + 0.1; z += D / 4) box(1, floorH * floors, 1, x, (floorH * floors) / 2, z, dark)
+    // Stützen (vom 2. Untergeschoss bis zum Dach)
+    for (let x = x0; x <= x1 + 0.1; x += W / 4) for (let z = z0; z <= z1 + 0.1; z += D / 4) box(1, floorH * (floors + under), 1, x, (floorH * (floors - under)) / 2, z, dark)
+    // Betonwände der Tiefgarage (Süden bleibt über dem Boden offen: dort liegt die Einfahrt)
+    const dep = floorH * under
+    for (const [w, d, x, z] of [[0.6, D, x0, (z0 + z1) / 2], [0.6, D, x1, (z0 + z1) / 2], [W, 0.6, (x0 + x1) / 2, z1], [W, 0.6, (x0 + x1) / 2, z0]] as const) box(w, dep, d, x, -dep / 2, z, conc)
     // Außenwand im Erdgeschoss (Westen, Osten, Norden); Süden bleibt offen
     for (const [w, d, x, z] of [[0.6, D, x0, (z0 + z1) / 2], [0.6, D, x1, (z0 + z1) / 2], [W, 0.6, (x0 + x1) / 2, z1]] as const) box(w, floorH, d, x, floorH / 2, z, steel)
     // Einfahrt-Sturz mit P-Schild
@@ -833,11 +852,11 @@ function buildCity(THREE: THREE, scene: T.Scene, ground: T.Mesh, night: boolean)
     const bt = new THREE.CanvasTexture(cv); bt.wrapS = THREE.RepeatWrapping; bt.colorSpace = THREE.SRGBColorSpace
     const H = CITY.half, len = H * 2 + 8
     // Mauerstücke: Stadt (Süd, West, Ost), Nordmauer mit Tor und die Grenze des Außenbereichs hinter dem Tor
-    const gx = (OUT.x1 + GATE) / 2, gl = OUT.x1 - GATE, oz = (OUT.z0 + OUT.z1) / 2, ol = OUT.z1 - OUT.z0
+    const gx = (OUT.x1 + GATE) / 2, gl = OUT.x1 - GATE
     const segs: Array<[number, number, number, number]> = [
       [0, -H - 1, len, 0], [-H - 1, 0, len, Math.PI / 2], [H + 1, 0, len, Math.PI / 2],
       [-gx, H, gl, 0], [gx, H, gl, 0],
-      [-OUT.x1 - 1, oz, ol, Math.PI / 2], [OUT.x1 + 1, oz, ol, Math.PI / 2], [0, OUT.z1 + 1, OUT.x1 * 2 + 4, 0],
+      [-OUT.x1 - 1, (OUT.z1 - OUT.x1) / 2, OUT.z1 + OUT.x1, Math.PI / 2], [OUT.x1 + 1, (OUT.z1 - OUT.x1) / 2, OUT.z1 + OUT.x1, Math.PI / 2], [0, OUT.z1 + 1, OUT.x1 * 2 + 4, 0], [0, -OUT.x1 - 1, OUT.x1 * 2 + 4, 0],
     ]
     for (const [x, z, ln, ry] of segs) {
       const t2 = bt.clone(); t2.needsUpdate = true; t2.repeat.set(ln / 8, 1)
@@ -855,6 +874,51 @@ function buildCity(THREE: THREE, scene: T.Scene, ground: T.Mesh, night: boolean)
   {
     const grass = new THREE.Mesh(new THREE.PlaneGeometry(OUT.x1 - OUT.x0, OUT.z1 - OUT.z0), new THREE.MeshStandardMaterial({ color: night ? 0x1d3a22 : 0x4a8a3c, roughness: 1 }))
     grass.rotation.x = -Math.PI / 2; grass.position.set(0, -0.02, (OUT.z0 + OUT.z1) / 2); scene.add(grass)
+    // Wiese rund um die Stadt (Süd, West, Ost) bis zur Weltgrenze – darauf liegt die Rennstrecke
+    const gmat = new THREE.MeshStandardMaterial({ color: night ? 0x1d3a22 : 0x4a8a3c, roughness: 1 })
+    for (const [w, d, x, z] of [[1800, 180, 0, -810], [180, 1440, -810, 0], [180, 1440, 810, 0]] as const) {
+      const gm = new THREE.Mesh(new THREE.PlaneGeometry(w, d), gmat); gm.rotation.x = -Math.PI / 2; gm.position.set(x, 0, z); scene.add(gm)
+    }
+    // Start/Ziel der Rennstrecke (Schachbrett) mit Torbogen
+    {
+      const cv = document.createElement('canvas'); cv.width = 64; cv.height = 256
+      const cg = cv.getContext('2d')!
+      for (let i = 0; i < 8; i++) for (let j = 0; j < 2; j++) { cg.fillStyle = (i + j) % 2 ? '#111' : '#fff'; cg.fillRect(j * 32, i * 32, 32, 32) }
+      const st = new THREE.Mesh(new THREE.PlaneGeometry(4, 30), new THREE.MeshBasicMaterial({ map: new THREE.CanvasTexture(cv) }))
+      st.rotation.x = -Math.PI / 2; st.position.set(0, 0.2, -RING.h); scene.add(st)
+      for (const sx of [-RING.w - 2, RING.w + 2]) { const p = new THREE.Mesh(new THREE.BoxGeometry(1.4, 11, 1.4), new THREE.MeshStandardMaterial({ color: 0x1f2937 })); p.position.set(sx, 5.5, -RING.h); scene.add(p) }
+      const bar = new THREE.Mesh(new THREE.BoxGeometry(RING.w * 2 + 6, 2.4, 1.6), new THREE.MeshBasicMaterial({ color: 0xdc2626 })); bar.position.set(0, 11, -RING.h); scene.add(bar)
+    }
+    // Randsteine der Rennstrecke (rot/weiß) innen und außen
+    {
+      const rpts = ringPath(6), mat = [new THREE.MeshBasicMaterial({ color: 0xdc2626 }), new THREE.MeshBasicMaterial({ color: 0xf8fafc })]
+      const geo = new THREE.BoxGeometry(1.2, 0.18, 6.2)
+      const inst = [new THREE.InstancedMesh(geo, mat[0], rpts.length * 2), new THREE.InstancedMesh(geo, mat[1], rpts.length * 2)]
+      const cnt = [0, 0], dm = new THREE.Object3D()
+      for (let i = 0; i < rpts.length - 1; i++) {
+        const [x, z] = rpts[i], [x2, z2] = rpts[i + 1], dx = x2 - x, dz = z2 - z, dl = Math.hypot(dx, dz) || 1, nx = -dz / dl, nz = dx / dl, k = i % 2
+        for (const sd of [-1, 1]) { dm.position.set(x + nx * sd * (RING.w - 7.3), 0.1, z + nz * sd * (RING.w - 7.3)); dm.rotation.set(0, Math.atan2(dx, dz), 0); dm.updateMatrix(); inst[k].setMatrixAt(cnt[k]++, dm.matrix) }
+      }
+      inst.forEach((m, k) => { m.count = cnt[k]; m.instanceMatrix.needsUpdate = true; scene.add(m) })
+    }
+    // Wald an den Bergen (Instanzen: Stamm + zwei Kronen)
+    {
+      const ts = trees(), n = ts.length
+      const trunk = new THREE.InstancedMesh(new THREE.CylinderGeometry(0.35, 0.5, 3, 6), new THREE.MeshStandardMaterial({ color: 0x5b3b22, roughness: 1 }), n)
+      const c1 = new THREE.InstancedMesh(new THREE.ConeGeometry(2.8, 5.5, 7), new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 1 }), n)
+      const c2 = new THREE.InstancedMesh(new THREE.ConeGeometry(2.1, 4.5, 7), new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 1 }), n)
+      const dm = new THREE.Object3D(), col = new THREE.Color()
+      ts.forEach((t, i) => {
+        const h = hillH(t.x, t.z), s = t.s
+        dm.rotation.set(0, 0, 0); dm.scale.set(s, s, s)
+        dm.position.set(t.x, h + 1.5 * s, t.z); dm.updateMatrix(); trunk.setMatrixAt(i, dm.matrix)
+        dm.position.set(t.x, h + (3 + 2.2) * s, t.z); dm.updateMatrix(); c1.setMatrixAt(i, dm.matrix)
+        dm.position.set(t.x, h + (3 + 5.2) * s, t.z); dm.updateMatrix(); c2.setMatrixAt(i, dm.matrix)
+        const g = 0.28 + ((i * 37) % 17) / 17 * 0.18
+        col.setRGB(0.08 + g * 0.2, g + (night ? 0 : 0.18), 0.1 + g * 0.15); c1.setColorAt(i, col); c2.setColorAt(i, col)
+      })
+      for (const m of [trunk, c1, c2]) { m.instanceMatrix.needsUpdate = true; if (m.instanceColor) m.instanceColor.needsUpdate = true; scene.add(m) }
+    }
     for (const m of MOUNTAINS) {
       const RA = 72, RR = 44, pos: number[] = [], col: number[] = [], idx: number[] = []
       for (let i = 0; i <= RR; i++) for (let j = 0; j < RA; j++) {
@@ -874,12 +938,14 @@ function buildCity(THREE: THREE, scene: T.Scene, ground: T.Mesh, night: boolean)
     }
     // Straßenbänder (folgen dem Gelände, Mittelstreifen als helle Linie)
     const rp: number[] = [], ri: number[] = [], rc: number[] = []
-    for (const path of outRoads()) {
+    const allRoads = outRoads()
+    for (const path of allRoads) {
+      const isRing = path === allRoads[allRoads.length - 1]
       const base = rp.length / 3
       for (let i = 0; i < path.length; i++) {
         const [x, z] = path[i], p0 = path[Math.max(0, i - 1)], p1 = path[Math.min(path.length - 1, i + 1)]
         const dx = p1[0] - p0[0], dz = p1[1] - p0[1], dl = Math.hypot(dx, dz) || 1, nx = -dz / dl, nz = dx / dl
-        for (const w of [-8, -0.35, 0.35, 8]) { const px = x + nx * w, pz = z + nz * w; rp.push(px, hillH(px, pz) + 0.12, pz); const l = Math.abs(w) < 1 ? 0.85 : 0.2; rc.push(l, l, l * 0.95) }
+        for (const w of [-8, -0.35, 0.35, 8]) { const px = x + nx * w, pz = z + nz * w; rp.push(px, hillH(px, pz) + 0.12, pz); const l = isRing ? 0.17 : Math.abs(w) < 1 ? 0.85 : 0.2; rc.push(l, l, l * 0.95) }
       }
       for (let i = 0; i < path.length - 1; i++) for (let k = 0; k < 3; k++) { const a = base + i * 4 + k, b = a + 1, c2 = a + 4, d = a + 5; ri.push(a, c2, b, b, c2, d) }
     }

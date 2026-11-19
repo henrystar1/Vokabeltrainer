@@ -4,9 +4,26 @@ import { CITY } from './city'
 export const OUT = { x0: -900, x1: 900, z0: CITY.half, z1: 2150 }
 /** Halbe Breite der Toröffnung in der Stadtmauer (Nordseite, Straße x = 0). */
 export const GATE = 14
+/** Rennstrecke rund um die Stadt: Quadrat mit Mittellinie |x|,|z| = RING.h, abgerundete Ecken, Breite ±RING.w. */
+export const RING = { h: 800, w: 15, r: 70 }
+/** Geschlossene Mittellinie der Rennstrecke (Start/Ziel bei (0, -h), Fahrtrichtung gegen den Uhrzeigersinn von oben gesehen). */
+export function ringPath(step = 12): Pt[] {
+  const { h, r } = RING, c = h - r, pts: Pt[] = []
+  const side = (a: Pt, b: Pt) => { const n = Math.max(1, Math.round(Math.hypot(b[0] - a[0], b[1] - a[1]) / step)); for (let i = 0; i < n; i++) pts.push([a[0] + ((b[0] - a[0]) * i) / n, a[1] + ((b[1] - a[1]) * i) / n]) }
+  const arc = (cx: number, cz: number, a0: number) => { const n = 8; for (let i = 0; i < n; i++) { const a = a0 + (i / n) * (Math.PI / 2); pts.push([cx + r * Math.cos(a), cz + r * Math.sin(a)]) } }
+  side([-c, -h], [c, -h]); arc(c, -c, -Math.PI / 2)
+  side([h, -c], [h, c]); arc(c, c, 0)
+  side([c, h], [-c, h]); arc(-c, c, Math.PI / 2)
+  side([-h, c], [-h, -c]); arc(-c, -c, Math.PI)
+  pts.push(pts[0])
+  return pts
+}
+/** Eckpunkte der Rennstrecke (für die Bot-Navigation um die Stadtmauer). */
+export const RING_CORNERS: ReadonlyArray<Pt> = [[RING.h, RING.h], [-RING.h, RING.h], [-RING.h, -RING.h], [RING.h, -RING.h]]
 /** Gesamte Spielwelt (für die Karte): Stadt plus Außenbereich. */
-export const WORLD = { x0: -900, x1: 900, z0: -CITY.half, z1: OUT.z1 }
+export const WORLD = { x0: -900, x1: 900, z0: -900, z1: OUT.z1 }
 
+export type Pt = [number, number]
 export interface Mountain { x: number; z: number; R: number; H: number; a0: number; dir: 1 | -1; turns: number }
 /** Winkel a: Punkt = (x + r·sin a, z + r·cos a). Die Serpentine beginnt am Fuß auf der Seite der Hauptstraße. */
 export const MOUNTAINS: ReadonlyArray<Mountain> = [
@@ -30,7 +47,6 @@ export function hillSlope(x: number, z: number, h: number): number {
   const d = 2.2
   return (hillH(x + Math.sin(h) * d, z + Math.cos(h) * d) - hillH(x - Math.sin(h) * d, z - Math.cos(h) * d)) / (2 * d)
 }
-export type Pt = [number, number]
 /** Serpentinenstraße eines Berges von unten nach oben. */
 export function spiral(m: Mountain, step = 6): Pt[] {
   const pts: Pt[] = []
@@ -49,6 +65,7 @@ export function outRoads(): Pt[][] {
     if (m.z === 1250) roads.push(line([0, 1250], s[0]))
     roads.push(s)
   }
+  roads.push(ringPath())
   return roads
 }
 /** Liegt der Punkt im Außenbereich (hinter dem Tor/der Mauer)? */

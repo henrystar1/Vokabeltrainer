@@ -155,4 +155,10 @@ describe('Polizei-Bot fährt zum Bandit', () => {
     expect(chaseCar('bandit', false, false, true).kind).toBe('sportbike')
     expect(chaseCar('cop', false, false, false).kind).toBe('roadster')
   })
+  it('Bot fährt in die Tiefgarage zu einem Bandit im 2. Untergeschoss', () => {
+    const tgt = { x: -160, z: -180, lvl: 0, y: -9 }
+    const r = parkRun({ ...startCar(t, 0), x: -120, z: -240, h: -Math.PI / 2, v: 10, lvl: 0 }, tgt, 150, (c) => Math.hypot(c.x - tgt.x, c.z - tgt.z) < 6 && (c.y ?? 0) < -8)
+    expect(r.car.y ?? 0).toBeLessThan(-8)
+    expect(Math.hypot(r.car.x - tgt.x, r.car.z - tgt.z)).toBeLessThan(8)
+  })
 })

@@ -94,18 +94,22 @@ export const OUTLAND = { x1: 900, z1: 2150, gate: 14 }
 export function cityPush(x: number, z: number): { nx: number; nz: number; depth: number; /** Dachhöhe bei Häusern: oberhalb davon ist nichts im Weg */ top?: number; /** Unterkante (Sturz): darunter kann man durchfahren */ lo?: number } | null {
   const H = CITY.half
   const o = OUTLAND
-  // Außenbereich hinter dem Tor: eigene Grenzen; die Stadtmauer (Dicke 4 m) trennt ihn von der Stadt, nur das Tor ist offen
-  if (z > H - 2 && Math.abs(x) <= o.x1 && z <= o.z1) {
-    if (Math.abs(x) > o.gate && z < H + 2) return z >= H ? { nx: 0, nz: 1, depth: H + 2 - z } : { nx: 0, nz: -1, depth: z - (H - 2) }
-    if (z > H) return null
-  }
-  if (z > H && Math.abs(x) <= o.x1 && z <= o.z1) return null
-  if (z > H && Math.abs(x) <= o.x1) return { nx: 0, nz: -1, depth: z - o.z1 }
-  if (z > H && x > o.x1) return { nx: -1, nz: 0, depth: x - o.x1 }
-  if (z > H && x < -o.x1) return { nx: 1, nz: 0, depth: -o.x1 - x }
-  if (Math.abs(x) > H || Math.abs(z) > H) {
-    if (Math.abs(x) - H > Math.abs(z) - H) return { nx: -Math.sign(x), nz: 0, depth: Math.abs(x) - H }
-    return { nx: 0, nz: -Math.sign(z), depth: Math.abs(z) - H }
+  // Außenwelt: Rechteck um die Stadt (Rennstrecke, Wiesen, Berge); Grenzen ringsum
+  if (x > o.x1) return { nx: -1, nz: 0, depth: x - o.x1 }
+  if (x < -o.x1) return { nx: 1, nz: 0, depth: -o.x1 - x }
+  if (z > o.z1) return { nx: 0, nz: -1, depth: z - o.z1 }
+  if (z < -o.x1) return { nx: 0, nz: 1, depth: -o.x1 - z }
+  const m = Math.max(Math.abs(x), Math.abs(z))
+  if (m > H + 2) return null
+  if (m > H - 2) {
+    // Stadtmauer (4 m dick); nur das Nordtor (x = 0) ist offen
+    if (z > 0 && Math.abs(x) <= o.gate && Math.abs(z) >= Math.abs(x)) return null
+    const ax = Math.abs(x) > Math.abs(z)
+    const sg = ax ? Math.sign(x) : Math.sign(z)
+    const out = m >= H
+    const d = out ? H + 2 - m : m - (H - 2)
+    const n = out ? sg : -sg
+    return ax ? { nx: n, nz: 0, depth: d } : { nx: 0, nz: n, depth: d }
   }
   const c = city()
   const list = c.grid.get(`${Math.floor(x / CELL)},${Math.floor(z / CELL)}`)

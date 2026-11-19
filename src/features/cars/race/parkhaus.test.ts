@@ -13,7 +13,7 @@ describe('Parkhaus', () => {
     const a = parkSurfaces(lane, PARK.z0 + 18)
     for (let i = 1; i < a.length; i++) expect(a[i] - a[i - 1]).toBeCloseTo(PARK.floorH, 5)
     expect(parkSurfaces(lane, PARK.z0 + PARK.ramp + 5)).toContain(PARK.floorH * PARK.floors)
-    expect(parkSurfaces(PARK.x1 - 5, PARK.z0 + 10)).toEqual([PARK.floorH, PARK.floorH * 2, PARK.floorH * 3, PARK.floorH * 4])
+    expect(parkSurfaces(PARK.x1 - 5, PARK.z0 + 10)).toEqual([-9, -4.5, 0, 4.5, 9, 13.5, 18])
     expect(parkSurfaces(0, 0)).toEqual([])
   })
   it('Wände halten außen, Süden ist unten offen', () => {
@@ -47,5 +47,24 @@ describe('Parkhaus', () => {
     let car: Car = { ...startCar(t, 0), x: -180, z: -180, h: Math.PI / 2, v: 10, y: PARK.floorH * PARK.floors + 1.5 }
     for (let i = 0; i < 30 * 5; i++) car = stepCar(car, { ...none, gas: true, fly: true, chase: true }, dt, t, st, true)
     expect(car.x).toBeGreaterThan(PARK.x1 + 3)
+  })
+  it('Untergeschoss: von der Platte (Erdgeschoss) die Rampe nach unten fahren', () => {
+    const st = statsFor('kleinwagen', 150)
+    let car: Car = { ...startCar(t, 0), x: PARK.x0 + 13, z: PARK.z0 + 44, h: Math.PI, v: 6, y: 0 }
+    for (let i = 0; i < 30 * 8 && car.z > PARK.z0 + 4; i++) car = stepCar(car, { ...none, gas: true }, dt, t, st, true)
+    expect(car.y ?? 0).toBeLessThan(-3.5)
+    expect(car.dmg).toBe(0)
+  })
+  it('Wände: auf keiner Ebene kommt man bei Vollgas aus dem Parkhaus oder steckt darin', () => {
+    const st = statsFor('roadster', 215)
+    let seed = 7
+    const rnd = () => { seed = (seed * 16807) % 2147483647; return seed / 2147483647 }
+    for (const y of [-9, -4.5, 0, 4.5, 13.5, 18]) for (let n = 0; n < 12; n++) {
+      let car: Car = { ...startCar(t, 0), x: PARK.x1 - 14 - rnd() * 20, z: PARK.z0 + 50 + rnd() * 30, h: rnd() * Math.PI * 2, v: 25 + rnd() * 40, y }
+      for (let i = 0; i < 30 * 6; i++) {
+        car = stepCar(car, { ...none, gas: true, left: i % 40 < 6 }, dt, t, st, true)
+        if (y !== 0 || car.z > PARK.z0 + 1) { expect(car.x).toBeGreaterThan(PARK.x0 - 0.5); expect(car.x).toBeLessThan(PARK.x1 + 0.5); expect(car.z).toBeLessThan(PARK.z1 + 0.5) }
+      }
+    }
   })
 })

@@ -465,7 +465,7 @@ export default function RaceView({ trackId, custom, laps, me, assistOk = false, 
         g.fillStyle = '#1f2937'; g.fillRect(0, 0, S, S)
         g.setTransform(-k * ch, -k * sh, k * sh, -k * ch, cx + k * (ch * car.x - sh * car.z), cx + k * (sh * car.x + ch * car.z))
         const H = CITY.half
-        g.fillStyle = '#2f5a35'; g.fillRect(WORLD.x0, H, WORLD.x1 - WORLD.x0, WORLD.z1 - H)
+        g.fillStyle = '#2f5a35'; g.fillRect(WORLD.x0, WORLD.z0, WORLD.x1 - WORLD.x0, WORLD.z1 - WORLD.z0)
         g.fillStyle = '#2b2f36'; g.fillRect(-H, -H, H * 2, H * 2)
         for (const m of MOUNTAINS) {
           g.fillStyle = '#5b6b45'; g.beginPath(); g.arc(m.x, m.z, m.R, 0, 7); g.fill()
