@@ -3,6 +3,7 @@ import { carList, carUpgrades, raceSuperInfo, type SuperInfo } from '../../../se
 import { SUPERCAR, setFlyConfig } from '../stats'
 import { NO_UP, type Up } from '../tuning'
 import type { RaceCarInfo } from './RaceView'
+import { getColor } from '../carPrefs'
 
 /** Auto, das man im Rennen fahren kann. */
 export interface RaceCarOption extends RaceCarInfo { id: string; top: number | null; up: Up }
@@ -17,8 +18,8 @@ export function useRaceCars(): State & { reload: () => Promise<void> } {
     const [list, ups, info] = await Promise.all([carList().catch(() => []), carUpgrades().catch(() => []), raceSuperInfo().catch((): SuperInfo => ({ ok: false, kmh: 700, assist: false }))])
     setFlyConfig(info.fly)
     const upOf = (id: string): Up => { const u = ups.find((x) => x.car_id === id); return u ? { motor: u.motor, reifen: u.reifen, bremse: u.bremse } : NO_UP }
-    const own: RaceCarOption[] = list.filter((c) => c.owned).map((c) => ({ id: c.id, name: c.name, kind: c.kind, color: c.color, top: c.top_kmh, up: upOf(c.id) }))
-    return { cars: info.ok ? [{ ...SUPERCAR, top: info.kmh, up: NO_UP }, ...own] : own, superOk: info.ok, assistOk: info.assist, ready: true }
+    const own: RaceCarOption[] = list.filter((c) => c.owned).map((c) => ({ id: c.id, name: c.name, kind: c.kind, color: getColor(c.id) ?? c.color, top: c.top_kmh, up: upOf(c.id) }))
+    return { cars: info.ok ? [{ ...SUPERCAR, color: getColor(SUPERCAR.id) ?? SUPERCAR.color, top: info.kmh, up: NO_UP }, ...own] : own, superOk: info.ok, assistOk: info.assist, ready: true }
   }, [])
   useEffect(() => {
     let on = true

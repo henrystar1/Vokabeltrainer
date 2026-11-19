@@ -1,3 +1,4 @@
+import { inParkXZ } from './parkhaus'
 import { describe, expect, it } from 'vitest'
 import { CATCH_DIST, caught, chaseCar, clearLine, copDrive, copSpawn, type BotMem } from './chase'
 import { CITY, city } from './city'
@@ -124,11 +125,14 @@ describe('Polizei-Bot fährt zum Bandit', () => {
       const d = copDrive(car, tgt, mem, dt)
       if (d.reset) { resets++; car = { ...car, x: d.reset.x, z: d.reset.z, h: d.reset.h, v: 0, dmg: 0, lvl: 0, y: 0 } }
       if (d.repair) car = { ...car, dmg: 0, hold: 0 }
-      car = stepCar(car, { ...d.inp, chase: true }, dt, t, st, true)
+      // wie in RaceView: außen nahe am Parkhaus hochfliegen, darüber sinken lassen
+      const botIn = inParkXZ(car.x, car.z, 0)
+      const want = inParkXZ(tgt.x, tgt.z, 8) ? !botIn && inParkXZ(car.x, car.z, 45) : false
+      car = stepCar(car, { ...d.inp, fly: want, chase: true }, dt, t, st, true)
     }
     return { car, resets }
   }
-  it('Bot fährt im Parkhaus Rampe für Rampe nach oben aufs Dach, ohne zu fliegen', () => {
+  it('Bot fliegt vor dem Parkhaus hoch, landet aufs Dach und kommt zum Bandit auf dem Dach', () => {
     const tgt = { x: -160, z: -170, lvl: 0, y: 18 }
     const r = parkRun({ ...startCar(t, 0), x: -120, z: -240, h: -Math.PI / 2, v: 10, lvl: 0 }, tgt, 90, (c) => Math.hypot(c.x - tgt.x, c.z - tgt.z) < 5 && (c.y ?? 0) > 17)
     expect(r.car.y ?? 0).toBeGreaterThan(17)
@@ -139,5 +143,16 @@ describe('Polizei-Bot fährt zum Bandit', () => {
     const r = parkRun({ ...startCar(t, 0), x: -180, z: -170, h: 0, v: 0, lvl: 0, y: 18 }, tgt, 120, (c) => Math.hypot(c.x - tgt.x, c.z - tgt.z) < 12)
     expect(Math.hypot(r.car.x - tgt.x, r.car.z - tgt.z)).toBeLessThan(15)
     expect(r.car.y ?? 0).toBeLessThan(1)
+  })
+  it('Bot erreicht einen Bandit im Erdgeschoss des Parkhauses: aufs Dach, dann die Rampen hinunter', () => {
+    const tgt = { x: -160, z: -180, lvl: 0, y: 0 }
+    const r = parkRun({ ...startCar(t, 0), x: -120, z: -240, h: -Math.PI / 2, v: 10, lvl: 0 }, tgt, 150, (c) => Math.hypot(c.x - tgt.x, c.z - tgt.z) < 6 && (c.y ?? 0) < 1.5)
+    expect(Math.hypot(r.car.x - tgt.x, r.car.z - tgt.z)).toBeLessThan(8)
+    expect(r.car.y ?? 0).toBeLessThan(1.5)
+  })
+  it('Motorrad-Fahrer bekommen in der Jagd ein Motorrad', () => {
+    expect(chaseCar('cop', false, false, true).kind).toBe('sportbike')
+    expect(chaseCar('bandit', false, false, true).kind).toBe('sportbike')
+    expect(chaseCar('cop', false, false, false).kind).toBe('roadster')
   })
 })

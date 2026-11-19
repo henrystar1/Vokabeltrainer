@@ -1,4 +1,4 @@
-import { PARK, inParkXZ } from './parkhaus'
+import { PARK, PARK_TOP, inParkXZ } from './parkhaus'
 import { CITY, GARAGES, TUNNELS, bridgeAt, cityPush, type TunnelSeg } from './city'
 import { flyHeight } from '../stats'
 import type { Car, Input } from './physics'
@@ -7,7 +7,9 @@ import type { Car, Input } from './physics'
 export type Role = 'bandit' | 'cop'
 
 /** Autos der Rollen: Bandit schnell und fliegend, Polizei etwas langsamer (Admin-Fahrer: auch fliegend wie der Roadster). */
-export function chaseCar(role: Role, isAdminCar: boolean, bot = false): { kind: string; color: string; top: number } {
+export function chaseCar(role: Role, isAdminCar: boolean, bot = false, onBike = false): { kind: string; color: string; top: number } {
+  // Wer mit einem Motorrad in die Stadt kommt, fährt auch die Jagd auf einem Motorrad (Bandit dunkel, Polizei weiß)
+  if (onBike) return { kind: 'sportbike', color: role === 'bandit' ? '#111827' : '#f8fafc', top: role === 'bandit' ? 240 : 225 }
   if (role === 'bandit') return { kind: 'roadster', color: '#111827', top: 255 }
   if (isAdminCar) return { kind: 'roadster', color: '#f8fafc', top: 215 }
   // Polizei fährt ebenfalls einen Flug-Wagen (sonst käme sie nicht an einen fliegenden Banditen)
@@ -102,17 +104,17 @@ function entranceFor(car: Car, tgt: { x: number; z: number }): { x: number; z: n
  * Fahr-KI im Parkhaus: rauf im Zick-Zack (Rampe auf der Westspur nach Norden, oben auf der Ostspur zurück nach Süden, am Südende wieder auf die Rampe),
  * runter spiegelbildlich. `direct`: geradeaus zum Ziel (gleiche Ebene) bzw. in die Einfahrt hinein; sonst Straßenpunkt vor dem Tor.
  */
-export function parkNav(car: Car, tgt: { x: number; z: number; y?: number }): { x: number; z: number; direct?: boolean; slow?: boolean } | null {
+export function parkNav(car: Car, tgt: { x: number; z: number; y?: number }): { x: number; z: number; direct?: boolean; slow?: boolean; hold?: boolean } | null {
   const { x0, x1, z0, laneW, ramp } = PARK
   const xA = x0 + laneW / 2, xm = x0 + laneW, xB = (xm + x1) / 2
   const carIn = inParkXZ(car.x, car.z, 1), tIn = inParkXZ(tgt.x, tgt.z, 2)
   if (!carIn && !tIn) return null
   const y = car.y ?? 0, ty = tgt.y ?? 0, s = car.z - z0, laneA = car.x < xm
   if (!carIn) {
-    // von außen: erst zur Straße vor der Einfahrt, dann geradeaus hinein
-    const out = { x: xA, z: z0 - 16 }, rx = car.x - out.x, rz = car.z - out.z
-    if (Math.hypot(rx, rz) < 8 || (car.z < z0 && car.z > z0 - 30 && Math.abs(rx) < 9)) return { x: xA, z: z0 + 12, direct: true, slow: true }
-    return { x: out.x, z: -240 }
+    // von außen: erst zur Straße vor dem Parkhaus, dort hochfliegen (über die Wand, PARK_TOP), dann direkt aufs Dach und von oben weiter
+    const fx = Math.max(PARK.x0, Math.min(PARK.x1, car.x)), fz = Math.max(PARK.z0, Math.min(PARK.z1, car.z))
+    if (Math.hypot(car.x - fx, car.z - fz) < 45) return y < PARK_TOP + 2.5 ? { x: car.x, z: car.z, hold: true } : { x: tgt.x, z: tgt.z, direct: true, slow: true }
+    return { x: xA, z: -240 }
   }
   if (!tIn) {
     // Ziel ist draußen: unten (Erdgeschoss) einfach nach Süden hinaus, oben erst nach unten
@@ -191,6 +193,7 @@ export function copDrive(car: Car, tgt0: { x: number; z: number; lvl?: number; y
   // Garagen-Zufahrt: vor dem Tor auf Schritttempo, damit er die Kurve in die Einfahrt schafft
   const gApproach = lvl === 0 && !gateTgt && !!ent && !entDirect
   const parkSlow = !!pk?.slow
+  if (pk?.hold) { mem.stuck = 0; mem.pt = 0; return { inp: { gas: false, brake: true, left: false, right: false } } }
   const slow = (nodeWp && dist < 55 && car.v > 21) || exitBrake || (parkSlow && car.v > 11) || (gApproach && dist < 60 && car.v > 12) || (cross !== undefined && cross < 90 && car.v > 17)
   const brake = car.v > 9 && ((parkSlow && car.v > 15) || (gApproach && dist < 40 && car.v > 9) || (cross !== undefined && cross < 60 && car.v > 20) || Math.abs(diff) > 1.0 || (sharp && dist < 38 && car.v > 15) || (nodeWp && dist < 45 && car.v > 26) || (exitBrake && car.v > 28))
   const inp: Input = { gas: !brake && !slow && (Math.abs(diff) < 1.3 || car.v < 6), brake, left: diff > 0.07, right: diff < -0.07 }

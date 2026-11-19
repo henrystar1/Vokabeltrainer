@@ -10,6 +10,8 @@ import CarRun from '../features/cars/CarRun'
 import RaceMenu from '../features/cars/race/RaceMenu'
 import RaceBoard from '../features/cars/race/RaceBoard'
 import TuneTab from '../features/cars/TuneTab'
+import Showroom from '../features/cars/Showroom'
+import { getPick, setPick as setPickLocal } from '../features/cars/carPrefs'
 import { useRaceCars } from '../features/cars/race/useRaceCars'
 import { Link } from 'react-router-dom'
 import { carBuy, carList } from '../services/cars'
@@ -36,8 +38,9 @@ export default function Cars() {
   const wallet = useWallet()
   const list = useAsync(carList, [])
   const [busy, setBusy] = useState<string | null>(null)
-  const [tab, setTab] = useState<'shop' | 'tune' | 'race' | 'rank' | 'drive'>('shop')
-  const [pick, setPick] = useState<string | null>(null)
+  const [tab, setTab] = useState<'show' | 'shop' | 'tune' | 'race' | 'rank' | 'drive'>('show')
+  const [pick, setPickState] = useState<string | null>(getPick)
+  const setPick = (id: string) => { setPickState(id); setPickLocal(id) }
   const [msg, setMsg] = useState<string | null>(null)
   const cars = list.data ?? []
   const owned = cars.filter((c) => c.owned)
@@ -55,8 +58,9 @@ export default function Cars() {
       {list.error && <ErrorBox message={list.error} onRetry={list.reload} />}
       {list.loading && !list.data && <Spinner />}
       <div className="flex gap-2" role="tablist" aria-label="Bereich">
-        {([['shop', 'Kaufen'], ['tune', 'Tuning'], ['race', 'Rennen'], ['rank', 'Rangliste'], ['drive', 'Autobahn']] as const).map(([k, l]) => <button key={k} type="button" role="tab" aria-selected={tab === k} onClick={() => setTab(k)} className={`min-h-[44px] rounded-lg border px-4 ${tab === k ? 'border-accent-cyan bg-accent-cyan/20' : 'border-white/15 hover:bg-white/10'}`}>{l}</button>)}
+        {([['show', 'Showroom'], ['shop', 'Kaufen'], ['tune', 'Tuning'], ['race', 'Rennen'], ['rank', 'Rangliste'], ['drive', 'Autobahn']] as const).map(([k, l]) => <button key={k} type="button" role="tab" aria-selected={tab === k} onClick={() => setTab(k)} className={`min-h-[44px] rounded-lg border px-4 ${tab === k ? 'border-accent-cyan bg-accent-cyan/20' : 'border-white/15 hover:bg-white/10'}`}>{l}</button>)}
       </div>
+      {tab === 'show' && list.data && <Showroom shop={cars} cars={rc.cars} superOk={rc.superOk} assistOk={rc.assistOk} onChanged={async () => { await rc.reload(); await list.reload() }} />}
       {tab === 'tune' && <Card><TuneTab cars={rc.cars} shop={cars} onChanged={rc.reload} /></Card>}
       {tab === 'race' && (
         <Card>

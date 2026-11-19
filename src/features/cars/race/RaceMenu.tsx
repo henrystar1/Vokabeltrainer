@@ -41,10 +41,10 @@ export function TrackPreview({ id = 0, def, className = '' }: { id?: number; def
 }
 
 /** Einzelspieler: Strecke wählen (feste oder gemalte), Training oder gegen Bots. */
-export default function RaceMenu({ car, assistOk = false }: { car: RaceCarInfo; assistOk?: boolean }) {
+export default function RaceMenu({ car, assistOk = false, only, onClose }: { car: RaceCarInfo; assistOk?: boolean; /** nur Lobby (startet sofort) oder nur Rennen (Karte und Bots wählen) */ only?: 'lobby' | 'race'; onClose?: () => void }) {
   const auth = useAuthOptional()
   const isAdmin = auth?.isAdmin ?? false
-  const [openLobby, setOpenLobby] = useState(false)
+  const [openLobby, setOpenLobby] = useState(only === 'lobby')
   const [sel, setSel] = useState<{ t: number } | { c: RaceTrackRow }>({ t: 0 })
   const [laps, setLaps] = useState(3)
   const [mode, setMode] = useState<'train' | 'bots'>('bots')
@@ -68,7 +68,7 @@ export default function RaceMenu({ car, assistOk = false }: { car: RaceCarInfo; 
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [mode, level, nBots, run?.key])
 
-  if (openLobby && auth?.user) return <RaceView key="open" trackId={13} laps={1} me={car} assistOk={assistOk} online={{ gameId: 'open-city', userId: auth.user.id, players: [], open: true, name: auth.displayName ?? car.name }} onExit={() => setOpenLobby(false)} />
+  if (openLobby && auth?.user) return <RaceView key="open" trackId={13} laps={1} me={car} assistOk={assistOk} online={{ gameId: 'open-city', userId: auth.user.id, players: [], open: true, name: auth.displayName ?? car.name }} onExit={() => { setOpenLobby(false); onClose?.() }} />
   if (test) return <RaceView key="test" trackId={0} custom={test} laps={1} me={car} assistOk={assistOk} onAgain={() => setTest({ ...test })} onExit={() => setTest(null)} />
   if (run) return <RaceView key={run.key} trackId={'t' in sel ? sel.t : 0} custom={'c' in sel ? def : undefined} laps={laps} me={car} assistOk={assistOk} bots={bots} onAgain={() => setRun({ key: run.key + 1 })} onExit={() => setRun(null)} />
   if (editor) return <TrackEditor onClose={() => setEditor(false)} onTest={(d) => setTest(d)} onSaved={() => { setEditor(false); loadCustom() }} />
@@ -77,7 +77,7 @@ export default function RaceMenu({ car, assistOk = false }: { car: RaceCarInfo; 
   const card = (on: boolean) => `w-full rounded-xl border p-2 text-left ${on ? 'border-accent-cyan bg-white/10' : 'border-white/10 hover:bg-white/5'}`
   return (
     <div className="space-y-4">
-      {auth?.user && <button type="button" onClick={() => setOpenLobby(true)} className="min-h-[48px] w-full rounded-xl border border-accent-cyan px-6 text-lg font-semibold text-accent-cyan sm:w-auto">Offene Stadt-Lobby: sofort mitfahren</button>}
+      {auth?.user && only !== 'race' && only !== 'lobby' && <button type="button" onClick={() => setOpenLobby(true)} className="min-h-[48px] w-full rounded-xl border border-accent-cyan px-6 text-lg font-semibold text-accent-cyan sm:w-auto">Offene Stadt-Lobby: sofort mitfahren</button>}
       <div>
         <h3 className="mb-2 font-semibold">Strecke</h3>
         <ul className="grid grid-cols-2 gap-3 sm:grid-cols-3">

@@ -12,7 +12,7 @@ import { MOUNTAINS, WORLD, hillH, hillSlope, outRoads } from './mountains'
 import { CHASE_MAX_MS, caught, chaseCar, copDrive, copSpawn, type BotMem, type Role } from './chase'
 import ChasePanel, { type ChaseApi, type ChaseUi, type Peer } from './ChasePanel'
 import type { Up } from '../tuning'
-import { raceChaseReward, raceReward, raceSubmit } from '../../../services/cars'
+import { carList, raceChaseReward, raceReward, raceSubmit } from '../../../services/cars'
 import { useWalletOptional } from '../../koins/WalletProvider'
 
 export interface RaceCarInfo { /** Auto-ID im Shop (für die Rangliste) */ id?: string; /** Tuning-Stufen */ up?: Up; name: string; kind: string; color: string; /** eigene Höchstgeschwindigkeit des Autos (km/h) */ top?: number | null }
@@ -143,6 +143,8 @@ export default function RaceView({ trackId, custom, laps, me, assistOk = false, 
         THREE = await import('three')
         build = (await import('./scene')).buildScene
       } catch { setLoadErr('Die 3D-Ansicht konnte nicht geladen werden. Prüfe die Verbindung und lade die Seite neu.'); return }
+      // eigene Autos des Admins bekannt machen (auch die der Mitfahrer)
+      await carList().catch(() => [])
       if (dead) return
       const track = buildTrack(def)
       const rs = build(THREE, track)
@@ -295,7 +297,7 @@ export default function RaceView({ trackId, custom, laps, me, assistOk = false, 
       const syncLobby = () => { const l = lobbyCur; setChaseUi((o) => ({ ...o, lobby: l ? { id: l.id, bandits: l.bandits.map((b) => (b === online?.userId ? 'me' : b)), invited: { ...l.invited }, bots: l.bots } : undefined })) }
       const applyRole = (role: Role | null) => {
         myRole = role
-        if (role) { const cc = chaseCar(role, me.kind === 'supercar'); eff.kind = cc.kind; eff.color = cc.color; eff.up = undefined; topNow = cc.top }
+        if (role) { const cc = chaseCar(role, me.kind === 'supercar', false, isBike(me.kind)); eff.kind = cc.kind; eff.color = cc.color; eff.up = undefined; topNow = cc.top }
         else { eff.kind = me.kind; eff.color = me.color; eff.up = me.up; topNow = userTop }
         myStats = mkStats()
         scene.remove(myMesh)
@@ -563,8 +565,9 @@ export default function RaceView({ trackId, custom, laps, me, assistOk = false, 
               if (d.reset) pb.car = { ...pb.car, x: d.reset.x, z: d.reset.z, h: d.reset.h, v: 0, steer: 0, slip: 0, dmg: 0, hold: 0, lvl: 0, y: 0 }
               if (d.repair) pb.car = { ...pb.car, dmg: 0, hold: 0 }
               // Bots fliegen hoch, wenn der Bandit höher ist, und lassen sich sinken, wenn er tiefer ist
-              // (am Parkhaus nicht: dort fahren sie die Rampen, sonst knallen sie von außen gegen die Wand)
-              const want = (tg.y ?? 0) > (pb.car.y ?? 0) + 2.5 && !inParkXZ(tg.x, tg.z, 8) && !inParkXZ(pb.car.x, pb.car.z, 8)
+              // Ziel im Parkhaus: außen nahe dran hochfliegen (aufs Dach), über dem Parkhaus sinken lassen und die Rampen hinunterfahren
+              const botIn = inParkXZ(pb.car.x, pb.car.z, 0)
+              const want = inParkXZ(tg.x, tg.z, 8) ? !botIn && inParkXZ(pb.car.x, pb.car.z, 45) : (tg.y ?? 0) > (pb.car.y ?? 0) + 2.5 && !botIn
               pb.car = stepCar(pb.car, { ...d.inp, fly: want, chase: true }, dt, track, pb.st, true)
               for (const bd of bands) if (chase && caught({ x: pb.car.x, z: pb.car.z, lvl: pb.car.lvl ?? 0, fly: 0, y: pb.car.y }, bd)) markCaught(bd.id, true)
             }

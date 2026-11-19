@@ -44,7 +44,9 @@ export const BIKE_KINDS = ['chopper', 'crossbike', 'sportbike', 'hyperbike']
 export const isBike = (kind: string): boolean => BIKE_KINDS.includes(kind)
 /** Nur der Roadster kann kurz fliegen (2 s, danach 20 s laden). */
 /** Fliegen können der Sky-Roadster und das Admin-Supercar. */
-export const canFly = (kind: string): boolean => kind === 'roadster' || kind === 'supercar'
+/** Eigene Autos (Admin), die fliegen können. */
+export const CUSTOM_FLY = new Set<string>()
+export const canFly = (kind: string): boolean => kind === 'roadster' || kind === 'supercar' || CUSTOM_FLY.has(kind)
 export const FLY_SECONDS = 2
 export const FLY_COOLDOWN = 20
 /** Vom Admin eingestellt (gilt für alle): Flugdauer, Ladezeit (Sekunden) und ob sich das Auto im Flug seitwärts rollt. */

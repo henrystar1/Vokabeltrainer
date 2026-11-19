@@ -1,5 +1,6 @@
 import type * as T from 'three'
 import { isBike } from '../stats'
+import { buildSpecCar, getSpec } from '../customCar'
 import { RoundedBoxGeometry } from 'three/examples/jsm/geometries/RoundedBoxGeometry.js'
 import { roadProximity, type Track } from './track'
 import { BRIDGES, CITY, GARAGES, TUNNELS, bridgeH, city, tunnelD } from './city'
@@ -353,6 +354,13 @@ function nameSprite(THREE: THREE, name: string, y: number): T.Sprite {
 
 /** Schönes Auto aus abgerundeten Teilen: Karosserie, Kabine mit Glas, Räder mit Felgen, Lichter, je Art Besonderheiten. */
 function buildCar(THREE: THREE, kind: string, color: string, name: string, isMe: boolean): T.Group {
+  const sp = getSpec(kind)
+  if (sp) {
+    const g = buildSpecCar(THREE, sp, color)
+    if (sp.fly) addJets(THREE, g, sp.len, sp.wid)
+    if (!isMe) g.add(nameSprite(THREE, name, 2.6))
+    return g
+  }
   if (isBike(kind)) return buildBike(THREE, kind, color, name, isMe)
   if (kind === 'supercar') return buildSupercar(THREE, color, name, isMe)
   const b = BODIES[kind] ?? BODIES.kleinwagen
@@ -992,4 +1000,9 @@ function tickSiren(g: T.Group, ms: number) {
   const ph = Math.floor(ms / 120) % 6
   s.red.visible = ph === 0 || ph === 1 || ph === 4
   s.blue.visible = ph === 2 || ph === 3 || ph === 5
+}
+
+/** Auto-Modell für Vorschauen (Showroom): Blickrichtung +z, ohne Namensschild. */
+export function makeCarModel(THREE: THREE, kind: string, color: string): T.Group {
+  return buildCar(THREE, kind, color, '', true)
 }
