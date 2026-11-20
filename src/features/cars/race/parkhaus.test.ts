@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { PARK, PARK_TOP, parkPush, parkSurfaces } from './parkhaus'
+import { PARK, PARK_LANES, PARK_TOP, PARK_TUNNEL, parkPush, parkShaft, parkSurfaces } from './parkhaus'
+import { tunnelAt } from './city'
 import { startCar, stepCar, statsFor, type Car } from './physics'
 import { TRACKS, buildTrack } from './track'
 
@@ -8,13 +9,17 @@ const none = { gas: false, brake: false, left: false, right: false, nitro: false
 const t = buildTrack(TRACKS[13])
 
 describe('Parkhaus', () => {
-  it('Flächen liegen mit 4,5 m Abstand übereinander, Rampe steigt 4,5 m', () => {
-    const lane = PARK.x0 + 5
-    const a = parkSurfaces(lane, PARK.z0 + 18)
-    for (let i = 1; i < a.length; i++) expect(a[i] - a[i - 1]).toBeCloseTo(PARK.floorH, 5)
-    expect(parkSurfaces(lane, PARK.z0 + PARK.ramp + 5)).toContain(PARK.floorH * PARK.floors)
-    expect(parkSurfaces(PARK.x1 - 5, PARK.z0 + 10)).toEqual([-9, -4.5, 0, 4.5, 9, 13.5, 18])
+  it('Flächen: Platten alle 4,5 m, Rampen hinauf (West), Abfahrt ins 1. UG, Abfahrt ins 2. UG (Ost); Schächte ohne Decke', () => {
+    const z = PARK.z0 + 18
+    expect(parkSurfaces(PARK_LANES.up, z)).toEqual([-9, 2.25, 6.75, 11.25, 15.75])
+    expect(parkSurfaces(PARK_LANES.dn, z)).toEqual([-9, -2.25])
+    expect(parkSurfaces(PARK_LANES.east, z)).toEqual([-9, -6.75, 0, 4.5, 9, 13.5, 18])
+    expect(parkSurfaces(PARK_LANES.mid, z)).toEqual([-9, -4.5, 0, 4.5, 9, 13.5, 18])
+    expect(parkSurfaces(PARK_LANES.up, PARK.z0 + PARK.ramp + 5)).toContain(PARK.floorH * PARK.floors)
+    expect(parkSurfaces(PARK_LANES.dn, PARK.z0 + PARK.ramp + 5)).toEqual([-9, -4.5, 0, 4.5, 9, 13.5, 18])
     expect(parkSurfaces(0, 0)).toEqual([])
+    expect(parkShaft(PARK_LANES.dn, z)).toBe(true)
+    expect(parkShaft(PARK_LANES.mid, z)).toBe(false)
   })
   it('Wände halten außen, Süden ist unten offen', () => {
     expect(parkPush(PARK.x0, -180, 1)).not.toBeNull()
@@ -26,7 +31,7 @@ describe('Parkhaus', () => {
   })
   it('über die Rampe in die erste Ebene fahren', () => {
     const st = statsFor('roadster', 200)
-    let car: Car = { ...startCar(t, 0), x: PARK.x0 + 13, z: PARK.z0 - 14, h: 0, v: 12 }
+    let car: Car = { ...startCar(t, 0), x: PARK_LANES.up, z: PARK.z0 - 14, h: 0, v: 12 }
     for (let i = 0; i < 30 * 6 && car.z < PARK.z0 + PARK.ramp + 8; i++) car = stepCar(car, { ...none, gas: true }, dt, t, st, true)
     expect(car.y ?? 0).toBeGreaterThan(PARK.floorH - 1)
     expect(car.z).toBeGreaterThan(PARK.z0 + PARK.ramp - 5)
@@ -48,10 +53,10 @@ describe('Parkhaus', () => {
     for (let i = 0; i < 30 * 5; i++) car = stepCar(car, { ...none, gas: true, fly: true, chase: true }, dt, t, st, true)
     expect(car.x).toBeGreaterThan(PARK.x1 + 3)
   })
-  it('Untergeschoss: von der Platte (Erdgeschoss) die Rampe nach unten fahren', () => {
+  it('Abfahrt: von der Einfahrt (Straße) nach Norden hinunter ins 1. Untergeschoss', () => {
     const st = statsFor('kleinwagen', 150)
-    let car: Car = { ...startCar(t, 0), x: PARK.x0 + 13, z: PARK.z0 + 44, h: Math.PI, v: 6, y: 0 }
-    for (let i = 0; i < 30 * 8 && car.z > PARK.z0 + 4; i++) car = stepCar(car, { ...none, gas: true }, dt, t, st, true)
+    let car: Car = { ...startCar(t, 0), x: PARK_LANES.dn, z: PARK.z0 - 20, h: 0, v: 8, y: 0 }
+    for (let i = 0; i < 30 * 8 && car.z < PARK.z0 + PARK.ramp + 6; i++) car = stepCar(car, { ...none, gas: car.v < 9 }, dt, t, st, true)
     expect(car.y ?? 0).toBeLessThan(-3.5)
     expect(car.dmg).toBe(0)
   })
@@ -66,5 +71,50 @@ describe('Parkhaus', () => {
         if (y !== 0 || car.z > PARK.z0 + 1) { expect(car.x).toBeGreaterThan(PARK.x0 - 0.5); expect(car.x).toBeLessThan(PARK.x1 + 0.5); expect(car.z).toBeLessThan(PARK.z1 + 0.5) }
       }
     }
+  })
+  // Fährt Wegpunkte ab (Tempo ~9 m/s, lenkt zum Punkt). Gibt das Auto am Ende und die tiefste/höchste Höhe zurück.
+  const follow = (car0: Car, wps: Array<[number, number]>, kind = 'kleinwagen'): { car: Car; ymin: number } => {
+    const st = statsFor(kind, 150)
+    let car = car0, ymin = 0
+    for (const [wx, wz] of wps) {
+      for (let i = 0; i < 30 * 40 && Math.hypot(wx - car.x, wz - car.z) > 4.5; i++) {
+        let dh = Math.atan2(wx - car.x, wz - car.z) - car.h; while (dh > Math.PI) dh -= Math.PI * 2; while (dh < -Math.PI) dh += Math.PI * 2
+        car = stepCar(car, { ...none, gas: car.v < 9, brake: car.v > 11, left: dh > 0.06, right: dh < -0.06 }, dt, t, st, true)
+        ymin = Math.min(ymin, car.y ?? 0)
+      }
+    }
+    return { car, ymin }
+  }
+  it('Fahrt: Einfahrt → 1. UG → 2. UG und wieder hinaus (Abfahrten, ohne Schaden)', () => {
+    const z0 = PARK.z0, R = PARK.ramp
+    const down = follow({ ...startCar(t, 0), x: PARK_LANES.dn, z: z0 - 20, h: 0, v: 8 }, [[PARK_LANES.dn, z0 + R + 24], [PARK_LANES.east, z0 + R + 24], [PARK_LANES.east, z0 + 4]])
+    expect(down.car.y ?? 0).toBeLessThan(-7.5)
+    expect(down.car.dmg).toBe(0)
+    const out = follow({ ...down.car, h: 0, v: 6 }, [[PARK_LANES.east, z0 + R + 24], [PARK_LANES.dn, z0 + R + 24], [PARK_LANES.dn, z0 - 25]])
+    expect(out.car.z).toBeLessThan(z0 - 20)
+    expect(out.car.y ?? 0).toBeGreaterThan(-0.5)
+    expect(out.car.dmg).toBe(0)
+  })
+  it('Tunnel-Anschluss: von Ebene −1 durch die Ostwand in den Tunnel und zurück ins Parkhaus', () => {
+    expect(tunnelAt(-150, PARK_TUNNEL.z)).not.toBeNull()
+    const z0 = PARK.z0
+    // runter auf Ebene −1, dann nach Osten durch die Öffnung bis zur Straßenröhre unter x = −120
+    const a = follow({ ...startCar(t, 0), x: PARK_LANES.dn, z: z0 - 20, h: 0, v: 8 }, [[PARK_LANES.dn, z0 + PARK.ramp + 8], [PARK_LANES.mid, PARK_TUNNEL.z], [-135, PARK_TUNNEL.z], [-122, PARK_TUNNEL.z]])
+    expect(a.car.lvl).toBe(-1)
+    expect(a.car.x).toBeGreaterThan(-130)
+    // zurück: wieder auf Ebene −1 im Parkhaus
+    const b = follow({ ...a.car, h: -Math.PI / 2 }, [[-150, PARK_TUNNEL.z], [-185, PARK_TUNNEL.z]])
+    expect(b.car.lvl ?? 0).toBe(0)
+    expect(b.car.y ?? 0).toBeCloseTo(PARK_TUNNEL.y, 0)
+  })
+  it('Fliegen: im offenen Schacht der Rampen kann man hochfliegen, unter einer Decke nicht', () => {
+    const st = statsFor('roadster', 215)
+    const climb = (x: number, z: number, y: number): number => {
+      let car: Car = { ...startCar(t, 0), x, z, h: 0, v: 0, y }
+      for (let i = 0; i < 30 * 3; i++) car = stepCar(car, { ...none, fly: true }, dt, t, st, true)
+      return car.y ?? 0
+    }
+    expect(climb(PARK_LANES.dn, PARK.z0 + 10, -1)).toBeGreaterThan(8)
+    expect(climb(PARK_LANES.mid, PARK.z0 + 50, 0)).toBeLessThan(1)
   })
 })

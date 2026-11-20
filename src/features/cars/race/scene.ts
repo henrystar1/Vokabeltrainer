@@ -3,10 +3,13 @@ import { isBike } from '../stats'
 import { buildSpecCar, getSpec } from '../customCar'
 import { RoundedBoxGeometry } from 'three/examples/jsm/geometries/RoundedBoxGeometry.js'
 import { roadProximity, type Track } from './track'
-import { BRIDGES, CITY, GARAGES, TUNNELS, bridgeH, city, tunnelD } from './city'
-import { PARK, PARK_TOP } from './parkhaus'
+import { BRIDGES, CITY, type Bld, GARAGES, TUNNELS, bridgeH, city, tunnelD } from './city'
+import { PARK, PARK_TOP, PARK_TUNNEL } from './parkhaus'
 import { GATE, MOUNTAINS, OUT, RING, hillH, outRoads, ringPath } from './mountains'
 import { trees } from './forest'
+import { makeWalkerModel } from './walkerMesh'
+import { makeInteriorViewer } from './interiorMesh'
+import { layoutOf } from './interior'
 import { RAMPS, STUNT, loopPoint } from './stunt'
 
 type THREE = typeof import('three')
@@ -91,6 +94,10 @@ export interface RaceScene {
   addSiren: (g: T.Group) => void
   /** Blaulicht blinken lassen (Zeit in ms). */
   tickSiren: (g: T.Group, ms: number) => void
+  /** Spielfigur zu Fuß (Hemdfarbe). */
+  makeWalker: (shirt: string, pants?: string) => T.Group
+  /** Innenraum des Hauses zeigen, in dem die Figur steht (null = keins). */
+  showInterior: (b: { x: number; z: number; w: number; d: number; h: number; c: number } | null) => void
 }
 
 export function buildScene(THREE: THREE, t: Track): RaceScene {
@@ -294,7 +301,8 @@ export function buildScene(THREE: THREE, t: Track): RaceScene {
   // Übungsfeld: keine Strecke, keine Szenerie – nur der endlose Asphalt
   if (mode === 'free' || mode === 'fill' || mode === 'city' || mode === 'stunt') while (scene.children.length > mark) scene.remove(scene.children[mark])
   if (mode === 'stunt') buildStunt(THREE, scene, ground)
-  if (mode === 'city') buildCity(THREE, scene, ground, !!th.night)
+  let showInterior: RaceScene['showInterior'] = () => {}
+  if (mode === 'city') showInterior = buildCity(THREE, scene, ground, !!th.night)
   if (mode === 'fill') {
     // ausgefüllte Fläche: Asphalt im Vieleck, weiße Randlinie, keine Barriere
     const P = t.def.pts
@@ -305,7 +313,7 @@ export function buildScene(THREE: THREE, t: Track): RaceScene {
     scene.add(ln)
   }
   const makeCar = (kind: string, color: string, name: string, isMe: boolean) => buildCar(THREE, kind, color, name, isMe)
-  return { scene, sun, theme: th, makeCar, follow, focus, damageCar: (g, dmg, slip, v, time) => damageCar(THREE, g, dmg, slip, v, time), addSiren: (g) => addSiren(THREE, g), tickSiren }
+  return { scene, sun, theme: th, makeCar, follow, focus, damageCar: (g, dmg, slip, v, time) => damageCar(THREE, g, dmg, slip, v, time), addSiren: (g) => addSiren(THREE, g), tickSiren, makeWalker: (shirt, pants) => makeWalkerModel(THREE, shirt, pants), showInterior }
 }
 
 interface Body { len: number; wid: number; hgt: number; cabLen: number; cabH: number; cabZ: number; wheelR: number; spoiler?: boolean; bed?: boolean; open?: boolean; tall?: boolean; cage?: boolean; scoop?: boolean; formula?: boolean; track?: number; wheelW?: number; stripe?: boolean }
@@ -636,7 +644,7 @@ function buildSupercar(THREE: THREE, color: string, name: string, isMe: boolean)
 
 
 /** Stadt: Straßen (Asphalt mit Mittelstrichen), Häuserblöcke mit Fenstern, Parks mit Bäumen und die Brücke. */
-function buildCity(THREE: THREE, scene: T.Scene, ground: T.Mesh, night: boolean) {
+function buildCity(THREE: THREE, scene: T.Scene, ground: T.Mesh, night: boolean): RaceScene['showInterior'] {
   ground.material = new THREE.MeshStandardMaterial({ color: 0x33363e, roughness: 0.95 })
   const P = CITY.pitch
   // Mittelstriche: gestrichelt, ein Instanz-Mesh
@@ -669,7 +677,9 @@ function buildCity(THREE: THREE, scene: T.Scene, ground: T.Mesh, night: boolean)
     p.forEach((a, i) => { pos.push(...a); nor.push(...nrm); uv.push(...uvs[i]); col.push(c.r, c.g, c.b) })
     idx.push(b, b + 1, b + 2, b, b + 2, b + 3)
   }
+  const ranges = new Map<Bld, [number, number]>()
   for (const b of buildings) {
+    const vStart = pos.length / 3
     const x0 = b.x - b.w / 2, x1 = b.x + b.w / 2, z0 = b.z - b.d / 2, z1 = b.z + b.d / 2, h = b.h, c = pal[b.c], y0 = b.lo ?? 0
     const tw = b.w / 6, td = b.d / 6, th = (h - y0) / 6
     face([[x0, y0, z1], [x1, y0, z1], [x1, h, z1], [x0, h, z1]], [0, 0, 1], tw, th, c)
@@ -678,11 +688,37 @@ function buildCity(THREE: THREE, scene: T.Scene, ground: T.Mesh, night: boolean)
     face([[x0, y0, z0], [x0, y0, z1], [x0, h, z1], [x0, h, z0]], [-1, 0, 0], td, th, c)
     if (y0 > 0) face([[x0, y0, z0], [x1, y0, z0], [x1, y0, z1], [x0, y0, z1]], [0, -1, 0], 0.01, 0.01, c.clone().multiplyScalar(0.4))
     face([[x0, h, z1], [x1, h, z1], [x1, h, z0], [x0, h, z0]], [0, 1, 0], 0.01, 0.01, c.clone().multiplyScalar(0.55))
+    ranges.set(b, [vStart, pos.length / 3])
   }
   const bg = new THREE.BufferGeometry()
   bg.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); bg.setAttribute('normal', new THREE.Float32BufferAttribute(nor, 3))
   bg.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2)); bg.setAttribute('color', new THREE.Float32BufferAttribute(col, 3)); bg.setIndex(idx)
   scene.add(new THREE.Mesh(bg, new THREE.MeshStandardMaterial({ map: wt, vertexColors: true, roughness: 0.85 })))
+  // Türen an der Fassade (Rahmen + dunkle Öffnung) für jedes begehbare Haus
+  {
+    const dp: number[] = [], di: number[] = [], dc: number[] = []
+    for (const b of buildings) {
+      if (b.lo !== undefined) continue
+      const d = layoutOf(b).door, tx = d.nz !== 0 ? 1 : 0, tz = d.nx !== 0 ? 1 : 0
+      const quad = (hw: number, hgt: number, off: number, col: number[]) => {
+        const o = dp.length / 3
+        const px = d.x + d.nx * off, pz = d.z + d.nz * off
+        const pts = [[-hw, 0], [hw, 0], [hw, hgt], [-hw, hgt]]
+        // Reihenfolge so, dass die Vorderseite nach außen zeigt
+        const fl = d.nz < 0 || d.nx > 0 ? false : true
+        const seq = fl ? pts : [...pts].reverse()
+        for (const [u, v] of seq) { dp.push(px + tx * u, v, pz + tz * u); dc.push(...col) }
+        di.push(o, o + 1, o + 2, o, o + 2, o + 3)
+      }
+      quad(1.9, 3.1, 0.03, [0.85, 0.85, 0.8]); quad(1.5, 2.8, 0.05, [0.08, 0.06, 0.05])
+    }
+    const dg = new THREE.BufferGeometry()
+    dg.setAttribute('position', new THREE.Float32BufferAttribute(dp, 3)); dg.setAttribute('color', new THREE.Float32BufferAttribute(dc, 3)); dg.setIndex(di)
+    scene.add(new THREE.Mesh(dg, new THREE.MeshBasicMaterial({ vertexColors: true, side: THREE.FrontSide, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 })))
+  }
+  const viewer = makeInteriorViewer(THREE, scene, { geo: bg, ranges }, night)
+  const wallMats = pal.map((c) => new THREE.MeshStandardMaterial({ color: c, roughness: 0.85, side: THREE.DoubleSide }))
+  const showInterior: RaceScene['showInterior'] = (b) => { viewer(b as Bld | null, b ? wallMats[b.c] : wallMats[0]) }
 
   // Gehwege unter jedem Block (hellgrau, leicht erhöht) und Parks
   const walk = new THREE.MeshStandardMaterial({ color: night ? 0x5b6270 : 0x9ca3af, roughness: 1 })
@@ -809,30 +845,47 @@ function buildCity(THREE: THREE, scene: T.Scene, ground: T.Mesh, night: boolean)
   {
     const steel = new THREE.MeshStandardMaterial({ color: night ? 0x64748b : 0x94a3b8, roughness: 0.5, metalness: 0.35 })
     const dark = new THREE.MeshStandardMaterial({ color: 0x334155, roughness: 0.6, metalness: 0.3 })
-    const { x0, x1, z0, z1, laneW, ramp, floorH, floors, under } = PARK
+    const { x0, x1, z0, z1, laneW, ramp, floorH, floors, under, up: upW, dn: dnW, east: eastW } = PARK
     const conc = new THREE.MeshStandardMaterial({ color: night ? 0x3b4252 : 0x6b7280, roughness: 0.9 })
     const box = (w: number, h: number, d: number, x: number, y: number, z: number, m: T.Material = steel) => { const b = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), m); b.position.set(x, y, z); scene.add(b); return b }
-    const xm = x0 + laneW, W = x1 - x0, D = z1 - z0
+    const xm = x0 + upW + dnW, xe = x1 - eastW, W = x1 - x0, D = z1 - z0
+    const lamp = new THREE.MeshBasicMaterial({ color: 0xfff7d6 })
     for (let k = -under; k <= floors; k++) {
       const y = floorH * k
-      box(x1 - xm, 0.5, D, (xm + x1) / 2, y - 0.25, (z0 + z1) / 2)
-      box(laneW, 0.5, D - ramp, x0 + laneW / 2, y - 0.25, z0 + ramp + (D - ramp) / 2)
-      box(W, 0.12, 0.4, (x0 + x1) / 2, y - 0.56, (z0 + z1) / 2, new THREE.MeshBasicMaterial({ color: 0xfff7d6 }))
+      // Westspur (Rampen hinauf/hinab): Platte nur nördlich der Rampen, ganz unten auch darunter
+      box(xm - x0, 0.5, D - ramp, (x0 + xm) / 2, y - 0.25, z0 + ramp + (D - ramp) / 2)
+      if (k === -under) box(xm - x0, 0.5, ramp, (x0 + xm) / 2, y - 0.25, z0 + ramp / 2)
+      // Mitte und Ost: Loch über der Abfahrt ins 2. Untergeschoss (Ebene −1)
+      if (k === -1) { box(xe - xm, 0.5, D, (xm + xe) / 2, y - 0.25, (z0 + z1) / 2); box(eastW, 0.5, D - ramp, (xe + x1) / 2, y - 0.25, z0 + ramp + (D - ramp) / 2) }
+      else box(x1 - xm, 0.5, D, (xm + x1) / 2, y - 0.25, (z0 + z1) / 2)
+      box(W, 0.12, 0.4, (x0 + x1) / 2, y - 0.56, (z0 + z1) / 2, lamp)
       if (k <= 0) continue
-      // Brüstung rund herum (Süden nur über Ebene 1 geschlossen genug: überall 1 m)
+      // Brüstung rund herum
       box(W, 1, 0.5, (x0 + x1) / 2, y + 0.5, z1); box(0.5, 1, D, x0, y + 0.5, (z0 + z1) / 2); box(0.5, 1, D, x1, y + 0.5, (z0 + z1) / 2); box(W, 1, 0.5, (x0 + x1) / 2, y + 0.5, z0)
     }
-    // Rampen (geneigte Platten) auf der Westspur
+    // Rampen (geneigte Platten): hinauf (Westen, steigen nach Norden), Abfahrt ins 1. UG (daneben, fällt nach Norden), Abfahrt ins 2. UG (Osten, steigt nach Norden)
     const ang = Math.atan2(floorH, ramp), rl = Math.hypot(floorH, ramp)
-    for (let k = -under; k < floors; k++) {
-      const r = box(laneW, 0.5, rl, x0 + laneW / 2, floorH * k + floorH / 2 - 0.25, z0 + ramp / 2); r.rotation.x = -ang
+    for (let k = 0; k < floors; k++) {
+      const r = box(upW, 0.5, rl, x0 + upW / 2, floorH * k + floorH / 2 - 0.25, z0 + ramp / 2); r.rotation.x = -ang
       box(0.5, 1, rl, x0, floorH * k + floorH / 2 + 0.5, z0 + ramp / 2).rotation.x = -ang
     }
-    // Stützen (vom 2. Untergeschoss bis zum Dach)
-    for (let x = x0; x <= x1 + 0.1; x += W / 4) for (let z = z0; z <= z1 + 0.1; z += D / 4) box(1, floorH * (floors + under), 1, x, (floorH * (floors - under)) / 2, z, dark)
+    { const r = box(dnW, 0.5, rl, x0 + upW + dnW / 2, -floorH / 2 - 0.25, z0 + ramp / 2); r.rotation.x = ang }
+    { const r = box(eastW, 0.5, rl, x1 - eastW / 2, -1.5 * floorH - 0.25, z0 + ramp / 2); r.rotation.x = -ang }
+    // gelb-schwarze Kanten an der Abfahrt (Randstein am Schacht, damit man sie von oben sieht)
+    for (const x of [x0 + upW, xm]) box(0.5, 0.35, ramp, x, 0.18, z0 + ramp / 2, new THREE.MeshBasicMaterial({ color: 0xfacc15 }))
+    // Stützen (vom 2. Untergeschoss bis zum Dach), nicht in den Rampenschächten
+    for (let x = x0; x <= x1 + 0.1; x += W / 4) for (let z = z0; z <= z1 + 0.1; z += D / 4) { if (x < xm + 0.5 && z < z0 + ramp + 2) continue; box(1, floorH * (floors + under), 1, x, (floorH * (floors - under)) / 2, z, dark) }
     // Betonwände der Tiefgarage (Süden bleibt über dem Boden offen: dort liegt die Einfahrt)
     const dep = floorH * under
-    for (const [w, d, x, z] of [[0.6, D, x0, (z0 + z1) / 2], [0.6, D, x1, (z0 + z1) / 2], [W, 0.6, (x0 + x1) / 2, z1], [W, 0.6, (x0 + x1) / 2, z0]] as const) box(w, dep, d, x, -dep / 2, z, conc)
+    for (const [w, d, x, z] of [[0.6, D, x0, (z0 + z1) / 2], [W, 0.6, (x0 + x1) / 2, z1], [W, 0.6, (x0 + x1) / 2, z0]] as const) box(w, dep, d, x, -dep / 2, z, conc)
+    // Ostwand mit Tunnel-Anschluss (Ebene −1): Öffnung 12 m breit, 4 m hoch
+    {
+      const oz = PARK_TUNNEL.z, ow = 12, zs = z0, ze = oz - ow / 2, zs2 = oz + ow / 2
+      box(0.6, dep, ze - zs, x1, -dep / 2, (zs + ze) / 2, conc); box(0.6, dep, z1 - zs2, x1, -dep / 2, (zs2 + z1) / 2, conc)
+      box(0.6, dep - floorH, ow, x1, -dep + (dep - floorH) / 2, oz, conc)           // unter der Öffnung (2. UG)
+      box(0.6, 0.6, ow, x1, -0.3, oz, conc)                                           // Sturz
+      box(0.3, 1, ow, x1 - 2, -floorH + 3.6, oz, new THREE.MeshBasicMaterial({ color: 0x22c55e }))  // grünes Schild „Tunnel“
+    }
     // Außenwand im Erdgeschoss (Westen, Osten, Norden); Süden bleibt offen
     for (const [w, d, x, z] of [[0.6, D, x0, (z0 + z1) / 2], [0.6, D, x1, (z0 + z1) / 2], [W, 0.6, (x0 + x1) / 2, z1]] as const) box(w, floorH, d, x, floorH / 2, z, steel)
     // Einfahrt-Sturz mit P-Schild
@@ -989,6 +1042,7 @@ function buildCity(THREE: THREE, scene: T.Scene, ground: T.Mesh, night: boolean)
     d.position.set(x, bridgeH(x, zc) + 0.08, zc); scene.add(d)
   }
   }
+  return showInterior
 }
 
 

@@ -2,7 +2,7 @@ import { advance, inPolygon, pointAt, project, type Track } from './track'
 import { canFly, carKmh, flyConfig, flyHeight, isBike, kindDims, kindStats } from '../stats'
 import { hillH, hillSlope } from './mountains'
 import { treePush } from './forest'
-import { PARK, PARK_TOP, inParkXZ, parkPush, parkSurfaces } from './parkhaus'
+import { PARK, PARK_TOP, PARK_TUNNEL, inParkXZ, parkPush, parkShaft, parkSurfaces } from './parkhaus'
 import { CITY, bridgeH, cityPush, onDeck, roofH, tunnelAt, tunnelClamp, tunnelD, tunnelRamp } from './city'
 import { G, STUNT, arenaPush, groundH, loopPoint } from './stunt'
 import { upFactors, type Up } from '../tuning'
@@ -210,6 +210,8 @@ export function stepCar(c: Car, inp: Input, dt: number, t: Track, st: CarStats, 
           v *= 0.8
         }
       }
+      // Tiefgarage Ebene −1: durch die Öffnung der Ostwand in den Tunnel (und zurück)
+      if (lvl === 0 && inParkXZ(x, z, 0) && (c.y ?? 0) < PARK_TUNNEL.y + 1.5 && (c.y ?? 0) > PARK_TUNNEL.y - 1.5 && tunnelAt(x, z) && Math.abs(Math.sin(moveH)) > 0.75) lvl = -1
     } else if (lvl === 1 && (!onDeck(x, z) || (st.fly && inp.fly && canDrive && !wrecked && !waiting))) lvl = 0
     else if (lvl === -1 && !tunnelAt(x, z)) lvl = 0
     if (lvl === -1 && tunnelD(x, z) > 1.5) {
@@ -244,10 +246,12 @@ export function stepCar(c: Car, inp: Input, dt: number, t: Track, st: CarStats, 
     if ((c.lvl ?? 0) === 1 && lvl === 0) { y = bridgeH(c.x, c.z); vy = 0 }
     if (lvl === 0) {
       // Untergrund: Gelände (Berge) oder Hausdach; am Boden folgt das Auto der Oberfläche, in der Luft gilt der Flug
-      const gh = surfAt(x, z, c.y ?? 0, !!inp.chase), gPrev = surf0
-      const wasOn = (c.lvl ?? 0) === 0 && (c.y ?? 0) <= gPrev + 0.02
+      // aus dem Tunnel-Anschluss ins Parkhaus: auf Ebene −1
+      if ((c.lvl ?? 0) === -1 && inParkXZ(x, z, 0)) { y = PARK_TUNNEL.y; vy = 0 }
+      const gh = surfAt(x, z, y, !!inp.chase), gPrev = surf0
+      const wasOn = ((c.lvl ?? 0) === 0 || (c.lvl ?? 0) === -1) && y <= gPrev + 0.02
       // im Parkhaus (unter dem Dach) kann man nicht abheben – man würde durch die Decken steigen
-      const inGarage = inParkXZ(x, z, 0) && y < PARK.floorH * PARK.floors - 0.4
+      const inGarage = inParkXZ(x, z, 0) && y < PARK.floorH * PARK.floors - 0.4 && !parkShaft(x, z)
       const climb = st.fly && inp.fly && canDrive && !wrecked && !waiting && !inGarage
       if (climb) {
         vy = Math.min(17, Math.max(vy, 0) + 30 * dt)

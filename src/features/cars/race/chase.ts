@@ -1,4 +1,4 @@
-import { PARK, PARK_TOP, inParkXZ } from './parkhaus'
+import { PARK, PARK_LANES, PARK_TOP, inParkXZ } from './parkhaus'
 import { RING_CORNERS, GATE } from './mountains'
 import { CITY, GARAGES, TUNNELS, bridgeAt, cityPush, type TunnelSeg } from './city'
 import { flyHeight } from '../stats'
@@ -106,40 +106,63 @@ function entranceFor(car: Car, tgt: { x: number; z: number }): { x: number; z: n
  * runter spiegelbildlich. `direct`: geradeaus zum Ziel (gleiche Ebene) bzw. in die Einfahrt hinein; sonst Straßenpunkt vor dem Tor.
  */
 export function parkNav(car: Car, tgt: { x: number; z: number; y?: number }): { x: number; z: number; direct?: boolean; slow?: boolean; hold?: boolean } | null {
-  const { x0, x1, z0, laneW, ramp } = PARK
-  const xA = x0 + laneW / 2, xm = x0 + laneW, xB = (xm + x1) / 2
+  const { x0, x1, z0, ramp, up: upW, dn: dnW } = PARK
+  const xU = PARK_LANES.up, xD = PARK_LANES.dn, xC = PARK_LANES.east, xB = PARK_LANES.mid, xm = x0 + upW + dnW
   const carIn = inParkXZ(car.x, car.z, 1), tIn = inParkXZ(tgt.x, tgt.z, 2)
   if (!carIn && !tIn) return null
-  const y = car.y ?? 0, ty = tgt.y ?? 0, s = car.z - z0, laneA = car.x < xm
+  const y = car.y ?? 0, ty = tgt.y ?? 0, s = car.z - z0
+  const lev = (h: number) => Math.floor((h + PARK.floorH / 2) / PARK.floorH + 1e-9)
+  const Lc = lev(y), Lt = lev(ty)
+  const go = (x: number, z: number) => ({ x, z, direct: true, slow: true })
   if (!carIn) {
-    // von außen: erst zur Straße vor dem Parkhaus, dort hochfliegen (über die Wand, PARK_TOP), dann direkt aufs Dach und von oben weiter
+    // von außen: Ziel im Erdgeschoss oder darunter → über die Einfahrt (unten über die Abfahrt); sonst hochfliegen und von oben weiter
     if (ty < 2.5) {
-      // Ziel im Erdgeschoss oder darunter: normal über die Einfahrt hinein
-      const out = { x: xA, z: z0 - 16 }, rx = car.x - out.x, rz = car.z - out.z
-      if (Math.hypot(rx, rz) < 8 || (car.z < z0 && car.z > z0 - 30 && Math.abs(rx) < 9)) return { x: xA, z: z0 + 12, direct: true, slow: true }
+      const ex = ty < -2 ? xD : xB
+      const out = { x: ex, z: z0 - 16 }, rx = car.x - out.x, rz = car.z - out.z
+      if (Math.hypot(rx, rz) < 8 || (car.z < z0 && car.z > z0 - 30 && Math.abs(rx) < 9)) return go(ex, z0 + 12)
       return { x: out.x, z: -240 }
     }
     const fx = Math.max(PARK.x0, Math.min(PARK.x1, car.x)), fz = Math.max(PARK.z0, Math.min(PARK.z1, car.z))
     if (Math.hypot(car.x - fx, car.z - fz) < 45) return y < PARK_TOP + 2.5 ? { x: car.x, z: car.z, hold: true } : { x: tgt.x, z: tgt.z, direct: true, slow: true }
-    return { x: xA, z: -240 }
+    return { x: xU, z: -240 }
   }
-  if (!tIn) {
-    // Ziel ist draußen: unten (Erdgeschoss) einfach nach Süden hinaus, oben erst nach unten
-    if (y < 2) return { x: car.x, z: z0 - 30, direct: true, slow: true }
-  } else if (Math.abs(y - ty) < 2.2 && !(laneA && s < ramp && !(tgt.x < xm && tgt.z - z0 < ramp))) {
-    return { x: tgt.x, z: tgt.z, direct: true, slow: true }
+  // auf einer Rampe (nicht darunter): Position im Schacht UND Höhe passt zur Rampenfläche
+  const fl = PARK.floorH * Math.min(s, ramp) / ramp
+  const inUp = car.x < x0 + upW && s < ramp && y > -2
+  const inDn = car.x >= x0 + upW && car.x < xm && s < ramp && Math.abs(y + fl) < 2.2
+  const inEast = car.x >= x1 - PARK.east && s < ramp && Math.abs(y - (-2 * PARK.floorH + fl)) < 2.2
+  // Ziel auf gleicher Ebene (nicht in einem Schacht): geradeaus
+  const tShaft = tIn && tgt.x < xm && tgt.z - z0 < ramp
+  if (tIn && Lc === Lt && !inUp && !inDn && !inEast && !tShaft) return go(tgt.x, tgt.z)
+  const wantLevel = tIn ? Lt : 0                                   // Ziel draußen: Straße = Ebene 0
+  // Abfahrt ins 1. Untergeschoss (neben der Rampe hinauf): von der Einfahrt nach Norden hinunter, in der Gegenrichtung hinauf
+  if (inDn) {
+    if (wantLevel < 0) return go(xD, z0 + ramp + 24)
+    if (Lc >= 0 && tIn) return go(xB, z0 + 4)                      // oben angekommen: auf die Mittelspur
+    return go(xD, z0 - 30)
   }
-  const up = tIn && ty > y
-  if (up) {
-    if (laneA && s < ramp) return { x: xA, z: z0 + ramp + 14, direct: true, slow: true }       // Rampe hinauf
-    if (laneA) return { x: xB, z: z0 + ramp + 8, direct: true, slow: true }                      // oben angekommen: auf die Ostspur
-    if (s > 12) return { x: xB, z: z0 + 6, direct: true, slow: true }                           // Ostspur nach Süden
-    return { x: xA, z: z0 + 6, direct: true, slow: true }                                        // am Südende: nach Westen auf die Rampenspur
+  // Abfahrt ins 2. Untergeschoss (Osten): nach Norden hinauf, nach Süden hinunter
+  if (inEast) {
+    if (wantLevel <= -2) return Lc <= -2 && tIn ? go(tgt.x, tgt.z) : go(xC, z0 + 9)
+    return go(xC, z0 + ramp + 24)
   }
-  // runter
-  if (laneA && s < ramp) return s > 9 ? { x: xA, z: z0 + 2, direct: true, slow: true } : { x: xB, z: z0 + 5, direct: true, slow: true }
-  if (laneA) return { x: xA, z: z0 + ramp - 14, direct: true, slow: true }                      // oben auf der Rampe angekommen: hinunter
-  return s < ramp + 4 ? { x: xB, z: z0 + ramp + 8, direct: true, slow: true } : { x: xA, z: z0 + ramp + 6, direct: true, slow: true }   // Ostspur nach Norden, dann nach Westen zur Rampe
+  if (Lc < 0) {
+    if (wantLevel < Lc) return car.x > xC - 4 ? go(xC, z0 + 9) : go(xC, z0 + ramp + 24)    // runter: Ostspur, dann nach Süden
+    if (Lc === -2) return go(xC, z0 + 9)                                                    // 2. UG: zum Südende der Ostrampe, dann nach Norden (inEast)
+    return Math.abs(car.x - xD) < 6 ? go(xD, z0 - 30) : go(xD, z0 + ramp + 24)             // 1. UG: zur Abfahrt, nach Süden hinauf
+  }
+  if (Lc === 0 && wantLevel < 0) return s > 14 && !inUp ? go(xB, z0 + 6) : go(xD, z0 + 3)  // Erdgeschoss → Abfahrt nach unten
+  if (Lc === 0 && !tIn) return go(car.x, z0 - 30)                                           // Ziel draußen: nach Süden hinaus
+  if (tIn && wantLevel > Lc) {
+    if (inUp) return go(xU, z0 + ramp + 14)                                                 // Rampe hinauf
+    if (car.x < x0 + upW + 1) return go(xB, z0 + ramp + 8)                                  // oben angekommen: auf die Mittelspur
+    if (s > 12) return go(xB, z0 + 6)                                                       // Mittelspur nach Süden
+    return go(xU, z0 + 6)                                                                   // am Südende: nach Westen auf die Rampenspur
+  }
+  // oben, runter (Rampe hinab)
+  if (inUp) return s > 9 ? go(xU, z0 + 2) : go(xB, z0 + 5)
+  if (car.x < x0 + upW + 1) return go(xU, z0 + ramp - 14)
+  return s < ramp + 4 ? go(xB, z0 + ramp + 8) : go(xU, z0 + ramp + 6)
 }
 
 /** Schneidet die Strecke a→b die Stadtmauer (Quadrat)? */

@@ -19,10 +19,10 @@ export const BRIDGES: ReadonlyArray<{ bz: number; bx0: number; bx1: number }> = 
 ]
 
 export interface Bld { x: number; z: number; w: number; d: number; h: number; /** Unterkante (Sturz über einer Garageneinfahrt): darunter kann man durchfahren */ lo?: number; /** Farbvariante 0–5 */ c: number }
-import { PARK } from './parkhaus'
+import { PARK, PARK_TUNNEL } from './parkhaus'
 export interface CityData { buildings: Bld[]; parks: Array<{ x: number; z: number; size: number }>; grid: Map<string, number[]> }
 
-const CELL = 40
+export const CELL = 40
 let cache: CityData | null = null
 
 function rng(seed: number) { let a = seed >>> 0; return () => { a = (a + 0x6d2b79f5) >>> 0; let t = a; t = Math.imul(t ^ (t >>> 15), t | 1); t ^= t + Math.imul(t ^ (t >>> 7), t | 61); return ((t ^ (t >>> 14)) >>> 0) / 4294967296 } }
@@ -155,6 +155,8 @@ export const TUNNELS: ReadonlyArray<TunnelSeg> = [
   { dir: 'z', c: 420, a0: -465, a1: -353, r1: false },
   { dir: 'x', c: -300, a0: -7, a1: 105, r0: false },
   { dir: 'x', c: 180, a0: -353, a1: -255, r0: false },
+  // Parkhaus: Ostwand der Tiefgarage (Ebene −1) → Straßenröhre unter x = −120
+  { dir: 'x', c: PARK_TUNNEL.z, a0: -165, a1: -120, ...CLOSED },
 ]
 /** Garagen-Häuser: Block (Mitte), Achse und Tür (Blockkante, an der man von der Straße hineinfährt). */
 export const GARAGES: ReadonlyArray<{ bx: number; bz: number; seg: number; door: { x: number; z: number }; out: { x: number; z: number }; inn: { x: number; z: number } }> = [

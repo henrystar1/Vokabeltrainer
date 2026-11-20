@@ -161,4 +161,16 @@ describe('Polizei-Bot fährt zum Bandit', () => {
     expect(r.car.y ?? 0).toBeLessThan(-8)
     expect(Math.hypot(r.car.x - tgt.x, r.car.z - tgt.z)).toBeLessThan(8)
   })
+  it('Bot erreicht einen Bandit im 1. Untergeschoss', () => {
+    const tgt = { x: -165, z: -150, lvl: 0, y: -4.5 }
+    const r = parkRun({ ...startCar(t, 0), x: -120, z: -240, h: -Math.PI / 2, v: 10, lvl: 0 }, tgt, 120, (c) => Math.hypot(c.x - tgt.x, c.z - tgt.z) < 6 && (c.y ?? 0) < -3.5)
+    expect(Math.hypot(r.car.x - tgt.x, r.car.z - tgt.z)).toBeLessThan(8)
+    expect(r.car.y ?? 0).toBeLessThan(-3.5)
+  })
+  it.each([-4.5, -9])('Bot kommt von Ebene %s aus dem Parkhaus zum Bandit auf der Straße', (y) => {
+    const tgt = { x: -120, z: -300, lvl: 0, y: 0 }
+    const r = parkRun({ ...startCar(t, 0), x: -165, z: -150, h: Math.PI, v: 0, lvl: 0, y }, tgt, 150, (c) => Math.hypot(c.x - tgt.x, c.z - tgt.z) < 12)
+    expect(Math.hypot(r.car.x - tgt.x, r.car.z - tgt.z)).toBeLessThan(15)
+    expect(r.car.y ?? 0).toBeLessThan(1)
+  })
 })

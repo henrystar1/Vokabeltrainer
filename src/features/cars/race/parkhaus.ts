@@ -8,28 +8,46 @@ export const PARK = {
   laneW: 26, ramp: 36, floorH: 4.5, floors: 4,
   /** Untergeschosse */
   under: 2,
+  /** Spurbreiten: Rampe nach oben (Westen), Abfahrt nach unten (daneben) und Abfahrt zum 2. Untergeschoss (Osten) */
+  up: 13, dn: 13, east: 13,
 }
+/** Mitten der Spuren (x): Rampe hinauf, Abfahrt ins 1. Untergeschoss, Abfahrt ins 2. Untergeschoss, Mittelspur. */
+export const PARK_LANES = {
+  up: PARK.x0 + PARK.up / 2,
+  dn: PARK.x0 + PARK.up + PARK.dn / 2,
+  east: PARK.x1 - PARK.east / 2,
+  mid: (PARK.x0 + PARK.up + PARK.dn + PARK.x1 - PARK.east) / 2,
+}
+/** Tunnel-Anschluss auf Ebene −1 (Ostwand): Mitte (z) und Höhe der Ebene. */
+export const PARK_TUNNEL = { z: -180, y: -PARK.floorH }
+/** Offener Schacht (Rampen ohne Decke) in der Westspur: dort kann man auch fliegen. */
+export const parkShaft = (x: number, z: number, m = 0): boolean => x >= PARK.x0 - m && x <= PARK.x0 + PARK.up + PARK.dn + m && z >= PARK.z0 - m && z <= PARK.z0 + PARK.ramp + 4
 /** Obere Kante der Außenwand/Brüstung. */
 export const PARK_TOP = PARK.floorH * PARK.floors + 1
 /** Liegt (x, z) im Parkhaus-Grundriss (m = Rand, der dazugezählt wird)? */
 export const inParkXZ = (x: number, z: number, m = 0): boolean => x >= PARK.x0 - m && x <= PARK.x1 + m && z >= PARK.z0 - m && z <= PARK.z1 + m
 
 /**
- * Höhen aller befahrbaren Flächen bei (x, z), von unten nach oben: je Ebene Rampe (Spur im Westen, s = 0…ramp) bzw. Platte.
- * Ebenen: `under` Untergeschosse (−9, −4,5), das Erdgeschoss (0) und `floors` Stockwerke darüber. Die Rampen aller Ebenen liegen mit konstant
- * 4,5 m Abstand übereinander, die Platten ebenso – so ist jede Höhe eindeutig zu unterscheiden. Innerhalb des Grundrisses gibt es keinen
- * eigenen „Boden“: das Erdgeschoss ist die Platte bei 0.
+ * Höhen aller befahrbaren Flächen bei (x, z), von unten nach oben.
+ * Westspur (s = Abstand von der Südkante, 0…ramp): Rampe HINAUF (links, Ebenen 0…floors−1 steigen nach Norden), daneben die ABFAHRT ins
+ * 1. Untergeschoss (0 → −4,5 nach Norden). Ostspur: Abfahrt ins 2. Untergeschoss (−4,5 → −9 steigt nach Norden). Sonst Platten je Ebene
+ * (−9, −4,5, 0 … Dach); die Schächte der Rampen sind ohne Platte, so ist jede Höhe eindeutig.
  */
 export function parkSurfaces(x: number, z: number): number[] {
   if (x < PARK.x0 || x > PARK.x1 || z < PARK.z0 || z > PARK.z1) return []
   const s = z - PARK.z0, out: number[] = []
-  const laneA = x < PARK.x0 + PARK.laneW
-  for (let k = -PARK.under; k < PARK.floors; k++) {
-    if (laneA && s <= PARK.ramp) out.push(PARK.floorH * k + (PARK.floorH * s) / PARK.ramp)
-    if (!laneA || s >= PARK.ramp) out.push(PARK.floorH * k)
+  const up = x < PARK.x0 + PARK.up, dn = !up && x < PARK.x0 + PARK.up + PARK.dn, east = x >= PARK.x1 - PARK.east
+  const onRamp = s <= PARK.ramp
+  if (up && onRamp) for (let k = 0; k < PARK.floors; k++) out.push(PARK.floorH * k + (PARK.floorH * s) / PARK.ramp)
+  if (dn && onRamp) out.push((-PARK.floorH * s) / PARK.ramp)
+  if (east && onRamp) out.push(-2 * PARK.floorH + (PARK.floorH * s) / PARK.ramp)
+  const shaft = (up || dn) && s < PARK.ramp
+  for (let k = -PARK.under; k <= PARK.floors; k++) {
+    if (shaft) { if (k === -PARK.under) out.push(PARK.floorH * k); continue }          // Schacht: nur der Boden ganz unten
+    if (east && s < PARK.ramp && k === -1) continue                                  // Loch über der Abfahrt ins 2. Untergeschoss
+    out.push(PARK.floorH * k)
   }
-  if (!laneA || s >= PARK.ramp) out.push(PARK.floorH * PARK.floors)
-  return out
+  return out.sort((a, b) => a - b)
 }
 
 /**
