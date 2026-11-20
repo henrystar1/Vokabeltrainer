@@ -15,6 +15,10 @@ export interface Layout {
   flights: Flight[]
   /** Treppenzelle (für Lichtlöcher und Anzeige) */
   stairCell: Rect
+  /** Türlücken zwischen Zimmerzellen (Weltkoordinaten) und Zellenraster für die Wegfindung */
+  gaps: Array<{ a: number; b: number; x: number; z: number }>
+  nx: number; nz: number
+  cellOf: (x: number, z: number) => number
 }
 
 /** Gebäude, das den Punkt enthält (Garagenhäuser mit Sturz zählen nicht). */
@@ -55,19 +59,21 @@ export function layoutOf(b: Bld): Layout {
     return { x0: b.x + Math.min(...pts.map((p) => p[0])), x1: b.x + Math.max(...pts.map((p) => p[0])), z0: b.z + Math.min(...pts.map((p) => p[1])), z1: b.z + Math.max(...pts.map((p) => p[1])) }
   }
   const outerC: Rect[] = [], outerUpC: Rect[] = [], innerC: Rect[] = []
+  const gapsC: Array<{ a: number; b: number; u: number; v: number }> = []
   const doorU = -hw + 10
   // Süd (Tür), Nord, West, Ost
   outerC.push({ x0: -hw, x1: doorU - DOOR_W / 2, z0: -hd, z1: -hd + T_OUT }, { x0: doorU + DOOR_W / 2, x1: hw, z0: -hd, z1: -hd + T_OUT })
   outerUpC.push({ x0: -hw, x1: hw, z0: -hd, z1: -hd + T_OUT })
   for (const list of [outerC, outerUpC]) list.push({ x0: -hw, x1: hw, z0: hd - T_OUT, z1: hd }, { x0: -hw, x1: -hw + T_OUT, z0: -hd, z1: hd }, { x0: hw - T_OUT, x1: hw, z0: -hd, z1: hd })
   // Zwischenwände mit je einer Türlücke
-  const seg = (a0: number, a1: number, line: number, alongZ: boolean, key: number) => {
+  const seg = (a0: number, a1: number, line: number, alongZ: boolean, key: number, ca: number, cb: number) => {
     const span = a1 - a0, gc = a0 + 2.5 + hash(b, key, 1) * (span - 5)
+    gapsC.push({ a: ca, b: cb, u: alongZ ? line : gc, v: alongZ ? gc : line })
     const piece = (p0: number, p1: number) => { if (p1 - p0 > 0.05) innerC.push(alongZ ? { x0: line - T_IN / 2, x1: line + T_IN / 2, z0: p0, z1: p1 } : { x0: p0, x1: p1, z0: line - T_IN / 2, z1: line + T_IN / 2 }) }
     piece(a0, gc - GAP_W / 2); piece(gc + GAP_W / 2, a1)
   }
-  for (let i = 1; i < nx; i++) for (let j = 0; j < nz; j++) seg(-hd + j * cdep, -hd + (j + 1) * cdep, -hw + i * cwid, true, i * 31 + j)
-  for (let j = 1; j < nz; j++) for (let i = 0; i < nx; i++) seg(-hw + i * cwid, -hw + (i + 1) * cwid, -hd + j * cdep, false, 500 + j * 31 + i)
+  for (let i = 1; i < nx; i++) for (let j = 0; j < nz; j++) seg(-hd + j * cdep, -hd + (j + 1) * cdep, -hw + i * cwid, true, i * 31 + j, j * nx + i - 1, j * nx + i)
+  for (let j = 1; j < nz; j++) for (let i = 0; i < nx; i++) seg(-hw + i * cwid, -hw + (i + 1) * cwid, -hd + j * cdep, false, 500 + j * 31 + i, (j - 1) * nx + i, j * nx + i)
   // Treppenhaus in der Zelle (0,0): zwei gegenläufige Läufe, durch eine Wand getrennt
   const v0 = -hd + T_OUT + 2.2, L = cdep - T_OUT - 2.2 - 2.6
   const laneA: Rect = { x0: -hw + 0.8, x1: -hw + 0.8 + STAIR_W, z0: v0, z1: v0 + L }
@@ -90,6 +96,14 @@ export function layoutOf(b: Bld): Layout {
     door: { x: b.x + (rot === 0 ? doorU : rot === 1 ? -hd : rot === 2 ? -doorU : hd), z: b.z + (rot === 0 ? -hd : rot === 1 ? -doorU : rot === 2 ? hd : doorU), nx: rot === 1 ? -1 : rot === 3 ? 1 : 0, nz: rot === 0 ? -1 : rot === 2 ? 1 : 0 },
     flights,
     stairCell: toWorld({ x0: -hw, x1: -hw + cwid, z0: -hd, z1: -hd + cdep }),
+    nx, nz,
+    gaps: gapsC.map((g) => { const p = rot === 0 ? [g.u, g.v] : rot === 1 ? [g.v, -g.u] : rot === 2 ? [-g.u, -g.v] : [-g.v, g.u]; return { a: g.a, b: g.b, x: b.x + p[0], z: b.z + p[1] } }),
+    cellOf: (x, z) => {
+      const dx = x - b.x, dz = z - b.z
+      const [u, v] = rot === 0 ? [dx, dz] : rot === 1 ? [-dz, dx] : rot === 2 ? [-dx, -dz] : [dz, -dx]
+      const i = Math.max(0, Math.min(nx - 1, Math.floor((u + hw) / cwid))), j = Math.max(0, Math.min(nz - 1, Math.floor((v + hd) / cdep)))
+      return j * nx + i
+    },
   }
   cache.set(b, lay)
   return lay
@@ -138,4 +152,59 @@ export function interiorSurfaces(b: Bld, x: number, z: number): number[] {
     if (t >= 0 && t <= 1) out.push(f.k * FLOOR_H + t * FLOOR_H)
   }
   return out.sort((a, c) => a - c)
+}
+
+/** Nächster Wegpunkt innerhalb eines Geschosses: durch die Türlücken der Zimmerwände (Breitensuche über die Zellen). */
+function roomStep(L: Layout, from: { x: number; z: number }, goal: { x: number; z: number }): { x: number; z: number } {
+  const a = L.cellOf(from.x, from.z), g = L.cellOf(goal.x, goal.z)
+  if (a === g) return goal
+  const prev = new Map<number, { c: number; gx: number; gz: number }>([[a, { c: -1, gx: 0, gz: 0 }]])
+  const q = [a]
+  while (q.length && !prev.has(g)) {
+    const c = q.shift()!
+    for (const e of L.gaps) {
+      const o = e.a === c ? e.b : e.b === c ? e.a : -1
+      if (o >= 0 && !prev.has(o)) { prev.set(o, { c, gx: e.x, gz: e.z }); q.push(o) }
+    }
+  }
+  if (!prev.has(g)) return goal
+  let c = g, st = prev.get(g)!
+  while (st.c !== a) { c = st.c; st = prev.get(c)! }
+  return { x: st.gx, z: st.gz }
+}
+
+/** Weg innerhalb eines Hauses zu einem Punkt auf Geschoss ft (Treppen, Türlücken). */
+function insideStep(L: Layout, from: { x: number; z: number; y: number }, to: { x: number; z: number }, ft: number): { x: number; z: number } {
+  const fc = Math.max(0, Math.min(L.floors - 1, Math.floor((from.y + 0.3) / FLOOR_H)))
+  if (fc === ft) return roomStep(L, from, to)
+  const up = ft > fc
+  const f = L.flights[up ? fc : fc - 1]
+  if (!f) return roomStep(L, from, to)
+  const axisX = f.lane.x1 - f.lane.x0 > f.lane.z1 - f.lane.z0
+  const cx = (f.lane.x0 + f.lane.x1) / 2, cz = (f.lane.z0 + f.lane.z1) / 2, len = f.hi - f.lo
+  const at = (t: number) => { const p = f.lo + (f.dir === 1 ? t : 1 - t) * len; return axisX ? { x: p, z: cz } : { x: cx, z: p } }
+  const t = (axisX ? from.x - f.lo : from.z - f.lo) / len, tt = f.dir === 1 ? t : 1 - t
+  const lane = axisX ? from.z >= f.lane.z0 && from.z <= f.lane.z1 : from.x >= f.lane.x0 && from.x <= f.lane.x1
+  const inL = lane && tt > -0.3 && tt < 1.3
+  if (up) return inL ? at(1.15) : roomStep(L, from, at(-0.12))
+  return inL ? at(-0.15) : roomStep(L, from, at(1.12))
+}
+
+/** Nächster Wegpunkt für eine Figur (z. B. Polizist), die zu einem Ziel läuft – auch in Häuser hinein und die Treppen hinauf/hinunter. */
+export function walkNav(from: { x: number; z: number; y: number }, to: { x: number; z: number; y?: number }): { x: number; z: number } {
+  const bt = buildingAt(to.x, to.z), bw = buildingAt(from.x, from.z)
+  const ty = to.y ?? 0
+  if (bw && bw !== bt) {
+    const L = layoutOf(bw), d = L.door
+    if (Math.hypot(from.x - d.x, from.z - d.z) < 2.2 && from.y < 1) return { x: d.x + d.nx * 3, z: d.z + d.nz * 3 }
+    return insideStep(L, from, { x: d.x - d.nx * 1.2, z: d.z - d.nz * 1.2 }, 0)
+  }
+  if (!bt) return { x: to.x, z: to.z }
+  const L = layoutOf(bt), d = L.door
+  if (bw !== bt) {
+    const dOut = { x: d.x + d.nx * 3, z: d.z + d.nz * 3 }
+    return Math.hypot(from.x - d.x, from.z - d.z) > 3.6 ? dOut : { x: d.x - d.nx * 2, z: d.z - d.nz * 2 }
+  }
+  const ft = Math.max(0, Math.min(L.floors - 1, Math.floor((ty + 0.3) / FLOOR_H)))
+  return insideStep(L, from, to, ft)
 }

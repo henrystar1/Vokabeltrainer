@@ -95,7 +95,7 @@ export interface RaceScene {
   /** Blaulicht blinken lassen (Zeit in ms). */
   tickSiren: (g: T.Group, ms: number) => void
   /** Spielfigur zu Fuß (Hemdfarbe). */
-  makeWalker: (shirt: string, pants?: string) => T.Group
+  makeWalker: (shirt: string, pants?: string, name?: string) => T.Group
   /** Innenraum des Hauses zeigen, in dem die Figur steht (null = keins). */
   showInterior: (b: { x: number; z: number; w: number; d: number; h: number; c: number } | null) => void
 }
@@ -313,7 +313,7 @@ export function buildScene(THREE: THREE, t: Track): RaceScene {
     scene.add(ln)
   }
   const makeCar = (kind: string, color: string, name: string, isMe: boolean) => buildCar(THREE, kind, color, name, isMe)
-  return { scene, sun, theme: th, makeCar, follow, focus, damageCar: (g, dmg, slip, v, time) => damageCar(THREE, g, dmg, slip, v, time), addSiren: (g) => addSiren(THREE, g), tickSiren, makeWalker: (shirt, pants) => makeWalkerModel(THREE, shirt, pants), showInterior }
+  return { scene, sun, theme: th, makeCar, follow, focus, damageCar: (g, dmg, slip, v, time) => damageCar(THREE, g, dmg, slip, v, time), addSiren: (g) => addSiren(THREE, g), tickSiren, makeWalker: (shirt, pants, name) => { const g = makeWalkerModel(THREE, shirt, pants); if (name) g.add(nameSprite(THREE, name, 2.35)); return g }, showInterior }
 }
 
 interface Body { len: number; wid: number; hgt: number; cabLen: number; cabH: number; cabZ: number; wheelR: number; spoiler?: boolean; bed?: boolean; open?: boolean; tall?: boolean; cage?: boolean; scoop?: boolean; formula?: boolean; track?: number; wheelW?: number; stripe?: boolean }
@@ -855,6 +855,7 @@ function buildCity(THREE: THREE, scene: T.Scene, ground: T.Mesh, night: boolean)
       // Westspur (Rampen hinauf/hinab): Platte nur nördlich der Rampen, ganz unten auch darunter
       box(xm - x0, 0.5, D - ramp, (x0 + xm) / 2, y - 0.25, z0 + ramp + (D - ramp) / 2)
       if (k === -under) box(xm - x0, 0.5, ramp, (x0 + xm) / 2, y - 0.25, z0 + ramp / 2)
+      else if (k >= 1) box(dnW, 0.5, ramp, x0 + upW + dnW / 2, y - 0.25, z0 + ramp / 2)   // über der Abfahrt: Platte, damit man von der Mittelspur zur nächsten Rampe kommt
       // Mitte und Ost: Loch über der Abfahrt ins 2. Untergeschoss (Ebene −1)
       if (k === -1) { box(xe - xm, 0.5, D, (xm + xe) / 2, y - 0.25, (z0 + z1) / 2); box(eastW, 0.5, D - ramp, (xe + x1) / 2, y - 0.25, z0 + ramp + (D - ramp) / 2) }
       else box(x1 - xm, 0.5, D, (xm + x1) / 2, y - 0.25, (z0 + z1) / 2)

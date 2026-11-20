@@ -65,3 +65,25 @@ describe('Zu Fuß durchs Haus', () => {
     }
   })
 })
+
+import { walkNav } from './interior'
+describe('Wegfindung ins Haus', () => {
+  it('Figur findet von der Straße über die Treppe in jedes Geschoss und wieder hinaus', () => {
+    const b = city().buildings.find((q) => q.lo === undefined && q.w > 30 && q.d > 30 && q.h > 14)!
+    const L = layoutOf(b)
+    const top = (L.floors - 1) * FLOOR_H
+    const d = L.door
+    let w = newWalker(d.x + d.nx * 12, d.z + d.nz * 12, 0)
+    const run = (tx: number, tz: number, ty: number, max: number) => {
+      for (let i = 0; i < max; i++) {
+        const n = walkNav(w, { x: tx, z: tz, y: ty })
+        let da = Math.atan2(n.x - w.x, n.z - w.z) - w.h; da = Math.atan2(Math.sin(da), Math.cos(da))
+        w = stepWalker(w, { fwd: Math.abs(da) < 1.3, back: false, left: da > 0.1, right: da < -0.1, run: true }, 1 / 60)
+        if (Math.hypot(tx - w.x, tz - w.z) < 1.2 && Math.abs(w.y - ty) < 1) return true
+      }
+      return false
+    }
+    expect(run(b.x + 3, b.z + 3, top, 60 * 90)).toBe(true)
+    expect(run(d.x + d.nx * 8, d.z + d.nz * 8, 0, 60 * 90)).toBe(true)
+  })
+})

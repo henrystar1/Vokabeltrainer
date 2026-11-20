@@ -70,3 +70,7 @@ export const flyHeight = (left: number): number => {
 /** Das Admin-Supercar: virtuelles Auto (nicht im Shop), rot, Tempo stellt der Admin ein (Standard 700 km/h). */
 export const SUPERCAR_ID = 'supercar'
 export const SUPERCAR = { id: SUPERCAR_ID, name: 'Admin-Hyperion', kind: 'supercar', color: '#dc2626', top: 700 }
+
+/** Sitzplätze je Auto (Admin im Showroom, Standard 4). */
+export const seatConfig = { n: 4 }
+export const setSeats = (n: number | null | undefined): void => { seatConfig.n = n && n >= 1 && n <= 8 ? Math.floor(n) : 4 }

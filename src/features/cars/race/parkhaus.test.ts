@@ -12,13 +12,13 @@ describe('Parkhaus', () => {
   it('Flächen: Platten alle 4,5 m, Rampen hinauf (West), Abfahrt ins 1. UG, Abfahrt ins 2. UG (Ost); Schächte ohne Decke', () => {
     const z = PARK.z0 + 18
     expect(parkSurfaces(PARK_LANES.up, z)).toEqual([-9, 2.25, 6.75, 11.25, 15.75])
-    expect(parkSurfaces(PARK_LANES.dn, z)).toEqual([-9, -2.25])
+    expect(parkSurfaces(PARK_LANES.dn, z)).toEqual([-9, -2.25, 4.5, 9, 13.5, 18])
     expect(parkSurfaces(PARK_LANES.east, z)).toEqual([-9, -6.75, 0, 4.5, 9, 13.5, 18])
     expect(parkSurfaces(PARK_LANES.mid, z)).toEqual([-9, -4.5, 0, 4.5, 9, 13.5, 18])
     expect(parkSurfaces(PARK_LANES.up, PARK.z0 + PARK.ramp + 5)).toContain(PARK.floorH * PARK.floors)
     expect(parkSurfaces(PARK_LANES.dn, PARK.z0 + PARK.ramp + 5)).toEqual([-9, -4.5, 0, 4.5, 9, 13.5, 18])
     expect(parkSurfaces(0, 0)).toEqual([])
-    expect(parkShaft(PARK_LANES.dn, z)).toBe(true)
+    expect(parkShaft(PARK_LANES.up, z)).toBe(true)
     expect(parkShaft(PARK_LANES.mid, z)).toBe(false)
   })
   it('Wände halten außen, Süden ist unten offen', () => {
@@ -95,6 +95,13 @@ describe('Parkhaus', () => {
     expect(out.car.y ?? 0).toBeGreaterThan(-0.5)
     expect(out.car.dmg).toBe(0)
   })
+  it('Fahrt: im Zick-Zack über mehrere Rampen hinauf (Mittelspur → nächste Rampe), und wieder hinunter', () => {
+    const z0 = PARK.z0, R = PARK.ramp, xU = PARK_LANES.up, xB = PARK_LANES.mid
+    const cyc: Array<[number, number]> = [[xU, z0 + R + 14], [xB, z0 + R + 8], [xB, z0 + 6], [xU, z0 + 6]]
+    const up = follow({ ...startCar(t, 0), x: xU, z: z0 - 20, h: 0, v: 8 }, [...cyc, ...cyc, [xU, z0 + R + 14]])
+    expect(up.car.y ?? 0).toBeGreaterThan(12)
+    expect(up.car.dmg).toBe(0)
+  })
   it('Tunnel-Anschluss: von Ebene −1 durch die Ostwand in den Tunnel und zurück ins Parkhaus', () => {
     expect(tunnelAt(-150, PARK_TUNNEL.z)).not.toBeNull()
     const z0 = PARK.z0
@@ -114,7 +121,7 @@ describe('Parkhaus', () => {
       for (let i = 0; i < 30 * 3; i++) car = stepCar(car, { ...none, fly: true }, dt, t, st, true)
       return car.y ?? 0
     }
-    expect(climb(PARK_LANES.dn, PARK.z0 + 10, -1)).toBeGreaterThan(8)
+    expect(climb(PARK_LANES.up, PARK.z0 + 10, 0)).toBeGreaterThan(8)
     expect(climb(PARK_LANES.mid, PARK.z0 + 50, 0)).toBeLessThan(1)
   })
 })

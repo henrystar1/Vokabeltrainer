@@ -1,6 +1,9 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { errorMessage } from '../../lib/errors'
-import { carBuy, carUpgrade, type CarRow } from '../../services/cars'
+import { useAsync } from '../../lib/useAsync'
+import { adminFootSet, adminSeatsSet, carBuy, carUpgrade, raceSuperInfo, type CarRow } from '../../services/cars'
+import { setFootSpeeds } from './race/foot'
+import { setSeats } from './stats'
 import { useWallet } from '../koins/WalletProvider'
 import RaceMenu from './race/RaceMenu'
 import AdminCarBuilder from './AdminCarBuilder'
@@ -106,6 +109,41 @@ function Stat({ label, value, max, unit, gain }: { label: string; value: number;
       <div className="flex justify-between text-xs text-slate-300"><span>{label}</span><span className="font-semibold tabular-nums">{value}{unit}{gain > 0 && <span className="ml-1 text-emerald-300">+{gain}</span>}</span></div>
       <div className="mt-0.5 h-2 overflow-hidden rounded-full bg-white/10"><div className="h-full rounded-full bg-gradient-to-r from-cyan-400 via-emerald-300 to-amber-300 transition-all duration-700 ease-out" style={{ width: `${Math.min(100, (value / max) * 100)}%` }} /></div>
     </div>
+  )
+}
+
+/** Admin: Sitzplätze je Auto und Lauf-/Sprinttempo der Spielfigur (gilt für alle). */
+function FootSettings() {
+  const info = useAsync(raceSuperInfo, [])
+  const [seats, setSeatsV] = useState<string | null>(null)
+  const [walk, setWalk] = useState<string | null>(null)
+  const [run, setRun] = useState<string | null>(null)
+  const [msg, setMsg] = useState<string | null>(null)
+  const d = info.data
+  const v = { seats: seats ?? String(d?.seats ?? 4), walk: walk ?? String(d?.walk ?? 4.4), run: run ?? String(d?.run ?? 7.6) }
+  const num = (t: string) => Number(t.replace(',', '.')) || 0
+  async function save() {
+    setMsg(null)
+    try {
+      await adminSeatsSet(Math.floor(num(v.seats)))
+      await adminFootSet(num(v.walk), num(v.run))
+      setSeats(Math.floor(num(v.seats))); setFootSpeeds(num(v.walk), num(v.run))
+      await info.reload(); setSeatsV(null); setWalk(null); setRun(null); setMsg('Gespeichert.')
+    } catch (e) { setMsg(errorMessage(e)) }
+  }
+  const inp = 'min-h-[44px] w-20 rounded-lg border border-white/15 bg-space-900/60 px-3'
+  return (
+    <section className="space-y-2 rounded-xl border border-white/10 p-3">
+      <h3 className="font-semibold">Mitfahren und Laufen (Admin)</h3>
+      <p className="text-sm text-slate-400">Wie viele Leute in ein Auto passen (der Erste fährt, die anderen fahren mit) und wie schnell die Figur läuft und sprintet.</p>
+      <div className="flex flex-wrap items-center gap-3 text-sm">
+        <label className="flex items-center gap-2">Sitzplätze<input aria-label="Sitzplätze pro Auto" inputMode="numeric" value={v.seats} onChange={(e) => setSeatsV(e.target.value)} className={inp} />(1–8)</label>
+        <label className="flex items-center gap-2">Laufen<input aria-label="Lauftempo in Metern pro Sekunde" inputMode="decimal" value={v.walk} onChange={(e) => setWalk(e.target.value)} className={inp} />m/s</label>
+        <label className="flex items-center gap-2">Sprint<input aria-label="Sprinttempo in Metern pro Sekunde" inputMode="decimal" value={v.run} onChange={(e) => setRun(e.target.value)} className={inp} />m/s</label>
+        <button type="button" onClick={() => void save()} className="min-h-[44px] rounded-lg bg-accent-cyan px-3 font-semibold text-slate-950">Speichern</button>
+      </div>
+      {msg && <p className="text-sm text-amber-200" role="status">{msg}</p>}
+    </section>
   )
 }
 
@@ -223,6 +261,7 @@ export default function Showroom({ shop, cars, superOk, assistOk, onChanged }: {
         <button type="button" disabled={!cur.owned} onClick={() => setView('race')} className="min-h-[56px] rounded-xl bg-accent-cyan px-6 text-lg font-bold text-slate-950 disabled:opacity-40">Rennen</button>
       </div>
       {!cur.owned && <p className="text-xs text-slate-400">Kaufe das Auto, um damit zu fahren.</p>}
+      {isAdmin && <FootSettings />}
       {isAdmin && <AdminCarBuilder onSaved={onChanged} />}
     </div>
   )

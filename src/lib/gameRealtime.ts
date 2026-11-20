@@ -38,7 +38,18 @@ function clientFor(d: GameDb): SupabaseClient {
   return c
 }
 
-let list: GameDb[] = envList() ?? FALLBACK
+const STORE = 'gamedbs-v1'
+function storedList(): GameDb[] | null {
+  try { const r = JSON.parse(localStorage.getItem(STORE) ?? 'null') as GameDb[] | null; return Array.isArray(r) && r.length && r.every((x) => x?.url && x?.key) ? r : null } catch { return null }
+}
+/** Zuletzt vom Server gelieferte Liste hat Vorrang vor den eingebauten Werten: so haben alle Geräte dieselbe Reihenfolge, auch wenn der Abruf mal scheitert. */
+let list: GameDb[] = storedList() ?? envList() ?? FALLBACK
+let serverLoaded = storedList() !== null
+const listeners = new Set<() => void>()
+/** Kam die Liste schon einmal vom Server (jetzt oder früher)? */
+export const gameDbsLoaded = (): boolean => serverLoaded
+/** Meldet, wenn sich die Liste der Spiel-Datenbanken ändert (dann müssen offene Kanäle neu verbinden). */
+export const onGameDbsChange = (cb: () => void): (() => void) => { listeners.add(cb); return () => { listeners.delete(cb) } }
 
 let current = 0
 /** Welche Datenbank gerade gilt (0, 1, …). Wird bei jeder Meldung vom Server gesetzt. */
@@ -72,7 +83,16 @@ export function whenGameDbsReady(): Promise<void> {
   if (Date.now() - loadedAt < 300_000) return Promise.resolve()
   if (!loading) {
     loading = rpc<GameDb[]>('parkour_game_dbs')
-      .then((r) => { if (Array.isArray(r) && r.length > 0) { list = r.filter((x) => x?.url && x?.key); current = Math.min(current, list.length - 1) } loadedAt = Date.now() })
+      .then((r) => {
+        if (Array.isArray(r) && r.length > 0) {
+          const next = r.filter((x) => x?.url && x?.key)
+          const changed = JSON.stringify(next) !== JSON.stringify(list)
+          list = next; current = Math.min(current, list.length - 1); serverLoaded = true
+          try { localStorage.setItem(STORE, JSON.stringify(next)) } catch { /* ignorieren */ }
+          if (changed) for (const cb of [...listeners]) cb()
+        }
+        loadedAt = Date.now()
+      })
       .catch(() => { loadedAt = Date.now() - 240_000 /* in einer Minute nochmal versuchen */ })
       .finally(() => { loading = null })
   }

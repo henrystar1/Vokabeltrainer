@@ -1,4 +1,4 @@
-import { cityPush } from './city'
+import { bridgeH, cityPush, onDeck, tunnelAt, tunnelClamp, tunnelD } from './city'
 import { hillH } from './mountains'
 import { treePush } from './forest'
 import { parkPush, parkSurfaces } from './parkhaus'
@@ -21,17 +21,28 @@ export interface Walker {
   ph: number
   /** Geschwindigkeit in m/s (für die Animation) */
   sp: number
+  /** Ebene: 0 Straße/Gelände, −1 Tunnel, 1 Brücke */
+  lvl?: number
 }
-export interface WalkInput { fwd: boolean; back: boolean; left: boolean; right: boolean; run?: boolean }
+export interface WalkInput { fwd: boolean; back: boolean; left: boolean; right: boolean; run?: boolean; jump?: boolean }
 export const WALK = 4.4
 export const RUN = 7.6
+/** Lauf- und Sprinttempo (vom Admin im Showroom einstellbar) */
+export const footConfig = { walk: WALK, run: RUN }
+export const setFootSpeeds = (walk?: number | null, run?: number | null): void => {
+  footConfig.walk = walk && walk >= 1 && walk <= 40 ? walk : WALK
+  footConfig.run = run && run >= 1 && run <= 40 ? run : RUN
+}
+export const JUMP_V = 7.4
 export const HP_MAX = 100
 export const WALK_R = 0.45
 
 export const newWalker = (x: number, z: number, h: number, y?: number): Walker => ({ x, z, h, y: y ?? hillH(x, z), vy: 0, vx: 0, vz: 0, hp: HP_MAX, stun: 0, inv: 0, ph: 0, sp: 0 })
 
 /** Boden unter der Figur: Gelände oder Parkhaus-Ebene, die höchstens 0,6 m über den Füßen liegt. */
-export function groundAt(x: number, z: number, y: number): number {
+export function groundAt(x: number, z: number, y: number, lvl = 0): number {
+  if (lvl === -1) return -tunnelD(x, z)
+  if (lvl === 1) return bridgeH(x, z)
   const bi = buildingAt(x, z)
   if (bi) {
     const is = interiorSurfaces(bi, x, z)
@@ -53,18 +64,39 @@ function pushAt(x: number, z: number, px: number, pz: number, y: number) {
   return cityPush(x, z) ?? treePush(x, z) ?? parkPush(x, z, y, px, pz)
 }
 
-/** Ein Schritt zu Fuß: Drehen mit links/rechts, vor/zurück, Rückstoß klingt ab, Häuser/Bäume/Parkhauswände sind fest. */
+/** Ein Schritt zu Fuß (in Teilschritten ≤ 0,2 m, damit man auch bei Rucklern nicht durch Wände läuft). */
 export function stepWalker(w: Walker, inp: WalkInput, dt: number): Walker {
+  const fast = Math.hypot(w.vx, w.vz) + (inp.fwd ? footConfig.run * 1.3 : 0) + 8
+  const n = Math.max(1, Math.min(40, Math.ceil((fast * dt) / 0.2)))
+  let cur = w
+  for (let i = 0; i < n; i++) cur = stepOnce(cur, i === 0 ? inp : { ...inp, jump: false }, dt / n)
+  return cur
+}
+
+function stepOnce(w: Walker, inp: WalkInput, dt: number): Walker {
   const stunned = w.stun > 0
   let h = w.h
+  const lvl0 = w.lvl ?? 0
   if (!stunned) h += ((inp.left ? 1 : 0) - (inp.right ? 1 : 0)) * 2.7 * dt
-  const sp = stunned ? 0 : (inp.fwd ? 1 : 0) * (inp.run ? RUN : WALK) - (inp.back ? 1 : 0) * WALK * 0.55
+  const g0 = groundAt(w.x, w.z, w.y, lvl0)
+  const grounded = w.y <= g0 + 0.05 && w.vy <= 0
+  const air = !grounded
+  const base = (inp.run ? footConfig.run : footConfig.walk) * (air ? 1.3 : 1)
+  const sp = stunned ? 0 : (inp.fwd ? 1 : 0) * base - (inp.back ? 1 : 0) * footConfig.walk * 0.55
   const dec = Math.exp(-2.2 * dt)
   let vx = w.vx * dec, vz = w.vz * dec
   if (Math.hypot(vx, vz) < 0.05) { vx = 0; vz = 0 }
   let x = w.x + (Math.sin(h) * sp + vx) * dt, z = w.z + (Math.cos(h) * sp + vz) * dt
+  let lvl = lvl0
+  // Ebenenwechsel: Tunnelrampe hinunter, Brücke hinauf, wieder heraus
+  if (lvl === 0) {
+    const d = tunnelD(x, z)
+    if (d > 0.05 && d < 1.4 && w.y <= 0.3 && tunnelAt(x, z)) lvl = -1
+    else if (onDeck(x, z) && bridgeH(x, z) > 0.05 && w.y >= bridgeH(x, z) - 0.6 && w.y <= bridgeH(x, z) + 1) lvl = 1
+  } else if (lvl === -1) { if (!tunnelAt(x, z)) lvl = 0 } else if (lvl === 1 && !onDeck(x, z)) lvl = 0
+  if (lvl === -1 && tunnelD(x, z) > 1.5) { const c = tunnelClamp(x, z); if (c) { x = c.x; z = c.z } }
   // Kollision: vier Punkte um die Figur
-  for (let it = 0; it < 2; it++) {
+  if (lvl === 0) for (let it = 0; it < 2; it++) {
     let bd = 0, bn = 0, bm = 0
     for (const [ox, oz] of [[WALK_R, 0], [-WALK_R, 0], [0, WALK_R], [0, -WALK_R]] as const) {
       const p = pushAt(x + ox, z + oz, w.x + ox, w.z + oz, w.y)
@@ -75,11 +107,12 @@ export function stepWalker(w: Walker, inp: WalkInput, dt: number): Walker {
     const into = -(vx * bn + vz * bm)
     if (into > 0) { vx += bn * into; vz += bm * into }
   }
-  const g = groundAt(x, z, w.y)
+  const g = groundAt(x, z, w.y, lvl)
   let y = w.y, vy = w.vy
+  if (inp.jump && grounded && !stunned) { vy = JUMP_V; y = w.y + 0.02 }
   if (y > g + 0.02 || vy > 0) { vy -= 24 * dt; y += vy * dt; if (y <= g) { y = g; vy = 0 } } else { y = g; vy = 0 }
   const speed = Math.hypot(Math.sin(h) * sp + vx, Math.cos(h) * sp + vz)
-  return { ...w, x, z, h, y, vy, vx, vz, stun: Math.max(0, w.stun - dt), inv: Math.max(0, w.inv - dt), ph: w.ph + Math.min(speed, 8) * dt * 1.7, sp: speed }
+  return { ...w, x, z, h, y, vy, vx, vz, lvl, stun: Math.max(0, w.stun - dt), inv: Math.max(0, w.inv - dt), ph: w.ph + Math.min(speed, 8) * dt * 1.7, sp: speed }
 }
 
 /** Auto-Daten für die Treffer-Prüfung (Hitbox: Länge/Breite, Tempo in m/s). */
@@ -109,17 +142,24 @@ export function carHit(w: Walker, c: HitCar): Walker | null {
   return { ...w, hp: Math.max(0, w.hp - dmg), vx: (ax / al) * k, vz: (az / al) * k, vy: 5 + sp * 0.18, y: w.y + 0.05, stun: 1.6 + Math.min(1.5, sp * 0.04), inv: 0.9 }
 }
 
-/** Aussteigen während der Fahrt: Schwung des Autos geht auf die Figur über, bei hohem Tempo gibt es Schaden. */
-export function exitFromCar(c: { x: number; z: number; h: number; v: number; wid: number; y?: number }, side = 1): Walker {
-  const rx = Math.cos(c.h) * side, rz = -Math.sin(c.h) * side
+/** Aussteigen während der Fahrt: Schwung des Autos geht auf die Figur über, bei hohem Tempo gibt es Schaden. Der Ausstiegsort muss auf der Höhe des Autos liegen (Parkhaus!). */
+export function exitFromCar(c: { x: number; z: number; h: number; v: number; wid: number; y?: number; lvl?: number }, side = 1): Walker {
+  const lvl = c.lvl ?? 0
+  const cy = lvl === -1 ? -tunnelD(c.x, c.z) : lvl === 1 ? bridgeH(c.x, c.z) : (c.y ?? 0)
+  const rx = Math.cos(c.h), rz = -Math.sin(c.h)
   const off = c.wid / 2 + 0.9
-  let x = c.x + rx * off, z = c.z + rz * off
-  const p = cityPush(x, z)
-  if (p) { x -= rx * off * 2; z -= rz * off * 2 }
-  const w = newWalker(x, z, c.h, c.y ?? 0)
+  let x = c.x, z = c.z
+  let found = false
+  for (const [sd, k] of [[side, 1], [-side, 1], [side, 1.7], [-side, 1.7], [side, 2.6], [-side, 2.6]] as const) {
+    const tx = c.x + rx * sd * off * k, tz = c.z + rz * sd * off * k
+    const ok = lvl === 0 ? !pushAt(tx, tz, c.x, c.z, cy) && groundAt(tx, tz, cy) >= cy - 0.7 : lvl === -1 ? tunnelAt(tx, tz) !== null : onDeck(tx, tz)
+    if (ok) { x = tx; z = tz; found = true; break }
+  }
+  const w = newWalker(x, z, c.h, cy)
   const sp = Math.abs(c.v)
   const fall = sp > 11 ? Math.round((sp - 11) * 2.6) : 0
-  return { ...w, y: Math.max(w.y, c.y ?? 0), vx: Math.sin(c.h) * c.v * 0.55 + rx * Math.min(3, sp * 0.1), vz: Math.cos(c.h) * c.v * 0.55 + rz * Math.min(3, sp * 0.1), hp: HP_MAX - Math.min(90, fall), stun: sp > 15 ? 0.9 : 0, inv: 1.2 }
+  const sd = found && (x - c.x) * rx + (z - c.z) * rz < 0 ? -1 : 1
+  return { ...w, lvl, y: cy, vx: Math.sin(c.h) * c.v * 0.55 + rx * sd * Math.min(3, sp * 0.1), vz: Math.cos(c.h) * c.v * 0.55 + rz * sd * Math.min(3, sp * 0.1), hp: HP_MAX - Math.min(90, fall), stun: sp > 15 ? 0.9 : 0, inv: 1.2 }
 }
 
 /** Nächstes Auto in Reichweite zum Einsteigen (Abstand zur Mitte ≤ r). */

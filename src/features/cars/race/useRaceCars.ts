@@ -1,8 +1,9 @@
 import { useCallback, useEffect, useState } from 'react'
 import { carList, carUpgrades, raceSuperInfo, type SuperInfo } from '../../../services/cars'
-import { SUPERCAR, setFlyConfig } from '../stats'
+import { SUPERCAR, setFlyConfig, setSeats } from '../stats'
 import { NO_UP, type Up } from '../tuning'
 import type { RaceCarInfo } from './RaceView'
+import { setFootSpeeds } from './foot'
 import { getColor } from '../carPrefs'
 
 /** Auto, das man im Rennen fahren kann. */
@@ -17,6 +18,8 @@ export function useRaceCars(): State & { reload: () => Promise<void> } {
   const load = useCallback(async () => {
     const [list, ups, info] = await Promise.all([carList().catch(() => []), carUpgrades().catch(() => []), raceSuperInfo().catch((): SuperInfo => ({ ok: false, kmh: 700, assist: false }))])
     setFlyConfig(info.fly)
+    setSeats(info.seats)
+    setFootSpeeds(info.walk, info.run)
     const upOf = (id: string): Up => { const u = ups.find((x) => x.car_id === id); return u ? { motor: u.motor, reifen: u.reifen, bremse: u.bremse } : NO_UP }
     const own: RaceCarOption[] = list.filter((c) => c.owned).map((c) => ({ id: c.id, name: c.name, kind: c.kind, color: getColor(c.id) ?? c.color, top: c.top_kmh, up: upOf(c.id) }))
     return { cars: info.ok ? [{ ...SUPERCAR, color: getColor(SUPERCAR.id) ?? SUPERCAR.color, top: info.kmh, up: NO_UP }, ...own] : own, superOk: info.ok, assistOk: info.assist, ready: true }
