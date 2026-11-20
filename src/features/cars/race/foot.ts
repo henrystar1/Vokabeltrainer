@@ -143,7 +143,7 @@ export function carHit(w: Walker, c: HitCar): Walker | null {
 }
 
 /** Aussteigen während der Fahrt: Schwung des Autos geht auf die Figur über, bei hohem Tempo gibt es Schaden. Der Ausstiegsort muss auf der Höhe des Autos liegen (Parkhaus!). */
-export function exitFromCar(c: { x: number; z: number; h: number; v: number; wid: number; y?: number; lvl?: number }, side = 1): Walker {
+export function exitFromCar(c: { x: number; z: number; h: number; v: number; wid: number; y?: number; lvl?: number }, side = 1, hp = HP_MAX): Walker {
   const lvl = c.lvl ?? 0
   const cy = lvl === -1 ? -tunnelD(c.x, c.z) : lvl === 1 ? bridgeH(c.x, c.z) : (c.y ?? 0)
   const rx = Math.cos(c.h), rz = -Math.sin(c.h)
@@ -159,7 +159,7 @@ export function exitFromCar(c: { x: number; z: number; h: number; v: number; wid
   const sp = Math.abs(c.v)
   const fall = sp > 11 ? Math.round((sp - 11) * 2.6) : 0
   const sd = found && (x - c.x) * rx + (z - c.z) * rz < 0 ? -1 : 1
-  return { ...w, lvl, y: cy, vx: Math.sin(c.h) * c.v * 0.55 + rx * sd * Math.min(3, sp * 0.1), vz: Math.cos(c.h) * c.v * 0.55 + rz * sd * Math.min(3, sp * 0.1), hp: HP_MAX - Math.min(90, fall), stun: sp > 15 ? 0.9 : 0, inv: 1.2 }
+  return { ...w, lvl, y: cy, vx: Math.sin(c.h) * c.v * 0.55 + rx * sd * Math.min(3, sp * 0.1), vz: Math.cos(c.h) * c.v * 0.55 + rz * sd * Math.min(3, sp * 0.1), hp: Math.max(1, hp - Math.min(90, fall)), stun: sp > 15 ? 0.9 : 0, inv: 1.2 }
 }
 
 /** Nächstes Auto in Reichweite zum Einsteigen (Abstand zur Mitte ≤ r). */

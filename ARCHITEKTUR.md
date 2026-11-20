@@ -904,3 +904,9 @@ Tabelle `book_library_hidden`; `in_library` blendet ein veröffentlichtes Buch d
 - Mitfahren/Sitze: `seatConfig.n` (Admin im Showroom, Standard 4); wer zuerst einsteigt, fährt; Mitfahrer senden `rd:<Fahrer-ID>`, sind unsichtbar und spiegeln das Auto (`tickRide`); Zähler `n/m` oben. Verlassene Autos anderer (`pk-<uid6>-<id>`) sind einsteigbar; Übernahme per Broadcast-Event `cl` (Besitzer und Peers entfernen das Auto). Auto-Auswahl beim Spawnen (Liste der eigenen Autos via `useRaceCars`).
 - Server-Split: `gameRealtime.ts` speichert die vom Server gelieferte Datenbank-Liste lokal (`gamedbs-v1`), RaceView verbindet erst, wenn sie geladen ist (`gameDbsLoaded`), und verbindet bei Änderung neu (`onGameDbsChange`). Pausierte Datenbanken müssen im Admin (Spiel-Datenbanken) aus der Liste entfernt werden.
 - SQL `0110_car_seats.sql`: Einstellungen car_seats/walk_speed/run_speed, `admin_seats_set`, `admin_foot_set`, `race_super_info` mit seats/walk/run.
+
+## Update 137
+- Leben im Auto (`RaceView`: `myHp`, `prevV/prevDmg/burnT/wreck`): Autoschaden kostet Leben (×0,9), brennendes Auto (>85 % Schaden) −3,5 HP/s und explodiert nach 7 s; Einschlag aus >300 km/h (Tempo halbiert, `car.hit`) oder Schaden-Sprung >40 oder HP 0 → `explode()` (Feuer-/Rauchpartikel, 3,6 s, danach neues Auto bei Start). HP gehen beim Aus-/Einsteigen mit (`exitFromCar(…, hp)`), keine Erholung im Auto, HP-Balken auch im Auto sichtbar.
+- Spawn: N öffnet die Auswahl, N dann 1…9 spawnt das n-schnellste eigene Auto (`bestFirst` nach `carKmh`).
+- Verkaufen: SQL `car_sell` (50 % von `car_owned.paid`, Tuning wird gelöscht), Showroom-Knopf mit Bestätigung.
+- Netz: Kanal-Status wird überwacht (CHANNEL_ERROR/TIMED_OUT/CLOSED + Wächter alle 4 s) und neu verbunden; vorher konnte ein toter Empfangskanal weiter per REST senden (einer sieht den anderen, umgekehrt nicht).

@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { errorMessage } from '../../lib/errors'
 import { useAsync } from '../../lib/useAsync'
-import { adminFootSet, adminSeatsSet, carBuy, carUpgrade, raceSuperInfo, type CarRow } from '../../services/cars'
+import { adminFootSet, adminSeatsSet, carBuy, carSell, carUpgrade, raceSuperInfo, type CarRow } from '../../services/cars'
 import { setFootSpeeds } from './race/foot'
 import { setSeats } from './stats'
 import { useWallet } from '../koins/WalletProvider'
@@ -161,6 +161,7 @@ export default function Showroom({ shop, cars, superOk, assistOk, onChanged }: {
   const [colors, setColors] = useState<Record<string, string>>({})
   const [busy, setBusy] = useState<string | null>(null)
   const [msg, setMsg] = useState<string | null>(null)
+  const [sellArm, setSellArm] = useState<string | null>(null)
   const [pop, setPop] = useState<{ key: number; text: string } | null>(null)
   const [view, setView] = useState<null | 'race' | 'lobby'>(null)
   // gemerktes Lieblingsauto beim ersten Anzeigen auswählen
@@ -182,6 +183,11 @@ export default function Showroom({ shop, cars, superOk, assistOk, onChanged }: {
   async function buy() {
     setBusy('buy'); setMsg(null)
     try { wallet.setBalance(await carBuy(cur.id)); await onChanged(); setMsg(`${cur.name} steht jetzt in deiner Garage.`) } catch (e) { setMsg(errorMessage(e)) } finally { setBusy(null) }
+  }
+  async function sell() {
+    if (sellArm !== cur.id) { setSellArm(cur.id); setMsg(`Wirklich verkaufen? Du bekommst die Hälfte des Kaufpreises zurück, das Tuning geht verloren. Nochmal tippen zum Bestätigen.`); return }
+    setBusy('sell'); setMsg(null); setSellArm(null)
+    try { wallet.setBalance(await carSell(cur.id)); await onChanged(); setMsg(`${cur.name} verkauft.`) } catch (e) { setMsg(errorMessage(e)) } finally { setBusy(null) }
   }
   async function tune(part: UpPart) {
     setBusy(part); setMsg(null)
@@ -220,6 +226,7 @@ export default function Showroom({ shop, cars, superOk, assistOk, onChanged }: {
       </div>
       <div className="flex flex-wrap items-center justify-between gap-3">
         <p className="text-sm text-slate-300">{cur.owned ? <span className="text-emerald-300">In deiner Garage{cur.special ? ' (Admin-Auto)' : ''}</span> : <>Preis: <b>{cur.price.toLocaleString('de-DE')} Coins</b></>}</p>
+        {cur.owned && !cur.special && <button type="button" disabled={busy !== null} onClick={() => void sell()} className={`min-h-[44px] rounded-lg border px-4 text-sm font-semibold disabled:opacity-40 ${sellArm === cur.id ? 'border-rose-400 bg-rose-500/20 text-rose-200' : 'border-white/20 text-slate-200 hover:bg-white/10'}`}>{busy === 'sell' ? '…' : sellArm === cur.id ? 'Ja, verkaufen' : `Verkaufen · ca. ${Math.floor(cur.price / 2).toLocaleString('de-DE')} Coins`}</button>}
         {!cur.owned && <button type="button" disabled={busy !== null} onClick={() => void buy()} className="min-h-[44px] rounded-lg bg-accent-cyan px-6 font-bold text-slate-950 disabled:opacity-40">{busy === 'buy' ? '…' : `Kaufen · ${cur.price.toLocaleString('de-DE')} Coins`}</button>}
       </div>
       <div className="grid gap-4 md:grid-cols-2">

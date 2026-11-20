@@ -6,6 +6,7 @@ export interface CarRow { id: string; name: string; kind: string; color: string;
 export const carList = async (): Promise<CarRow[]> => { const l = await rpc<CarRow[]>('car_list'); registerCustomRows(l); return l }
 export const adminCarCustomSave = (id: string, name: string, price: number, top: number, color: string, spec: unknown) => rpc<void>('admin_car_custom_save', { p_id: id, p_name: name, p_price: price, p_top: top, p_color: color, p_spec: spec })
 export const carBuy = (id: string) => rpc<number>('car_buy', { p_id: id })
+export const carSell = (id: string) => rpc<number>('car_sell', { p_id: id })
 export const adminCarSet = (id: string, price: number, active: boolean) => rpc<void>('admin_car_set', { p_id: id, p_price: price, p_active: active })
 export const raceSubmit = (track: string, car: string, lapMs: number) => rpc<void>('race_submit', { p_track: track, p_car: car, p_lap_ms: lapMs })
 

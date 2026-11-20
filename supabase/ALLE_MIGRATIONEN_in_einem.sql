@@ -27322,7 +27322,7 @@ end $$;
 
 -- ===== 0110_car_seats.sql =====
 -- ============================================================================
--- 0110: Sitzplätze pro Auto und Lauftempo zu Fuß (Update 136). Wiederholbar. Nach 0109 ausführen.
+-- 0110: Sitzplätze pro Auto, Lauftempo zu Fuß, Auto verkaufen (Update 136/137). Wiederholbar. Nach 0109 ausführen.
 --  * Einstellung car_seats (Standard 4); admin_seats_set(n): nur Admin, 1–8
 --  * Einstellungen walk_speed / run_speed (in 0,1 m/s, Standard 44 / 76); admin_foot_set(walk, run): nur Admin, 1–40 m/s
 --  * race_super_info() liefert zusätzlich seats, walk, run (m/s)
@@ -27369,11 +27369,28 @@ begin
 end;
 $$;
 
+-- Auto verkaufen: 50 % des bezahlten Preises zurück, Tuning des Autos geht verloren
+drop function if exists public.car_sell(text);
+create or replace function public.car_sell(p_id text)
+returns bigint language plpgsql security definer set search_path = public as $$
+declare v_me uuid := public._og_check(); o public.car_owned; v_bal bigint;
+begin
+  perform public._feature_guard('cars');
+  perform pg_advisory_xact_lock(hashtext('car:' || v_me::text));
+  select * into o from public.car_owned where user_id = v_me and car_id = p_id;
+  if o.car_id is null then raise exception 'Dieses Auto gehört dir nicht.' using errcode = '22023'; end if;
+  delete from public.car_upgrades where user_id = v_me and car_id = p_id;
+  delete from public.car_owned where user_id = v_me and car_id = p_id;
+  v_bal := public._grant_koins(v_me, (o.paid / 2)::integer, 'shop', 'car-sell:' || p_id);
+  return v_bal;
+end;
+$$;
+
 do $$
 declare r record;
 begin
   for r in select p.oid::regprocedure as sig, p.proname from pg_proc p join pg_namespace n on n.oid = p.pronamespace
-            where n.nspname = 'public' and p.proname in ('race_super_info', 'admin_seats_set', 'admin_foot_set') loop
+            where n.nspname = 'public' and p.proname in ('race_super_info', 'admin_seats_set', 'admin_foot_set', 'car_sell') loop
     execute format('revoke all on function %s from public, anon, authenticated', r.sig);
     execute format('grant execute on function %s to authenticated', r.sig);
   end loop;

@@ -5,7 +5,7 @@ import { DMG_MAX, botInput, crash, packLimit, startCar, statsFor, stepCar, type 
 import { TRACKS, buildTrack, curveAhead, isOpen, pointAt, project, trackKey, type TrackDef } from './track'
 import { assistSteer, buildRaceLine } from './line'
 import { createFx } from './fx'
-import { canFly, flyHeight, flyRoll, isBike, kindDims, seatConfig } from '../stats'
+import { canFly, carKmh, flyHeight, flyRoll, isBike, kindDims, seatConfig } from '../stats'
 import { useRaceCars, type RaceCarOption } from './useRaceCars'
 import { PARK, PARK_TOP, parkSurfaces, inParkXZ } from './parkhaus'
 import { BRIDGES, CITY, GARAGES, TUNNELS, bridgeH, city, inPark, roofH, tunnelClamp, tunnelD } from './city'
@@ -79,6 +79,9 @@ const loadMapCfg = (): MapCfg => {
   try { const j = JSON.parse(localStorage.getItem('vt-race-map') ?? '{}') as Partial<MapCfg>; return { on: j.on !== false, r: Math.min(MAP_RANGES.length - 1, Math.max(0, Number.isInteger(j.r) ? (j.r as number) : 1)), s: Math.min(MAP_SIZES.length - 1, Math.max(0, Number.isInteger(j.s) ? (j.s as number) : 1)) } } catch { return { on: true, r: 1, s: 1 } }
 }
 
+/** Eigene Autos nach Höchsttempo, schnellstes zuerst (für N + 1…9). */
+const bestFirst = (l: RaceCarOption[]): RaceCarOption[] => [...l].sort((a, b) => carKmh(b.kind, b.top) - carKmh(a.kind, a.top))
+
 export default function RaceView({ trackId, custom, laps, me, assistOk = false, bots = [], online, onFinish, onAgain, onExit }: Props) {
   const mount = useRef<HTMLDivElement>(null)
   const mini = useRef<HTMLCanvasElement>(null)
@@ -137,7 +140,8 @@ export default function RaceView({ trackId, custom, laps, me, assistOk = false, 
   useEffect(() => { if (!footUi.on) { joyRef.current = { x: 0, y: 0 }; setKnob({ x: 0, y: 0 }) } }, [footUi.on])
   const joyEnd = () => { joyRef.current = { x: 0, y: 0 }; setKnob({ x: 0, y: 0 }) }
   const exitRef = useRef<() => void>(() => undefined)
-  const spawnRef = useRef<(o?: RaceCarOption) => void>(() => undefined)
+  const spawnRef = useRef<(o?: RaceCarOption, nth?: number) => void>(() => undefined)
+  const spawnArm = useRef(0)
   const joyRef = useRef({ x: 0, y: 0 })
   const runRef = useRef(false)
   const [panel, setPanel] = useState(false)
@@ -266,7 +270,7 @@ export default function RaceView({ trackId, custom, laps, me, assistOk = false, 
 
       // Tastatur
       const keyMap: Record<string, Key> = { ArrowLeft: 'left', a: 'left', A: 'left', ArrowRight: 'right', d: 'right', D: 'right', ArrowUp: 'gas', w: 'gas', W: 'gas', ArrowDown: 'brake', s: 'brake', S: 'brake', ' ': 'brake', e: 'fly', E: 'fly' }
-      const kd = (e: KeyboardEvent) => { const k = keyMap[e.key]; if (k) { inp.current[k] = true; e.preventDefault() } else if (e.key === 'r' || e.key === 'R') resetReq.current = true; else if (e.key === 'c' || e.key === 'C') toggleRef.current(); else if (e.key === 'f' || e.key === 'F') assistToggleRef.current(); else if (e.key === 'h' || e.key === 'H') toggleHide.current(); else if (e.key === 'x' || e.key === 'X') exitRef.current(); else if (e.key === 'n' || e.key === 'N') spawnRef.current(); else if (e.key === 'Shift') runRef.current = true; if (e.key === ' ') inp.current.jump = true }
+      const kd = (e: KeyboardEvent) => { const k = keyMap[e.key]; if (k) { inp.current[k] = true; e.preventDefault() } else if (e.key === 'r' || e.key === 'R') resetReq.current = true; else if (e.key === 'c' || e.key === 'C') toggleRef.current(); else if (e.key === 'f' || e.key === 'F') assistToggleRef.current(); else if (e.key === 'h' || e.key === 'H') toggleHide.current(); else if (e.key === 'x' || e.key === 'X') exitRef.current(); else if (e.key === 'n' || e.key === 'N') { spawnArm.current = performance.now() + 2500; spawnRef.current() } else if (e.key >= '1' && e.key <= '9' && performance.now() < spawnArm.current) { spawnArm.current = 0; spawnRef.current(undefined, Number(e.key)) } else if (e.key === 'Shift') runRef.current = true; if (e.key === ' ') inp.current.jump = true }
       const ku = (e: KeyboardEvent) => { const k = keyMap[e.key]; if (k) { inp.current[k] = false; e.preventDefault() } else if (e.key === 'Shift') runRef.current = false; if (e.key === ' ') inp.current.jump = false }
       window.addEventListener('keydown', kd); window.addEventListener('keyup', ku)
       cleanups.push(() => { window.removeEventListener('keydown', kd); window.removeEventListener('keyup', ku) })
@@ -307,8 +311,16 @@ export default function RaceView({ trackId, custom, laps, me, assistOk = false, 
         })
         ch.on('broadcast', { event: 'ch' }, ({ payload }) => onCh(payload as Record<string, unknown>))
         ch.on('broadcast', { event: 'cl' }, ({ payload }) => onClaim(String((payload as { id?: unknown }).id ?? '')))
-        ch.subscribe((s) => { if (s === 'SUBSCRIBED') ready = true })
+        const mine = ch
+        mine.subscribe((st) => {
+          if (ch !== mine) return
+          if (st === 'SUBSCRIBED') { ready = true; return }
+          // Verbindung weg: nicht weiter „blind“ senden (sonst sieht nur einer den anderen), sondern neu verbinden
+          if (st === 'CHANNEL_ERROR' || st === 'TIMED_OUT' || st === 'CLOSED') { ready = false; window.setTimeout(() => { if (!dead && ch === mine) connectNet() }, 2000) }
+        })
       }
+      // Wächter: ist der Kanal nicht mehr „joined“, neu verbinden (z. B. nach WLAN-Wechsel oder iPad-Standby)
+      if (online) { const wd = window.setInterval(() => { if (!dead && ch && ch.state !== 'joined' && ch.state !== 'joining') { ready = false; connectNet() } }, 4000); cleanups.push(() => window.clearInterval(wd)) }
       // Erst verbinden, wenn die Datenbank-Liste vom Server da ist (sonst landen Geräte mit verschiedener Liste auf verschiedenen Servern); ändert sie sich später, neu verbinden
       const bootNet = (tries: number) => void whenGameDbsReady().then(() => {
         if (dead) return
@@ -389,9 +401,23 @@ export default function RaceView({ trackId, custom, laps, me, assistOk = false, 
       const pkId = (p: Parked) => `pk-${online?.userId.slice(0, 6) ?? 'x'}-${p.id}`
       let footMesh: import('three').Group | null = null
       let footKo = 0
+      /** Leben der Figur (auch im Auto: Schäden am Auto und Feuer kosten Leben, es gibt dort keine Erholung) */
+      let myHp = HP_MAX
+      let prevV = 0, prevDmg = 0, burnT = 0, wreck = 0
       let footMsg = '', footMsgT = 0
       let lastSpawn = 0, lastRegenHit = 0, lastPark = 0
       const say = (m: string) => { footMsg = m; footMsgT = performance.now() + 3500 }
+      const explode = (why: string) => {
+        wreck = 3.6; myHp = 0; car = { ...car, v: 0 }
+        const y0 = (car.y ?? 0) + 0.8
+        for (let i = 0; i < 70; i++) {
+          const a = Math.random() * Math.PI * 2, s = 4 + Math.random() * 16
+          fx.emit('fire', car.x, y0, car.z, Math.cos(a) * s, 3 + Math.random() * 14, Math.sin(a) * s, 0.7 + Math.random() * 0.8)
+          if (i % 2 === 0) fx.emit('smoke', car.x, y0, car.z, Math.cos(a) * s * 0.5, 2 + Math.random() * 8, Math.sin(a) * s * 0.5, 1.4 + Math.random())
+        }
+        myMesh.visible = false
+        say(why)
+      }
       const idleIn = { gas: false, brake: false, left: false, right: false }
       const setVehicle = (kind: string, color: string, top: number | null | undefined, up: typeof me.up, siren: boolean) => {
         eff.kind = kind; eff.color = color; eff.up = up; topNow = top
@@ -419,7 +445,7 @@ export default function RaceView({ trackId, custom, laps, me, assistOk = false, 
         if (foot) { enterCar(); return }
         if (Math.abs(car.vy ?? 0) > 1.5 || car.fly > 0) { say('In der Luft kannst du nicht aussteigen.'); return }
         mkParked({ ...car }, eff.kind, eff.color, myStats, topNow, eff.up, myRole === 'cop')
-        foot = exitFromCar({ ...car, wid: myStats.wid }, 1)
+        foot = exitFromCar({ ...car, wid: myStats.wid }, 1, myHp)
         if (footMesh) scene.remove(footMesh)
         makeFootMesh()
         myMesh.visible = false
@@ -433,7 +459,7 @@ export default function RaceView({ trackId, custom, laps, me, assistOk = false, 
       const leaveRide = (m?: string) => {
         const r = ride ? remotes.get(ride) : undefined
         ride = null
-        foot = exitFromCar({ x: car.x, z: car.z, h: car.h, v: r?.v ?? 0, wid: r ? kindDims(r.kind).wid : 1.8, y: car.y, lvl: car.lvl }, 1)
+        foot = exitFromCar({ x: car.x, z: car.z, h: car.h, v: r?.v ?? 0, wid: r ? kindDims(r.kind).wid : 1.8, y: car.y, lvl: car.lvl }, 1, myHp)
         makeFootMesh(); footKo = 0
         if (m) say(m)
       }
@@ -478,9 +504,14 @@ export default function RaceView({ trackId, custom, laps, me, assistOk = false, 
           car = { ...pb.car, dmg: 0 }
           setVehicle(pb.kind, pb.color, Math.round(pb.st.top * 3.6), undefined, true)
         }
+        myHp = f.hp; prevV = 0; prevDmg = car.dmg; burnT = 0
         foot = null
         if (footMesh) { scene.remove(footMesh); footMesh = null }
         myMesh.visible = true
+      }
+      const respawnAfterDeath = () => {
+        car = startCar(track, 0); myHp = HP_MAX; prevV = 0; prevDmg = 0; burnT = 0; myMesh.visible = true
+        say('Dein Auto ist explodiert – du bekommst ein neues.')
       }
       const spawnCar = (o?: RaceCarOption) => {
         if (!isCity) return
@@ -505,7 +536,7 @@ export default function RaceView({ trackId, custom, laps, me, assistOk = false, 
         if (p) { scene.remove(p.mesh); parked = parked.filter((q) => q !== p) }
       }
       exitRef.current = exitCar
-      spawnRef.current = (o) => { if (o) { setPick(false); spawnCar(o) } else if (garageRef.current.length > 1) setPick((v) => !v); else spawnCar() }
+      spawnRef.current = (o, nth) => { if (nth) { setPick(false); const b = bestFirst(garageRef.current)[nth - 1]; if (b) spawnCar(b); else say(`Du hast kein Auto Nr. ${nth}.`) } else if (o) { setPick(false); spawnCar(o) } else if (garageRef.current.length > 1) setPick((v) => !v); else spawnCar() }
       /** Schritt zu Fuß: laufen, Autos treffen mich, Leben, K.O. und Wiederkehr */
       const tickFoot = (dt: number, nowT: number) => {
         let w = foot
@@ -816,7 +847,10 @@ export default function RaceView({ trackId, custom, laps, me, assistOk = false, 
         // Bei hohem Tempo in kleinen Teilschritten fahren (höchstens ~1,6 m pro Schritt) und nach jedem Schritt Zusammenstöße prüfen:
         // so rast man nicht durch andere Autos hindurch, und der Aufprall wird richtig erkannt.
         let bumped = false
-        if (!foot && !ride) {
+        if (wreck > 0) {
+          wreck -= dt
+          if (wreck <= 0) respawnAfterDeath()
+        } else if (!foot && !ride) {
         const nSub = Math.max(1, Math.min(240, Math.ceil(Math.abs(car.v) * dt / 1.6)))
         for (let k = 0; k < nSub; k++) {
           car = stepCar(car, chase && !chase.over ? { ...input, chase: true } : input, dt / nSub, track, myStats, go, true)
@@ -988,6 +1022,19 @@ export default function RaceView({ trackId, custom, laps, me, assistOk = false, 
           if (camRoll) camera.rotateZ(-camRoll)
           camera.fov += ((62 + Math.min(18, sp * 0.22)) - camera.fov) * Math.min(1, dt * 3)
         }
+        if (isCity && !foot && !ride && wreck <= 0) {
+          // Leben im Auto: Schaden am Auto und Feuer kosten Leben
+          const dd = car.dmg - prevDmg
+          if (dd > 0) myHp -= dd * 0.9
+          const burning = car.dmg / DMG_MAX > 0.85
+          if (burning) { burnT += dt; myHp -= 3.5 * dt } else burnT = 0
+          const sp = Math.abs(car.v)
+          if (prevV > 300 / 3.6 && sp < prevV * 0.5 && car.hit > 0.3) explode('Mit über 300 km/h eingeschlagen – das war tödlich! Das Auto explodiert.')
+          else if (myHp <= 0) explode('Du hast den Unfall nicht überlebt – das Auto explodiert.')
+          else if (dd > 40) explode('Schwerer Aufprall – das Auto explodiert!')
+          else if (burning && burnT > 7) explode('Das brennende Auto ist explodiert!')
+          prevV = sp; prevDmg = car.dmg
+        }
         if (!foot) rs.showInterior(null)
         if (ride) myMesh.visible = false
         if (foot) {
@@ -1060,7 +1107,7 @@ export default function RaceView({ trackId, custom, laps, me, assistOk = false, 
             const near = !!f && footKo <= 0 && !!nearestCar(f, [...parked.map((p) => ({ x: p.car.x, z: p.car.z })), ...pbots.filter((pb) => pb.w && !pb.carGone).map((pb) => ({ x: pb.car.x, z: pb.car.z })), ...[...remotes.values()].filter((r) => !r.wk && !r.rd && !r.id.startsWith('pb-') && fresh(r)).map((r) => ({ x: r.x, z: r.z }))], 5.5)
             const seat = f ? '' : `${ride ? occupants(ride) : occupants(online?.userId ?? '')}/${seatConfig.n}`
             const msg = performance.now() < footMsgT ? footMsg : ''
-            const hp = f ? Math.round(f.hp) : HP_MAX
+            const hp = Math.round(f ? f.hp : Math.max(0, myHp))
             setFootUi((o) => (o.on === !!f && o.hp === hp && o.near === near && o.ko === footKo > 0 && o.n === parked.length && o.msg === msg && o.seat === seat && o.ride === !!ride ? o : { on: !!f, hp, near, ko: footKo > 0, n: parked.length, msg, seat, ride: !!ride }))
           }
           drawMini()
@@ -1172,17 +1219,17 @@ export default function RaceView({ trackId, custom, laps, me, assistOk = false, 
           {hud.curve < 0 ? '◀◀ Linkskurve' : 'Rechtskurve ▶▶'} · {hud.curveDist} m
         </div>
       )}
-      {footUi.on && (
+      {(footUi.on || footUi.hp < HP_MAX) && (
         <div className="pointer-events-none absolute bottom-40 left-1/2 w-56 -translate-x-1/2 text-center text-xs text-white">
           <div className="h-3 overflow-hidden rounded-full bg-black/55"><div className={`h-full ${footUi.hp > 50 ? 'bg-emerald-500' : footUi.hp > 25 ? 'bg-amber-400' : 'bg-rose-500'}`} style={{ width: `${footUi.hp}%` }} /></div>
-          <p className="mt-0.5 [text-shadow:0_1px_4px_#000]">❤ {footUi.hp} · Laufen: WASD · Rennen: Shift · Springen: Leertaste · Einsteigen: X</p>
+          <p className="mt-0.5 [text-shadow:0_1px_4px_#000]">❤ {footUi.hp}{footUi.on ? ' · Laufen: WASD · Rennen: Shift · Springen: Leertaste · Einsteigen: X' : ''}</p>
         </div>
       )}
       {def.mode === 'city' && !footUi.on && footUi.seat && <div className="pointer-events-none absolute left-1/2 top-12 -translate-x-1/2 rounded-full bg-black/55 px-3 py-0.5 text-xs font-bold text-white" role="status">{footUi.ride ? 'Mitfahrer' : 'Fahrer'} · 👥 {footUi.seat}</div>}
       {pick && (
         <div className="absolute left-3 top-16 z-20 max-h-64 w-52 overflow-auto rounded-xl bg-slate-900/95 p-2 text-sm text-white" role="menu" aria-label="Auto zum Spawnen wählen">
-          <p className="px-1 pb-1 text-xs text-slate-300">Welches Auto spawnen?</p>
-          {rcars.cars.map((c) => <button key={c.id} type="button" role="menuitem" onClick={() => spawnRef.current(c)} className="flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-left hover:bg-white/15"><span className="h-3 w-3 shrink-0 rounded-full border border-white/40" style={{ background: c.color }} />{c.name}</button>)}
+          <p className="px-1 pb-1 text-xs text-slate-300">Welches Auto spawnen? (Schnellstes = 1, auch N dann Ziffer)</p>
+          {bestFirst(rcars.cars).map((c, i) => <button key={c.id} type="button" role="menuitem" onClick={() => spawnRef.current(c)} className="flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-left hover:bg-white/15"><span className="h-3 w-3 shrink-0 rounded-full border border-white/40" style={{ background: c.color }} />{i < 9 ? `${i + 1}. ` : ''}{c.name}</button>)}
         </div>
       )}
       {footUi.ko && <p className="pointer-events-none absolute inset-0 grid place-items-center text-3xl font-black text-rose-300 [text-shadow:0_3px_12px_#000]">Überfahren!</p>}
