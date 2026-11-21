@@ -1,5 +1,4 @@
 import { PARK, PARK_LANES, PARK_TOP, inParkXZ } from './parkhaus'
-import { RING_CORNERS, GATE } from './mountains'
 import { CITY, GARAGES, TUNNELS, bridgeAt, cityPush, type TunnelSeg } from './city'
 import { flyHeight } from '../stats'
 import type { Car, Input } from './physics'
@@ -165,24 +164,6 @@ export function parkNav(car: Car, tgt: { x: number; z: number; y?: number }): { 
   return s < ramp + 4 ? go(xB, z0 + ramp + 8) : go(xU, z0 + ramp + 6)
 }
 
-/** Schneidet die Strecke a→b die Stadtmauer (Quadrat)? */
-function wallBlocks(ax: number, az: number, bx: number, bz: number): boolean {
-  const H = CITY.half + 3
-  for (let i = 1; i < 40; i++) { const t = i / 40, x = ax + (bx - ax) * t, z = az + (bz - az) * t; if (Math.abs(x) < H && Math.abs(z) < H) return true }
-  return false
-}
-
-/** Weglänge von (x, z) zum Ziel um die Stadtmauer herum (über die Ecken der Rennstrecke; `seen` = Bitmaske besuchter Ecken). */
-function routeLen(x: number, z: number, t: { x: number; z: number }, seen: number): number {
-  if (!wallBlocks(x, z, t.x, t.z)) return Math.hypot(t.x - x, t.z - z)
-  let b = Infinity
-  RING_CORNERS.forEach(([cx, cz], k) => {
-    if (seen & (1 << k) || wallBlocks(x, z, cx, cz)) return
-    b = Math.min(b, Math.hypot(cx - x, cz - z) + routeLen(cx, cz, t, seen | (1 << k)))
-  })
-  return b
-}
-
 /** Fahr-KI eines Polizei-Bots: fährt über die Straßen (und durch die Tunnel) auf `tgt` (den Bandit) zu, repariert sich selbst und löst sich, wenn er hängt. */
 export function copDrive(car: Car, tgt0: { x: number; z: number; lvl?: number; y?: number }, mem: BotMem, dt: number): BotDrive {
   const P = CITY.pitch, K = CITY.K
@@ -194,24 +175,25 @@ export function copDrive(car: Car, tgt0: { x: number; z: number; lvl?: number; y
   // Außenwelt (Rennstrecke, Wiesen, Berge): in die Stadt nur durchs Nordtor (x = 0); um die Mauer herum über die Ecken der Rennstrecke
   const HH = CITY.half
   const isOut = (x: number, z: number) => Math.abs(x) > HH + 4 || Math.abs(z) > HH + 4
-  const carOut = isOut(car.x, car.z), tgtOut = isOut(tgt0.x, tgt0.z)
-  const aroundWall = (t: { x: number; z: number }) => {
-    if (!wallBlocks(car.x, car.z, t.x, t.z)) return t
-    let best: { x: number; z: number } | null = null, bd = Infinity
-    RING_CORNERS.forEach(([cx, cz], k) => {
-      if (wallBlocks(car.x, car.z, cx, cz)) return
-      const sc = Math.hypot(cx - car.x, cz - car.z) + routeLen(cx, cz, t, 1 << k)
-      if (sc < bd) { bd = sc; best = { x: cx, z: cz } }
-    })
-    return best ?? t
-  }
-  let gateTgt: { x: number; z: number } | null = null
-  if (carOut && !tgtOut) gateTgt = car.z > HH && Math.abs(car.x) < GATE + 14 ? { x: 0, z: HH - 40 } : aroundWall({ x: 0, z: HH + 40 })
-  else if (!carOut && tgtOut) gateTgt = { x: 0, z: HH + 40 }
-  else if (carOut && tgtOut) { const w = aroundWall(tgt0); gateTgt = w === tgt0 ? null : w }
-  const cornerWp = !!gateTgt && RING_CORNERS.some(([cx, cz]) => cx === gateTgt!.x && cz === gateTgt!.z)
-  const tgt = gateTgt ?? ent ?? tgt0
-  const entDirect = !gateTgt && !!ent && (ent as { direct?: boolean }).direct
+  // Keine Stadtmauer mehr: außerhalb der Stadt (oder zum Ziel draußen) geht es querfeldein direkt zum Ziel
+  const carOut = isOut(car.x, car.z)
+  const outDirect = carOut
+  const cornerWp = false
+  // Von draußen in die Stadt: erst quer zur Stadtgrenze (nächstes Stück der Randstraße), dann über die Straßen
+  const E = CITY.K * CITY.pitch
+  const tgtIn = !isOut(tgt0.x, tgt0.z)
+  const edge = carOut && tgtIn
+    ? (Math.abs(car.z) >= Math.abs(car.x) ? { x: Math.max(-E, Math.min(E, tgt0.x)), z: Math.sign(car.z) * E } : { x: Math.sign(car.x) * E, z: Math.max(-E, Math.min(E, tgt0.z)) })
+    : null
+  // Aus der Stadt hinaus: erst zum nächsten Randknoten Richtung Ziel, dann direkt (querfeldein)
+  const exitPt = !carOut && !tgtIn && lvl === 0 && !ent
+    ? (Math.abs(tgt0.z) >= Math.abs(tgt0.x)
+      ? { x: Math.round(Math.max(-E, Math.min(E, tgt0.x)) / CITY.pitch) * CITY.pitch, z: Math.sign(tgt0.z) * E }
+      : { x: Math.sign(tgt0.x) * E, z: Math.round(Math.max(-E, Math.min(E, tgt0.z)) / CITY.pitch) * CITY.pitch })
+    : null
+  const exitDirect = !!exitPt && Math.hypot(exitPt.x - car.x, exitPt.z - car.z) < 30
+  const tgt = edge ?? (exitPt && !exitDirect ? exitPt : null) ?? ent ?? tgt0
+  const entDirect = outDirect || exitDirect || (!!ent && !!(ent as { direct?: boolean }).direct)
   const ci = node(car.x), cj = node(car.z), ti = node(tgt.x), tj = node(tgt.z)
   let wx = tgt.x, wz = tgt.z, cross: number | undefined
   if (lvl === -1) {
@@ -255,7 +237,7 @@ export function copDrive(car: Car, tgt0: { x: number; z: number; lvl?: number; y
     if (sg) { const ca = sg.dir === 'x' ? car.x : car.z, f = (sg.dir === 'x' ? Math.sin(car.h) : Math.cos(car.h)) >= 0; exitBrake = (f ? sg.a1 - ca : ca - sg.a0) < 110 && car.v > 24 }
   }
   // Garagen-Zufahrt: vor dem Tor auf Schritttempo, damit er die Kurve in die Einfahrt schafft
-  const gApproach = lvl === 0 && !gateTgt && !!ent && !entDirect
+  const gApproach = lvl === 0 && !!ent && !entDirect
   const parkSlow = !!pk?.slow
   if (pk?.hold) { mem.stuck = 0; mem.pt = 0; return { inp: { gas: false, brake: true, left: false, right: false } } }
   const slow = (cornerWp && dist < 150 && car.v > 17) || (nodeWp && dist < 55 && car.v > 21) || exitBrake || (parkSlow && car.v > 11) || (gApproach && dist < 60 && car.v > 12) || (cross !== undefined && cross < 90 && car.v > 17)

@@ -24,7 +24,7 @@ export interface Walker {
   /** Ebene: 0 Straße/Gelände, −1 Tunnel, 1 Brücke */
   lvl?: number
 }
-export interface WalkInput { fwd: boolean; back: boolean; left: boolean; right: boolean; run?: boolean; jump?: boolean }
+export interface WalkInput { fwd: boolean; back: boolean; left: boolean; right: boolean; run?: boolean; jump?: boolean; turn?: number }
 export const WALK = 4.4
 export const RUN = 7.6
 /** Lauf- und Sprinttempo (vom Admin im Showroom einstellbar) */
@@ -77,7 +77,7 @@ function stepOnce(w: Walker, inp: WalkInput, dt: number): Walker {
   const stunned = w.stun > 0
   let h = w.h
   const lvl0 = w.lvl ?? 0
-  if (!stunned) h += ((inp.left ? 1 : 0) - (inp.right ? 1 : 0)) * 2.7 * dt
+  if (!stunned) h += ((inp.left ? 1 : 0) - (inp.right ? 1 : 0) - (inp.turn ?? 0)) * 2.7 * dt
   const g0 = groundAt(w.x, w.z, w.y, lvl0)
   const grounded = w.y <= g0 + 0.05 && w.vy <= 0
   const air = !grounded

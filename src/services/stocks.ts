@@ -21,3 +21,5 @@ export const adminStockHoldings = (userId: string | null = null) => rpc<StockHol
 /** Admin: Aktien vergeben (Plus) oder abziehen (Minus). Gibt den neuen Bestand zurück. */
 export const adminStockAdjust = (userId: string, symbol: string, delta: number) => rpc<number>('admin_stock_adjust', { p_user: userId, p_symbol: symbol, p_delta: delta })
 export const adminStockRemove = (symbol: string) => rpc<number>('admin_stock_remove', { p_symbol: symbol })
+
+export const adminStockCrash = () => rpc<number>('admin_stock_crash')

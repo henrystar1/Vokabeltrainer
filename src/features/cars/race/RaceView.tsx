@@ -56,7 +56,7 @@ interface Props {
   onExit?: () => void
 }
 
-interface Remote { id: string; name: string; kind: string; color: string; x: number; z: number; h: number; v: number; tx: number; tz: number; th: number; total: number; ft: number | null; seen: number; dmg: number; slip: number; fl: number; lv?: number; yy?: number; pt?: number; hd?: boolean; wk?: boolean; rd?: string; ro?: 'b' | 'c'; mesh?: import('three').Group }
+interface Remote { id: string; name: string; kind: string; color: string; x: number; z: number; h: number; v: number; tx: number; tz: number; th: number; total: number; ft: number | null; seen: number; dmg: number; slip: number; fl: number; lv?: number; yy?: number; pt?: number; hd?: boolean; wk?: boolean; wc?: string; ex?: number; rd?: string; ro?: 'b' | 'c'; mesh?: import('three').Group }
 
 import { buildingAt, walkNav, FLOOR_H } from './interior'
 import { HP_MAX, carHit, exitFromCar, nearestCar, newWalker, stepWalker, type Walker } from './foot'
@@ -67,6 +67,8 @@ import { hillH as hillHeight } from './mountains'
 const COUNT_MS = 4500
 /** Offene Felder: Wartezeit zwischen zwei Reparaturen (ohne Totalschaden) */
 const REPAIR_CD_MS = 12000
+/** Joystick-Auslenkung → Drehung (Totzone, flache Kurve für feines Zielen) */
+const joyTurnCurve = (x: number) => { const a = Math.abs(x); return a < 0.12 ? 0 : Math.sign(x) * Math.pow((a - 0.12) / 0.88, 1.6) }
 const fmt = (ms: number) => { const m = Math.floor(ms / 60000); const s = ms / 1000 - m * 60; return `${m}:${s.toFixed(2).padStart(5, '0')}` }
 const lapKey = (key: string) => `race-best-${key}`
 
@@ -142,7 +144,21 @@ export default function RaceView({ trackId, custom, laps, me, assistOk = false, 
   const exitRef = useRef<() => void>(() => undefined)
   const spawnRef = useRef<(o?: RaceCarOption, nth?: number) => void>(() => undefined)
   const spawnArm = useRef(0)
+  const punchReq = useRef(false)
   const joyRef = useRef({ x: 0, y: 0 })
+  const lsGet = (k: string, d: string) => { try { return localStorage.getItem(k) ?? d } catch { return d } }
+  const lsSet = (k: string, v: string) => { try { localStorage.setItem(k, v) } catch { /* ignorieren */ } }
+  /** Joystick-Drehempfindlichkeit (Faktor), eigene Figurenfarbe ('' = Autofarbe), Render-Umkreis in m (0 = aus) */
+  const joyTurnRef = useRef(Number(lsGet('vt-race-joyturn', '0.5')) || 0.5)
+  const [joyTurn, setJoyTurn] = useState(joyTurnRef.current)
+  const applyJoyTurn = (v: number) => { joyTurnRef.current = v; setJoyTurn(v); lsSet('vt-race-joyturn', String(v)) }
+  const wcRef = useRef(/^#[0-9a-f]{6}$/i.test(lsGet('vt-race-wcolor', '')) ? lsGet('vt-race-wcolor', '') : '')
+  const [wcUi, setWcUi] = useState(wcRef.current)
+  const applyWc = (c: string) => { wcRef.current = c; setWcUi(c); lsSet('vt-race-wcolor', c); remakeFoot.current() }
+  const remakeFoot = useRef<() => void>(() => undefined)
+  const rrRef = useRef(Number(lsGet('vt-race-radius', '0')) || 0)
+  const [rrUi, setRrUi] = useState(rrRef.current)
+  const applyRr = (m: number) => { rrRef.current = m; setRrUi(m); lsSet('vt-race-radius', String(m)) }
   const runRef = useRef(false)
   const [panel, setPanel] = useState(false)
   const [chaseKind, setChaseKind] = useState<string | null>(null)
@@ -204,6 +220,44 @@ export default function RaceView({ trackId, custom, laps, me, assistOk = false, 
       levelAir = def.mode === 'city'
       const fx = createFx(THREE, rs.scene)
       cleanups.push(() => fx.dispose())
+      // Explosionen: Feuerball, Druckwelle, Lichtblitz und fliegende Trümmer
+      interface Blast { t: number; ball: import('three').Mesh; ring: import('three').Mesh; light: import('three').PointLight; debris: Array<{ m: import('three').Mesh; vx: number; vy: number; vz: number; rx: number; rz: number }> }
+      const blasts: Blast[] = []
+      const blastAt = (x: number, y: number, z: number, color = '#ff7a1a') => {
+        const ball = new THREE.Mesh(new THREE.SphereGeometry(1, 16, 12), new THREE.MeshBasicMaterial({ color: '#ffb347', transparent: true, opacity: 0.95, depthWrite: false }))
+        ball.position.set(x, y, z)
+        const ring = new THREE.Mesh(new THREE.RingGeometry(0.8, 1, 32), new THREE.MeshBasicMaterial({ color: '#fff3d6', transparent: true, opacity: 0.8, side: THREE.DoubleSide, depthWrite: false }))
+        ring.rotation.x = -Math.PI / 2; ring.position.set(x, y - 0.6, z)
+        const light = new THREE.PointLight(color, 60, 90); light.position.set(x, y + 1, z)
+        const debris: Blast['debris'] = []
+        const dm = new THREE.MeshStandardMaterial({ color: '#2b2b2b', roughness: 0.8 })
+        for (let i = 0; i < 14; i++) {
+          const m = new THREE.Mesh(new THREE.BoxGeometry(0.3 + Math.random() * 0.7, 0.15 + Math.random() * 0.3, 0.3 + Math.random() * 0.6), dm)
+          m.position.set(x, y, z)
+          const a = Math.random() * Math.PI * 2, sp = 5 + Math.random() * 12
+          debris.push({ m, vx: Math.cos(a) * sp, vy: 6 + Math.random() * 12, vz: Math.sin(a) * sp, rx: (Math.random() - 0.5) * 14, rz: (Math.random() - 0.5) * 14 })
+          rs.scene.add(m)
+        }
+        rs.scene.add(ball, ring, light)
+        blasts.push({ t: 0, ball, ring, light, debris })
+      }
+      const tickBlasts = (dt: number) => {
+        for (let i = blasts.length - 1; i >= 0; i--) {
+          const b = blasts[i]; b.t += dt
+          const k = b.t / 1.6
+          const bs = 1 + Math.min(1, b.t / 0.45) * 6.5
+          b.ball.scale.setScalar(bs); (b.ball.material as import('three').MeshBasicMaterial).opacity = Math.max(0, 0.95 - b.t / 0.8)
+          b.ring.scale.setScalar(1 + b.t * 34); (b.ring.material as import('three').MeshBasicMaterial).opacity = Math.max(0, 0.8 - b.t / 0.7)
+          b.light.intensity = Math.max(0, 60 * (1 - b.t / 0.9))
+          for (const d of b.debris) { d.vy -= 22 * dt; d.m.position.x += d.vx * dt; d.m.position.y = Math.max(0.1, d.m.position.y + d.vy * dt); d.m.position.z += d.vz * dt; d.m.rotation.x += d.rx * dt; d.m.rotation.z += d.rz * dt }
+          if (k >= 1) {
+            rs.scene.remove(b.ball, b.ring, b.light); for (const d of b.debris) rs.scene.remove(d.m)
+            b.ball.geometry.dispose(); b.ring.geometry.dispose(); blasts.splice(i, 1)
+          }
+        }
+      }
+      cleanups.push(() => { for (const b of blasts) { rs.scene.remove(b.ball, b.ring, b.light); for (const d of b.debris) rs.scene.remove(d.m) } blasts.length = 0 })
+      let exN = 0
       let fxTick = 0
       const carFx = (kind: string, x: number, z: number, h: number, v: number, slip: number, fly: number, gas: boolean, dt2: number, alt = 0) => {
         const fxv = Math.sin(h), fzv = Math.cos(h), rx = Math.cos(h), rz = -Math.sin(h)
@@ -270,7 +324,7 @@ export default function RaceView({ trackId, custom, laps, me, assistOk = false, 
 
       // Tastatur
       const keyMap: Record<string, Key> = { ArrowLeft: 'left', a: 'left', A: 'left', ArrowRight: 'right', d: 'right', D: 'right', ArrowUp: 'gas', w: 'gas', W: 'gas', ArrowDown: 'brake', s: 'brake', S: 'brake', ' ': 'brake', e: 'fly', E: 'fly' }
-      const kd = (e: KeyboardEvent) => { const k = keyMap[e.key]; if (k) { inp.current[k] = true; e.preventDefault() } else if (e.key === 'r' || e.key === 'R') resetReq.current = true; else if (e.key === 'c' || e.key === 'C') toggleRef.current(); else if (e.key === 'f' || e.key === 'F') assistToggleRef.current(); else if (e.key === 'h' || e.key === 'H') toggleHide.current(); else if (e.key === 'x' || e.key === 'X') exitRef.current(); else if (e.key === 'n' || e.key === 'N') { spawnArm.current = performance.now() + 2500; spawnRef.current() } else if (e.key >= '1' && e.key <= '9' && performance.now() < spawnArm.current) { spawnArm.current = 0; spawnRef.current(undefined, Number(e.key)) } else if (e.key === 'Shift') runRef.current = true; if (e.key === ' ') inp.current.jump = true }
+      const kd = (e: KeyboardEvent) => { const k = keyMap[e.key]; if (k) { inp.current[k] = true; e.preventDefault() } else if (e.key === 'r' || e.key === 'R') resetReq.current = true; else if (e.key === 'c' || e.key === 'C') toggleRef.current(); else if (e.key === 'f' || e.key === 'F') assistToggleRef.current(); else if (e.key === 'h' || e.key === 'H') toggleHide.current(); else if (e.key === 'x' || e.key === 'X') exitRef.current(); else if (e.key === 'q' || e.key === 'Q') punchReq.current = true; else if (e.key === 'n' || e.key === 'N') { spawnArm.current = performance.now() + 2500; spawnRef.current() } else if (e.key >= '1' && e.key <= '9' && performance.now() < spawnArm.current) { spawnArm.current = 0; spawnRef.current(undefined, Number(e.key)) } else if (e.key === 'Shift') runRef.current = true; if (e.key === ' ') inp.current.jump = true }
       const ku = (e: KeyboardEvent) => { const k = keyMap[e.key]; if (k) { inp.current[k] = false; e.preventDefault() } else if (e.key === 'Shift') runRef.current = false; if (e.key === ' ') inp.current.jump = false }
       window.addEventListener('keydown', kd); window.addEventListener('keyup', ku)
       cleanups.push(() => { window.removeEventListener('keydown', kd); window.removeEventListener('keyup', ku) })
@@ -297,6 +351,9 @@ export default function RaceView({ trackId, custom, laps, me, assistOk = false, 
           r.ro = payload.ro === 'c' ? 'c' : payload.ro === 'b' ? 'b' : undefined
           r.wk = payload.wk === 1
           r.rd = typeof payload.rd === 'string' ? payload.rd : ''
+          { const ex = Number(payload.ex) || 0; if (r.ex !== undefined && ex > r.ex) blastAt(Number(payload.x) || 0, (Number(payload.y) || 0) + 0.8, Number(payload.z) || 0); r.ex = ex }
+          const wcNew = typeof payload.wc === 'string' && /^#[0-9a-f]{6}$/i.test(payload.wc) ? payload.wc : ''
+          if (wcNew !== (r.wc ?? '')) { r.wc = wcNew; if (r.mesh && r.wk) { scene.remove(r.mesh); r.mesh = undefined } }
           if (r.mesh && !!r.mesh.userData.wk !== r.wk) { scene.remove(r.mesh); r.mesh = undefined }
           if (typeof payload.ce === 'string' && chase && !chase.over && chase.id === payload.ce) finishChase(payload.cw === 'police' ? 'police' : 'bandit', false)
           r.hd = payload.hd === 1; r.lv = Number(payload.lv) || 0; r.yy = Number(payload.y) || 0; r.pt = Number(payload.pt) || 0
@@ -307,9 +364,16 @@ export default function RaceView({ trackId, custom, laps, me, assistOk = false, 
             r.kind = payload.k; r.color = String(payload.c || '#94a3b8')
             if (r.mesh) { scene.remove(r.mesh); r.mesh = undefined }
           }
-          if (!r.mesh) { if (r.wk) { r.mesh = rs.makeWalker(r.ro === 'c' ? '#1d4ed8' : r.ro === 'b' ? '#111827' : r.color, undefined, r.name); r.mesh.userData.wk = true } else { r.mesh = rs.makeCar(r.kind, r.color, r.name, false); if (r.ro === 'c') rs.addSiren(r.mesh) } r.mesh.userData.ro = r.ro; r.x = r.tx; r.z = r.tz; r.h = r.th; scene.add(r.mesh) }
+          if (!r.mesh) { if (r.wk) { r.mesh = rs.makeWalker(r.ro === 'c' ? '#1d4ed8' : r.ro === 'b' ? '#111827' : (r.wc || r.color), undefined, r.name); r.mesh.userData.wk = true } else { r.mesh = rs.makeCar(r.kind, r.color, r.name, false); if (r.ro === 'c') rs.addSiren(r.mesh) } r.mesh.userData.ro = r.ro; r.x = r.tx; r.z = r.tz; r.h = r.th; scene.add(r.mesh) }
         })
         ch.on('broadcast', { event: 'ch' }, ({ payload }) => onCh(payload as Record<string, unknown>))
+        ch.on('broadcast', { event: 'pn' }, ({ payload }) => {
+          const p = payload as { to?: unknown; dx?: unknown; dz?: unknown }
+          if (!foot || p.to !== online.userId || ride) return
+          const dx = Math.max(-1, Math.min(1, Number(p.dx) || 0)), dz = Math.max(-1, Math.min(1, Number(p.dz) || 0))
+          foot = { ...foot, vx: foot.vx + dx * 8, vz: foot.vz + dz * 8, hp: Math.max(0, foot.hp - 8), stun: Math.max(foot.stun, 0.45) }
+          lastRegenHit = performance.now(); say('Du wurdest geschlagen!')
+        })
         ch.on('broadcast', { event: 'cl' }, ({ payload }) => onClaim(String((payload as { id?: unknown }).id ?? '')))
         const mine = ch
         mine.subscribe((st) => {
@@ -401,6 +465,7 @@ export default function RaceView({ trackId, custom, laps, me, assistOk = false, 
       const pkId = (p: Parked) => `pk-${online?.userId.slice(0, 6) ?? 'x'}-${p.id}`
       let footMesh: import('three').Group | null = null
       let footKo = 0
+      let lastPunch = 0
       /** Leben der Figur (auch im Auto: Schäden am Auto und Feuer kosten Leben, es gibt dort keine Erholung) */
       let myHp = HP_MAX
       let prevV = 0, prevDmg = 0, burnT = 0, wreck = 0
@@ -415,6 +480,7 @@ export default function RaceView({ trackId, custom, laps, me, assistOk = false, 
           fx.emit('fire', car.x, y0, car.z, Math.cos(a) * s, 3 + Math.random() * 14, Math.sin(a) * s, 0.7 + Math.random() * 0.8)
           if (i % 2 === 0) fx.emit('smoke', car.x, y0, car.z, Math.cos(a) * s * 0.5, 2 + Math.random() * 8, Math.sin(a) * s * 0.5, 1.4 + Math.random())
         }
+        blastAt(car.x, y0, car.z); exN++
         myMesh.visible = false
         say(why)
       }
@@ -451,9 +517,10 @@ export default function RaceView({ trackId, custom, laps, me, assistOk = false, 
         myMesh.visible = false
         footKo = 0
       }
+      remakeFoot.current = () => { if (footMesh) makeFootMesh() }
       const makeFootMesh = () => {
         if (footMesh) scene.remove(footMesh)
-        footMesh = rs.makeWalker(myRole === 'cop' ? '#1d4ed8' : myRole === 'bandit' ? '#111827' : eff.color)
+        footMesh = rs.makeWalker(myRole === 'cop' ? '#1d4ed8' : myRole === 'bandit' ? '#111827' : (wcRef.current || eff.color))
         scene.add(footMesh)
       }
       const leaveRide = (m?: string) => {
@@ -549,7 +616,7 @@ export default function RaceView({ trackId, custom, laps, me, assistOk = false, 
           return
         }
         const m = inp.current
-        w = stepWalker(w, { fwd: m.gas || joyRef.current.y > 0.3, back: (m.brake && !m.jump) || joyRef.current.y < -0.3, left: m.left || joyRef.current.x < -0.3, right: m.right || joyRef.current.x > 0.3, run: m.fly || runRef.current || joyRef.current.y > 0.85, jump: m.jump }, dt)
+        w = stepWalker(w, { fwd: m.gas || joyRef.current.y > 0.3, back: (m.brake && !m.jump) || joyRef.current.y < -0.3, left: m.left, right: m.right, turn: joyTurnCurve(joyRef.current.x) * joyTurnRef.current * 2, run: m.fly || runRef.current || joyRef.current.y > 0.85, jump: m.jump }, dt)
         const hitBy = (cx: number, cz: number, ch: number, cv: number, len: number, wid: number, cy: number) => {
           const r = carHit(w!, { x: cx, z: cz, h: ch, v: cv, len, wid, y: cy })
           if (r) { w = r; lastRegenHit = nowT }
@@ -558,6 +625,23 @@ export default function RaceView({ trackId, custom, laps, me, assistOk = false, 
         for (const pb of pbots) if (!pb.carGone) hitBy(pb.car.x, pb.car.z, pb.car.h, pb.car.v, pb.st.len, pb.st.wid, pb.car.y ?? 0)
         for (const p of parked) hitBy(p.car.x, p.car.z, p.car.h, p.car.v, p.st.len, p.st.wid, p.car.y ?? 0)
         for (const r of remotes.values()) { if (r.wk || r.rd || nowT - r.seen > 2000) continue; const rd = kindDims(r.kind); hitBy(r.x, r.z, r.h, r.v, rd.len, rd.wid, r.yy ?? 0) }
+        if (punchReq.current) {
+          punchReq.current = false
+          if (nowT - lastPunch > 450 && w.stun <= 0) {
+            lastPunch = nowT
+            let tgt: Remote | null = null, bd = 2.6
+            for (const r of remotes.values()) {
+              if (!r.wk || r.rd || nowT - r.seen > 2000 || r.id.endsWith('w') || Math.abs((r.yy ?? 0) - w.y) > 2) continue
+              const dx = r.x - w.x, dz = r.z - w.z, d = Math.hypot(dx, dz)
+              if (d > bd) continue
+              let da = Math.atan2(dx, dz) - w.h; while (da > Math.PI) da -= Math.PI * 2; while (da < -Math.PI) da += Math.PI * 2
+              if (Math.abs(da) < 1.2) { tgt = r; bd = d }
+            }
+            if (tgt && ready) { void ch?.send({ type: 'broadcast', event: 'pn', payload: { to: tgt.id, dx: Math.sin(w.h), dz: Math.cos(w.h) } }).catch(() => undefined); say(`Schlag auf ${tgt.name}!`) }
+            else say('Schlag ins Leere.')
+            w = { ...w, ph: w.ph + 2 }
+          }
+        }
         if (w.hp <= 0) { footKo = 3.2; w = { ...w, stun: 3.2 }; say('Überfahren! Du stehst gleich wieder auf.') }
         else if (w.hp < HP_MAX && w.stun <= 0 && nowT - lastRegenHit > 6000) w = { ...w, hp: Math.min(HP_MAX, w.hp + 2 * dt) }
         foot = w
@@ -773,6 +857,7 @@ export default function RaceView({ trackId, custom, laps, me, assistOk = false, 
         prev = now
         const go = now >= startAt
         const raceMs = Math.max(0, now - startAt)
+        tickBlasts(dt)
 
         if (resetReq.current) {
           resetReq.current = false
@@ -875,7 +960,7 @@ export default function RaceView({ trackId, custom, laps, me, assistOk = false, 
             if (c2) p.car = c2
           }
           for (const r of remotes.values()) {
-            if (r.wk || now - r.seen > 3000 || r.fl > 0 || (r.lv ?? 0) !== (car.lvl ?? 0) || Math.abs((r.yy ?? 0) - (car.y ?? 0)) > 2) continue
+            if (r.wk || r.rd || now - r.seen > 3000 || r.fl > 0 || (r.lv ?? 0) !== (car.lvl ?? 0) || Math.abs((r.yy ?? 0) - (car.y ?? 0)) > 2) continue
             const age = Math.min(0.25, (now - r.seen) / 1000), rd = kindDims(r.kind)
             const sc = now - (hitAt.get(r) ?? -1e9) < 250 ? 0 : 1
             const c1 = crash(car, myStats, { x: r.x + Math.sin(r.h) * r.v * age, z: r.z + Math.cos(r.h) * r.v * age, h: r.h, v: r.v, slip: r.slip }, { len: rd.len + 0.5, wid: rd.wid + 0.4 }, 0.5, DMG_MAX, sc)
@@ -963,7 +1048,7 @@ export default function RaceView({ trackId, custom, laps, me, assistOk = false, 
           r.x += (r.tx + Math.sin(r.th) * r.v * 0.05 - r.x) * k; r.z += (r.tz + Math.cos(r.th) * r.v * 0.05 - r.z) * k
           let dh = r.th - r.h; while (dh > Math.PI) dh -= Math.PI * 2; while (dh < -Math.PI) dh += Math.PI * 2
           r.h += dh * k
-          r.mesh.visible = now - r.seen < (r.ro === 'b' ? 9000 : 5000) && !r.rd
+          r.mesh.visible = now - r.seen < (r.ro === 'b' ? 9000 : 5000) && !r.rd && (!rrRef.current || Math.hypot(r.x - car.x, r.z - car.z) < rrRef.current)
           if (r.ro === 'c' && !r.wk) rs.tickSiren(r.mesh, now)
           for (const ch of r.mesh.children) if ((ch as { isSprite?: boolean }).isSprite) ch.visible = !r.hd || r.ro === 'b'
           if (r.wk) { r.mesh.position.set(r.x, r.yy ?? 0, r.z); r.mesh.rotation.y = r.h; poseWalker(r.mesh, now / 140, r.v, 0, false) } else place(r.mesh, r.x, r.z, r.h, r.v, 0, r.dmg, r.slip, r.fl, r.lv ?? 0, r.yy ?? 0, r.pt ?? 0)
@@ -1079,11 +1164,12 @@ export default function RaceView({ trackId, custom, laps, me, assistOk = false, 
         }
         rs.sun.position.set(car.x + 120, 220, car.z + 80); rs.sun.target.position.set(car.x, 0, car.z); rs.sun.target.updateMatrixWorld()
         fx.update(dt)
+        { const rr = rrRef.current, far = rr ? rr + 60 : 4000; if (camera.far !== far) { camera.far = far; camera.updateProjectionMatrix(); const fg = scene.fog as { near: number; far: number } | null; if (fg) { fg.far = rr ? rr : (isCity ? 2300 : 1100); fg.near = rr ? rr * 0.45 : 200 } renderer.setPixelRatio(rr ? 1 : Math.min(window.devicePixelRatio, 2)); resize() } }
         renderer.render(scene, camera)
 
         if (online && now - lastSend > 55) {
           lastSend = now
-          send({ u: online.userId, x: car.x, z: car.z, h: car.h, v: foot ? foot.sp : car.v, wk: foot ? 1 : 0, rd: ride ?? '', t: car.total, k: eff.kind, c: eff.color, ro: myRole === 'bandit' ? 'b' : myRole === 'cop' ? 'c' : '', f: finishedMs, d: Math.round(car.dmg), sl: Math.round(car.slip * 100) / 100, fl: Math.round(car.fly * 100) / 100, lv: car.lvl ?? 0, y: Math.round((car.y ?? 0) * 10) / 10, pt: Math.round(pitchOf(car) * 100) / 100, n: online.name ?? me.name, hd: hiddenNow ? 1 : 0, ce: endInfo && now < endInfo.until ? endInfo.id : '', cw: endInfo?.win ?? '' })
+          send({ u: online.userId, x: car.x, z: car.z, h: car.h, v: foot ? foot.sp : car.v, wk: foot ? 1 : 0, wc: wcRef.current, ex: exN, rd: ride ?? '', t: car.total, k: eff.kind, c: eff.color, ro: myRole === 'bandit' ? 'b' : myRole === 'cop' ? 'c' : '', f: finishedMs, d: Math.round(car.dmg), sl: Math.round(car.slip * 100) / 100, fl: Math.round(car.fly * 100) / 100, lv: car.lvl ?? 0, y: Math.round((car.y ?? 0) * 10) / 10, pt: Math.round(pitchOf(car) * 100) / 100, n: online.name ?? me.name, hd: hiddenNow ? 1 : 0, ce: endInfo && now < endInfo.until ? endInfo.id : '', cw: endInfo?.win ?? '' })
           if (now - lastPark > 900) { lastPark = now; parked.forEach((p) => send({ u: pkId(p), x: p.car.x, z: p.car.z, h: p.car.h, v: p.car.v, t: 0, k: p.kind, c: p.color, ro: '', f: null, d: Math.round(p.car.dmg), sl: 0, fl: 0, lv: p.car.lvl ?? 0, y: Math.round((p.car.y ?? 0) * 10) / 10, pt: 0, n: 'Geparkt', hd: 0 })) }
           for (const pb of pbots) if (pb.w) send({ u: `${pb.id}w`, x: pb.w.x, z: pb.w.z, h: pb.w.h, v: pb.w.sp, wk: 1, t: 0, k: 'kleinwagen', c: '#1d4ed8', ro: 'c', f: null, d: 0, sl: 0, fl: 0, lv: 0, y: Math.round(pb.w.y * 10) / 10, pt: 0, n: pb.name, hd: 0 })
           for (const pb of pbots) if (!pb.carGone) send({ u: pb.id, x: pb.car.x, z: pb.car.z, h: pb.car.h, v: pb.car.v, t: 0, k: pb.kind, c: pb.color, ro: 'c', f: null, d: 0, sl: Math.round(pb.car.slip * 100) / 100, fl: 0, lv: pb.car.lvl ?? 0, y: Math.round((pb.car.y ?? 0) * 10) / 10, pt: 0, n: pb.name, hd: 0 })
@@ -1256,6 +1342,21 @@ export default function RaceView({ trackId, custom, laps, me, assistOk = false, 
             <div className="flex gap-1" role="group" aria-label="Beschleunigung">
               {[0.25, 0.5, 1, 2, 5, 20].map((m) => <button key={m} type="button" onClick={() => applyAcc(m)} aria-pressed={accMul === m} className={`flex-1 rounded py-1 ${accMul === m ? 'bg-cyan-500 font-bold text-slate-950' : 'bg-white/15'}`}>{m.toLocaleString('de-DE')}</button>)}
             </div>
+            {def.mode === 'city' && (
+              <>
+                <p className="mb-1 mt-2 flex justify-between"><span>Joystick-Drehung</span><b className="tabular-nums">×{joyTurn.toLocaleString('de-DE')}</b></p>
+                <div className="flex gap-1" role="group" aria-label="Joystick-Drehempfindlichkeit">
+                  {[0.2, 0.35, 0.5, 0.75, 1].map((m) => <button key={m} type="button" onClick={() => applyJoyTurn(m)} aria-pressed={joyTurn === m} className={`flex-1 rounded py-1 ${joyTurn === m ? 'bg-cyan-500 font-bold text-slate-950' : 'bg-white/15'}`}>{m.toLocaleString('de-DE')}</button>)}
+                </div>
+                <p className="mb-1 mt-2 flex items-center justify-between"><span>Farbe der Figur</span>
+                  <span className="flex items-center gap-1"><input type="color" aria-label="Figurenfarbe" value={wcUi || '#94a3b8'} onChange={(e) => applyWc(e.target.value)} className="h-6 w-10 rounded" />
+                    <button type="button" onClick={() => applyWc('')} className="rounded bg-white/15 px-2 py-1">Auto</button></span></p>
+                <p className="mb-1 mt-2 flex justify-between"><span>Nur im Umkreis rendern</span><b className="tabular-nums">{rrUi ? `${rrUi} m` : 'aus'}</b></p>
+                <div className="flex gap-1" role="group" aria-label="Render-Umkreis">
+                  {[0, 250, 500, 900].map((m) => <button key={m} type="button" onClick={() => applyRr(m)} aria-pressed={rrUi === m} className={`flex-1 rounded py-1 ${rrUi === m ? 'bg-cyan-500 font-bold text-slate-950' : 'bg-white/15'}`}>{m === 0 ? 'Aus' : m}</button>)}
+                </div>
+              </>
+            )}
           </div>
         )}
         {def.mode === 'city' && (
@@ -1289,6 +1390,7 @@ export default function RaceView({ trackId, custom, laps, me, assistOk = false, 
         {footUi.on ? (
           <>
             <button type="button" aria-label="Rennen" {...hold('fly')} className={`${btn} h-20 w-24 text-base !bg-cyan-600/60`}>RENNEN</button>
+            <button type="button" aria-label="Schlagen" onPointerDown={() => { punchReq.current = true }} className={`${btn} h-20 w-20 text-base !bg-rose-600/65`}>SCHLAG</button>
             <button type="button" aria-label="Springen" {...hold('jump')} className={`${btn} h-28 w-28 text-lg !bg-emerald-600/65`}>SPRINGEN</button>
           </>
         ) : (

@@ -26,12 +26,12 @@ describe('Berge hinter der Stadt', () => {
     }
     expect(outRoads().length).toBeGreaterThanOrEqual(4)
   })
-  it('Mauer: nur das Tor ist offen, Außenbereich hat eigene Grenzen', () => {
+  it('Keine Mauer, Außenbereich hat eigene Grenzen', () => {
     const H = CITY.half
     expect(cityPush(0, H + 1)).toBeNull()
     expect(cityPush(0, H)).toBeNull()
-    expect(cityPush(GATE + 20, H + 0.5)).not.toBeNull()
-    expect(cityPush(-300, H - 1)).not.toBeNull()
+    expect(cityPush(GATE + 20, H + 0.5)).toBeNull()
+    expect(cityPush(-300, H + 1)).toBeNull()
     expect(cityPush(300, H + 100)).toBeNull()
     expect(cityPush(OUT.x1 + 10, H + 100)).not.toBeNull()
     expect(cityPush(0, OUT.z1 + 10)).not.toBeNull()

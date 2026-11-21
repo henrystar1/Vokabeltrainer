@@ -5,7 +5,7 @@ import { RoundedBoxGeometry } from 'three/examples/jsm/geometries/RoundedBoxGeom
 import { roadProximity, type Track } from './track'
 import { BRIDGES, CITY, type Bld, GARAGES, TUNNELS, bridgeH, city, tunnelD } from './city'
 import { PARK, PARK_TOP, PARK_TUNNEL } from './parkhaus'
-import { GATE, MOUNTAINS, OUT, RING, hillH, outRoads, ringPath } from './mountains'
+import { MOUNTAINS, OUT, RING, hillH, outRoads, ringPath } from './mountains'
 import { trees } from './forest'
 import { makeWalkerModel } from './walkerMesh'
 import { makeInteriorViewer } from './interiorMesh'
@@ -898,18 +898,13 @@ function buildCity(THREE: THREE, scene: T.Scene, ground: T.Mesh, night: boolean)
     sign.position.set(x0 + laneW / 2, PARK_TOP + 5, z0 - 0.5); scene.add(sign)
     box(0.5, 5, 0.5, x0 + laneW / 2, PARK_TOP + 2.5, z0 - 0.5, dark)
   }
-  // Stadtgrenze: gestreifte Sperre rundherum, damit man nicht aus Versehen dagegen fährt
+  // Äußere Weltgrenze (Außenbereich): gestreifte Sperre; die Stadtmauer gibt es nicht mehr
   {
     const cv = document.createElement('canvas'); cv.width = 128; cv.height = 32
     const cg = cv.getContext('2d')!
     for (let i = 0; i < 8; i++) { cg.fillStyle = i % 2 ? '#f8fafc' : '#dc2626'; cg.fillRect(i * 16, 0, 16, 32) }
     const bt = new THREE.CanvasTexture(cv); bt.wrapS = THREE.RepeatWrapping; bt.colorSpace = THREE.SRGBColorSpace
-    const H = CITY.half, len = H * 2 + 8
-    // Mauerstücke: Stadt (Süd, West, Ost), Nordmauer mit Tor und die Grenze des Außenbereichs hinter dem Tor
-    const gx = (OUT.x1 + GATE) / 2, gl = OUT.x1 - GATE
     const segs: Array<[number, number, number, number]> = [
-      [0, -H - 1, len, 0], [-H - 1, 0, len, Math.PI / 2], [H + 1, 0, len, Math.PI / 2],
-      [-gx, H, gl, 0], [gx, H, gl, 0],
       [-OUT.x1 - 1, (OUT.z1 - OUT.x1) / 2, OUT.z1 + OUT.x1, Math.PI / 2], [OUT.x1 + 1, (OUT.z1 - OUT.x1) / 2, OUT.z1 + OUT.x1, Math.PI / 2], [0, OUT.z1 + 1, OUT.x1 * 2 + 4, 0], [0, -OUT.x1 - 1, OUT.x1 * 2 + 4, 0],
     ]
     for (const [x, z, ln, ry] of segs) {
@@ -919,9 +914,6 @@ function buildCity(THREE: THREE, scene: T.Scene, ground: T.Mesh, night: boolean)
       const fence = new THREE.Mesh(new THREE.PlaneGeometry(ln, 9), new THREE.MeshBasicMaterial({ color: 0xef4444, transparent: true, opacity: 0.16, side: THREE.DoubleSide, depthWrite: false }))
       fence.position.set(x, 7.5, z); fence.rotation.y = ry; scene.add(fence)
     }
-    // Torpfosten
-    for (const sx of [-GATE - 1, GATE + 1]) { const p = new THREE.Mesh(new THREE.BoxGeometry(2, 9, 2), new THREE.MeshStandardMaterial({ color: 0xf59e0b })); p.position.set(sx, 4.5, H); scene.add(p) }
-    const lintel = new THREE.Mesh(new THREE.BoxGeometry(GATE * 2 + 4, 1.2, 2), new THREE.MeshBasicMaterial({ color: 0xf59e0b })); lintel.position.set(0, 9, H); scene.add(lintel)
   }
 
   // Hinter der Stadt: Wiese, Berge mit Serpentinenstraßen, Hauptstraße vom Tor

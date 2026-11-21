@@ -910,3 +910,15 @@ Tabelle `book_library_hidden`; `in_library` blendet ein veröffentlichtes Buch d
 - Spawn: N öffnet die Auswahl, N dann 1…9 spawnt das n-schnellste eigene Auto (`bestFirst` nach `carKmh`).
 - Verkaufen: SQL `car_sell` (50 % von `car_owned.paid`, Tuning wird gelöscht), Showroom-Knopf mit Bestätigung.
 - Netz: Kanal-Status wird überwacht (CHANNEL_ERROR/TIMED_OUT/CLOSED + Wächter alle 4 s) und neu verbunden; vorher konnte ein toter Empfangskanal weiter per REST senden (einer sieht den anderen, umgekehrt nicht).
+
+
+## Update 138
+- **Keine Stadtmauer mehr**: `cityPush` (city.ts) kennt nur noch Häuser und die Außenwelt-Grenzen; scene.ts zeichnet nur noch die äußeren Streifen. Polizei-Bots (`copDrive`, chase.ts): von draußen zuerst zur Randstraße (`edge`), aus der Stadt hinaus zum nächsten Randknoten (`exitPt`), dann querfeldein. Mauer-Tests (city/foot/mountains/ring) auf „frei“ umgestellt.
+- **Mitfahrer-Ruckeln**: Der Fahrer ignoriert Mitfahrer (`r.rd`) in der Crash-Schleife gegen Remotes.
+- **Joystick**: analoges Drehen (`WalkInput.turn`, Totzone 0,12, Kurve ^1,6) mit Empfindlichkeit ×0,2–1 (Zahnrad-Panel, localStorage `vt-race-joyturn`, Standard 0,5).
+- **Figurenfarbe**: Farbwähler im Panel (`vt-race-wcolor`), per Payload `wc` an andere gesendet. (Minecraft-Skin: Teil B, nur Pro.)
+- **Schlagen**: Taste Q / Knopf SCHLAG; nächste Figur zu Fuß im Umkreis 2,6 m und ±70°, Event `pn` {to,dx,dz}; Empfänger: −8 Leben, Rückstoß, kurz betäubt. Kein Schaden gegen Polizei-Bot-Figuren.
+- **Explosion**: `blastAt/tickBlasts` (Feuerball, Druckwelle, Lichtblitz, 14 Trümmer); Zähler `ex` im Payload, andere sehen die Explosion ebenfalls.
+- **Umkreis rendern** (Panel, aus/250/500/900 m, `vt-race-radius`): Kamera-Far, Nebel, Pixelratio 1, Remotes außerhalb ausgeblendet.
+- **Börsencrash**: SQL 0111 (`admin_stock_crash`, Spalten crash_at/crash_from_cents/crash_ratio, `_stock_tick` erweitert): jede Aktie fällt linear in 5 h auf 0–10 % des Kurses; Button auf der Börse-Seite (nur Admin).
+- Teil B (offen): Shops, Fitnessstudio, Bank-Raub, Minecraft-Skin (Pro).

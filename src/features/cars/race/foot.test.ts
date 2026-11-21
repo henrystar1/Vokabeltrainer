@@ -16,10 +16,10 @@ describe('Zu Fuß', () => {
     const r = stepWalker(newWalker(0, 0, 0), { ...idle, fwd: true, run: true }, 1)
     expect(r.z).toBeCloseTo(RUN, 0)
   })
-  it('geht nicht durch die Stadtmauer und Häuser', () => {
+  it('läuft ohne Stadtmauer aus der Stadt hinaus', () => {
     let w = newWalker(CITY.half - 10, 0, Math.PI / 2)
     for (let i = 0; i < 300; i++) w = stepWalker(w, { ...idle, fwd: true }, 1 / 30)
-    expect(w.x).toBeLessThan(CITY.half + 0.5)
+    expect(w.x).toBeGreaterThan(CITY.half + 5)
   })
   it('Auto überfährt die Figur: Schaden und Rückstoß weg vom Auto, langsames Auto nicht', () => {
     const car = { x: 0, z: 0, h: 0, v: 20, len: 4.4, wid: 1.9 }

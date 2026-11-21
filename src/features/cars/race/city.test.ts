@@ -43,11 +43,11 @@ describe('Stadt', () => {
     expect(car.dmg).toBe(0)
     expect(car.x).toBeGreaterThan(alley!.x0 + 35)
   })
-  it('Stadtmauer hält das Auto in der Stadt', () => {
+  it('Keine Stadtmauer: Auto fährt aus der Stadt hinaus', () => {
     const st = statsFor('sportwagen', 200)
     let car: Car = { ...startCar(t, 0), x: 0, z: 0, h: Math.PI / 2, v: 40 }
     for (let i = 0; i < 30 * 40; i++) car = stepCar(car, { ...none, gas: true }, dt, t, st, true)
-    expect(Math.abs(car.x)).toBeLessThanOrEqual(CITY.half + 0.5)
+    expect(Math.abs(car.x)).toBeGreaterThan(CITY.half + 20)
   })
 })
 

@@ -99,18 +99,8 @@ export function cityPush(x: number, z: number): { nx: number; nz: number; depth:
   if (x < -o.x1) return { nx: 1, nz: 0, depth: -o.x1 - x }
   if (z > o.z1) return { nx: 0, nz: -1, depth: z - o.z1 }
   if (z < -o.x1) return { nx: 0, nz: 1, depth: -o.x1 - z }
-  const m = Math.max(Math.abs(x), Math.abs(z))
-  if (m > H + 2) return null
-  if (m > H - 2) {
-    // Stadtmauer (4 m dick); nur das Nordtor (x = 0) ist offen
-    if (z > 0 && Math.abs(x) <= o.gate && Math.abs(z) >= Math.abs(x)) return null
-    const ax = Math.abs(x) > Math.abs(z)
-    const sg = ax ? Math.sign(x) : Math.sign(z)
-    const out = m >= H
-    const d = out ? H + 2 - m : m - (H - 2)
-    const n = out ? sg : -sg
-    return ax ? { nx: n, nz: 0, depth: d } : { nx: 0, nz: n, depth: d }
-  }
+  // Keine Stadtmauer mehr: aus der Stadt kommt man überall hinaus zur Rennstrecke
+  if (Math.max(Math.abs(x), Math.abs(z)) > H + 2) return null
   const c = city()
   const list = c.grid.get(`${Math.floor(x / CELL)},${Math.floor(z / CELL)}`)
   if (!list) return null

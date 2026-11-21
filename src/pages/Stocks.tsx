@@ -7,7 +7,8 @@ import { useAsync } from '../lib/useAsync'
 import { errorMessage } from '../lib/errors'
 import { useWallet } from '../features/koins/WalletProvider'
 import StockChart from '../features/stocks/StockChart'
-import { stockHistory, stockList, stockTrade, type StockRow } from '../services/stocks'
+import { useAuth } from '../features/auth/AuthProvider'
+import { adminStockCrash, stockHistory, stockList, stockTrade, type StockRow } from '../services/stocks'
 
 const REFRESH_MS = 30_000
 const FEE_PERMILLE_FALLBACK = 10
@@ -20,6 +21,7 @@ const DRIVER_HINT: Record<string, string> = {
 /** Börse: Spiel-Aktien, deren Kurse der Server simuliert; Handel mit Coins. */
 export default function Stocks() {
   const wallet = useWallet()
+  const { isAdmin } = useAuth()
   const list = useAsync(stockList, [])
   const hist = useAsync(stockHistory, [])
   const [tick, setTick] = useState(0)
@@ -56,6 +58,9 @@ export default function Stocks() {
   return (
     <div className="space-y-5">
       <PageHeader eyebrow="Spiel-Aktien: Die Kurse schwanken ständig. Kauf und Verkauf kosten eine kleine Gebühr." title="Börse" />
+      {isAdmin && (
+        <button type="button" onClick={() => { if (confirm('Börsencrash auslösen? Alle Aktien fallen innerhalb von 5 Stunden auf 0 bis 10 % ihres jetzigen Kurses.')) void adminStockCrash().then(() => { setMsg({ ok: true, text: 'Börsencrash gestartet: die Kurse fallen in den nächsten 5 Stunden.' }); void list.reload() }).catch((e) => setMsg({ ok: false, text: errorMessage(e) })) }} className="min-h-[44px] rounded-lg border border-rose-400/50 bg-rose-500/10 px-4 text-sm font-semibold text-rose-300 hover:bg-rose-500/20">Börsencrash auslösen (Admin)</button>
+      )}
       {list.error && <ErrorBox message={list.error} onRetry={list.reload} />}
       {list.loading && !list.data && <Spinner />}
       {rows.length === 0 && list.data && <Notice>Noch keine Aktien eingerichtet.</Notice>}

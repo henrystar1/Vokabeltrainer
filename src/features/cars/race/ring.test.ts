@@ -17,9 +17,9 @@ describe('Rennstrecke um die Stadt', () => {
     }
     expect(outRoads().length).toBeGreaterThan(4)
   })
-  it('Mauer blockiert, Tor und Außenwelt sind frei, Weltgrenze schiebt zurück', () => {
-    expect(cityPush(H + 1, 0)).not.toBeNull()
-    expect(cityPush(0, -H)).not.toBeNull()
+  it('Keine Mauer: Stadtrand und Außenwelt sind frei, Weltgrenze schiebt zurück', () => {
+    expect(cityPush(H + 1, 0)).toBeNull()
+    expect(cityPush(0, -H)).toBeNull()
     expect(cityPush(0, H)).toBeNull()
     expect(cityPush(H + 40, 0)).toBeNull()
     expect(cityPush(0, -H - 80)).toBeNull()
