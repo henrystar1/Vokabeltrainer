@@ -40,3 +40,12 @@ export interface RaceRewardResult { coins: number; koins: number | null; capped:
 /** Coins für die Polizeijagd: mit Menschen mehr als nur mit Bots, Sieger mehr als Verlierer (Server rechnet und deckelt). */
 export const raceChaseReward = (humans: number, bots: number, win: boolean, secs: number) => rpc<RaceRewardResult>('race_chase_reward', { p_humans: humans, p_bots: bots, p_win: win, p_secs: secs })
 export const raceReward = (place: number, field: number, ms: number, online: boolean) => rpc<RaceRewardResult>('race_reward', { p_place: place, p_field: field, p_ms: ms, p_online: online })
+
+/** Shop/Fitnessstudio-Belohnungen (Update 139) */
+export interface RacePerks { spawn_max: number; spawn_sec: number; hearts: number; shop: number; gym: number }
+export const racePerkInfo = () => rpc<RacePerks>('race_perk_info')
+export const racePerkAnswer = (kind: 'shop' | 'gym') => rpc<RacePerks>('race_perk_answer', { p_kind: kind })
+/** Bank: Sekunden bis zum nächsten möglichen Raub, Raub starten/mitmachen, Beute (1000 Coins, geteilt) abholen */
+export const raceBankStatus = () => rpc<number>('race_bank_status')
+export const raceBankClaim = () => rpc<number>('race_bank_claim')
+export const raceBankPay = () => rpc<{ coins: number; koins: number | null }>('race_bank_pay')

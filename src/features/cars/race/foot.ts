@@ -35,9 +35,11 @@ export const setFootSpeeds = (walk?: number | null, run?: number | null): void =
 }
 export const JUMP_V = 7.4
 export const HP_MAX = 100
+/** Maximale Leben der eigenen Figur (Fitnessstudio erhöht sie bis 200) */
+export const hpCfg = { max: HP_MAX }
 export const WALK_R = 0.45
 
-export const newWalker = (x: number, z: number, h: number, y?: number): Walker => ({ x, z, h, y: y ?? hillH(x, z), vy: 0, vx: 0, vz: 0, hp: HP_MAX, stun: 0, inv: 0, ph: 0, sp: 0 })
+export const newWalker = (x: number, z: number, h: number, y?: number): Walker => ({ x, z, h, y: y ?? hillH(x, z), vy: 0, vx: 0, vz: 0, hp: hpCfg.max, stun: 0, inv: 0, ph: 0, sp: 0 })
 
 /** Boden unter der Figur: Gelände oder Parkhaus-Ebene, die höchstens 0,6 m über den Füßen liegt. */
 export function groundAt(x: number, z: number, y: number, lvl = 0): number {
@@ -143,7 +145,7 @@ export function carHit(w: Walker, c: HitCar): Walker | null {
 }
 
 /** Aussteigen während der Fahrt: Schwung des Autos geht auf die Figur über, bei hohem Tempo gibt es Schaden. Der Ausstiegsort muss auf der Höhe des Autos liegen (Parkhaus!). */
-export function exitFromCar(c: { x: number; z: number; h: number; v: number; wid: number; y?: number; lvl?: number }, side = 1, hp = HP_MAX): Walker {
+export function exitFromCar(c: { x: number; z: number; h: number; v: number; wid: number; y?: number; lvl?: number }, side = 1, hp = hpCfg.max): Walker {
   const lvl = c.lvl ?? 0
   const cy = lvl === -1 ? -tunnelD(c.x, c.z) : lvl === 1 ? bridgeH(c.x, c.z) : (c.y ?? 0)
   const rx = Math.cos(c.h), rz = -Math.sin(c.h)

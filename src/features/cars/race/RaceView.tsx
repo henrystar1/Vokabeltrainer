@@ -59,9 +59,13 @@ interface Props {
 interface Remote { id: string; name: string; kind: string; color: string; x: number; z: number; h: number; v: number; tx: number; tz: number; th: number; total: number; ft: number | null; seen: number; dmg: number; slip: number; fl: number; lv?: number; yy?: number; pt?: number; hd?: boolean; wk?: boolean; wc?: string; ex?: number; rd?: string; ro?: 'b' | 'c'; mesh?: import('three').Group }
 
 import { buildingAt, walkNav, FLOOR_H } from './interior'
-import { HP_MAX, carHit, exitFromCar, nearestCar, newWalker, stepWalker, type Walker } from './foot'
+import { HP_MAX, hpCfg, carHit, exitFromCar, nearestCar, newWalker, stepWalker, type Walker } from './foot'
 import { poseWalker } from './walkerMesh'
+import { POI_COLOR, POI_LETTER, poiNear, pois, type PoiKind } from './poi'
+import VocabShop from './VocabShop'
+import { racePerkInfo, raceBankClaim, raceBankPay, raceBankStatus, type RacePerks } from '../../../services/cars'
 import { cityPush } from './city'
+import { errorMessage } from '../../../lib/errors'
 import { hillH as hillHeight } from './mountains'
 
 const COUNT_MS = 4500
@@ -145,6 +149,21 @@ export default function RaceView({ trackId, custom, laps, me, assistOk = false, 
   const spawnRef = useRef<(o?: RaceCarOption, nth?: number) => void>(() => undefined)
   const spawnArm = useRef(0)
   const punchReq = useRef(false)
+  const [perksUi, setPerksUi] = useState<RacePerks>({ spawn_max: 2, spawn_sec: 0, hearts: 100, shop: 0, gym: 0 })
+  /** Spawn-Limit (2, oder 5 nach Lernen im Shop) und Ablaufzeit */
+  const perkRef = useRef({ until: 0, hearts: 100 })
+  const applyPerks = (p: RacePerks) => { perkRef.current = { until: p.spawn_sec > 0 ? Date.now() + p.spawn_sec * 1000 : 0, hearts: p.hearts }; hpCfg.max = p.hearts; setPerksUi(p) }
+  const [shopUi, setShopUi] = useState<'shop' | 'gym' | null>(null)
+  const [poiUi, setPoiUi] = useState<{ kind: PoiKind; name: string } | null>(null)
+  const [bankWait, setBankWait] = useState(0)
+  const heistRef = useRef<() => void>(() => undefined)
+  const poiKey = useRef<() => void>(() => undefined)
+  useEffect(() => {
+    if (def.mode !== 'city' || !online) return
+    racePerkInfo().then(applyPerks).catch(() => undefined)
+    return () => { hpCfg.max = 100 }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
   const joyRef = useRef({ x: 0, y: 0 })
   const lsGet = (k: string, d: string) => { try { return localStorage.getItem(k) ?? d } catch { return d } }
   const lsSet = (k: string, v: string) => { try { localStorage.setItem(k, v) } catch { /* ignorieren */ } }
@@ -324,7 +343,7 @@ export default function RaceView({ trackId, custom, laps, me, assistOk = false, 
 
       // Tastatur
       const keyMap: Record<string, Key> = { ArrowLeft: 'left', a: 'left', A: 'left', ArrowRight: 'right', d: 'right', D: 'right', ArrowUp: 'gas', w: 'gas', W: 'gas', ArrowDown: 'brake', s: 'brake', S: 'brake', ' ': 'brake', e: 'fly', E: 'fly' }
-      const kd = (e: KeyboardEvent) => { const k = keyMap[e.key]; if (k) { inp.current[k] = true; e.preventDefault() } else if (e.key === 'r' || e.key === 'R') resetReq.current = true; else if (e.key === 'c' || e.key === 'C') toggleRef.current(); else if (e.key === 'f' || e.key === 'F') assistToggleRef.current(); else if (e.key === 'h' || e.key === 'H') toggleHide.current(); else if (e.key === 'x' || e.key === 'X') exitRef.current(); else if (e.key === 'q' || e.key === 'Q') punchReq.current = true; else if (e.key === 'n' || e.key === 'N') { spawnArm.current = performance.now() + 2500; spawnRef.current() } else if (e.key >= '1' && e.key <= '9' && performance.now() < spawnArm.current) { spawnArm.current = 0; spawnRef.current(undefined, Number(e.key)) } else if (e.key === 'Shift') runRef.current = true; if (e.key === ' ') inp.current.jump = true }
+      const kd = (e: KeyboardEvent) => { if ((e.target as HTMLElement | null)?.tagName === 'INPUT') return; if (e.key === 'g' || e.key === 'G') { poiKey.current(); return } const k = keyMap[e.key]; if (k) { inp.current[k] = true; e.preventDefault() } else if (e.key === 'r' || e.key === 'R') resetReq.current = true; else if (e.key === 'c' || e.key === 'C') toggleRef.current(); else if (e.key === 'f' || e.key === 'F') assistToggleRef.current(); else if (e.key === 'h' || e.key === 'H') toggleHide.current(); else if (e.key === 'x' || e.key === 'X') exitRef.current(); else if (e.key === 'q' || e.key === 'Q') punchReq.current = true; else if (e.key === 'n' || e.key === 'N') { spawnArm.current = performance.now() + 2500; spawnRef.current() } else if (e.key >= '1' && e.key <= '9' && performance.now() < spawnArm.current) { spawnArm.current = 0; spawnRef.current(undefined, Number(e.key)) } else if (e.key === 'Shift') runRef.current = true; if (e.key === ' ') inp.current.jump = true }
       const ku = (e: KeyboardEvent) => { const k = keyMap[e.key]; if (k) { inp.current[k] = false; e.preventDefault() } else if (e.key === 'Shift') runRef.current = false; if (e.key === ' ') inp.current.jump = false }
       window.addEventListener('keydown', kd); window.addEventListener('keyup', ku)
       cleanups.push(() => { window.removeEventListener('keydown', kd); window.removeEventListener('keyup', ku) })
@@ -413,7 +432,7 @@ export default function RaceView({ trackId, custom, laps, me, assistOk = false, 
       interface PBot { id: string; name: string; kind: string; color: string; car: Car; st: CarStats; mem: BotMem; mesh: import('three').Group; w?: Walker; wm?: import('three').Group; carGone?: boolean }
       let pbots: PBot[] = []
       let endInfo: { id: string; win: 'police' | 'bandit'; until: number } | null = null
-      let chase: { id: string; bandits: string[]; got: Set<string>; cops: string[]; bots: number; t0: number; from: string; over: boolean } | null = null
+      let chase: { id: string; bandits: string[]; got: Set<string>; cops: string[]; bots: number; t0: number; from: string; over: boolean; heist?: boolean } | null = null
       let iCaught = false
       let lobbyCur: { id: string; bandits: string[]; invitees: string[]; invited: Record<string, 'wait' | 'yes' | 'no'>; bots: number } | null = null
       let incoming: { id: string; from: string; fn: string; role: 'bandit' | 'cop'; bots: number } | null = null
@@ -432,10 +451,20 @@ export default function RaceView({ trackId, custom, laps, me, assistOk = false, 
         car = { ...car, fly: 0, cool: 0 }
         setChaseKind(role ? eff.kind : null)
       }
-      const startChase = (id: string, bandits: string[], cops: string[], bots: number, from: string, role: Role) => {
+      const startChase = (id: string, bandits: string[], cops: string[], bots: number, from: string, role: Role, heist = false) => {
         if (!online || chase) return
         iCaught = false
-        chase = { id, bandits, got: new Set<string>(), cops, bots, t0: performance.now(), from, over: false }
+        chase = { id, bandits, got: new Set<string>(), cops, bots, t0: performance.now(), from, over: false, heist }
+        // Zu Fuß (Bankraub): direkt ins Fluchtauto vor der Tür
+        if (foot) {
+          const f0 = foot
+          let sx = f0.x, sz = f0.z
+          for (const [dx, dz] of [[6, 0], [-6, 0], [0, 6], [0, -6], [9, 0], [-9, 0], [0, 9], [0, -9]] as const) { if (!cityPush(f0.x + dx, f0.z + dz) && !buildingAt(f0.x + dx, f0.z + dz)) { sx = f0.x + dx; sz = f0.z + dz; break } }
+          car = { ...startCar(track, 0), x: sx, z: sz, h: f0.h, v: 0, lvl: f0.lvl ?? 0, y: f0.y }
+          foot = null
+          if (footMesh) { scene.remove(footMesh); footMesh = null }
+          myMesh.visible = true
+        }
         applyRole(role)
         if (from === online.userId) {
           pbots = Array.from({ length: Math.min(6, bots) }, (_, i) => {
@@ -453,8 +482,19 @@ export default function RaceView({ trackId, custom, laps, me, assistOk = false, 
       const dropBotRemotes = () => { for (const r of [...remotes.values()]) if (r.id.startsWith('pb-')) { if (r.mesh) scene.remove(r.mesh); remotes.delete(r.id) } }
       const syncActive = () => { const c = chase; if (c) setChaseUi((o) => (o.active ? { ...o, active: { ...o.active, got: c.got.size, caught: iCaught } } : o)) }
 
+      // Besondere Häuser: Leuchtsäule und Schild über der Tür
+      const poiMeshes: Array<import('three').Object3D> = []
+      if (isCity) for (const p of pois()) {
+        const col = new THREE.Color(POI_COLOR[p.kind])
+        const beam = new THREE.Mesh(new THREE.CylinderGeometry(0.5, 0.5, 40, 8), new THREE.MeshBasicMaterial({ color: col, transparent: true, opacity: 0.35, depthWrite: false }))
+        beam.position.set(p.x, 20, p.z)
+        const sign = new THREE.Mesh(new THREE.BoxGeometry(5, 1.4, 0.3), new THREE.MeshBasicMaterial({ color: col }))
+        sign.position.set(p.x, 4.6, p.z)
+        rs.scene.add(beam, sign); poiMeshes.push(beam, sign)
+      }
+      cleanups.push(() => { for (const m of poiMeshes) rs.scene.remove(m) })
       // ── Zu Fuß (Stadt): aussteigen, in andere Autos einsteigen, Autos spawnen; Autos rollen aus ──
-      interface Parked { id: string; car: Car; kind: string; color: string; st: CarStats; top: number | null | undefined; up: typeof me.up; siren: boolean; mesh: import('three').Group }
+      interface Parked { id: string; car: Car; kind: string; color: string; st: CarStats; top: number | null | undefined; up: typeof me.up; siren: boolean; sp?: boolean; mesh: import('three').Group }
       let parked: Parked[] = []
       let parkN = 0
       let foot: Walker | null = null
@@ -466,8 +506,9 @@ export default function RaceView({ trackId, custom, laps, me, assistOk = false, 
       let footMesh: import('three').Group | null = null
       let footKo = 0
       let lastPunch = 0
+      let lastBankPoll = 0
       /** Leben der Figur (auch im Auto: Schäden am Auto und Feuer kosten Leben, es gibt dort keine Erholung) */
-      let myHp = HP_MAX
+      let myHp = hpCfg.max
       let prevV = 0, prevDmg = 0, burnT = 0, wreck = 0
       let footMsg = '', footMsgT = 0
       let lastSpawn = 0, lastRegenHit = 0, lastPark = 0
@@ -577,13 +618,15 @@ export default function RaceView({ trackId, custom, laps, me, assistOk = false, 
         myMesh.visible = true
       }
       const respawnAfterDeath = () => {
-        car = startCar(track, 0); myHp = HP_MAX; prevV = 0; prevDmg = 0; burnT = 0; myMesh.visible = true
+        car = startCar(track, 0); myHp = hpCfg.max; prevV = 0; prevDmg = 0; burnT = 0; myMesh.visible = true
         say('Dein Auto ist explodiert – du bekommst ein neues.')
       }
       const spawnCar = (o?: RaceCarOption) => {
         if (!isCity) return
         const nowT = performance.now()
         if (nowT - lastSpawn < 1200) return
+        const cap = Date.now() < perkRef.current.until ? 5 : 2
+        if (parked.filter((q) => q.sp).length >= cap) { say(`Spawn-Limit erreicht (${cap}). Lerne Vokabeln in einem Shop (S auf der Karte) für bis zu 5.`); return }
         const src = foot ?? car
         const h = foot ? foot.h : car.h
         for (const [d, sd] of [[5, 0], [5, 3.5], [5, -3.5], [8, 0], [-5, 0]] as const) {
@@ -591,7 +634,7 @@ export default function RaceView({ trackId, custom, laps, me, assistOk = false, 
           if (cityPush(x, z) || cityPush(x + 2, z) || cityPush(x - 2, z) || cityPush(x, z + 2) || cityPush(x, z - 2)) continue
           lastSpawn = nowT
           const k = o?.kind ?? me.kind, col = o?.color ?? me.color, tp = o ? o.top : userTop, up = o ? o.up : me.up, st = statsFor(k, tp, up)
-          mkParked({ ...startCar(track, 0), x, z, h, v: 0, lvl: 0, y: foot ? foot.y : (car.y ?? hillHeight(x, z)) }, k, col, st, tp, up, false)
+          mkParked({ ...startCar(track, 0), x, z, h, v: 0, lvl: 0, y: foot ? foot.y : (car.y ?? hillHeight(x, z)) }, k, col, st, tp, up, false).sp = true
           return
         }
         say('Hier ist kein Platz zum Spawnen.')
@@ -643,7 +686,7 @@ export default function RaceView({ trackId, custom, laps, me, assistOk = false, 
           }
         }
         if (w.hp <= 0) { footKo = 3.2; w = { ...w, stun: 3.2 }; say('Überfahren! Du stehst gleich wieder auf.') }
-        else if (w.hp < HP_MAX && w.stun <= 0 && nowT - lastRegenHit > 6000) w = { ...w, hp: Math.min(HP_MAX, w.hp + 2 * dt) }
+        else if (w.hp < hpCfg.max && w.stun <= 0 && nowT - lastRegenHit > 6000) w = { ...w, hp: Math.min(hpCfg.max, w.hp + 2 * dt) }
         foot = w
       }
       /** Geparkte/ausrollende Autos weiterrollen lassen */
@@ -669,13 +712,16 @@ export default function RaceView({ trackId, custom, laps, me, assistOk = false, 
         if (announce) { const eid = chase.id; for (const dl of [0, 500, 1200, 2500]) window.setTimeout(() => { if (!dead) sendCh({ t: 'end', id: eid, win }) }, dl) }
         const mine = (myRole === 'cop') === (win === 'police')
         const humansOther = chase.cops.length, botsN = chase.bots, secs = Math.round((performance.now() - chase.t0) / 1000)
+        const heist = !!chase.heist, heistWin = heist && win === 'bandit' && myRole === 'bandit' && !iCaught
         for (const b of pbots) { scene.remove(b.mesh); if (b.wm) scene.remove(b.wm) }
         pbots = []
         dropBotRemotes()
         applyRole(null)
         chase = null
         setChaseUi({ over: { win, mine } })
-        void raceChaseReward(humansOther, botsN, mine, secs).then((r) => { if (dead) return; setChaseUi((o) => (o.over ? { ...o, over: { ...o.over, coins: r.coins, capped: r.capped } } : o)); if (r.koins !== null) walletRef.current?.setBalance(r.koins) }).catch(() => undefined)
+        if (heist) {
+          if (heistWin) void raceBankPay().then((r) => { if (dead) return; setChaseUi((o) => (o.over ? { ...o, over: { ...o.over, coins: r.coins } } : o)); if (r.koins !== null) walletRef.current?.setBalance(r.koins) }).catch(() => undefined)
+        } else void raceChaseReward(humansOther, botsN, mine, secs).then((r) => { if (dead) return; setChaseUi((o) => (o.over ? { ...o, over: { ...o.over, coins: r.coins, capped: r.capped } } : o)); if (r.koins !== null) walletRef.current?.setBalance(r.koins) }).catch(() => undefined)
         window.setTimeout(() => { if (!dead) setChaseUi((o) => (o.over ? {} : o)) }, 6000)
       }
       onCh = (p) => {
@@ -695,7 +741,7 @@ export default function RaceView({ trackId, custom, laps, me, assistOk = false, 
         } else if (p.t === 'go') {
           const cops = Array.isArray(p.cops) ? (p.cops as string[]) : []
           const bl = Array.isArray(p.bandits) ? (p.bandits as string[]) : typeof p.bandit === 'string' ? [p.bandit] : []
-          if (bl.includes(online.userId)) startChase(id, bl, cops, Number(p.bots) || 0, String(p.from), 'bandit')
+          if (bl.includes(online.userId)) { if (p.hz === 1) void raceBankClaim().catch(() => undefined); startChase(id, bl, cops, Number(p.bots) || 0, String(p.from), 'bandit', p.hz === 1) }
           else if (cops.includes(online.userId)) startChase(id, bl, cops, Number(p.bots) || 0, String(p.from), 'cop')
         } else if (p.t === 'cau') {
           if (chase && chase.id === id && typeof p.u === 'string') markCaught(p.u, false)
@@ -703,6 +749,28 @@ export default function RaceView({ trackId, custom, laps, me, assistOk = false, 
           dropBotRemotes()
           if (chase && chase.id === id) finishChase(p.win === 'police' ? 'police' : 'bandit', false)
         }
+      }
+      heistRef.current = () => {
+        const f = foot as Walker | null
+        if (!f || chase) return
+        if (!online) { say('Die Bank kann nur im Online-Spiel ausgeraubt werden.'); return }
+        const p = poiNear(f.x, f.z, f.y)
+        if (!p || p.kind !== 'bank') return
+        void raceBankClaim().then(() => {
+          if (dead || chase) return
+          const mates = [...remotes.values()].filter((r) => r.wk && !r.rd && !r.ro && !r.id.startsWith('pb-') && !r.id.endsWith('w') && fresh(r) && Math.hypot(r.x - p.x, r.z - p.z) < 11).slice(0, 3).map((r) => r.id)
+          const id = `bank-${online.userId}-${Date.now()}`
+          const bandits = [online.userId, ...mates]
+          const msg = { t: 'go', id, bandits, cops: [] as string[], bots: 6, from: online.userId, hz: 1 }
+          for (const dl of [0, 600, 1500]) window.setTimeout(() => { if (!dead) sendCh(msg) }, dl)
+          startChase(id, bandits, [], 6, online.userId, 'bandit', true)
+        }).catch((e) => say(errorMessage(e)))
+      }
+      poiKey.current = () => {
+        const f = foot as Walker | null
+        const p = f ? poiNear(f.x, f.z, f.y) : null
+        if (!p) return
+        if (p.kind === 'bank') heistRef.current(); else setShopUi(p.kind)
       }
       chaseApi.current = {
         invite: (ids, banditSel, bots) => {
@@ -822,6 +890,14 @@ export default function RaceView({ trackId, custom, laps, me, assistOk = false, 
           let rr = r
           if (dl > rad - 4) { px = cx + (dx / dl) * (rad - 4); py = cx + (dy / dl) * (rad - 4); rr = Math.max(2, r * 0.6) }
           g.fillStyle = '#000'; g.beginPath(); g.arc(px, py, rr + 1.2, 0, 7); g.fill(); g.fillStyle = col; g.beginPath(); g.arc(px, py, rr, 0, 7); g.fill()
+        }
+        for (const p of pois()) {
+          let px = sx(p.x, p.z), py = sy(p.x, p.z)
+          const dx = px - cx, dy = py - cx, dl = Math.hypot(dx, dy)
+          if (dl > rad - 8) { px = cx + (dx / dl) * (rad - 8); py = cx + (dy / dl) * (rad - 8) }
+          g.fillStyle = '#000'; g.beginPath(); g.arc(px, py, 8, 0, 7); g.fill()
+          g.fillStyle = POI_COLOR[p.kind]; g.beginPath(); g.arc(px, py, 6.5, 0, 7); g.fill()
+          g.fillStyle = '#0f172a'; g.font = 'bold 9px sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText(POI_LETTER[p.kind], px, py + 0.5)
         }
         const nowT = performance.now()
         for (const b of botList) dot(b.car.x, b.car.z, b.color, 3)
@@ -1194,6 +1270,9 @@ export default function RaceView({ trackId, custom, laps, me, assistOk = false, 
             const seat = f ? '' : `${ride ? occupants(ride) : occupants(online?.userId ?? '')}/${seatConfig.n}`
             const msg = performance.now() < footMsgT ? footMsg : ''
             const hp = Math.round(f ? f.hp : Math.max(0, myHp))
+            const pn = f && footKo <= 0 ? poiNear(f.x, f.z, f.y) : null
+            setPoiUi((o) => (o?.name === pn?.name ? o : pn ? { kind: pn.kind, name: pn.name } : null))
+            if (pn?.kind === 'bank' && now - lastBankPoll > 4000) { lastBankPoll = now; void raceBankStatus().then((w) => { if (!dead) setBankWait(w) }).catch(() => undefined) }
             setFootUi((o) => (o.on === !!f && o.hp === hp && o.near === near && o.ko === footKo > 0 && o.n === parked.length && o.msg === msg && o.seat === seat && o.ride === !!ride ? o : { on: !!f, hp, near, ko: footKo > 0, n: parked.length, msg, seat, ride: !!ride }))
           }
           drawMini()
@@ -1305,13 +1384,19 @@ export default function RaceView({ trackId, custom, laps, me, assistOk = false, 
           {hud.curve < 0 ? '◀◀ Linkskurve' : 'Rechtskurve ▶▶'} · {hud.curveDist} m
         </div>
       )}
-      {(footUi.on || footUi.hp < HP_MAX) && (
+      {(footUi.on || footUi.hp < perksUi.hearts) && (
         <div className="pointer-events-none absolute bottom-40 left-1/2 w-56 -translate-x-1/2 text-center text-xs text-white">
-          <div className="h-3 overflow-hidden rounded-full bg-black/55"><div className={`h-full ${footUi.hp > 50 ? 'bg-emerald-500' : footUi.hp > 25 ? 'bg-amber-400' : 'bg-rose-500'}`} style={{ width: `${footUi.hp}%` }} /></div>
+          <div className="h-3 overflow-hidden rounded-full bg-black/55"><div className={`h-full ${footUi.hp > perksUi.hearts / 2 ? 'bg-emerald-500' : footUi.hp > perksUi.hearts / 4 ? 'bg-amber-400' : 'bg-rose-500'}`} style={{ width: `${Math.min(100, (footUi.hp / perksUi.hearts) * 100)}%` }} /></div>
           <p className="mt-0.5 [text-shadow:0_1px_4px_#000]">❤ {footUi.hp}{footUi.on ? ' · Laufen: WASD · Rennen: Shift · Springen: Leertaste · Einsteigen: X' : ''}</p>
         </div>
       )}
       {def.mode === 'city' && !footUi.on && footUi.seat && <div className="pointer-events-none absolute left-1/2 top-12 -translate-x-1/2 rounded-full bg-black/55 px-3 py-0.5 text-xs font-bold text-white" role="status">{footUi.ride ? 'Mitfahrer' : 'Fahrer'} · 👥 {footUi.seat}</div>}
+      {poiUi && footUi.on && !shopUi && (
+        <button type="button" onClick={() => poiKey.current()} disabled={poiUi.kind === 'bank' && bankWait > 0} className="absolute bottom-52 left-1/2 z-20 min-h-[48px] -translate-x-1/2 rounded-xl border border-white/40 px-4 text-sm font-bold text-slate-950 disabled:opacity-60" style={{ background: POI_COLOR[poiUi.kind] }}>
+          {poiUi.kind === 'bank' ? (bankWait > 0 ? `Bank ruht noch ${Math.ceil(bankWait / 60)} Min` : 'AUSRAUBEN (G) – 6 Min Polizeijagd') : poiUi.kind === 'shop' ? 'Shop betreten (G): Vokabeln lernen' : 'Fitnessstudio (G): Vokabeln lernen'}
+        </button>
+      )}
+      {shopUi && <VocabShop kind={shopUi} perks={perksUi} onPerks={applyPerks} onClose={() => setShopUi(null)} />}
       {pick && (
         <div className="absolute left-3 top-16 z-20 max-h-64 w-52 overflow-auto rounded-xl bg-slate-900/95 p-2 text-sm text-white" role="menu" aria-label="Auto zum Spawnen wählen">
           <p className="px-1 pb-1 text-xs text-slate-300">Welches Auto spawnen? (Schnellstes = 1, auch N dann Ziffer)</p>

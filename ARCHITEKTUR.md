@@ -922,3 +922,11 @@ Tabelle `book_library_hidden`; `in_library` blendet ein veröffentlichtes Buch d
 - **Umkreis rendern** (Panel, aus/250/500/900 m, `vt-race-radius`): Kamera-Far, Nebel, Pixelratio 1, Remotes außerhalb ausgeblendet.
 - **Börsencrash**: SQL 0111 (`admin_stock_crash`, Spalten crash_at/crash_from_cents/crash_ratio, `_stock_tick` erweitert): jede Aktie fällt linear in 5 h auf 0–10 % des Kurses; Button auf der Börse-Seite (nur Admin).
 - Teil B (offen): Shops, Fitnessstudio, Bank-Raub, Minecraft-Skin (Pro).
+
+
+## Update 139 (Teil B)
+- **Besondere Häuser** (`race/poi.ts`): feste Auswahl aus den Stadthäusern: 1 Bank (gelb, B), 4 Shops (cyan, S), 2 Fitnessstudios (pink, F). Leuchtsäule + Schild an der Tür, Markierung auf der Karte (am Rand, wenn weit weg). Benutzen: zu Fuß innerhalb 7 m der Tür, Knopf oder Taste G.
+- **Vokabel-Abfrage** (`race/VocabShop.tsx`): Fragen aus dem eigenen Lernpool (`getLearningPool`), Antwort prüft `isAnswerCorrect`, jede richtige zählt der Server (`race_perk_answer`, mind. 1,5 s Abstand). Shop: 10 richtige = 30 Min Spawn-Limit 5 statt 2 (zählt nur gespawnte Autos, `Parked.sp`). Fitness: 10 richtige = +10 Leben, höchstens +100 (`hpCfg.max` in foot.ts, HP-Balken relativ). Das Vokabelwissen (Stufen) wird dabei nicht verändert.
+- **Bank**: Knopf AUSRAUBEN → `race_bank_claim` (Server, global), dann normale Polizeijagd mit 6 Bots (`startChase(..., heist=true)`, Event `go` mit `hz:1`). Wer zu Fuß in 11 m um die Bank steht, wird automatisch Mit-Räuber (bis 4, Server: Beitritt 40 s lang). Überlebt man die 6 Minuten ungefangen: `race_bank_pay` (1000 Coins, durch Räuber geteilt, erst nach 350 s). Danach 16 Min gesperrt (6 Jagd + 10 Ruhe); Status `race_bank_status` wird an der Bank alle 4 s abgefragt.
+- **Eingabefelder**: Tastatur-Steuerung ignoriert Eingaben in `<input>`.
+- SQL 0112 (race_perks, race_bank, 5 RPCs). Offen: Minecraft-Skin-Import (nur Pro).
