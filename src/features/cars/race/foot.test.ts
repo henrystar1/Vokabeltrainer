@@ -77,7 +77,7 @@ describe('Zu Fuß: Springen, Wände, Parkhaus, Tempo', () => {
   })
   it('Tempo einstellbar', () => {
     setFootSpeeds(9, 20)
-    try { expect(footConfig).toEqual({ walk: 9, run: 20 }) } finally { setFootSpeeds(null, null) }
+    try { expect(footConfig).toMatchObject({ walk: 9, run: 20 }) } finally { setFootSpeeds(null, null) }
     expect(footConfig.walk).toBe(4.4)
   })
   it('Aussteigen im Parkhaus: Figur bleibt auf der Höhe des Autos (nicht im Schacht)', () => {

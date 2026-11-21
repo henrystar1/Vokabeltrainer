@@ -5,6 +5,8 @@ export const FLOOR_H = 3.6
 const T_OUT = 0.5, T_IN = 0.3, DOOR_W = 3.0, GAP_W = 2.4, STAIR_W = 2.4
 
 export interface Rect { x0: number; x1: number; z0: number; z1: number }
+/** Einrichtung (Tresen, Geräte, Betten …): feste Quader, die den Weg versperren (bis Höhe y0 + h) und im Innenraum gezeichnet werden */
+export interface Solid extends Rect { h: number; color: number; y0?: number; /** nur Anzeige, keine Kollision */ deco?: boolean }
 export interface Flight { k: number; /** Spur (Welt) */ lane: Rect; /** Steigung entlang z (+1) oder −z (−1) */ dir: 1 | -1; lo: number; hi: number }
 export interface Layout {
   b: Bld
@@ -18,6 +20,7 @@ export interface Layout {
   /** Türlücken zwischen Zimmerzellen (Weltkoordinaten) und Zellenraster für die Wegfindung */
   gaps: Array<{ a: number; b: number; x: number; z: number }>
   nx: number; nz: number
+  solids: Solid[]
   cellOf: (x: number, z: number) => number
 }
 
@@ -42,6 +45,15 @@ export function doorSide(b: Bld): 0 | 1 | 2 | 3 {
 }
 
 const cache = new WeakMap<Bld, Layout>()
+const specials = new WeakMap<Bld, Solid[]>()
+/** Haus als Halle mit Einrichtung (Bank, Shop, Fitnessstudio, Krankenhaus): ein großer Raum, ein Geschoss, keine Treppen. */
+export function setSpecial(b: Bld, solids: Solid[]): void { specials.set(b, solids); cache.delete(b) }
+/** Kanonische Hausmaße (Tür im Süden bei Querposition −w/2+10): Breite cw, Tiefe cd und Umrechnung (u quer, v Tiefe) → Welt */
+export function canon(b: Bld): { cw: number; cd: number; toW: (u: number, v: number) => { x: number; z: number } } {
+  const rot = doorSide(b), swap = rot % 2 === 1
+  const cw = swap ? b.d : b.w, cd = swap ? b.w : b.d
+  return { cw, cd, toW: (u, v) => { const p = rot === 0 ? [u, v] : rot === 1 ? [v, -u] : rot === 2 ? [-u, -v] : [-v, u]; return { x: b.x + p[0], z: b.z + p[1] } } }
+}
 const hash = (b: Bld, a: number, c: number) => { const s = Math.sin(b.x * 12.9898 + b.z * 78.233 + a * 37.719 + c * 11.13) * 43758.5453; return s - Math.floor(s) }
 
 export function layoutOf(b: Bld): Layout {
@@ -51,7 +63,8 @@ export function layoutOf(b: Bld): Layout {
   const swap = rot % 2 === 1
   const cw = swap ? b.d : b.w, cd = swap ? b.w : b.d
   const hw = cw / 2, hd = cd / 2
-  const nx = Math.max(1, Math.floor(cw / 16)), nz = Math.max(1, Math.floor(cd / 16))
+  const hall = specials.has(b)
+  const nx = hall ? 1 : Math.max(1, Math.floor(cw / 16)), nz = hall ? 1 : Math.max(1, Math.floor(cd / 16))
   const cwid = cw / nx, cdep = cd / nz
   // kanonisch: Tür im Süden (v = −hd); Welt = Drehung um das Gebäudezentrum
   const toWorld = (r: Rect): Rect => {
@@ -78,8 +91,8 @@ export function layoutOf(b: Bld): Layout {
   const v0 = -hd + T_OUT + 2.2, L = cdep - T_OUT - 2.2 - 2.6
   const laneA: Rect = { x0: -hw + 0.8, x1: -hw + 0.8 + STAIR_W, z0: v0, z1: v0 + L }
   const laneB: Rect = { x0: laneA.x1 + 0.4, x1: laneA.x1 + 0.4 + STAIR_W, z0: v0, z1: v0 + L }
-  innerC.push({ x0: laneA.x1 + 0.1, x1: laneA.x1 + 0.3, z0: v0, z1: v0 + L })
-  const floors = Math.max(2, Math.floor(b.h / FLOOR_H))
+  if (!hall) innerC.push({ x0: laneA.x1 + 0.1, x1: laneA.x1 + 0.3, z0: v0, z1: v0 + L })
+  const floors = hall ? 1 : Math.max(2, Math.floor(b.h / FLOOR_H))
   const flights: Flight[] = []
   // Steigrichtung kanonisch +v (gerade k) bzw. −v (ungerade k), in Weltrichtung gedreht
   const rotVec = (u: number, v: number) => (rot === 0 ? [u, v] : rot === 1 ? [v, -u] : rot === 2 ? [-u, -v] : [-v, u])
@@ -96,7 +109,7 @@ export function layoutOf(b: Bld): Layout {
     door: { x: b.x + (rot === 0 ? doorU : rot === 1 ? -hd : rot === 2 ? -doorU : hd), z: b.z + (rot === 0 ? -hd : rot === 1 ? -doorU : rot === 2 ? hd : doorU), nx: rot === 1 ? -1 : rot === 3 ? 1 : 0, nz: rot === 0 ? -1 : rot === 2 ? 1 : 0 },
     flights,
     stairCell: toWorld({ x0: -hw, x1: -hw + cwid, z0: -hd, z1: -hd + cdep }),
-    nx, nz,
+    nx, nz, solids: specials.get(b) ?? [],
     gaps: gapsC.map((g) => { const p = rot === 0 ? [g.u, g.v] : rot === 1 ? [g.v, -g.u] : rot === 2 ? [-g.u, -g.v] : [-g.v, g.u]; return { a: g.a, b: g.b, x: b.x + p[0], z: b.z + p[1] } }),
     cellOf: (x, z) => {
       const dx = x - b.x, dz = z - b.z
@@ -125,6 +138,7 @@ export function interiorPush(b: Bld, x: number, z: number, y: number): { nx: num
   }
   for (const r of outer) test(r)
   for (const r of lay.inner) test(r)
+  for (const s of lay.solids) if (!s.deco && y < (s.y0 ?? 0) + s.h - 0.25 && y >= (s.y0 ?? 0) - 0.5) test(s)
   return best
 }
 

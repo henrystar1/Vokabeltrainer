@@ -1,6 +1,7 @@
 import type * as T from 'three'
 import type { Bld } from './city'
 import { FLOOR_H, layoutOf, type Rect } from './interior'
+import { poiOf } from './poi'
 
 type THREE = typeof T
 
@@ -9,6 +10,8 @@ export function makeInteriorViewer(THREE: THREE, scene: T.Scene, ext: { geo: T.B
   let cur: Bld | null = null
   let group: T.Group | null = null
   let saved: { b: Bld; arr: Float32Array } | null = null
+  let vaultDoor: { pivot: T.Group; ang: number } | null = null
+  let vaultOpen = false
   const dim = night ? 0.6 : 1
   const mat = (c: number, o = 1, side: T.Side = THREE.DoubleSide) => new THREE.MeshStandardMaterial({ color: new THREE.Color(c).multiplyScalar(dim), emissive: new THREE.Color(c).multiplyScalar(0.35 * dim), roughness: 0.9, side, transparent: o < 1, opacity: o })
   const mats = { floor: mat(0xb08968), roof: mat(0xe5e7eb), part: mat(0xf1efe8, 0.5), step: mat(0xcbd5e1) }
@@ -61,9 +64,33 @@ export function makeInteriorViewer(THREE: THREE, scene: T.Scene, ext: { geo: T.B
         box(g, axisX ? { x0: p0, x1: p1, z0: f.lane.z0, z1: f.lane.z1 } : { x0: f.lane.x0, x1: f.lane.x1, z0: p0, z1: p1 }, y1 - 0.2, y1, mats.step)
       }
     }
+    // Einrichtung
+    for (const s of L.solids) {
+      const y0 = s.y0 ?? 0
+      if (s.h < 0.01) continue
+      const m = new THREE.Mesh(new THREE.BoxGeometry(s.x1 - s.x0, s.h, s.z1 - s.z0), new THREE.MeshStandardMaterial({ color: new THREE.Color(s.color).multiplyScalar(dim), roughness: 0.7 }))
+      m.position.set((s.x0 + s.x1) / 2, y0 + s.h / 2, (s.z0 + s.z1) / 2); g.add(m)
+    }
+    // Tresortür: Drehpunkt am Rand, öffnet sich beim Banküberfall
+    vaultDoor = null
+    const pv = poiOf(b)?.vault
+    if (pv) {
+      const pivot = new THREE.Group()
+      const ang = Math.atan2(pv.nx, pv.nz)
+      pivot.position.set(pv.x + pv.nx * 0.16 - Math.cos(ang) * pv.w / 2, 1.4, pv.z + pv.nz * 0.16 + Math.sin(ang) * pv.w / 2)
+      pivot.rotation.y = ang
+      const door = new THREE.Mesh(new THREE.BoxGeometry(pv.w, 2.6, 0.3), new THREE.MeshStandardMaterial({ color: 0x9ca3af, metalness: 0.6, roughness: 0.35 }))
+      door.position.set(pv.w / 2, 0, 0); pivot.add(door)
+      const wheel = new THREE.Mesh(new THREE.TorusGeometry(0.6, 0.08, 8, 20), new THREE.MeshStandardMaterial({ color: 0xfacc15 }))
+      wheel.position.set(pv.w / 2, 0, 0.2); pivot.add(wheel)
+      pivot.rotation.y = ang + (vaultOpen ? -1.9 : 0)
+      vaultDoor = { pivot, ang }
+      g.add(pivot)
+    }
     return g
   }
-  return (b: Bld | null, wallMat: T.Material) => {
+  const setVault = (open: boolean) => { vaultOpen = open; if (vaultDoor) vaultDoor.pivot.rotation.y = vaultDoor.ang + (open ? -1.9 : 0) }
+  const show = (b: Bld | null, wallMat: T.Material) => {
     if (b === cur) return
     restore(); clear(); cur = b
     if (!b) return
@@ -76,4 +103,5 @@ export function makeInteriorViewer(THREE: THREE, scene: T.Scene, ext: { geo: T.B
     }
     group = build(b, wallMat); scene.add(group)
   }
+  return { show, setVault }
 }

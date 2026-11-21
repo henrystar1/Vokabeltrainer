@@ -28,7 +28,7 @@ export interface WalkInput { fwd: boolean; back: boolean; left: boolean; right: 
 export const WALK = 4.4
 export const RUN = 7.6
 /** Lauf- und Sprinttempo (vom Admin im Showroom einstellbar) */
-export const footConfig = { walk: WALK, run: RUN }
+export const footConfig = { walk: WALK, run: RUN, /** Shop: Tempo- und Sprung-Faktor */ speed: 1, jump: 1 }
 export const setFootSpeeds = (walk?: number | null, run?: number | null): void => {
   footConfig.walk = walk && walk >= 1 && walk <= 40 ? walk : WALK
   footConfig.run = run && run >= 1 && run <= 40 ? run : RUN
@@ -36,7 +36,7 @@ export const setFootSpeeds = (walk?: number | null, run?: number | null): void =
 export const JUMP_V = 7.4
 export const HP_MAX = 100
 /** Maximale Leben der eigenen Figur (Fitnessstudio erhöht sie bis 200) */
-export const hpCfg = { max: HP_MAX }
+export const hpCfg = { max: HP_MAX, /** Schadensfaktor (Schutzweste aus dem Shop: 0,5) */ armor: 1 }
 export const WALK_R = 0.45
 
 export const newWalker = (x: number, z: number, h: number, y?: number): Walker => ({ x, z, h, y: y ?? hillH(x, z), vy: 0, vx: 0, vz: 0, hp: hpCfg.max, stun: 0, inv: 0, ph: 0, sp: 0 })
@@ -83,7 +83,7 @@ function stepOnce(w: Walker, inp: WalkInput, dt: number): Walker {
   const g0 = groundAt(w.x, w.z, w.y, lvl0)
   const grounded = w.y <= g0 + 0.05 && w.vy <= 0
   const air = !grounded
-  const base = (inp.run ? footConfig.run : footConfig.walk) * (air ? 1.3 : 1)
+  const base = (inp.run ? footConfig.run : footConfig.walk) * footConfig.speed * (air ? 1.3 : 1)
   const sp = stunned ? 0 : (inp.fwd ? 1 : 0) * base - (inp.back ? 1 : 0) * footConfig.walk * 0.55
   const dec = Math.exp(-2.2 * dt)
   let vx = w.vx * dec, vz = w.vz * dec
@@ -111,7 +111,7 @@ function stepOnce(w: Walker, inp: WalkInput, dt: number): Walker {
   }
   const g = groundAt(x, z, w.y, lvl)
   let y = w.y, vy = w.vy
-  if (inp.jump && grounded && !stunned) { vy = JUMP_V; y = w.y + 0.02 }
+  if (inp.jump && grounded && !stunned) { vy = JUMP_V * footConfig.jump; y = w.y + 0.02 }
   if (y > g + 0.02 || vy > 0) { vy -= 24 * dt; y += vy * dt; if (y <= g) { y = g; vy = 0 } } else { y = g; vy = 0 }
   const speed = Math.hypot(Math.sin(h) * sp + vx, Math.cos(h) * sp + vz)
   return { ...w, x, z, h, y, vy, vx, vz, lvl, stun: Math.max(0, w.stun - dt), inv: Math.max(0, w.inv - dt), ph: w.ph + Math.min(speed, 8) * dt * 1.7, sp: speed }
@@ -121,7 +121,7 @@ function stepOnce(w: Walker, inp: WalkInput, dt: number): Walker {
 export interface HitCar { x: number; z: number; h: number; v: number; len: number; wid: number; y?: number; fly?: number }
 export const HIT_MIN_V = 3
 /** Schaden eines Aufpralls bei Tempo v (m/s). */
-export const hitDamage = (v: number) => Math.min(HP_MAX, Math.round((Math.abs(v) - 2) * 3.4))
+export const hitDamage = (v: number) => Math.min(HP_MAX, Math.round(Math.round((Math.abs(v) - 2) * 3.4) * hpCfg.armor))
 
 /** Überfährt das Auto die Figur? Dann Schaden und Rückstoß (die Figur fliegt ein Stück vom Auto weg und nach oben). */
 export function carHit(w: Walker, c: HitCar): Walker | null {

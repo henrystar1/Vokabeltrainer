@@ -1,13 +1,25 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { getLearningPool } from '../../../services/learning'
-import { racePerkAnswer, type RacePerks } from '../../../services/cars'
+import { racePerkAnswer, racePerkBuy, type PerkItem, type RacePerks } from '../../../services/cars'
 import { errorMessage } from '../../../lib/errors'
 import { isAnswerCorrect } from '../../learning/answer'
 import { buildIndexes, makeQuestion, type Question } from '../../learning/questions'
 import type { PoolVocab } from '../../../types'
 
 /** Vokabel-Abfrage im Shop (Auto-Spawns) oder Fitnessstudio (Leben): jede richtige Antwort zählt, nach 10 gibt es die Belohnung (Server zählt und prüft). */
-export default function VocabShop({ kind, perks, onPerks, onClose }: { kind: 'shop' | 'gym'; perks: RacePerks | null; onPerks: (p: RacePerks) => void; onClose: () => void }) {
+const ITEMS: Record<'shop' | 'gym', Array<{ id: PerkItem; name: string; text: string; cost: number }>> = {
+  shop: [
+    { id: 'spawn', name: 'Autoschlüssel-Paket', text: 'Bis zu 5 statt 2 Auto-Spawns, 30 Min', cost: 10 },
+    { id: 'speed', name: 'Turnschuhe', text: '40 % schneller laufen, 30 Min', cost: 10 },
+    { id: 'jump', name: 'Sprungfedern', text: 'Höher springen, 30 Min', cost: 10 },
+    { id: 'armor', name: 'Schutzweste', text: 'Nur halber Schaden (Autos, Schläge, Unfälle), 30 Min', cost: 15 },
+    { id: 'heal', name: 'Erste-Hilfe-Set', text: 'Sofort volle Leben', cost: 3 },
+  ],
+  gym: [{ id: 'hearts', name: 'Training', text: '+10 Leben (höchstens +100)', cost: 10 }],
+}
+
+/** Theke im Shop / Training im Fitnessstudio: richtige Vokabeln sammeln Punkte (Server zählt), damit kauft man Artikel. Admin bekommt alles gratis. */
+export default function VocabShop({ kind, perks, isAdmin, onPerks, onBought, onClose }: { kind: 'shop' | 'gym'; perks: RacePerks | null; isAdmin: boolean; onPerks: (p: RacePerks) => void; onBought: (item: PerkItem) => void; onClose: () => void }) {
   const [pool, setPool] = useState<PoolVocab[] | null>(null)
   const [err, setErr] = useState<string | null>(null)
   const [q, setQ] = useState<Question | null>(null)
@@ -30,18 +42,29 @@ export default function VocabShop({ kind, perks, onPerks, onClose }: { kind: 'sh
       try { onPerks(await racePerkAnswer(kind)) } catch (e) { setErr(errorMessage(e)) }
     } else setFb({ ok: false, text: `Falsch – richtig: ${q.accepted.join(' / ')}` })
   }
-  const step = kind === 'shop' ? perks?.shop ?? 0 : perks?.gym ?? 0
+  const pts = kind === 'shop' ? perks?.shop ?? 0 : perks?.gym ?? 0
+  const buy = async (id: PerkItem) => {
+    try { onPerks(await racePerkBuy(id)); onBought(id); setErr(null); setFb({ ok: true, text: 'Gekauft!' }) } catch (e) { setErr(errorMessage(e)) }
+  }
   return (
-    <div className="absolute inset-0 z-30 flex items-center justify-center bg-black/60 p-3" role="dialog" aria-label={kind === 'shop' ? 'Vokabel-Shop' : 'Fitnessstudio'}>
+    <div className="absolute inset-0 z-30 flex items-center justify-center overflow-auto bg-black/60 p-3" role="dialog" aria-label={kind === 'shop' ? 'Shop' : 'Fitnessstudio'}>
       <div className="w-full max-w-sm space-y-3 rounded-2xl border border-white/15 bg-slate-900/95 p-4 text-white">
         <div className="flex items-center justify-between">
-          <h2 className="font-bold">{kind === 'shop' ? 'Vokabel-Shop' : 'Fitnessstudio'}</h2>
+          <h2 className="font-bold">{kind === 'shop' ? 'Shop – Theke' : 'Fitnessstudio'}</h2>
           <button type="button" onClick={onClose} className="min-h-[40px] rounded-lg bg-white/15 px-3 text-sm">Schließen</button>
         </div>
-        <p className="text-xs text-slate-300">{kind === 'shop' ? '10 richtige Vokabeln = 30 Minuten lang bis zu 5 statt 2 Auto-Spawns.' : '10 richtige Vokabeln = +10 Leben (höchstens +100).'}</p>
-        <div className="h-2 overflow-hidden rounded bg-white/15" aria-label={`Fortschritt ${step} von 10`}><div className="h-full bg-emerald-400" style={{ width: `${step * 10}%` }} /></div>
-        <p className="text-xs text-slate-400">{step}/10{perks ? (kind === 'shop' ? ` · Spawns: bis ${perks.spawn_max}${perks.spawn_sec > 0 ? ` (noch ${Math.ceil(perks.spawn_sec / 60)} Min)` : ''}` : ` · Leben: ${perks.hearts}`) : ''}</p>
+        <p className="text-xs text-slate-300">{isAdmin ? 'Admin: alles gratis.' : `Du hast ${pts} richtige Vokabeln gesammelt. Beantworte unten Vokabeln, um mehr zu sammeln.`}</p>
+        <ul className="space-y-1.5">
+          {ITEMS[kind].map((it) => (
+            <li key={it.id} className="flex items-center gap-2 rounded-lg bg-white/10 p-2">
+              <div className="min-w-0 flex-1"><p className="text-sm font-semibold">{it.name}</p><p className="text-xs text-slate-300">{it.text}</p></div>
+              <button type="button" onClick={() => void buy(it.id)} disabled={!isAdmin && pts < it.cost} className="min-h-[40px] shrink-0 rounded-lg bg-emerald-500 px-3 text-sm font-bold text-slate-950 disabled:opacity-40">{isAdmin ? 'Gratis' : `${it.cost} Vok.`}</button>
+            </li>
+          ))}
+        </ul>
+        {kind === 'gym' && perks && <p className="text-xs text-slate-400">Leben: {perks.hearts}</p>}
         {err && <p className="text-sm text-rose-300">{err}</p>}
+        <h3 className="pt-1 text-sm font-semibold">Vokabeln lernen</h3>
         {!pool && !err && <p className="text-sm">Lade Vokabeln …</p>}
         {pool && pool.length === 0 && <p className="text-sm">Du hast noch keine Vokabeln zum Abfragen.</p>}
         {q && (

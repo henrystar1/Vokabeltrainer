@@ -930,3 +930,14 @@ Tabelle `book_library_hidden`; `in_library` blendet ein veröffentlichtes Buch d
 - **Bank**: Knopf AUSRAUBEN → `race_bank_claim` (Server, global), dann normale Polizeijagd mit 6 Bots (`startChase(..., heist=true)`, Event `go` mit `hz:1`). Wer zu Fuß in 11 m um die Bank steht, wird automatisch Mit-Räuber (bis 4, Server: Beitritt 40 s lang). Überlebt man die 6 Minuten ungefangen: `race_bank_pay` (1000 Coins, durch Räuber geteilt, erst nach 350 s). Danach 16 Min gesperrt (6 Jagd + 10 Ruhe); Status `race_bank_status` wird an der Bank alle 4 s abgefragt.
 - **Eingabefelder**: Tastatur-Steuerung ignoriert Eingaben in `<input>`.
 - SQL 0112 (race_perks, race_bank, 5 RPCs). Offen: Minecraft-Skin-Import (nur Pro).
+
+
+## Update 140
+- **Häuser mit Einrichtung** (`race/poi.ts`, `interior.ts`): Bank, Krankenhaus, 4 Shops, 2 Fitnessstudios sind jetzt „Hallen“ (`setSpecial`: ein Raum, ein Geschoss, keine Treppen) mit `Layout.solids` (Quader mit Höhe/Farbe; `deco` = nur Anzeige). `interiorPush` kollidiert mit ihnen, `interiorMesh` zeichnet sie. Einrichtung wird in kanonischen Koordinaten (u quer, v Tiefe, `canon(b)`) geplant. Bedienstellen (`Spot`: Tresor, Theke, Gerät) → Knopf/Taste G (`spotNear`).
+- **Bank**: Tresen + Tresor (Tür dreht auf, `rs.setVault`). Am Tresor G → `race_bank_claim`, Jagd mit 6 Bots startet, Mit-Räuber sind alle zu Fuß im Bankhaus. Fluchtautos (ein Bandit-Roadster je Räuber, `Parked`) stehen vor der Tür, man bleibt zu Fuß. Auszahlung wie in 139.
+- **Shop-Theke / Fitness** (`VocabShop.tsx`, SQL 0113): richtige Vokabeln = Punkte (`race_perks.shop_correct/gym_correct`), Artikel per `race_perk_buy`: Autoschlüssel (5 Spawns), Turnschuhe (×1,4), Sprungfedern (×1,35), Schutzweste (halber Schaden), Erste Hilfe (heilt), Training (+10 Leben). Admin: alles gratis, 8 Auto-Spawns ohne Lernen.
+- **Krankenhaus**: Tod (Auto explodiert, zu Fuß 0 Leben, Mitfahrer) → zu Fuß im Bett, kein neues Auto (`hospitalRespawn`). Mitfahrer nehmen Schaden/Feuer des Fahrer-Autos, sterben bei dessen Explosion (`tickRide`, `ex`-Zähler).
+- **Vollbild**: Knopf oben Mitte (Fullscreen-API, sonst die ganze Seite).
+- **Minecraft-Skin** (Pro/Admin): PNG 64×64/64×32 im Zahnrad-Panel, `makeSkinWalker` (Skin-UV, Überlagerungsschicht, altes Format gespiegelt), Event `sk` (alle 15 s und bei Änderung), Empfang prüft Daten-URL (<45 kB).
+- **Schlag-Animation**: `poseWalker(..., punch)` (0..1, 320 ms): Arm schnellt vor, Oberkörper dreht, Ausfallschritt; andere sehen sie über den Zähler `pc` im Payload.
+- Einstellungen (Joystick-Drehung, Figurenfarbe, Render-Umkreis, Minecraft-Skin) liegen jetzt im Menü „⚙ Karte & Steuerung“ (vorher nur im Supercar-Panel).

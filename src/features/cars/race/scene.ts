@@ -7,7 +7,7 @@ import { BRIDGES, CITY, type Bld, GARAGES, TUNNELS, bridgeH, city, tunnelD } fro
 import { PARK, PARK_TOP, PARK_TUNNEL } from './parkhaus'
 import { MOUNTAINS, OUT, RING, hillH, outRoads, ringPath } from './mountains'
 import { trees } from './forest'
-import { makeWalkerModel } from './walkerMesh'
+import { makeSkinWalker, makeWalkerModel, skinCanvas } from './walkerMesh'
 import { makeInteriorViewer } from './interiorMesh'
 import { layoutOf } from './interior'
 import { RAMPS, STUNT, loopPoint } from './stunt'
@@ -95,9 +95,12 @@ export interface RaceScene {
   /** Blaulicht blinken lassen (Zeit in ms). */
   tickSiren: (g: T.Group, ms: number) => void
   /** Spielfigur zu Fuß (Hemdfarbe). */
-  makeWalker: (shirt: string, pants?: string, name?: string) => T.Group
+  /** `skin`: Minecraft-Skin als PNG-Daten-URL (optional, kommt asynchron an: dann wird das Modell im Group ausgetauscht) */
+  makeWalker: (shirt: string, pants?: string, name?: string, skin?: string) => T.Group
   /** Innenraum des Hauses zeigen, in dem die Figur steht (null = keins). */
   showInterior: (b: { x: number; z: number; w: number; d: number; h: number; c: number } | null) => void
+  /** Tresortür der Bank öffnen/schließen */
+  setVault: (open: boolean) => void
 }
 
 export function buildScene(THREE: THREE, t: Track): RaceScene {
@@ -302,7 +305,8 @@ export function buildScene(THREE: THREE, t: Track): RaceScene {
   if (mode === 'free' || mode === 'fill' || mode === 'city' || mode === 'stunt') while (scene.children.length > mark) scene.remove(scene.children[mark])
   if (mode === 'stunt') buildStunt(THREE, scene, ground)
   let showInterior: RaceScene['showInterior'] = () => {}
-  if (mode === 'city') showInterior = buildCity(THREE, scene, ground, !!th.night)
+  let setVault: RaceScene['setVault'] = () => {}
+  if (mode === 'city') ({ showInterior, setVault } = buildCity(THREE, scene, ground, !!th.night))
   if (mode === 'fill') {
     // ausgefüllte Fläche: Asphalt im Vieleck, weiße Randlinie, keine Barriere
     const P = t.def.pts
@@ -313,7 +317,22 @@ export function buildScene(THREE: THREE, t: Track): RaceScene {
     scene.add(ln)
   }
   const makeCar = (kind: string, color: string, name: string, isMe: boolean) => buildCar(THREE, kind, color, name, isMe)
-  return { scene, sun, theme: th, makeCar, follow, focus, damageCar: (g, dmg, slip, v, time) => damageCar(THREE, g, dmg, slip, v, time), addSiren: (g) => addSiren(THREE, g), tickSiren, makeWalker: (shirt, pants, name) => { const g = makeWalkerModel(THREE, shirt, pants); if (name) g.add(nameSprite(THREE, name, 2.35)); return g }, showInterior }
+  return { scene, sun, theme: th, makeCar, follow, focus, damageCar: (g, dmg, slip, v, time) => damageCar(THREE, g, dmg, slip, v, time), addSiren: (g) => addSiren(THREE, g), tickSiren, makeWalker: (shirt, pants, name, skin) => {
+    const g = makeWalkerModel(THREE, shirt, pants)
+    if (name) g.add(nameSprite(THREE, name, 2.35))
+    if (skin) {
+      const img = new Image()
+      // Skin kommt asynchron: das Körpermodell (Kind 0) wird dann ausgetauscht, Haltungs-Daten (Beine/Arme) übernommen
+      img.onload = () => {
+        const c = skinCanvas(img, img.naturalWidth, img.naturalHeight); if (!c) return
+        const sg = makeSkinWalker(THREE, c), si = sg.children[0]
+        sg.remove(si); g.remove(g.children[0]); g.add(si); g.children.splice(g.children.indexOf(si), 1); g.children.unshift(si)
+        Object.assign(g.userData, sg.userData)
+      }
+      img.src = skin
+    }
+    return g
+  }, showInterior, setVault }
 }
 
 interface Body { len: number; wid: number; hgt: number; cabLen: number; cabH: number; cabZ: number; wheelR: number; spoiler?: boolean; bed?: boolean; open?: boolean; tall?: boolean; cage?: boolean; scoop?: boolean; formula?: boolean; track?: number; wheelW?: number; stripe?: boolean }
@@ -644,7 +663,7 @@ function buildSupercar(THREE: THREE, color: string, name: string, isMe: boolean)
 
 
 /** Stadt: Straßen (Asphalt mit Mittelstrichen), Häuserblöcke mit Fenstern, Parks mit Bäumen und die Brücke. */
-function buildCity(THREE: THREE, scene: T.Scene, ground: T.Mesh, night: boolean): RaceScene['showInterior'] {
+function buildCity(THREE: THREE, scene: T.Scene, ground: T.Mesh, night: boolean): { showInterior: RaceScene['showInterior']; setVault: RaceScene['setVault'] } {
   ground.material = new THREE.MeshStandardMaterial({ color: 0x33363e, roughness: 0.95 })
   const P = CITY.pitch
   // Mittelstriche: gestrichelt, ein Instanz-Mesh
@@ -718,7 +737,7 @@ function buildCity(THREE: THREE, scene: T.Scene, ground: T.Mesh, night: boolean)
   }
   const viewer = makeInteriorViewer(THREE, scene, { geo: bg, ranges }, night)
   const wallMats = pal.map((c) => new THREE.MeshStandardMaterial({ color: c, roughness: 0.85, side: THREE.DoubleSide }))
-  const showInterior: RaceScene['showInterior'] = (b) => { viewer(b as Bld | null, b ? wallMats[b.c] : wallMats[0]) }
+  const showInterior: RaceScene['showInterior'] = (b) => { viewer.show(b as Bld | null, b ? wallMats[b.c] : wallMats[0]) }
 
   // Gehwege unter jedem Block (hellgrau, leicht erhöht) und Parks
   const walk = new THREE.MeshStandardMaterial({ color: night ? 0x5b6270 : 0x9ca3af, roughness: 1 })
@@ -1035,7 +1054,7 @@ function buildCity(THREE: THREE, scene: T.Scene, ground: T.Mesh, night: boolean)
     d.position.set(x, bridgeH(x, zc) + 0.08, zc); scene.add(d)
   }
   }
-  return showInterior
+  return { showInterior, setVault: viewer.setVault }
 }
 
 

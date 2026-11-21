@@ -42,8 +42,10 @@ export const raceChaseReward = (humans: number, bots: number, win: boolean, secs
 export const raceReward = (place: number, field: number, ms: number, online: boolean) => rpc<RaceRewardResult>('race_reward', { p_place: place, p_field: field, p_ms: ms, p_online: online })
 
 /** Shop/Fitnessstudio-Belohnungen (Update 139) */
-export interface RacePerks { spawn_max: number; spawn_sec: number; hearts: number; shop: number; gym: number }
+export interface RacePerks { spawn_max: number; spawn_sec: number; speed_sec: number; jump_sec: number; armor_sec: number; hearts: number; shop: number; gym: number }
 export const racePerkInfo = () => rpc<RacePerks>('race_perk_info')
+export type PerkItem = 'spawn' | 'speed' | 'jump' | 'armor' | 'heal' | 'hearts'
+export const racePerkBuy = (item: PerkItem) => rpc<RacePerks>('race_perk_buy', { p_item: item })
 export const racePerkAnswer = (kind: 'shop' | 'gym') => rpc<RacePerks>('race_perk_answer', { p_kind: kind })
 /** Bank: Sekunden bis zum nächsten möglichen Raub, Raub starten/mitmachen, Beute (1000 Coins, geteilt) abholen */
 export const raceBankStatus = () => rpc<number>('race_bank_status')

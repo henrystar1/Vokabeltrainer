@@ -52,6 +52,11 @@ export function PlusProvider({ children }: { children: ReactNode }) {
   )
 }
 
+/** Wie usePlus, aber ohne Fehler außerhalb des Providers (z. B. in Tests): liefert dann null. */
+export function usePlusOptional(): PlusState | null {
+  return useContext(PlusContext)
+}
+
 export function usePlus(): PlusState {
   const c = useContext(PlusContext)
   if (!c) throw new Error('usePlus braucht den PlusProvider.')
