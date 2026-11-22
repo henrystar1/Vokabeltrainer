@@ -335,7 +335,7 @@ export function buildScene(THREE: THREE, t: Track): RaceScene {
   }, showInterior, setVault }
 }
 
-interface Body { swat?: boolean; len: number; wid: number; hgt: number; cabLen: number; cabH: number; cabZ: number; wheelR: number; spoiler?: boolean; bed?: boolean; open?: boolean; tall?: boolean; cage?: boolean; scoop?: boolean; formula?: boolean; track?: number; wheelW?: number; stripe?: boolean }
+interface Body { swat?: boolean; amb?: boolean; len: number; wid: number; hgt: number; cabLen: number; cabH: number; cabZ: number; wheelR: number; spoiler?: boolean; bed?: boolean; open?: boolean; tall?: boolean; cage?: boolean; scoop?: boolean; formula?: boolean; track?: number; wheelW?: number; stripe?: boolean }
 const BODIES: Record<string, Body> = {
   kleinwagen: { len: 3.9, wid: 1.8, hgt: 0.75, cabLen: 2.1, cabH: 0.7, cabZ: -0.1, wheelR: 0.36 },
   limousine: { len: 4.8, wid: 1.9, hgt: 0.72, cabLen: 2.5, cabH: 0.62, cabZ: -0.2, wheelR: 0.38 },
@@ -355,6 +355,7 @@ const BODIES: Record<string, Body> = {
   rennwagen: { len: 5.0, wid: 0.9, hgt: 0.42, cabLen: 0.8, cabH: 0.35, cabZ: -0.2, wheelR: 0.42, formula: true, track: 1.85, wheelW: 0.55 },
   roadster: { len: 4.2, wid: 1.85, hgt: 0.5, cabLen: 1.0, cabH: 0.3, cabZ: -0.1, wheelR: 0.37, open: true, stripe: true },
   swat: { len: 6.4, wid: 2.5, hgt: 1.3, cabLen: 3.4, cabH: 0.8, cabZ: 0.5, wheelR: 0.62, tall: true, swat: true },
+  ambulance: { len: 6.2, wid: 2.3, hgt: 1.45, cabLen: 3.6, cabH: 0.5, cabZ: -0.5, wheelR: 0.5, tall: true, amb: true },
 }
 
 /** SWAT-Panzerwagen: Panzerplatten, Rammbügel, Lichtbalken, Dachgeschütz und große „SWAT“-Schriftzüge (Seiten, Dach, Motorhaube, Heck) */
@@ -405,6 +406,46 @@ function swatText(THREE: THREE, w: number, h: number, txt: string, fg = '#f8fafc
   if (g) { g.clearRect(0, 0, c.width, c.height); g.fillStyle = fg; g.font = `900 ${Math.round(c.height * 0.92)}px Arial Black, Impact, sans-serif`; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText(txt, c.width / 2, c.height / 2 + c.height * 0.04) }
   const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace
   return new THREE.Mesh(new THREE.PlaneGeometry(w, h), new THREE.MeshBasicMaterial({ map: t, transparent: true, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -2 }))
+}
+/** Krankenwagen: rote Warnstreifen, große Kreuze, Schrift (vorn gespiegelt), Blaulichtbalken vorn/hinten, Hecktüren, Trittbretter, Spiegel */
+function addAmbulanceParts(THREE: THREE, g: T.Group, b: Body, clearance: number): void {
+  const red = new THREE.MeshStandardMaterial({ color: 0xdc2626, roughness: 0.5 })
+  const white = new THREE.MeshStandardMaterial({ color: 0xf8fafc, roughness: 0.4 })
+  const dark = new THREE.MeshStandardMaterial({ color: 0x111827, roughness: 0.6, metalness: 0.3 })
+  const yellow = new THREE.MeshStandardMaterial({ color: 0xfacc15, roughness: 0.5 })
+  const top = clearance + b.hgt, W = b.wid, L = b.len
+  for (const sx of [-1, 1]) {
+    const x = sx * (W / 2 + 0.02)
+    const s1 = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.26, L * 0.96), red); s1.position.set(x, clearance + 0.62, 0); g.add(s1)
+    const s2 = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.07, L * 0.96), yellow); s2.position.set(x, clearance + 0.42, 0); g.add(s2)
+    const step = new THREE.Mesh(new THREE.BoxGeometry(0.22, 0.07, L * 0.4), dark); step.position.set(sx * (W / 2 + 0.1), clearance + 0.12, -0.6); g.add(step)
+    const mir = new THREE.Mesh(new THREE.BoxGeometry(0.28, 0.2, 0.08), dark); mir.position.set(sx * (W / 2 + 0.2), top - 0.2, L / 2 - 1.5); g.add(mir)
+    const t = swatText(THREE, 2.2, 0.5, 'AMBULANZ', '#dc2626'); t.rotation.y = sx * Math.PI / 2; t.position.set(sx * (W / 2 + 0.06), clearance + 1.0, 0.1); g.add(t)
+    // Kreuz an der Seite
+    const c1 = new THREE.Mesh(new THREE.BoxGeometry(0.03, 0.5, 0.16), red), c2 = new THREE.Mesh(new THREE.BoxGeometry(0.03, 0.16, 0.5), red)
+    c1.position.set(sx * (W / 2 + 0.05), clearance + 1.0, -1.8); c2.position.copy(c1.position); g.add(c1, c2)
+  }
+  // Dach: großes Kreuz, Lichtbalken vorn und hinten, Dachluke
+  const rc1 = new THREE.Mesh(new THREE.BoxGeometry(0.4, 0.03, 1.4), red), rc2 = new THREE.Mesh(new THREE.BoxGeometry(1.4, 0.03, 0.4), red)
+  const roofY = top + b.cabH
+  rc1.position.set(0, roofY + 0.02, -1.0); rc2.position.copy(rc1.position); g.add(rc1, rc2)
+  for (const [z, w] of [[L / 2 - 1.4, W * 0.8], [-L / 2 + 0.5, W * 0.7]] as const) {
+    const bar = new THREE.Mesh(new THREE.BoxGeometry(w, 0.16, 0.34), dark); bar.position.set(0, roofY + 0.1, z); g.add(bar)
+    const r = new THREE.Mesh(new THREE.BoxGeometry(w * 0.4, 0.14, 0.3), new THREE.MeshBasicMaterial({ color: 0xff2a2a })); r.position.set(-w * 0.22, roofY + 0.2, z)
+    const bl = new THREE.Mesh(new THREE.BoxGeometry(w * 0.4, 0.14, 0.3), new THREE.MeshBasicMaterial({ color: 0x2a6bff })); bl.position.set(w * 0.22, roofY + 0.2, z)
+    g.add(r, bl)
+  }
+  // Front: Schrift gespiegelt (lesbar im Rückspiegel), Stoßstange mit Rotlicht-Streifen, Kühlergrill
+  const front = swatText(THREE, 1.9, 0.4, 'AMBULANZ', '#dc2626'); front.scale.x = -1; front.position.set(0, top - 0.55, L / 2 + 0.03); g.add(front)
+  const bump = new THREE.Mesh(new THREE.BoxGeometry(W * 0.98, 0.22, 0.2), dark); bump.position.set(0, clearance + 0.28, L / 2 + 0.05); g.add(bump)
+  const stripe = new THREE.Mesh(new THREE.BoxGeometry(W * 0.98, 0.1, 0.05), red); stripe.position.set(0, top - 0.3, L / 2 + 0.02); g.add(stripe)
+  // Heck: Doppeltüren mit Fenstern, Kreuz, Warnstreifen
+  const rear = new THREE.Mesh(new THREE.BoxGeometry(W * 0.94, b.hgt * 0.8, 0.05), white); rear.position.set(0, clearance + b.hgt * 0.5, -L / 2 - 0.03); g.add(rear)
+  for (const sx of [-1, 1]) { const win = new THREE.Mesh(new THREE.BoxGeometry(W * 0.3, 0.42, 0.04), dark); win.position.set(sx * W * 0.23, clearance + b.hgt * 0.65, -L / 2 - 0.07); g.add(win) }
+  const gap = new THREE.Mesh(new THREE.BoxGeometry(0.03, b.hgt * 0.8, 0.06), dark); gap.position.set(0, clearance + b.hgt * 0.5, -L / 2 - 0.06); g.add(gap)
+  const k1 = new THREE.Mesh(new THREE.BoxGeometry(0.14, 0.5, 0.04), red), k2 = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.14, 0.04), red)
+  k1.position.set(0, clearance + 0.45, -L / 2 - 0.08); k2.position.copy(k1.position); g.add(k1, k2)
+  for (let i = 0; i < 6; i++) { const st = new THREE.Mesh(new THREE.BoxGeometry(W * 0.16, 0.12, 0.04), i % 2 ? white : red); st.position.set(-W * 0.4 + i * W * 0.16, clearance + 0.16, -L / 2 - 0.1); g.add(st) }
 }
 function addSwatParts(THREE: THREE, g: T.Group, b: Body, clearance: number): void {
   const steel = new THREE.MeshStandardMaterial({ color: 0x1f2937, roughness: 0.45, metalness: 0.7 })
@@ -526,6 +567,7 @@ function buildCar(THREE: THREE, kind: string, color: string, name: string, isMe:
     const halo = new THREE.Mesh(new THREE.TorusGeometry(0.3, 0.035, 6, 14, Math.PI), dark); halo.rotation.set(0, Math.PI / 2, 0); halo.position.set(0, clearance + 0.7, 0.05); g.add(halo)
   }
   if (b.swat) addSwatParts(THREE, g, b, clearance)
+  if (b.amb) addAmbulanceParts(THREE, g, b, clearance)
   // Rennstreifen
   if (b.stripe || kind === 'sportwagen' || kind === 'cabrio') {
     const st = new THREE.Mesh(new THREE.BoxGeometry(0.34, 0.02, b.len * 0.98), new THREE.MeshStandardMaterial({ color: 0xf8fafc, roughness: 0.4 }))

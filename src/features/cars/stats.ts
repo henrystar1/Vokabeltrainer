@@ -21,6 +21,7 @@ export const KIND_STATS: Record<string, KindStats> = {
   supercar: { kmh: 330, acc: 31, turn: 2.1, brake: 50 },
   /** SWAT-Panzerwagen: sehr schnell, schwer, hält viel aus (Schadensfaktor in KIND_TOUGH) */
   swat: { kmh: 310, acc: 30, turn: 1.8, brake: 50 },
+  ambulance: { kmh: 190, acc: 17, turn: 1.55, brake: 36 },
   chopper: { kmh: 190, acc: 17, turn: 2.1, brake: 30 },
   crossbike: { kmh: 175, acc: 24, turn: 2.7, brake: 34 },
   sportbike: { kmh: 260, acc: 30, turn: 2.6, brake: 44 },
@@ -36,7 +37,7 @@ export const KIND_DIMS: Record<string, { len: number; wid: number }> = {
   pickup: { len: 5.3, wid: 2.0 }, cabrio: { len: 4.3, wid: 1.85 }, sportwagen: { len: 4.5, wid: 1.95 }, bus: { len: 6.6, wid: 2.2 },
   oldtimer: { len: 4.4, wid: 1.8 }, buggy: { len: 3.4, wid: 1.9 }, monstertruck: { len: 4.8, wid: 2.4 }, muscle: { len: 4.9, wid: 1.95 },
   rallye: { len: 4.1, wid: 1.85 }, gt: { len: 4.7, wid: 2.0 }, hypercar: { len: 4.6, wid: 2.05 }, rennwagen: { len: 5.0, wid: 2.0 },
-  roadster: { len: 4.2, wid: 1.85 }, supercar: { len: 4.5, wid: 1.85 }, swat: { len: 6.4, wid: 2.5 },
+  roadster: { len: 4.2, wid: 1.85 }, supercar: { len: 4.5, wid: 1.85 }, swat: { len: 6.4, wid: 2.5 }, ambulance: { len: 6.2, wid: 2.3 },
   chopper: { len: 2.6, wid: 0.9 }, crossbike: { len: 2.1, wid: 0.8 }, sportbike: { len: 2.1, wid: 0.8 }, hyperbike: { len: 2.2, wid: 0.8 },
 }
 export const kindDims = (kind: string): { len: number; wid: number } => KIND_DIMS[kind] ?? KIND_DIMS.kleinwagen

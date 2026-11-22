@@ -958,3 +958,8 @@ Tabelle `book_library_hidden`; `in_library` blendet ein veröffentlichtes Buch d
 - **Rettung** (RaceView `startRescue/tickRescue`): Tod → bewusstlos; Krankenwagen-Bot fährt aus der Garage, parkt mit Abstand, 2 Sanitäter holen die Trage, Fahrt zurück, Aufwachen im Bett (`hospitalWake`). Sofort-Wiederbelebung 10 Coins (`race_revive_pay`, Admin gratis); Admin kann andere per Event `rv` freigeben. Sanitäter-Spieler im Dienst (Events `mc/mp/mh`, Payload `dn/dc/od`) fahren selbst; Lohn `race_duty_pay('medic')`.
 - **Dienste**: Spot `dress` (Ankleidezimmer) in Wache/Krankenhaus schaltet Dienst (`dutyRef`). Polizei im Dienst wird bei Bankraub/Diebstahl/Waffenkammer zur Wache teleportiert (`go`-Nachricht mit `cops`, `ex`), Lohn `race_duty_pay('police')`. Gestrichelte Wegelinie (`dashMesh`, `setRoute`) auf den Straßen.
 - SQL `0115_race_duty_revive.sql`. Nicht im Browser getestet.
+
+## Update 143
+- **Rettung repariert**: Ziel ist nur noch das Krankenhaus-**Gelände** (`inHospGrounds`: Block + 20 m Straße), dann Aufwachen im Bett (Bot und Sanitäter-Spieler). Vorher fehlte das Setzen der Sanitäter-Figuren; jetzt werden sie pro Frame positioniert/animiert (Arme tragen), mit Notfall-Teleports bei Hängern (`stuckFor`).
+- **Krankenwagen** als eigene Art `ambulance` (stats.ts, scene.ts `addAmbulanceParts`: rote/gelbe Streifen, Kreuze, „AMBULANZ“ (vorn gespiegelt), Blaulichtbalken vorn/hinten, Hecktüren); **Sanitäter-Skin** (`medicSkin/makeMedic` in swatMan.ts).
+- Nicht im Browser getestet.

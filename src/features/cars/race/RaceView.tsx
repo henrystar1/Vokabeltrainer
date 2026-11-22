@@ -62,7 +62,7 @@ import { buildingAt, walkNav, FLOOR_H } from './interior'
 import { raceDutyPay, raceRevivePay } from '../../../services/cars'
 import { HP_MAX, footConfig, hpCfg, carHit, exitFromCar, nearestCar, newWalker, stepWalker, type Walker } from './foot'
 import { poseWalker } from './walkerMesh'
-import { addBaton, makeSwatMan } from './swatMan'
+import { addBaton, makeMedic, makeSwatMan } from './swatMan'
 import { POI_COLOR, POI_LETTER, hospitalBed, pois, spotNear, type SpotKind } from './poi'
 import VocabShop from './VocabShop'
 import { racePerkInfo, raceBankClaim, raceBankPay, raceBankStatus, type RacePerks } from '../../../services/cars'
@@ -832,10 +832,13 @@ export default function RaceView({ trackId, custom, laps, me, assistOk = false, 
       let rescue: Rescue | null = null
       let dutyChase = false
       const hospLot = { x: (HOSPITAL.lot.x0 + HOSPITAL.lot.x1) / 2, z: HOSPITAL.lot.z1 - 12 }
+      /** Krankenhausgelände: der Block samt Gehweg (±48 m) und ein Stück Straße davor */
+      const inHospGrounds = (x: number, z: number) => Math.hypot(Math.max(Math.abs(x - HOSPITAL.cx) - 48, 0), Math.max(Math.abs(z - HOSPITAL.cz) - 48, 0)) < 20
+      let phaseSeen = '', phaseT = 0
       const mkAmb = (): PBot => {
         const slot = HOSPITAL.slots[0]
-        const mesh = rs.makeCar('bus', '#f8fafc', 'Krankenwagen', false); rs.addSiren(mesh); scene.add(mesh)
-        return { id: `pb-amb-${(online?.userId ?? 'x').slice(0, 6)}`, name: 'Krankenwagen', kind: 'bus', color: '#f8fafc', car: { ...startCar(track, 0), x: slot.x, z: slot.z, h: slot.h, v: 0 }, st: statsFor('bus', 170), mem: { stuck: 0 }, mesh }
+        const mesh = rs.makeCar('ambulance', '#f8fafc', 'Krankenwagen', false); scene.add(mesh)
+        return { id: `pb-amb-${(online?.userId ?? 'x').slice(0, 6)}`, name: 'Krankenwagen', kind: 'ambulance', color: '#f8fafc', car: { ...startCar(track, 0), x: slot.x, z: slot.z, h: slot.h, v: 0 }, st: statsFor('ambulance', 190), mem: { stuck: 0 }, mesh }
       }
       const mkStretcher = (): import('three').Group => {
         const g = new THREE.Group()
@@ -913,6 +916,8 @@ export default function RaceView({ trackId, custom, laps, me, assistOk = false, 
         if (!r || !foot) return
         const b = r.body, t = (nowT - r.t0) / 1000
         foot = { ...foot, stun: 99, hp: 1 }
+        if (phaseSeen !== r.phase) { phaseSeen = r.phase; phaseT = nowT }
+        const stuckFor = (nowT - phaseT) / 1000
         const hasMedic = [...remotes.values()].some((x) => x.od === 'm' && fresh(x) && !x.dn)
         if (r.phase === 'wait') {
           if (t > (hasMedic ? 14 : 5)) { r.amb = mkAmb(); r.phase = 'go'; say('Ein Krankenwagen fährt zu dir.') }
@@ -923,17 +928,25 @@ export default function RaceView({ trackId, custom, laps, me, assistOk = false, 
             const sx = Math.cos(a.car.h), sz = -Math.sin(a.car.h)
             r.medics = [-1, 1].map((sd) => {
               const w = newWalker(a.car.x + sx * sd * 2.4, a.car.z + sz * sd * 2.4, a.car.h, a.car.y ?? 0)
-              const m = rs.makeWalker('#f8fafc', '#dc2626', 'Sanitäter'); scene.add(m)
+              const m = makeMedic(THREE); scene.add(m)
               return { w, m }
             })
             r.stretcher = mkStretcher(); scene.add(r.stretcher)
             r.phase = 'walk'
           } else if (dd < 20) a.car = stepCar(a.car, { ...idleIn, brake: true }, dt, track, a.st, true)
-          else steerTo(a, b.x, b.z, dt)
+          else {
+            steerTo(a, b.x, b.z, dt)
+            if (stuckFor > 45) {
+              // Notfall: der Krankenwagen steht schon in der Nähe, falls er sich verirrt hat
+              for (const [ox, oz] of [[16, 0], [-16, 0], [0, 16], [0, -16], [22, 0], [-22, 0], [0, 22], [0, -22]] as const) if (!cityPush(b.x + ox, b.z + oz) && !buildingAt(b.x + ox, b.z + oz)) { a.car = { ...a.car, x: b.x + ox, z: b.z + oz, v: 0, lvl: 0, y: 0 }; break }
+              phaseT = nowT
+            }
+          }
         } else if (r.phase === 'walk') {
           const a = r.amb
           const d0 = walkTo(r.medics[0], b.x - Math.cos(b.h) * 0.9, b.z + Math.sin(b.h) * 0.9, dt), d1 = walkTo(r.medics[1], b.x + Math.cos(b.h) * 0.9, b.z - Math.sin(b.h) * 0.9, dt)
           if (r.stretcher) { const m0 = r.medics[0].w, m1 = r.medics[1].w; r.stretcher.position.set((m0.x + m1.x) / 2, m0.y + 0.7, (m0.z + m1.z) / 2); r.stretcher.rotation.y = Math.atan2(m1.x - m0.x, m1.z - m0.z) + Math.PI / 2 }
+          if (stuckFor > 25) for (const [i, m] of r.medics.entries()) m.w = { ...m.w, x: b.x + (i ? 2 : -2), z: b.z + 0.5, y: b.y }
           if (d0 < 2.2 && d1 < 2.2) { r.phase = 'carry'; say('Die Sanitäter legen dich auf die Trage …') }
           if (a) a.car = stepCar(a.car, { ...idleIn, brake: true }, dt, track, a.st, true)
         } else if (r.phase === 'carry' && r.amb) {
@@ -942,7 +955,8 @@ export default function RaceView({ trackId, custom, laps, me, assistOk = false, 
           const m0 = r.medics[0].w, m1 = r.medics[1].w
           const mx = (m0.x + m1.x) / 2, mz = (m0.z + m1.z) / 2
           if (r.stretcher) { r.stretcher.position.set(mx, m0.y + 0.7, mz); r.stretcher.rotation.y = Math.atan2(m1.x - m0.x, m1.z - m0.z) + Math.PI / 2 }
-          foot = { ...foot, x: mx, z: mz, y: m0.y + 0.95 }
+          foot = { ...foot, x: mx, z: mz, y: m0.y + 0.95, h: Math.atan2(m1.x - m0.x, m1.z - m0.z) + Math.PI / 2 }
+          if (stuckFor > 25) for (const [i, m] of r.medics.entries()) m.w = { ...m.w, x: a.car.x - Math.sin(a.car.h) * 3 + (i ? 1 : -1), z: a.car.z - Math.cos(a.car.h) * 3 }
           a.car = stepCar(a.car, { ...idleIn, brake: true }, dt, track, a.st, true)
           if (d0 < 2.6 && d1 < 2.6) {
             for (const m of r.medics) scene.remove(m.m)
@@ -955,11 +969,18 @@ export default function RaceView({ trackId, custom, laps, me, assistOk = false, 
           const a = r.amb
           steerTo(a, hospLot.x, hospLot.z, dt)
           foot = { ...foot, x: a.car.x, z: a.car.z, y: a.car.y ?? 0 }
-          if (Math.hypot(hospLot.x - a.car.x, hospLot.z - a.car.z) < 14) finishRescue()
+          if (inHospGrounds(a.car.x, a.car.z)) finishRescue()
         } else if (r.phase === 'carried') {
           const m = r.claimed ? remotes.get(r.claimed) : undefined
           if (m) foot = { ...foot, x: m.x, z: m.z, y: m.yy ?? 0 }
           if (footMesh) footMesh.visible = false
+        }
+        // Sanitäter zeigen: Figuren setzen, tragen mit nach vorn gestreckten Armen
+        for (const m of r.medics) {
+          m.m.position.set(m.w.x, m.w.y, m.w.z); m.m.rotation.y = m.w.h
+          poseWalker(m.m, m.w.ph, m.w.sp, 0, false)
+          const u = m.m.userData as Record<string, import('three').Group>
+          if (u.armL && u.armR) { u.armL.rotation.x = -1.0; u.armR.rotation.x = -1.0 }
         }
         // Sanitäter-Spieler ausgefallen oder zu langsam: nach 100 s kommt doch die Rettung
         if (t > 110 && r.phase !== 'back') { finishRescue(); return }
@@ -1023,7 +1044,7 @@ export default function RaceView({ trackId, custom, laps, me, assistOk = false, 
           const slot = HOSPITAL.slots[1]
           car = { ...car, x: slot.x, z: slot.z, h: slot.h, v: 0, y: 0, vy: 0, fly: 0, lvl: 0, dmg: 0, hit: 0, steer: 0, slip: 0 }
           foot = null; if (footMesh) { scene.remove(footMesh); footMesh = null }
-          setVehicle('bus', '#f8fafc', null, undefined, true); myMesh.visible = true
+          setVehicle('ambulance', '#f8fafc', null, undefined, false); myMesh.visible = true
           setRoute({ x: v.x, z: v.z }); say(`${v.name} braucht Hilfe! Fahr mit dem Krankenwagen hin (blaue Linie).`)
           return
         }
@@ -1037,7 +1058,7 @@ export default function RaceView({ trackId, custom, laps, me, assistOk = false, 
           }
         } else {
           setRoute({ x: hospLot.x, z: hospLot.z })
-          if (Math.hypot(hospLot.x - car.x, hospLot.z - car.z) < 18) {
+          if (inHospGrounds(car.x, car.z)) {
             if (ready) void ch?.send({ type: 'broadcast', event: 'mh', payload: { to: v.id } }).catch(() => undefined)
             void raceDutyPay('medic').then((r) => { if (dead || !r.coins) return; say(`Einsatz abgeschlossen: +${r.coins} Coins`); if (r.koins !== null) walletRef.current?.setBalance(r.koins) }).catch(() => undefined)
             endMission()
