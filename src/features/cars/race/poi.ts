@@ -3,7 +3,7 @@ import { canon, layoutOf, setSpecial, type Solid } from './interior'
 
 /** Besondere Häuser der Stadt mit Einrichtung: Bank (Tresen + Tresor), Shop (Theke), Fitnessstudio (Geräte), Krankenhaus (Betten, hier wacht man nach dem Tod auf). Feste Auswahl, überall gleich. */
 export type PoiKind = 'bank' | 'shop' | 'gym' | 'hospital' | 'police'
-export type SpotKind = 'vault' | 'counter' | 'machine' | 'armory' | 'steal'
+export type SpotKind = 'vault' | 'counter' | 'machine' | 'armory' | 'steal' | 'dress'
 export interface Spot { x: number; z: number; r: number; kind: SpotKind; label: string }
 export interface Poi {
   id: string; kind: PoiKind; name: string; b: Bld
@@ -38,7 +38,7 @@ export function pois(): Poi[] {
     }
   }
   take('bank', 'Bank', 1, 0, (b) => Math.hypot(b.x - 180, b.z + 180))
-  take('hospital', 'Krankenhaus', 1, 250, (b) => Math.hypot(b.x + 120, b.z - 120))
+  { const b = c.buildings.find((q) => q.kind === 'hospital'); if (b) out.push(furnish({ id: 'hospital0', kind: 'hospital', name: 'Krankenhaus', b, x: 0, z: 0, nx: 0, nz: 0, solids: [], spots: [] })) }
   { const b = c.buildings.find((q) => q.kind === 'police'); if (b) out.push(furnish({ id: 'police0', kind: 'police', name: 'Polizeiwache', b, x: 0, z: 0, nx: 0, nz: 0, solids: [], spots: [] })) }
   take('shop', 'Shop', 4, 260, (b) => hash(b))
   take('gym', 'Fitnessstudio', 2, 300, (b) => hash(b, 1) + 1)
@@ -101,17 +101,26 @@ function furnish(p: Poi): Poi {
     spot(W - 6.75, D - 14.4, 3.4, 'armory', 'Waffenkammer aufbrechen')
     solids.push(rect(-W + 0.6, -W + 1.6, 4, 9, 1.8, 0x7c2d12), rect(-W + 0.5, -W + 1.7, 4.4, 8.6, 0.5, 0xfacc15, { y0: 1.0, deco: true }))
     spot(-W + 4, 6.5, 3.2, 'steal', 'SWAT-Wagen klauen')
+    // Ankleidezimmer: Spinde an der Südwand, hier wird man Polizist (Dienst an/aus)
+    for (let i = 0; i < 5; i++) solids.push(rect(W - 15 + i * 2.6, W - 13 + i * 2.6, -D + 0.6, -D + 1.8, 2.3, i % 2 ? 0x1e40af : 0x1d4ed8), rect(W - 14.6 + i * 2.6, W - 13.4 + i * 2.6, -D + 1.8, -D + 1.9, 0.3, 0xe5e7eb, { y0: 1.6, deco: true }))
+    spot(W - 8, -D + 4.4, 3.2, 'dress', 'Ankleidezimmer: Polizei-Dienst')
   } else {
     const beds: NonNullable<Poi['beds']> = []
     let i = 0
     for (let u = -W + 8; u + 3 < W - 3 && i < 12; u += 5) for (let v = -D + 10; v + 3 < D - 3 && i < 12; v += 6) {
-      solids.push(rect(u, u + 1.0, v, v + 2.1, 0.55, 0xf8fafc), rect(u, u + 1.0, v + 2.1, v + 2.25, 1.1, 0x94a3b8), rect(u + 0.1, u + 0.9, v + 1.5, v + 2.0, 0.15, 0xdbeafe, { y0: 0.55, deco: true }))
+      const blanket = [0xef4444, 0x3b82f6, 0x22c55e, 0xfacc15][i % 4]
+      solids.push(rect(u, u + 1.0, v, v + 2.1, 0.55, 0xf8fafc), rect(u, u + 1.0, v + 2.1, v + 2.25, 1.1, 0x94a3b8), rect(u + 0.1, u + 0.9, v + 1.5, v + 2.0, 0.15, 0xdbeafe, { y0: 0.55, deco: true }), rect(u + 0.05, u + 0.95, v + 0.1, v + 1.4, 0.2, blanket, { y0: 0.55, deco: true }))
+      if (i % 2 === 0) solids.push(rect(u + 1.3, u + 1.4, v, v + 2.1, 1.9, 0x93c5fd, { deco: true }))
       const w = toW(u - 1.1, v + 1.0)
       beds.push({ x: w.x, z: w.z, h: Math.atan2(toW(u, v + 1).x - w.x, toW(u, v + 1).z - w.z) })
       i++
     }
     solids.push(rect(W - 10, W - 2, -D + 4, -D + 5.2, 1.1, 0xe5e7eb), rect(W - 10, W - 2, -D + 4, -D + 5.2, 0.12, 0xef4444, { y0: 1.1, deco: true }))
     p.beds = beds
+    // Wartebänke, Rotkreuz-Teppich und Ankleidezimmer (Sanitäter-Dienst) an der Südwand
+    solids.push(rect(-W + 14, -W + 20, -D + 6.5, -D + 7.3, 0.5, 0x2563eb), rect(-W + 14, -W + 20, -D + 6.2, -D + 6.5, 1.0, 0x1d4ed8), rect(-W + 24, -W + 25.2, -D + 3, -D + 6, 0.02, 0xef4444, { deco: true }), rect(-W + 23.4, -W + 25.8, -D + 4.2, -D + 4.8, 0.02, 0xef4444, { deco: true }))
+    for (let i = 0; i < 4; i++) solids.push(rect(-W + 28 + i * 2.6, -W + 30 + i * 2.6, -D + 0.6, -D + 1.8, 2.3, i % 2 ? 0xdc2626 : 0xf8fafc), rect(-W + 28.4 + i * 2.6, -W + 29.6 + i * 2.6, -D + 1.8, -D + 1.9, 0.3, 0xdc2626, { y0: 1.6, deco: true }))
+    spot(-W + 33, -D + 4.4, 3.2, 'dress', 'Ankleidezimmer: Sanitäter-Dienst')
   }
   setSpecial(p.b, solids)
   const d = layoutOf(p.b).door

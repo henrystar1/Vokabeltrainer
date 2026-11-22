@@ -51,3 +51,5 @@ export const racePerkAnswer = (kind: 'shop' | 'gym') => rpc<RacePerks>('race_per
 export const raceBankStatus = () => rpc<number>('race_bank_status')
 export const raceBankClaim = () => rpc<number>('race_bank_claim')
 export const raceBankPay = () => rpc<{ coins: number; koins: number | null }>('race_bank_pay')
+export const raceRevivePay = () => rpc<number>('race_revive_pay')
+export const raceDutyPay = (kind: 'police' | 'medic') => rpc<{ coins: number; koins: number | null }>('race_duty_pay', { p_kind: kind })

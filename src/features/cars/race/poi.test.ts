@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { newWalker, stepWalker } from './foot'
 import { buildingAt } from './interior'
-import { POLICE, cityPush } from './city'
+import { HOSPITAL, POLICE, cityPush } from './city'
 import { hospitalBed, poiNear, pois, spotNear } from './poi'
 
 describe('Besondere Häuser', () => {
@@ -37,6 +37,15 @@ describe('Besondere Häuser', () => {
     for (const s of POLICE.slots) { const h = cityPush(s.x, s.z); expect(h === null || h.lo !== undefined).toBe(true) }
     // der Parkplatz selbst ist frei
     expect(cityPush((POLICE.lot.x0 + POLICE.lot.x1) / 2, (POLICE.lot.z0 + POLICE.lot.z1) / 2)).toBeNull()
+  })
+  it('Krankenhaus und Wache haben ein Ankleidezimmer, das Krankenhaus Betten und Garagenplätze', () => {
+    const h = pois().find((q) => q.kind === 'hospital')!, c = pois().find((q) => q.kind === 'police')!
+    expect(h.spots.some((s) => s.kind === 'dress')).toBe(true)
+    expect(c.spots.some((s) => s.kind === 'dress')).toBe(true)
+    expect(h.beds?.length ?? 0).toBeGreaterThan(5)
+    expect(h.nz).toBeLessThan(-0.9)
+    for (const s of HOSPITAL.slots) { const k = cityPush(s.x, s.z); expect(k === null || k.lo !== undefined).toBe(true) }
+    expect(Math.hypot(h.x - c.x, h.z - c.z)).toBeGreaterThan(300)
   })
   it('poiNear findet das Haus an der Tür, spotNear die Bedienstelle', () => {
     const q = pois()[0]

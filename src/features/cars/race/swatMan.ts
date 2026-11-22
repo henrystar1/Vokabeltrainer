@@ -48,3 +48,15 @@ export function makeSwatMan(THREE: THREE): T.Group {
   if (arm) { gun.rotation.x = 0; arm.add(gun) }
   return m
 }
+
+/** Schlagstock in die rechte Hand eines Laufmodells (Polizist, Dieb mit Schlagstock) */
+export function addBaton(THREE: THREE, m: T.Group): void {
+  if (m.userData.bt) return
+  const arm = m.userData.armR as T.Group | undefined
+  if (!arm) return
+  const stick = new THREE.Mesh(new THREE.CylinderGeometry(0.035, 0.035, 0.62, 8), new THREE.MeshStandardMaterial({ color: 0x0b0f17, roughness: 0.4, metalness: 0.5 }))
+  stick.rotation.x = Math.PI / 2; stick.position.set(0, -0.58, 0.28)
+  const grip = new THREE.Mesh(new THREE.CylinderGeometry(0.042, 0.042, 0.16, 8), new THREE.MeshStandardMaterial({ color: 0x7c2d12, roughness: 0.8 }))
+  grip.rotation.x = Math.PI / 2; grip.position.set(0, -0.58, 0.02)
+  arm.add(stick, grip); m.userData.bt = 1
+}

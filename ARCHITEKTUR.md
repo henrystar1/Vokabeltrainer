@@ -949,3 +949,12 @@ Tabelle `book_library_hidden`; `in_library` blendet ein veröffentlichtes Buch d
 - **SWAT-Männer** (swatMan.ts: selbstgemalter 64×64-Skin + Pistole): steigen bei Bandit zu Fuß aus (`deploySwat`, höchstens 10 je Jagd), `swatMen` laufen/schießen (Leuchtspur `tracer`, Event `sd` = Schuss-Schaden), SWAT-Wagen-Geschütz der Bots (`swatTruckFire`). Menschlicher Fahrer: Taste Q im SWAT-Wagen (`fireSwat`), nur als Polizist in der Jagd oder Admin, geradeaus entlang der Fahrtrichtung, kein Button. Männer werden über `k:'swatman'` zu den Mitspielern gesendet.
 - **Polizeihof** (city.ts `POLICE`, eigener Block bei (−420, 300), `Bld.col/door/kind`): blaue Wache (Tür nach Süden zum Hof, weißes Dach-Band, Schilder, Lichtbalken), Parkplatz mit Buchten, offene Garage (Wände + Dach mit Sturz `lo`), 6 Startplätze (`POLICE.slots`) für die Streifenwagen/SWAT; Deko in scene.ts `policeDecor`. Innen hellblau.
 - Nicht im Browser getestet.
+
+## Update 142
+- **SWAT-Panzerung**: im SWAT-Wagen kein Autoschaden/Feuer/Explosion; Leben kostet nur Beschuss (`hurtByShot`) und Rammen durch schnellere Polizei (`swatHurt`). Rammt man selbst einen Polizei-Bot, kostet es nichts, aber `callSwat()` ruft SWAT.
+- **Schlagstock** sichtbar (`addBaton` in swatMan.ts): eigener Läufer, Polizei-Bots, Mitspieler (Payload `bt`). **Skin bleibt in der Jagd** (`makeFootMesh`, Remote-Läufer).
+- **Geschütz zielt** auf letzte Mausposition/Tippen (`aimDir`, Raycast auf Bodenebene; Klick/Tipp feuert, Q auch).
+- **Krankenhaus-Block** wie die Wache (`HOSPITAL` in city.ts, `blockLayout`; scene.ts `blockDecor` mit rotem Kreuz, Hof, Rettungsgarage); Betten mit bunten Decken.
+- **Rettung** (RaceView `startRescue/tickRescue`): Tod → bewusstlos; Krankenwagen-Bot fährt aus der Garage, parkt mit Abstand, 2 Sanitäter holen die Trage, Fahrt zurück, Aufwachen im Bett (`hospitalWake`). Sofort-Wiederbelebung 10 Coins (`race_revive_pay`, Admin gratis); Admin kann andere per Event `rv` freigeben. Sanitäter-Spieler im Dienst (Events `mc/mp/mh`, Payload `dn/dc/od`) fahren selbst; Lohn `race_duty_pay('medic')`.
+- **Dienste**: Spot `dress` (Ankleidezimmer) in Wache/Krankenhaus schaltet Dienst (`dutyRef`). Polizei im Dienst wird bei Bankraub/Diebstahl/Waffenkammer zur Wache teleportiert (`go`-Nachricht mit `cops`, `ex`), Lohn `race_duty_pay('police')`. Gestrichelte Wegelinie (`dashMesh`, `setRoute`) auf den Straßen.
+- SQL `0115_race_duty_revive.sql`. Nicht im Browser getestet.

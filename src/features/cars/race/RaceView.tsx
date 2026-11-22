@@ -8,7 +8,7 @@ import { createFx } from './fx'
 import { canFly, carKmh, flyHeight, flyRoll, isBike, kindDims, seatsOf, toughOf } from '../stats'
 import { useRaceCars, type RaceCarOption } from './useRaceCars'
 import { PARK, PARK_TOP, parkSurfaces, inParkXZ } from './parkhaus'
-import { BRIDGES, CITY, GARAGES, TUNNELS, bridgeH, city, inPark, roofH, tunnelClamp, tunnelD } from './city'
+import { BRIDGES, CITY, GARAGES, HOSPITAL, POLICE, TUNNELS, bridgeH, city, inPark, roofH, tunnelClamp, tunnelD } from './city'
 import { MOUNTAINS, WORLD, hillH, hillSlope, outRoads } from './mountains'
 import { CHASE_MAX_MS, chaseCar, clearLine, copDrive, type BotMem, type Role } from './chase'
 import ChasePanel, { type ChaseApi, type ChaseUi, type Peer } from './ChasePanel'
@@ -56,18 +56,19 @@ interface Props {
   onExit?: () => void
 }
 
-interface Remote { id: string; name: string; kind: string; color: string; x: number; z: number; h: number; v: number; tx: number; tz: number; th: number; total: number; ft: number | null; seen: number; dmg: number; slip: number; fl: number; lv?: number; yy?: number; pt?: number; hd?: boolean; wk?: boolean; wc?: string; ex?: number; pc?: number; pcAt?: number; rd?: string; ro?: 'b' | 'c'; mesh?: import('three').Group }
+interface Remote { id: string; name: string; kind: string; color: string; x: number; z: number; h: number; v: number; tx: number; tz: number; th: number; total: number; ft: number | null; seen: number; dmg: number; slip: number; fl: number; lv?: number; yy?: number; pt?: number; hd?: boolean; wk?: boolean; wc?: string; ex?: number; pc?: number; pcAt?: number; rd?: string; ro?: 'b' | 'c'; bt?: boolean; dn?: boolean; dc?: string; od?: string; mesh?: import('three').Group }
 
 import { buildingAt, walkNav, FLOOR_H } from './interior'
+import { raceDutyPay, raceRevivePay } from '../../../services/cars'
 import { HP_MAX, footConfig, hpCfg, carHit, exitFromCar, nearestCar, newWalker, stepWalker, type Walker } from './foot'
 import { poseWalker } from './walkerMesh'
-import { makeSwatMan } from './swatMan'
+import { addBaton, makeSwatMan } from './swatMan'
 import { POI_COLOR, POI_LETTER, hospitalBed, pois, spotNear, type SpotKind } from './poi'
 import VocabShop from './VocabShop'
 import { racePerkInfo, raceBankClaim, raceBankPay, raceBankStatus, type RacePerks } from '../../../services/cars'
 import { useAuthOptional } from '../../auth/AuthProvider'
 import { usePlusOptional } from '../../plus/PlusProvider'
-import { POLICE, cityPush } from './city'
+import { cityPush } from './city'
 import { errorMessage } from '../../../lib/errors'
 import { hillH as hillHeight } from './mountains'
 
@@ -163,6 +164,8 @@ export default function RaceView({ trackId, custom, laps, me, assistOk = false, 
   const perkRef = useRef({ until: 0, speed: 0, jump: 0, armor: 0, hearts: 100 })
   const applyPerks = (p: RacePerks) => { const t = Date.now(); perkRef.current = { until: p.spawn_sec > 0 ? t + p.spawn_sec * 1000 : 0, speed: p.speed_sec > 0 ? t + p.speed_sec * 1000 : 0, jump: p.jump_sec > 0 ? t + p.jump_sec * 1000 : 0, armor: p.armor_sec > 0 ? t + p.armor_sec * 1000 : 0, hearts: p.hearts }; hpCfg.max = p.hearts; setPerksUi(p) }
   const [shopUi, setShopUi] = useState<'shop' | 'gym' | null>(null)
+  const [dutyUi, setDutyUi] = useState<'' | 'p' | 'm'>('')
+  const [reviveUi, setReviveUi] = useState<{ mine: boolean; sec: number; other: { id: string; name: string } | null; busy: boolean }>({ mine: false, sec: 0, other: null, busy: false })
   const [poiUi, setPoiUi] = useState<{ kind: SpotKind; label: string } | null>(null)
   const healRef = useRef(false)
   /** Minecraft-Skin (nur Pro/Admin): PNG-Daten-URL im Browser gespeichert, an andere gesendet */
@@ -209,6 +212,9 @@ export default function RaceView({ trackId, custom, laps, me, assistOk = false, 
   const [bankWait, setBankWait] = useState(0)
   const heistRef = useRef<() => void>(() => undefined)
   const crimeRef = useRef<(what: 'armory' | 'steal') => void>(() => undefined)
+  const dutyRef = useRef<'' | 'p' | 'm'>('')
+  const reviveRef = useRef<() => void>(() => undefined)
+  const reviveOtherRef = useRef<(id: string) => void>(() => undefined)
   const poiKey = useRef<() => void>(() => undefined)
   useEffect(() => {
     if (def.mode !== 'city' || !online) return
@@ -433,12 +439,13 @@ export default function RaceView({ trackId, custom, laps, me, assistOk = false, 
           r.hd = payload.hd === 1; r.lv = Number(payload.lv) || 0; r.yy = Number(payload.y) || 0; r.pt = Number(payload.pt) || 0
           r.tx = Number(payload.x) || 0; r.tz = Number(payload.z) || 0; r.th = Number(payload.h) || 0; r.v = Number(payload.v) || 0
           r.dmg = Number(payload.d) || 0; r.slip = Number(payload.sl) || 0; r.fl = Number(payload.fl) || 0
+          r.dn = !!payload.dn; r.dc = String(payload.dc ?? ''); r.od = String(payload.od ?? ''); r.bt = !!payload.bt; if (r.bt && r.mesh && r.wk && !r.mesh.userData.bt) addBaton(THREE, r.mesh)
           r.total = Number(payload.t) || 0; r.ft = typeof payload.f === 'number' ? payload.f : null; r.seen = performance.now()
           if (typeof payload.k === 'string' && (payload.k !== r.kind || payload.c !== r.color || (r.mesh && r.mesh.userData.ro !== r.ro))) {
             r.kind = payload.k; r.color = String(payload.c || '#94a3b8')
             if (r.mesh) { scene.remove(r.mesh); r.mesh = undefined }
           }
-          if (!r.mesh) { if (r.wk && r.kind === 'swatman') { r.mesh = makeSwatMan(THREE); r.mesh.userData.wk = true } else if (r.wk) { r.mesh = rs.makeWalker(r.ro === 'c' ? '#1d4ed8' : r.ro === 'b' ? '#111827' : (r.wc || r.color), undefined, r.name, r.ro ? undefined : skins.get(r.id)); r.mesh.userData.wk = true } else { r.mesh = rs.makeCar(r.kind, r.color, r.name, false); if (r.ro === 'c') rs.addSiren(r.mesh) } r.mesh.userData.ro = r.ro; r.x = r.tx; r.z = r.tz; r.h = r.th; scene.add(r.mesh) }
+          if (!r.mesh) { if (r.wk && r.kind === 'swatman') { r.mesh = makeSwatMan(THREE); r.mesh.userData.wk = true } else if (r.wk) { r.mesh = rs.makeWalker(r.ro === 'c' ? '#1d4ed8' : r.ro === 'b' ? '#111827' : (r.wc || r.color), undefined, r.name, skins.get(r.id)); r.mesh.userData.wk = true; if (r.bt || r.ro === 'c') addBaton(THREE, r.mesh) } else { r.mesh = rs.makeCar(r.kind, r.color, r.name, false); if (r.ro === 'c') rs.addSiren(r.mesh) } r.mesh.userData.ro = r.ro; r.x = r.tx; r.z = r.tz; r.h = r.th; scene.add(r.mesh) }
         })
         ch.on('broadcast', { event: 'ch' }, ({ payload }) => onCh(payload as Record<string, unknown>))
         ch.on('broadcast', { event: 'sk' }, ({ payload }) => {
@@ -458,6 +465,11 @@ export default function RaceView({ trackId, custom, laps, me, assistOk = false, 
           lastRegenHit = performance.now(); say('Du wurdest geschlagen!')
         })
         // Schüsse (SWAT-Männer, SWAT-Geschütz) auf mich: zu Fuß Lebenspunkte, im Auto Schaden am Auto (SWAT-Wagen halten mehr aus)
+        // Rettung: Sanitäter melden sich (mc), laden mich ein (mp), liefern mich ab (mh); der Admin gibt gratis frei (rv)
+        ch.on('broadcast', { event: 'mc' }, ({ payload }) => { const p = payload as { to?: unknown; by?: unknown }; if (p.to === online.userId && rescue && !rescue.claimed && typeof p.by === 'string') rescueClaim(p.by) })
+        ch.on('broadcast', { event: 'mp' }, ({ payload }) => { const p = payload as { to?: unknown; by?: unknown }; if (p.to === online.userId && rescue && rescue.claimed === p.by) { rescue.phase = 'carried'; say('Die Sanitäter haben dich aufgeladen – ab ins Krankenhaus!') } })
+        ch.on('broadcast', { event: 'mh' }, ({ payload }) => { const p = payload as { to?: unknown }; if (p.to === online.userId && rescue) finishRescue() })
+        ch.on('broadcast', { event: 'rv' }, ({ payload }) => { const p = payload as { to?: unknown }; if (p.to === online.userId && rescue) reviveHere('Der Admin hat dich wiederbelebt!') })
         ch.on('broadcast', { event: 'sd' }, ({ payload }) => {
           const p = payload as { to?: unknown; d?: unknown; k?: unknown }
           if (p.to !== online.userId) return
@@ -595,6 +607,9 @@ export default function RaceView({ trackId, custom, laps, me, assistOk = false, 
         pb.w = undefined; if (pb.wm) { scene.remove(pb.wm); pb.wm = undefined }
         pb.carGone = true; scene.remove(pb.mesh)
         say('Polizist ausgeschaltet – die Polizei ruft SWAT!')
+        callSwat()
+      }
+      function callSwat() {
         const c = chase
         if (!c || c.over || c.from !== online?.userId || c.sw >= 4) return
         const n = c.sw++
@@ -611,13 +626,13 @@ export default function RaceView({ trackId, custom, laps, me, assistOk = false, 
         // Bankraub: Tresor auf, Fluchtautos (eins je Räuber) stehen vor der Tür; man bleibt zu Fuß
         const bank = heist ? pois().find((p) => p.kind === 'bank') : extra === 'armory' ? pois().find((p) => p.kind === 'police') : undefined
         const station = pois().find((p) => p.kind === 'police')
-        if (extra === 'steal' && station) {
+        if (role === 'bandit' && extra === 'steal' && station) {
           // SWAT-Wagen vom Hof der Wache klauen: man sitzt sofort drin
           car = { ...startCar(track, 0), x: station.x + station.nx * 9, z: station.z + station.nz * 9, h: Math.atan2(station.nx, station.nz), v: 0, lvl: 0, y: 0 }
           foot = null
           if (footMesh) { scene.remove(footMesh); footMesh = null }
           myMesh.visible = true
-        } else if (bank) {
+        } else if (role === 'bandit' && bank) {
           if (heist) rs.setVault(true)
           const n = bank.nx, m = bank.nz, idx = Math.max(0, bandits.indexOf(online.userId))
           const cc = chaseCar('bandit', false, false, false)
@@ -634,6 +649,15 @@ export default function RaceView({ trackId, custom, laps, me, assistOk = false, 
           myMesh.visible = true
         }
         applyRole(role, extra === 'steal')
+        dutyChase = false
+        if (role === 'cop' && dutyRef.current === 'p' && (heist || extra)) {
+          // Polizist im Dienst: zur Wache gebracht, Streifenwagen aus der Garage, Gangster verfolgen
+          const slot = POLICE.slots[POLICE.slots.length - 1 - (Math.max(0, cops.indexOf(online.userId)) % POLICE.slots.length)]
+          car = { ...car, x: slot.x, z: slot.z, h: slot.h, v: 0, y: 0, vy: 0, fly: 0, lvl: 0, dmg: 0, hit: 0, steer: 0, slip: 0 }
+          foot = null; if (footMesh) { scene.remove(footMesh); footMesh = null }
+          myMesh.visible = true; dutyChase = true
+          say('Einsatz! Du wurdest zur Wache gebracht – verfolge den Gangster (blaue Linie).')
+        }
         if (foot) makeFootMesh()
         if (from === online.userId) pbots = Array.from({ length: extra === 'steal' ? Math.min(4, bots) : Math.min(6, bots) }, (_, i) => mkPbot(i, extra === 'steal'))
         const bn = bandits.filter((b) => b !== online.userId).map((b) => remotes.get(b)?.name ?? 'Bandit').join(', ') || 'den Bandit'
@@ -672,7 +696,7 @@ export default function RaceView({ trackId, custom, laps, me, assistOk = false, 
       let lastBankPoll = 0
       /** Leben der Figur (auch im Auto: Schäden am Auto und Feuer kosten Leben, es gibt dort keine Erholung) */
       let myHp = hpCfg.max
-      let prevV = 0, prevDmg = 0, burnT = 0, wreck = 0
+      let prevV = 0, prevDmg = 0, burnT = 0, wreck = 0, swatHurt = 0
       let footMsg = '', footMsgT = 0
       let lastSpawn = 0, lastRegenHit = 0, lastPark = 0, lastMen = 0
       const say = (m: string) => { footMsg = m; footMsgT = performance.now() + 3500 }
@@ -724,7 +748,8 @@ export default function RaceView({ trackId, custom, laps, me, assistOk = false, 
       remakeFoot.current = () => { if (footMesh) makeFootMesh() }
       const makeFootMesh = () => {
         if (footMesh) scene.remove(footMesh)
-        footMesh = rs.makeWalker(myRole === 'cop' ? '#1d4ed8' : myRole === 'bandit' ? '#111827' : (wcRef.current || eff.color), undefined, undefined, myRole ? undefined : skinNow() || undefined)
+        footMesh = rs.makeWalker(myRole === 'cop' ? '#1d4ed8' : myRole === 'bandit' ? '#111827' : (wcRef.current || eff.color), undefined, undefined, skinNow() || undefined)
+        if (batonRef.current || myRole === 'cop') addBaton(THREE, footMesh)
         scene.add(footMesh)
       }
       const leaveRide = (m?: string) => {
@@ -750,7 +775,7 @@ export default function RaceView({ trackId, custom, laps, me, assistOk = false, 
       }
       const enterCar = () => {
         const f = foot
-        if (!f || footKo > 0) return
+        if (!f || footKo > 0 || rescue) return
         const cand: Array<{ x: number; z: number; p?: Parked; pb?: PBot; r?: Remote }> = [...parked.map((p) => ({ x: p.car.x, z: p.car.z, p })), ...pbots.filter((pb) => pb.w && !pb.carGone).map((pb) => ({ x: pb.car.x, z: pb.car.z, pb })), ...[...remotes.values()].filter((r) => !r.wk && !r.rd && !r.id.startsWith('pb-') && fresh(r) && Math.abs((r.yy ?? 0) - f.y) < 2.5).map((r) => ({ x: r.x, z: r.z, r }))]
         const n = nearestCar(f, cand, 5.5)
         if (!n) { say('Kein Auto in der Nähe zum Einsteigen.'); return }
@@ -790,21 +815,238 @@ export default function RaceView({ trackId, custom, laps, me, assistOk = false, 
         myMesh.visible = true
       }
       /** Nach dem Tod: zu Fuß in einem Bett im Krankenhaus aufwachen (kein neues Auto) */
-      const hospitalRespawn = (msg: string) => {
+      const hospitalWake = (msg: string) => {
         const bd = hospitalBed()
         ride = null; wreck = 0
         car = { ...car, x: bd.x, z: bd.z, h: bd.h, v: 0, y: 0, vy: 0, fly: 0, lvl: 0, dmg: 0, hit: 0, steer: 0, slip: 0 }
         myHp = hpCfg.max; prevV = 0; prevDmg = 0; burnT = 0
         foot = { ...newWalker(bd.x, bd.z, bd.h), stun: 1.2 }
         footKo = 0
-        // Gefangen ist man nur noch, wenn man in der Jagd stirbt
-        if (chase && !chase.over && myRole === 'bandit' && !iCaught && online) markCaught(online.userId, true)
         makeFootMesh(); myMesh.visible = false
         say(msg)
       }
+
+      // ── Tod und Rettung: Krankenwagen (Bot) oder Sanitäter-Spieler holt die Liege, sonst Wiederbelebung für 10 Coins ──
+      interface Medic { w: Walker; m: import('three').Group }
+      interface Rescue { t0: number; phase: 'wait' | 'go' | 'park' | 'walk' | 'carry' | 'back' | 'claimed' | 'carried'; amb?: PBot; medics: Medic[]; stretcher?: import('three').Group; body: { x: number; z: number; h: number; y: number }; claimed?: string; msg: string; free: boolean }
+      let rescue: Rescue | null = null
+      let dutyChase = false
+      const hospLot = { x: (HOSPITAL.lot.x0 + HOSPITAL.lot.x1) / 2, z: HOSPITAL.lot.z1 - 12 }
+      const mkAmb = (): PBot => {
+        const slot = HOSPITAL.slots[0]
+        const mesh = rs.makeCar('bus', '#f8fafc', 'Krankenwagen', false); rs.addSiren(mesh); scene.add(mesh)
+        return { id: `pb-amb-${(online?.userId ?? 'x').slice(0, 6)}`, name: 'Krankenwagen', kind: 'bus', color: '#f8fafc', car: { ...startCar(track, 0), x: slot.x, z: slot.z, h: slot.h, v: 0 }, st: statsFor('bus', 170), mem: { stuck: 0 }, mesh }
+      }
+      const mkStretcher = (): import('three').Group => {
+        const g = new THREE.Group()
+        const frame = new THREE.Mesh(new THREE.BoxGeometry(0.8, 0.08, 2.0), new THREE.MeshStandardMaterial({ color: 0xe5e7eb, roughness: 0.6 }))
+        const pad = new THREE.Mesh(new THREE.BoxGeometry(0.7, 0.12, 1.9), new THREE.MeshStandardMaterial({ color: 0xdc2626, roughness: 0.8 })); pad.position.y = 0.1
+        const cross = new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.02, 0.1), new THREE.MeshBasicMaterial({ color: 0xffffff })); cross.position.set(0, 0.17, 0.7)
+        g.add(frame, pad, cross)
+        return g
+      }
+      const clearRescueMeshes = () => {
+        if (!rescue) return
+        if (rescue.amb) scene.remove(rescue.amb.mesh)
+        for (const m of rescue.medics) scene.remove(m.m)
+        if (rescue.stretcher) scene.remove(rescue.stretcher)
+        rescue.amb = undefined; rescue.medics = []; rescue.stretcher = undefined
+      }
+      function rescueClaim(by: string) {
+        if (!rescue) return
+        rescue.claimed = by; rescue.phase = 'claimed'
+        if (rescue.amb) { scene.remove(rescue.amb.mesh); rescue.amb = undefined }
+        say('Ein Sanitäter ist auf dem Weg zu dir!')
+      }
+      const startRescue = (msg: string) => {
+        if (!hospitalBed || !pois().some((q) => q.kind === 'hospital') || rescue) { hospitalWake(msg); return }
+        const bx = foot ? foot.x : car.x, bz = foot ? foot.z : car.z, bh = foot ? foot.h : car.h, by = foot ? foot.y : (car.y ?? 0)
+        // Gefangen ist man nur noch, wenn man in der Jagd stirbt
+        if (chase && !chase.over && myRole === 'bandit' && !iCaught && online) markCaught(online.userId, true)
+        ride = null; wreck = 0; footKo = 0
+        myHp = 1; prevV = 0; prevDmg = 0; burnT = 0; swatHurt = 0
+        car = { ...car, x: bx, z: bz, v: 0, fly: 0, dmg: 0, hit: 0, steer: 0, slip: 0 }
+        foot = { ...newWalker(bx, bz, bh, by), hp: 1, stun: 99 }
+        rescue = { t0: performance.now(), phase: 'wait', medics: [], body: { x: bx, z: bz, h: bh, y: by }, msg, free: adminRef.current }
+        makeFootMesh(); myMesh.visible = false
+        say(msg + ' Hilfe ist unterwegs …')
+      }
+      /** Aufwachen im Krankenhausbett (Rettung abgeschlossen) */
+      function finishRescue() {
+        const r = rescue
+        clearRescueMeshes(); rescue = null
+        hospitalWake(r ? 'Du wurdest ins Krankenhaus gebracht und liegst im Bett.' : 'Du wachst im Krankenhaus auf.')
+      }
+      /** Sofort wiederbeleben, an Ort und Stelle */
+      function reviveHere(msg: string) {
+        const r = rescue
+        if (!r) return
+        clearRescueMeshes(); rescue = null
+        myHp = hpCfg.max
+        const b = r.body
+        foot = { ...newWalker(b.x, b.z, b.h, b.y), inv: 2.5 }
+        footKo = 0
+        makeFootMesh(); myMesh.visible = false
+        say(msg)
+      }
+      reviveRef.current = () => {
+        if (!rescue) return
+        setReviveUi((o) => ({ ...o, busy: true }))
+        void raceRevivePay().then((bal) => { if (dead) return; walletRef.current?.setBalance(bal); reviveHere('Wiederbelebt!') }).catch((e) => say(errorMessage(e))).finally(() => { if (!dead) setReviveUi((o) => ({ ...o, busy: false })) })
+      }
+      reviveOtherRef.current = (id) => { if (adminRef.current && ready) void ch?.send({ type: 'broadcast', event: 'rv', payload: { to: id } }).catch(() => undefined) }
+      const steerTo = (bot: PBot, tx: number, tz: number, dt: number) => {
+        const d = copDrive(bot.car, { x: tx, z: tz }, bot.mem, dt)
+        if (d.reset) bot.car = { ...bot.car, x: d.reset.x, z: d.reset.z, h: d.reset.h, v: 0, steer: 0, slip: 0, dmg: 0, hold: 0, lvl: 0, y: 0 }
+        if (d.repair) bot.car = { ...bot.car, dmg: 0, hold: 0 }
+        bot.car = stepCar(bot.car, { ...d.inp, fly: false, chase: true }, dt, track, bot.st, true)
+      }
+      const walkTo = (m: Medic, tx: number, tz: number, dt: number): number => {
+        const nv = walkNav({ x: m.w.x, z: m.w.z, y: m.w.y }, { x: tx, z: tz, y: rescue?.body.y ?? 0 })
+        let dh = Math.atan2(nv.x - m.w.x, nv.z - m.w.z) - m.w.h; while (dh > Math.PI) dh -= Math.PI * 2; while (dh < -Math.PI) dh += Math.PI * 2
+        const d = Math.hypot(tx - m.w.x, tz - m.w.z)
+        m.w = stepWalker(m.w, { fwd: d > 1.2 && Math.abs(dh) < 1.3, back: false, left: dh > 0.12, right: dh < -0.12, run: true }, dt)
+        return d
+      }
+      const tickRescue = (dt: number, nowT: number) => {
+        const r = rescue
+        if (!r || !foot) return
+        const b = r.body, t = (nowT - r.t0) / 1000
+        foot = { ...foot, stun: 99, hp: 1 }
+        const hasMedic = [...remotes.values()].some((x) => x.od === 'm' && fresh(x) && !x.dn)
+        if (r.phase === 'wait') {
+          if (t > (hasMedic ? 14 : 5)) { r.amb = mkAmb(); r.phase = 'go'; say('Ein Krankenwagen fährt zu dir.') }
+        } else if (r.phase === 'go' && r.amb) {
+          const a = r.amb, dd = Math.hypot(b.x - a.car.x, b.z - a.car.z)
+          if (dd < 20 && Math.abs(a.car.v) < 3) {
+            // mit etwas Abstand geparkt: zwei Sanitäter steigen aus und bringen die Trage
+            const sx = Math.cos(a.car.h), sz = -Math.sin(a.car.h)
+            r.medics = [-1, 1].map((sd) => {
+              const w = newWalker(a.car.x + sx * sd * 2.4, a.car.z + sz * sd * 2.4, a.car.h, a.car.y ?? 0)
+              const m = rs.makeWalker('#f8fafc', '#dc2626', 'Sanitäter'); scene.add(m)
+              return { w, m }
+            })
+            r.stretcher = mkStretcher(); scene.add(r.stretcher)
+            r.phase = 'walk'
+          } else if (dd < 20) a.car = stepCar(a.car, { ...idleIn, brake: true }, dt, track, a.st, true)
+          else steerTo(a, b.x, b.z, dt)
+        } else if (r.phase === 'walk') {
+          const a = r.amb
+          const d0 = walkTo(r.medics[0], b.x - Math.cos(b.h) * 0.9, b.z + Math.sin(b.h) * 0.9, dt), d1 = walkTo(r.medics[1], b.x + Math.cos(b.h) * 0.9, b.z - Math.sin(b.h) * 0.9, dt)
+          if (r.stretcher) { const m0 = r.medics[0].w, m1 = r.medics[1].w; r.stretcher.position.set((m0.x + m1.x) / 2, m0.y + 0.7, (m0.z + m1.z) / 2); r.stretcher.rotation.y = Math.atan2(m1.x - m0.x, m1.z - m0.z) + Math.PI / 2 }
+          if (d0 < 2.2 && d1 < 2.2) { r.phase = 'carry'; say('Die Sanitäter legen dich auf die Trage …') }
+          if (a) a.car = stepCar(a.car, { ...idleIn, brake: true }, dt, track, a.st, true)
+        } else if (r.phase === 'carry' && r.amb) {
+          const a = r.amb, bx = a.car.x - Math.sin(a.car.h) * 4.2, bz = a.car.z - Math.cos(a.car.h) * 4.2
+          const d0 = walkTo(r.medics[0], bx - Math.cos(a.car.h) * 0.9, bz + Math.sin(a.car.h) * 0.9, dt), d1 = walkTo(r.medics[1], bx + Math.cos(a.car.h) * 0.9, bz - Math.sin(a.car.h) * 0.9, dt)
+          const m0 = r.medics[0].w, m1 = r.medics[1].w
+          const mx = (m0.x + m1.x) / 2, mz = (m0.z + m1.z) / 2
+          if (r.stretcher) { r.stretcher.position.set(mx, m0.y + 0.7, mz); r.stretcher.rotation.y = Math.atan2(m1.x - m0.x, m1.z - m0.z) + Math.PI / 2 }
+          foot = { ...foot, x: mx, z: mz, y: m0.y + 0.95 }
+          a.car = stepCar(a.car, { ...idleIn, brake: true }, dt, track, a.st, true)
+          if (d0 < 2.6 && d1 < 2.6) {
+            for (const m of r.medics) scene.remove(m.m)
+            if (r.stretcher) scene.remove(r.stretcher)
+            r.medics = []; r.stretcher = undefined; r.phase = 'back'
+            if (footMesh) footMesh.visible = false
+            say('Du liegst im Krankenwagen – es geht ins Krankenhaus.')
+          }
+        } else if (r.phase === 'back' && r.amb) {
+          const a = r.amb
+          steerTo(a, hospLot.x, hospLot.z, dt)
+          foot = { ...foot, x: a.car.x, z: a.car.z, y: a.car.y ?? 0 }
+          if (Math.hypot(hospLot.x - a.car.x, hospLot.z - a.car.z) < 14) finishRescue()
+        } else if (r.phase === 'carried') {
+          const m = r.claimed ? remotes.get(r.claimed) : undefined
+          if (m) foot = { ...foot, x: m.x, z: m.z, y: m.yy ?? 0 }
+          if (footMesh) footMesh.visible = false
+        }
+        // Sanitäter-Spieler ausgefallen oder zu langsam: nach 100 s kommt doch die Rettung
+        if (t > 110 && r.phase !== 'back') { finishRescue(); return }
+        if (r.phase === 'claimed' && t > 70) { r.claimed = undefined; r.phase = 'go'; r.amb = mkAmb(); say('Der Sanitäter ist nicht angekommen – ein Krankenwagen fährt zu dir.') }
+        if (footMesh && r.phase !== 'back' && r.phase !== 'carried') footMesh.visible = true
+      }
+      const hospitalRespawn = (msg: string) => { startRescue(msg) }
+
+      // ── Dienste: Polizei (Ankleidezimmer in der Wache) und Sanitäter (Ankleidezimmer im Krankenhaus) ──
+      const toggleDuty = (kind: 'p' | 'm') => {
+        if (chase || rescue) return
+        const on = dutyRef.current === kind
+        dutyRef.current = on ? '' : kind; setDutyUi(dutyRef.current)
+        say(on ? 'Du bist nicht mehr im Dienst.' : kind === 'p' ? 'Du bist jetzt Polizist! Bei Bankraub, Autodiebstahl und Waffenkammer-Einbruch wirst du zur Wache gebracht – dafür gibt es Coins.' : 'Du bist jetzt Sanitäter! Wenn jemand stirbt, wirst du mit dem Krankenwagen losgeschickt – dafür gibt es Coins.')
+      }
+      // gestrichelte Wegelinie auf den Straßen zum Ziel
+      const dashMesh = new THREE.InstancedMesh(new THREE.BoxGeometry(1.2, 0.06, 3.4), new THREE.MeshBasicMaterial({ color: 0x38bdf8 }), 520)
+      dashMesh.count = 0; dashMesh.frustumCulled = false; scene.add(dashMesh)
+      cleanups.push(() => { scene.remove(dashMesh); dashMesh.dispose() })
+      let routeTgt: { x: number; z: number } | null = null, routeAt = 0
+      const setRoute = (t: { x: number; z: number } | null) => { routeTgt = t; routeAt = 0; if (!t) dashMesh.count = 0 }
+      const updateRoute = (nowT: number) => {
+        if (!routeTgt || nowT - routeAt < 1000) return
+        routeAt = nowT
+        const src = foot ?? car, P = CITY.pitch, T = routeTgt
+        const snap = (x: number, z: number): [number, number] => { const ai = Math.round(x / P), aj = Math.round(z / P); return Math.abs(x - ai * P) <= Math.abs(z - aj * P) ? [ai * P, z] : [x, aj * P] }
+        const a = snap(src.x, src.z), bb = snap(T.x, T.z)
+        const pts: Array<[number, number]> = [[src.x, src.z], a, [Math.round(a[0] / P) * P, Math.round(a[1] / P) * P], [Math.round(bb[0] / P) * P, Math.round(a[1] / P) * P], [Math.round(bb[0] / P) * P, Math.round(bb[1] / P) * P], bb, [T.x, T.z]]
+        const m4 = new THREE.Matrix4(), qq = new THREE.Quaternion(), up = new THREE.Vector3(0, 1, 0), one = new THREE.Vector3(1, 1, 1)
+        let n = 0
+        for (let i = 0; i + 1 < pts.length && n < 520; i++) {
+          const [x0, z0] = pts[i], [x1, z1] = pts[i + 1], len = Math.hypot(x1 - x0, z1 - z0)
+          if (len < 1) continue
+          const yaw = Math.atan2(x1 - x0, z1 - z0); qq.setFromAxisAngle(up, yaw)
+          for (let d = 2; d < len && n < 520; d += 7) { m4.compose(new THREE.Vector3(x0 + ((x1 - x0) * d) / len, 0.34, z0 + ((z1 - z0) * d) / len), qq, one); dashMesh.setMatrixAt(n++, m4) }
+        }
+        dashMesh.count = n; dashMesh.instanceMatrix.needsUpdate = true
+      }
+      // Sanitäter-Einsatz (Spieler): zum Krankenhaus teleportiert, im Krankenwagen zum Patienten, dann zurück
+      let mission: { victim: string; phase: 'drive' | 'back'; t0: number } | null = null
+      let lastDuty = 0
+      const endMission = () => { mission = null; setRoute(null); applyRole(null) }
+      const tickDuty = (nowT: number) => {
+        updateRoute(nowT)
+        if (nowT - lastDuty < 500) return
+        lastDuty = nowT
+        { const mineNow = !!rescue, oth = adminRef.current ? [...remotes.values()].find((x) => x.dn && fresh(x) && Math.hypot(x.x - (foot ?? car).x, x.z - (foot ?? car).z) < 90) : undefined
+          setReviveUi((o) => (o.mine === mineNow && o.other?.id === oth?.id ? o : { ...o, mine: mineNow, other: oth ? { id: oth.id, name: oth.name } : null })) }
+        // Polizist im Dienst: Weg zum nächsten Gangster
+        if (chase && !chase.over && myRole === 'cop' && dutyRef.current === 'p') {
+          let best: Remote | null = null
+          for (const bd of chase.bandits) { const rr = remotes.get(bd); if (rr && fresh(rr) && !chase.got.has(bd) && (!best || Math.hypot(rr.x - car.x, rr.z - car.z) < Math.hypot(best.x - car.x, best.z - car.z))) best = rr }
+          setRoute(best ? { x: best.x, z: best.z } : chase.from === online?.userId ? null : null)
+        } else if (!mission && !rescue) setRoute(null)
+        if (!online || dutyRef.current !== 'm' || chase || rescue) { if (mission && dutyRef.current !== 'm') endMission(); return }
+        if (!mission) {
+          const v = [...remotes.values()].find((x) => x.dn && !x.dc && fresh(x) && !x.id.startsWith('pb-'))
+          if (!v) return
+          mission = { victim: v.id, phase: 'drive', t0: nowT }
+          if (ready) void ch?.send({ type: 'broadcast', event: 'mc', payload: { to: v.id, by: online.userId } }).catch(() => undefined)
+          const slot = HOSPITAL.slots[1]
+          car = { ...car, x: slot.x, z: slot.z, h: slot.h, v: 0, y: 0, vy: 0, fly: 0, lvl: 0, dmg: 0, hit: 0, steer: 0, slip: 0 }
+          foot = null; if (footMesh) { scene.remove(footMesh); footMesh = null }
+          setVehicle('bus', '#f8fafc', null, undefined, true); myMesh.visible = true
+          setRoute({ x: v.x, z: v.z }); say(`${v.name} braucht Hilfe! Fahr mit dem Krankenwagen hin (blaue Linie).`)
+          return
+        }
+        const v = remotes.get(mission.victim)
+        if (!v || !fresh(v) || !v.dn || nowT - mission.t0 > 150000) { say('Der Einsatz ist beendet.'); endMission(); return }
+        if (mission.phase === 'drive') {
+          setRoute({ x: v.x, z: v.z })
+          if (Math.hypot(v.x - car.x, v.z - car.z) < 10 && Math.abs(car.v) < 10) {
+            if (ready) void ch?.send({ type: 'broadcast', event: 'mp', payload: { to: v.id, by: online.userId } }).catch(() => undefined)
+            mission.phase = 'back'; say('Patient aufgeladen! Bring ihn zum Krankenhaus.')
+          }
+        } else {
+          setRoute({ x: hospLot.x, z: hospLot.z })
+          if (Math.hypot(hospLot.x - car.x, hospLot.z - car.z) < 18) {
+            if (ready) void ch?.send({ type: 'broadcast', event: 'mh', payload: { to: v.id } }).catch(() => undefined)
+            void raceDutyPay('medic').then((r) => { if (dead || !r.coins) return; say(`Einsatz abgeschlossen: +${r.coins} Coins`); if (r.koins !== null) walletRef.current?.setBalance(r.koins) }).catch(() => undefined)
+            endMission()
+          }
+        }
+      }
       const respawnAfterDeath = () => { if (isCity) hospitalRespawn('Dein Auto ist explodiert – du wachst im Krankenhaus auf.'); else { car = startCar(track, 0); myHp = hpCfg.max; prevV = 0; prevDmg = 0; burnT = 0; myMesh.visible = true; say('Dein Auto ist explodiert – du bekommst ein neues.') } }
       const spawnCar = (o?: RaceCarOption) => {
-        if (!isCity) return
+        if (!isCity || rescue) return
         const nowT = performance.now()
         if (nowT - lastSpawn < 1200) return
         const cap = adminRef.current ? 8 : Date.now() < perkRef.current.until ? 5 : 2
@@ -833,6 +1075,7 @@ export default function RaceView({ trackId, custom, laps, me, assistOk = false, 
       const tickFoot = (dt: number, nowT: number) => {
         let w = foot
         if (!w) return
+        if (rescue) { tickRescue(dt, nowT); return }
         if (footKo > 0) {
           footKo -= dt
           w = stepWalker(w, { fwd: false, back: false, left: false, right: false }, dt)
@@ -887,7 +1130,9 @@ export default function RaceView({ trackId, custom, laps, me, assistOk = false, 
       }
       /** Geparkte/ausrollende Autos weiterrollen lassen */
       const tickParked = (dt: number) => {
+        if (footMesh && !footMesh.userData.bt && (batonRef.current || myRole === 'cop')) addBaton(THREE, footMesh)
         tickTracers(dt)
+        tickDuty(performance.now())
         for (const p of parked) {
           if (Math.abs(p.car.v) > 0.05 || (p.car.y ?? 0) > hillHeight(p.car.x, p.car.z) + 0.3) p.car = stepCar(p.car, idleIn, dt, track, p.st, true)
           else if (p.car.v !== 0) p.car = { ...p.car, v: 0 }
@@ -911,11 +1156,29 @@ export default function RaceView({ trackId, custom, laps, me, assistOk = false, 
           foot = { ...foot, hp: Math.max(0, foot.hp - d * hpCfg.armor), stun: Math.max(foot.stun, 0.12), vx: foot.vx + (Math.random() - 0.5) * 2, vz: foot.vz + (Math.random() - 0.5) * 2 }
           lastRegenHit = performance.now(); say('Du wirst beschossen!')
         } else if (!ride && !onFootHit) {
-          car = { ...car, dmg: Math.min(DMG_MAX, car.dmg + d * toughOf(eff.kind)) }
+          if (eff.kind === 'swat') swatHurt += d * 0.55
+          else car = { ...car, dmg: Math.min(DMG_MAX, car.dmg + d * toughOf(eff.kind)) }
           say('Dein Auto wird beschossen!')
         }
       }
       let lastShot = 0
+      // Zielpunkt: letzte Mausposition / Fingertipp auf dem Bild, als Richtung vom Geschütz aus auf der Bodenebene
+      let lastPtr: { x: number; y: number; t: number } | null = null
+      const aimDir = (): [number, number] | null => {
+        if (!lastPtr || performance.now() - lastPtr.t > 10000) return null
+        const rc = new THREE.Raycaster(), r = renderer.domElement.getBoundingClientRect()
+        rc.setFromCamera(new THREE.Vector2(((lastPtr.x - r.left) / r.width) * 2 - 1, -(((lastPtr.y - r.top) / r.height) * 2 - 1)), camera)
+        const o = rc.ray.origin, d = rc.ray.direction, gy = (car.y ?? 0) + 1.2
+        let tx: number, tz: number
+        if (d.y < -0.01) { const t = (gy - o.y) / d.y; tx = o.x + d.x * t; tz = o.z + d.z * t } else { tx = o.x + d.x * 100; tz = o.z + d.z * 100 }
+        const dx = tx - car.x, dz = tz - car.z, l = Math.hypot(dx, dz)
+        return l < 2 ? null : [dx / l, dz / l]
+      }
+      const swatArmed = () => eff.kind === 'swat' && !foot && !ride && (adminRef.current || (!!chase && !chase.over && myRole === 'cop'))
+      const onPtrMove = (e: PointerEvent) => { lastPtr = { x: e.clientX, y: e.clientY, t: performance.now() } }
+      const onPtrDown = (e: PointerEvent) => { onPtrMove(e); if (swatArmed()) fireSwat() }
+      renderer.domElement.addEventListener('pointermove', onPtrMove); renderer.domElement.addEventListener('pointerdown', onPtrDown)
+      cleanups.push(() => { renderer.domElement.removeEventListener('pointermove', onPtrMove); renderer.domElement.removeEventListener('pointerdown', onPtrDown) })
       const fireSwat = () => {
         if (eff.kind !== 'swat' || foot || ride) return
         const nowT = performance.now()
@@ -923,7 +1186,7 @@ export default function RaceView({ trackId, custom, laps, me, assistOk = false, 
         if (!allowed) { say('Das SWAT-Geschütz schießt nur bei der Polizeijagd (als Polizist) oder als Admin.'); return }
         if (nowT - lastShot < 330) return
         lastShot = nowT
-        const dx = Math.sin(car.h), dz = Math.cos(car.h), ax = car.x + dx * 3.6, az = car.z + dz * 3.6, ay = (car.y ?? 0) + 2.1
+        const aim = aimDir() ?? [Math.sin(car.h), Math.cos(car.h)], dx = aim[0], dz = aim[1], ax = car.x + dx * 3.6, az = car.z + dz * 3.6, ay = (car.y ?? 0) + 2.1
         const RANGE = 140
         type Tg = { x: number; z: number; r: number; apply: () => void }
         const tgs: Tg[] = []
@@ -964,6 +1227,7 @@ export default function RaceView({ trackId, custom, laps, me, assistOk = false, 
         endInfo = { id: chase.id, win, until: performance.now() + 20000 }
         if (announce) { const eid = chase.id; for (const dl of [0, 500, 1200, 2500]) window.setTimeout(() => { if (!dead) sendCh({ t: 'end', id: eid, win }) }, dl) }
         const mine = (myRole === 'cop') === (win === 'police')
+        if (dutyChase && myRole === 'cop') { dutyChase = false; void raceDutyPay('police').then((r) => { if (dead || !r.coins) return; say(`Einsatz beendet: +${r.coins} Coins`); if (r.koins !== null) walletRef.current?.setBalance(r.koins) }).catch(() => undefined) }
         const humansOther = chase.cops.length, botsN = chase.bots, secs = Math.round((performance.now() - chase.t0) / 1000)
         const heist = !!chase.heist, heistWin = heist && win === 'bandit' && myRole === 'bandit' && !iCaught, extra = chase.extra ?? '', crimeWin = win === 'bandit' && myRole === 'bandit' && !iCaught
         for (const b of pbots) { scene.remove(b.mesh); if (b.wm) scene.remove(b.wm) }
@@ -995,8 +1259,8 @@ export default function RaceView({ trackId, custom, laps, me, assistOk = false, 
         } else if (p.t === 'go') {
           const cops = Array.isArray(p.cops) ? (p.cops as string[]) : []
           const bl = Array.isArray(p.bandits) ? (p.bandits as string[]) : typeof p.bandit === 'string' ? [p.bandit] : []
-          if (bl.includes(online.userId)) { if (p.hz === 1) void raceBankClaim().catch(() => undefined); startChase(id, bl, cops, Number(p.bots) || 0, String(p.from), 'bandit', p.hz === 1) }
-          else if (cops.includes(online.userId)) startChase(id, bl, cops, Number(p.bots) || 0, String(p.from), 'cop')
+          if (bl.includes(online.userId)) { if (p.hz === 1) void raceBankClaim().catch(() => undefined); startChase(id, bl, cops, Number(p.bots) || 0, String(p.from), 'bandit', p.hz === 1, String(p.ex ?? '')) }
+          else if (cops.includes(online.userId)) startChase(id, bl, cops, Number(p.bots) || 0, String(p.from), 'cop', p.hz === 1, String(p.ex ?? ''))
         } else if (p.t === 'cau') {
           if (chase && chase.id === id && typeof p.u === 'string') markCaught(p.u, false)
         } else if (p.t === 'end') {
@@ -1004,6 +1268,7 @@ export default function RaceView({ trackId, custom, laps, me, assistOk = false, 
           if (chase && chase.id === id) finishChase(p.win === 'police' ? 'police' : 'bandit', false)
         }
       }
+      const dutyCops = () => [...remotes.values()].filter((r) => r.od === 'p' && fresh(r) && !r.ro && !r.rd && !r.id.startsWith('pb-')).map((r) => r.id)
       let armoryUntil = 0
       crimeRef.current = (what) => {
         const f = foot as Walker | null
@@ -1012,7 +1277,9 @@ export default function RaceView({ trackId, custom, laps, me, assistOk = false, 
         if (what === 'armory' && Date.now() < armoryUntil) { say('Die Waffenkammer ist leer – komm später wieder.'); return }
         if (what === 'armory') armoryUntil = Date.now() + 8 * 60 * 1000
         const id = `${what}-${online.userId}-${Date.now()}`
-        startChase(id, [online.userId], [], what === 'steal' ? 4 : 6, online.userId, 'bandit', false, what)
+        const dc = dutyCops()
+        if (dc.length) { const msg = { t: 'go', id, bandits: [online.userId], cops: dc, bots: what === 'steal' ? 4 : 6, from: online.userId, ex: what }; for (const dl of [0, 600, 1500]) window.setTimeout(() => { if (!dead) sendCh(msg) }, dl) }
+        startChase(id, [online.userId], dc, what === 'steal' ? 4 : 6, online.userId, 'bandit', false, what)
         say(what === 'armory' ? 'Waffenkammer offen! Schnapp dir den Schlagstock-Ruhm: überlebe 6 Minuten – die Polizei steht vor der Tür!' : 'Du sitzt im SWAT-Wagen! 6 Minuten Polizeijagd – die SWAT-Wagen fliegen auch.')
       }
       heistRef.current = () => {
@@ -1027,17 +1294,19 @@ export default function RaceView({ trackId, custom, laps, me, assistOk = false, 
           const mates = [...remotes.values()].filter((r) => r.wk && !r.rd && !r.ro && !r.id.startsWith('pb-') && !r.id.endsWith('w') && fresh(r) && buildingAt(r.x, r.z) === p.b).slice(0, 3).map((r) => r.id)
           const id = `bank-${online.userId}-${Date.now()}`
           const bandits = [online.userId, ...mates]
-          const msg = { t: 'go', id, bandits, cops: [] as string[], bots: 6, from: online.userId, hz: 1 }
+          const dc = dutyCops().filter((i) => !bandits.includes(i))
+          const msg = { t: 'go', id, bandits, cops: dc, bots: 6, from: online.userId, hz: 1 }
           for (const dl of [0, 600, 1500]) window.setTimeout(() => { if (!dead) sendCh(msg) }, dl)
-          startChase(id, bandits, [], 6, online.userId, 'bandit', true)
+          startChase(id, bandits, dc, 6, online.userId, 'bandit', true)
           say('Der Tresor ist offen! Lauf zu Fuß nach draußen zu den Fluchtautos!')
         }).catch((e) => say(errorMessage(e)))
       }
       poiKey.current = () => {
         const f = foot as Walker | null
-        const sn = f && footKo <= 0 ? spotNear(f.x, f.z, f.y) : null
+        const sn = f && footKo <= 0 && !rescue ? spotNear(f.x, f.z, f.y) : null
         if (!sn) return
         if (sn.spot.kind === 'vault') heistRef.current()
+        else if (sn.spot.kind === 'dress') toggleDuty(sn.poi.kind === 'police' ? 'p' : 'm')
         else if (sn.spot.kind === 'armory' || sn.spot.kind === 'steal') crimeRef.current(sn.spot.kind === 'armory' ? 'armory' : 'steal')
         else setShopUi(sn.spot.kind === 'counter' ? 'shop' : 'gym')
       }
@@ -1256,7 +1525,7 @@ export default function RaceView({ trackId, custom, laps, me, assistOk = false, 
               if (tg.wk && pb.car.v < 14 && Math.hypot(tg.x - pb.car.x, tg.z - pb.car.z) < 26) {
                 if (pb.swat) { deploySwat(pb); continue }
                 pb.w = exitFromCar({ ...pb.car, wid: pb.st.wid }, 1)
-                pb.wm = rs.makeWalker('#1d4ed8', '#0f172a', pb.name); scene.add(pb.wm)
+                pb.wm = rs.makeWalker('#1d4ed8', '#0f172a', pb.name); addBaton(THREE, pb.wm); scene.add(pb.wm)
                 continue
               }
               const d = copDrive(pb.car, tg, pb.mem, dt)
@@ -1309,6 +1578,8 @@ export default function RaceView({ trackId, custom, laps, me, assistOk = false, 
             const sc = now - (hitAt.get(pb) ?? -1e9) < 250 ? 0 : 1
             const c1 = crash(pre, myStats, { x: pb.car.x, z: pb.car.z, h: pb.car.h, v: pb.car.v }, pb.st, 0.5, DMG_MAX, sc)
             if (!c1) continue
+            if (sc && !pb.swat && Math.abs(pre.v) > 10 && Math.abs(pre.v) > Math.abs(pb.car.v)) callSwat()
+            if (eff.kind === 'swat' && sc && Math.abs(pb.car.v) > Math.abs(pre.v)) swatHurt += Math.max(0, c1.dmg - pre.dmg) * 3
             car = c1; bumped = true
             const c2 = crash(pb.car, pb.st, { x: pre.x, z: pre.z, h: pre.h, v: pre.v, slip: pre.slip }, myStats, 0.5, 85, sc)
             if (c2) pb.car = c2
@@ -1474,12 +1745,14 @@ export default function RaceView({ trackId, custom, laps, me, assistOk = false, 
         }
         if (isCity && !foot && !ride && wreck <= 0) {
           // Leben im Auto: Schaden am Auto und Feuer kosten Leben
-          const dd = car.dmg - prevDmg
+          const armored = eff.kind === 'swat'
+          if (armored) { myHp -= swatHurt; swatHurt = 0; car = { ...car, dmg: 0 }; prevDmg = 0 }
+          const dd = armored ? 0 : car.dmg - prevDmg
           if (dd > 0) myHp -= dd * 0.9
-          const burning = car.dmg / DMG_MAX > 0.85
+          const burning = !armored && car.dmg / DMG_MAX > 0.85
           if (burning) { burnT += dt; myHp -= 3.5 * dt } else burnT = 0
           const sp = Math.abs(car.v)
-          if (prevV > 300 / 3.6 && sp < prevV * 0.5 && car.hit > 0.3) explode('Mit über 300 km/h eingeschlagen – das war tödlich! Das Auto explodiert.')
+          if (!armored && prevV > 300 / 3.6 && sp < prevV * 0.5 && car.hit > 0.3) explode('Mit über 300 km/h eingeschlagen – das war tödlich! Das Auto explodiert.')
           else if (myHp <= 0) explode('Du hast den Unfall nicht überlebt – das Auto explodiert.')
           else if (dd > 40) explode('Schwerer Aufprall – das Auto explodiert!')
           else if (burning && burnT > 7) explode('Das brennende Auto ist explodiert!')
@@ -1534,11 +1807,11 @@ export default function RaceView({ trackId, custom, laps, me, assistOk = false, 
 
         if (online && now - lastSend > 55) {
           lastSend = now
-          send({ u: online.userId, x: car.x, z: car.z, h: car.h, v: foot ? foot.sp : car.v, wk: foot ? 1 : 0, wc: wcRef.current, ex: exN, pc: punchN, rd: ride ?? '', t: car.total, k: eff.kind, c: eff.color, ro: myRole === 'bandit' ? 'b' : myRole === 'cop' ? 'c' : '', f: finishedMs, d: Math.round(car.dmg), sl: Math.round(car.slip * 100) / 100, fl: Math.round(car.fly * 100) / 100, lv: car.lvl ?? 0, y: Math.round((car.y ?? 0) * 10) / 10, pt: Math.round(pitchOf(car) * 100) / 100, n: online.name ?? me.name, hd: hiddenNow ? 1 : 0, ce: endInfo && now < endInfo.until ? endInfo.id : '', cw: endInfo?.win ?? '' })
+          send({ u: online.userId, x: car.x, z: car.z, h: car.h, v: foot ? foot.sp : car.v, wk: foot ? 1 : 0, wc: wcRef.current, ex: exN, pc: punchN, rd: ride ?? '', t: car.total, k: eff.kind, c: eff.color, ro: myRole === 'bandit' ? 'b' : myRole === 'cop' ? 'c' : '', f: finishedMs, d: Math.round(car.dmg), sl: Math.round(car.slip * 100) / 100, fl: Math.round(car.fly * 100) / 100, lv: car.lvl ?? 0, y: Math.round((car.y ?? 0) * 10) / 10, pt: Math.round(pitchOf(car) * 100) / 100, n: online.name ?? me.name, bt: batonRef.current || myRole === 'cop' ? 1 : 0, dn: rescue ? 1 : 0, dc: rescue?.claimed ?? '', od: dutyRef.current, hd: hiddenNow ? 1 : 0, ce: endInfo && now < endInfo.until ? endInfo.id : '', cw: endInfo?.win ?? '' })
           if (now - lastPark > 900) { lastPark = now; parked.forEach((p) => send({ u: pkId(p), x: p.car.x, z: p.car.z, h: p.car.h, v: p.car.v, t: 0, k: p.kind, c: p.color, ro: '', f: null, d: Math.round(p.car.dmg), sl: 0, fl: 0, lv: p.car.lvl ?? 0, y: Math.round((p.car.y ?? 0) * 10) / 10, pt: 0, n: 'Geparkt', hd: 0 })) }
           for (const pb of pbots) if (pb.w) send({ u: `${pb.id}w`, x: pb.w.x, z: pb.w.z, h: pb.w.h, v: pb.w.sp, wk: 1, t: 0, k: 'kleinwagen', c: '#1d4ed8', ro: 'c', f: null, d: 0, sl: 0, fl: 0, lv: 0, y: Math.round(pb.w.y * 10) / 10, pt: 0, n: pb.name, hd: 0 })
           if (now - lastMen > 190) { lastMen = now; for (const pb of pbots) for (const mn of pb.men ?? []) send({ u: mn.id, x: mn.w.x, z: mn.w.z, h: mn.w.h, v: mn.w.sp, wk: 1, t: 0, k: 'swatman', c: '#0f172a', ro: 'c', f: null, d: 0, sl: 0, fl: 0, lv: 0, y: Math.round(mn.w.y * 10) / 10, pt: 0, n: 'SWAT', hd: 0 }) }
-          for (const pb of pbots) if (!pb.carGone) send({ u: pb.id, x: pb.car.x, z: pb.car.z, h: pb.car.h, v: pb.car.v, t: 0, k: pb.kind, c: pb.color, ro: 'c', f: null, d: 0, sl: Math.round(pb.car.slip * 100) / 100, fl: 0, lv: pb.car.lvl ?? 0, y: Math.round((pb.car.y ?? 0) * 10) / 10, pt: 0, n: pb.name, hd: 0 })
+          for (const pb of rescue?.amb ? [...pbots, rescue.amb] : pbots) if (!pb.carGone) send({ u: pb.id, x: pb.car.x, z: pb.car.z, h: pb.car.h, v: pb.car.v, t: 0, k: pb.kind, c: pb.color, ro: 'c', f: null, d: 0, sl: Math.round(pb.car.slip * 100) / 100, fl: 0, lv: pb.car.lvl ?? 0, y: Math.round((pb.car.y ?? 0) * 10) / 10, pt: 0, n: pb.name, hd: 0 })
         }
         if (now - lastHud > 110) {
           lastHud = now
@@ -1556,11 +1829,11 @@ export default function RaceView({ trackId, custom, laps, me, assistOk = false, 
           setRep((o) => { const hold = Math.ceil(car.hold ?? 0), cd = Math.max(0, Math.ceil((lastRepair + REPAIR_CD_MS - now) / 1000)); return o.hold === hold && o.cd === cd ? o : { hold, cd } })
           if (isCity) {
             const f = foot as Walker | null
-            const near = !!f && footKo <= 0 && !!nearestCar(f, [...parked.map((p) => ({ x: p.car.x, z: p.car.z })), ...pbots.filter((pb) => pb.w && !pb.carGone).map((pb) => ({ x: pb.car.x, z: pb.car.z })), ...[...remotes.values()].filter((r) => !r.wk && !r.rd && !r.id.startsWith('pb-') && fresh(r)).map((r) => ({ x: r.x, z: r.z }))], 5.5)
+            const near = !!f && footKo <= 0 && !rescue && !!nearestCar(f, [...parked.map((p) => ({ x: p.car.x, z: p.car.z })), ...pbots.filter((pb) => pb.w && !pb.carGone).map((pb) => ({ x: pb.car.x, z: pb.car.z })), ...[...remotes.values()].filter((r) => !r.wk && !r.rd && !r.id.startsWith('pb-') && fresh(r)).map((r) => ({ x: r.x, z: r.z }))], 5.5)
             const seat = f ? '' : `${ride ? occupants(ride) : occupants(online?.userId ?? '')}/${seatsOf(ride ? remotes.get(ride)?.kind ?? '' : eff.kind)}`
             const msg = performance.now() < footMsgT ? footMsg : ''
             const hp = Math.round(f ? f.hp : Math.max(0, myHp))
-            const pn = f && footKo <= 0 ? spotNear(f.x, f.z, f.y) : null
+            const pn = f && footKo <= 0 && !rescue ? spotNear(f.x, f.z, f.y) : null
             setPoiUi((o) => (o?.label === pn?.spot.label ? o : pn ? { kind: pn.spot.kind, label: pn.spot.label } : null))
             if (pn?.spot.kind === 'vault' && now - lastBankPoll > 4000) { lastBankPoll = now; void raceBankStatus().then((w) => { if (!dead) setBankWait(w) }).catch(() => undefined) }
             setFootUi((o) => (o.on === !!f && o.hp === hp && o.near === near && o.ko === footKo > 0 && o.n === parked.length && o.msg === msg && o.seat === seat && o.ride === !!ride ? o : { on: !!f, hp, near, ko: footKo > 0, n: parked.length, msg, seat, ride: !!ride }))
@@ -1704,10 +1977,20 @@ export default function RaceView({ trackId, custom, laps, me, assistOk = false, 
       )}
       {def.mode === 'city' && !footUi.on && footUi.seat && <div className="pointer-events-none absolute left-1/2 top-12 -translate-x-1/2 rounded-full bg-black/55 px-3 py-0.5 text-xs font-bold text-white" role="status">{footUi.ride ? 'Mitfahrer' : 'Fahrer'} · 👥 {footUi.seat}</div>}
       {poiUi && footUi.on && !shopUi && (
-        <button type="button" onClick={() => poiKey.current()} disabled={poiUi.kind === 'vault' && (bankWait > 0 || !!chaseUi.over)} className="absolute bottom-52 left-1/2 z-20 min-h-[48px] -translate-x-1/2 rounded-xl border border-white/40 px-4 text-sm font-bold text-slate-950 disabled:opacity-60" style={{ background: poiUi.kind === 'vault' ? POI_COLOR.bank : poiUi.kind === 'counter' ? POI_COLOR.shop : poiUi.kind === 'armory' || poiUi.kind === 'steal' ? POI_COLOR.police : POI_COLOR.gym }}>
-          {poiUi.kind === 'vault' ? (bankWait > 0 ? `Bank ruht noch ${Math.ceil(bankWait / 60)} Min` : 'TRESOR ÖFFNEN (G) – danach 6 Min Polizeijagd') : poiUi.kind === 'armory' ? 'WAFFENKAMMER AUFBRECHEN (G) – Schlagstock, 6 Min Polizeijagd' : poiUi.kind === 'steal' ? 'SWAT-WAGEN KLAUEN (G) – 6 Min Polizeijagd' : `${poiUi.label} (G)`}
+        <button type="button" onClick={() => poiKey.current()} disabled={poiUi.kind === 'vault' && (bankWait > 0 || !!chaseUi.over)} className="absolute bottom-52 left-1/2 z-20 min-h-[48px] -translate-x-1/2 rounded-xl border border-white/40 px-4 text-sm font-bold text-slate-950 disabled:opacity-60" style={{ background: poiUi.kind === 'vault' ? POI_COLOR.bank : poiUi.kind === 'counter' ? POI_COLOR.shop : poiUi.kind === 'armory' || poiUi.kind === 'steal' ? POI_COLOR.police : poiUi.kind === 'dress' ? '#a5b4fc' : POI_COLOR.gym }}>
+          {poiUi.kind === 'vault' ? (bankWait > 0 ? `Bank ruht noch ${Math.ceil(bankWait / 60)} Min` : 'TRESOR ÖFFNEN (G) – danach 6 Min Polizeijagd') : poiUi.kind === 'armory' ? 'WAFFENKAMMER AUFBRECHEN (G) – Schlagstock, 6 Min Polizeijagd' : poiUi.kind === 'steal' ? 'SWAT-WAGEN KLAUEN (G) – 6 Min Polizeijagd' : poiUi.kind === 'dress' ? `${poiUi.label} (G) – an/aus` : `${poiUi.label} (G)`}
         </button>
       )}
+      {reviveUi.mine && (
+        <div className="absolute inset-x-0 top-1/3 z-20 grid justify-items-center gap-2 px-4 text-center">
+          <p className="pointer-events-none text-2xl font-black text-rose-200 [text-shadow:0_3px_12px_#000]">Du bist bewusstlos – Hilfe ist unterwegs</p>
+          <button type="button" disabled={reviveUi.busy} onClick={() => reviveRef.current()} className="min-h-[48px] rounded-xl border border-white/40 bg-emerald-400 px-4 text-sm font-bold text-slate-950 disabled:opacity-60">{isAdmin ? 'Sofort wiederbeleben (gratis)' : 'Sofort wiederbeleben (10 Coins)'}</button>
+        </div>
+      )}
+      {isAdmin && reviveUi.other && !reviveUi.mine && (
+        <button type="button" onClick={() => reviveUi.other && reviveOtherRef.current(reviveUi.other.id)} className="absolute bottom-40 left-1/2 z-20 min-h-[44px] -translate-x-1/2 rounded-xl border border-white/40 bg-emerald-400 px-4 text-sm font-bold text-slate-950">{reviveUi.other.name} gratis wiederbeleben</button>
+      )}
+      {dutyUi && <div className="pointer-events-none absolute left-1/2 top-20 -translate-x-1/2 rounded-full px-3 py-0.5 text-xs font-bold text-white" style={{ background: dutyUi === 'p' ? '#2563eb' : '#dc2626' }} role="status">{dutyUi === 'p' ? '👮 Im Dienst: Polizei' : '🚑 Im Dienst: Sanitäter'}</div>}
       {shopUi && <VocabShop kind={shopUi} perks={perksUi} isAdmin={isAdmin} onPerks={applyPerks} onBought={(it) => { if (it === 'heal') healRef.current = true }} onClose={() => setShopUi(null)} />}
       {pick && (
         <div className="absolute left-3 top-16 z-20 max-h-64 w-52 overflow-auto rounded-xl bg-slate-900/95 p-2 text-sm text-white" role="menu" aria-label="Auto zum Spawnen wählen">
