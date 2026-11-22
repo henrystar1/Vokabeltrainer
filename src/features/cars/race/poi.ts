@@ -2,8 +2,8 @@ import { city, type Bld } from './city'
 import { canon, layoutOf, setSpecial, type Solid } from './interior'
 
 /** Besondere Häuser der Stadt mit Einrichtung: Bank (Tresen + Tresor), Shop (Theke), Fitnessstudio (Geräte), Krankenhaus (Betten, hier wacht man nach dem Tod auf). Feste Auswahl, überall gleich. */
-export type PoiKind = 'bank' | 'shop' | 'gym' | 'hospital' | 'police'
-export type SpotKind = 'vault' | 'counter' | 'machine' | 'armory' | 'steal' | 'dress'
+export type PoiKind = 'bank' | 'shop' | 'gym' | 'hospital' | 'police' | 'weapons'
+export type SpotKind = 'vault' | 'counter' | 'machine' | 'armory' | 'steal' | 'dress' | 'atm' | 'weapons'
 export interface Spot { x: number; z: number; r: number; kind: SpotKind; label: string }
 export interface Poi {
   id: string; kind: PoiKind; name: string; b: Bld
@@ -15,8 +15,8 @@ export interface Poi {
   /** Bett-Plätze (Aufwachen nach dem Tod): Standort neben dem Bett und Blickrichtung */
   beds?: Array<{ x: number; z: number; h: number }>
 }
-export const POI_COLOR: Record<PoiKind, string> = { bank: '#facc15', shop: '#22d3ee', gym: '#f472b6', hospital: '#ef4444', police: '#3b82f6' }
-export const POI_LETTER: Record<PoiKind, string> = { bank: 'B', shop: 'S', gym: 'F', hospital: '+', police: 'P' }
+export const POI_COLOR: Record<PoiKind, string> = { bank: '#facc15', shop: '#22d3ee', gym: '#f472b6', hospital: '#ef4444', police: '#3b82f6', weapons: '#f97316' }
+export const POI_LETTER: Record<PoiKind, string> = { bank: 'B', shop: 'S', gym: 'F', hospital: '+', police: 'P', weapons: 'W' }
 /** Reichweite um die Tür (Karte, Leuchtsäule) */
 export const POI_RANGE = 7
 
@@ -37,11 +37,12 @@ export function pois(): Poi[] {
       k++
     }
   }
-  take('bank', 'Bank', 1, 0, (b) => Math.hypot(b.x - 180, b.z + 180))
+  { const b = c.buildings.find((q) => q.kind === 'bank'); if (b) out.push(furnish({ id: 'bank0', kind: 'bank', name: 'Bank', b, x: 0, z: 0, nx: 0, nz: 0, solids: [], spots: [] })) }
   { const b = c.buildings.find((q) => q.kind === 'hospital'); if (b) out.push(furnish({ id: 'hospital0', kind: 'hospital', name: 'Krankenhaus', b, x: 0, z: 0, nx: 0, nz: 0, solids: [], spots: [] })) }
   { const b = c.buildings.find((q) => q.kind === 'police'); if (b) out.push(furnish({ id: 'police0', kind: 'police', name: 'Polizeiwache', b, x: 0, z: 0, nx: 0, nz: 0, solids: [], spots: [] })) }
   take('shop', 'Shop', 4, 260, (b) => hash(b))
   take('gym', 'Fitnessstudio', 2, 300, (b) => hash(b, 1) + 1)
+  take('weapons', 'Waffenladen', 1, 260, (b) => hash(b, 2) + 2)
   cache = out
   return out
 }
@@ -61,6 +62,17 @@ function furnish(p: Poi): Poi {
     solids.push(rect(-W + 14, W - 13, -D + 11, -D + 12.4, 1.1, wood), rect(-W + 14, W - 13, -D + 11, -D + 12.4, 0.12, 0xfacc15, { y0: 1.1, deco: true }))
     solids.push(rect(W - 12, W - 1.5, D - 12, D - 1.5, 3.2, 0x4b5563))
     spot(W - 6.75, D - 14.4, 3.4, 'vault', 'Tresor öffnen')
+    // Schalterhalle: Glasscheiben über dem Tresen, Absperrpfosten, Geldautomaten an der Westwand, Geldzähltisch
+    solids.push(rect(-W + 14, W - 13, -D + 11.6, -D + 11.8, 1.1, 0x93c5fd, { y0: 1.2, deco: true }))
+    for (let i = 0; i < 6; i++) solids.push(rect(-W + 8 + i * 3.2, -W + 8.2 + i * 3.2, -D + 6, -D + 6.2, 1.0, 0xfacc15), rect(-W + 8 + i * 3.2, -W + 11.2 + i * 3.2, -D + 6.05, -D + 6.15, 0.05, 0xdc2626, { y0: 0.85, deco: true }))
+    for (let i = 0; i < 2; i++) {
+      const v = 2 + i * 6
+      solids.push(rect(-W + 0.5, -W + 1.7, v, v + 1.4, 2.0, 0x1e3a8a), rect(-W + 1.7, -W + 1.78, v + 0.2, v + 1.2, 0.5, 0x22c55e, { y0: 1.35, deco: true }), rect(-W + 1.7, -W + 1.78, v + 0.3, v + 1.1, 0.12, 0x111827, { y0: 0.95, deco: true }))
+      spot(-W + 3.2, v + 0.7, 2.2, 'atm', 'Geldautomat knacken')
+    }
+    solids.push(rect(-W + 14, -W + 18, D - 8, D - 6, 0.9, 0x6b7280), rect(-W + 14.3, -W + 17.7, D - 7.7, D - 6.3, 0.3, 0x22c55e, { y0: 0.9, deco: true }), rect(-W + 15, -W + 16.2, D - 7.4, D - 6.6, 0.4, 0xfacc15, { y0: 1.2, deco: true }))
+    // Geldautomaten vor dem Haus (Weltkoordinaten, links und rechts der Tür)
+    for (const du of [8, 22]) spots.push({ x: p.b.x + du, z: p.b.z - p.b.d / 2 - 1.6, r: 2.2, kind: 'atm', label: 'Geldautomat knacken' })
     const m = toW(W - 6.75, D - 12), f = toW(W - 6.75, D - 13)
     const L = Math.hypot(f.x - m.x, f.z - m.z) || 1
     p.vault = { x: m.x, z: m.z, nx: (f.x - m.x) / L, nz: (f.z - m.z) / L, w: 5.4 }
@@ -104,6 +116,22 @@ function furnish(p: Poi): Poi {
     // Ankleidezimmer: Spinde an der Südwand, hier wird man Polizist (Dienst an/aus)
     for (let i = 0; i < 5; i++) solids.push(rect(W - 15 + i * 2.6, W - 13 + i * 2.6, -D + 0.6, -D + 1.8, 2.3, i % 2 ? 0x1e40af : 0x1d4ed8), rect(W - 14.6 + i * 2.6, W - 13.4 + i * 2.6, -D + 1.8, -D + 1.9, 0.3, 0xe5e7eb, { y0: 1.6, deco: true }))
     spot(W - 8, -D + 4.4, 3.2, 'dress', 'Ankleidezimmer: Polizei-Dienst')
+  } else if (p.kind === 'weapons') {
+    // Verkaufstresen mit Glasvitrine, Wandregale (Pistolen, Schlagstöcke), Puppen mit Weste und Helm, Probierzone
+    solids.push(rect(-W + 12, W - 10, D - 9, D - 7.8, 1.1, 0x1f2937), rect(-W + 12, W - 10, D - 9, D - 7.8, 0.12, 0xf97316, { y0: 1.1, deco: true }), rect(-W + 12.2, W - 10.2, D - 8.8, D - 8.0, 0.5, 0x93c5fd, { y0: 1.25, deco: true }))
+    for (let i = 0; i < 5; i++) solids.push(rect(-W + 14 + i * 4, -W + 14.6 + i * 4, D - 8.6, D - 8.2, 0.12, i % 2 ? 0x111827 : 0x64748b, { y0: 1.4, deco: true }))
+    solids.push(rect(-W + 0.6, -W + 1.8, -D + 8, D - 12, 2.4, 0x374151))
+    for (let i = 0; i < 9; i++) {
+      const v = -D + 9 + i * ((2 * D - 24) / 9)
+      solids.push(rect(-W + 1.8, -W + 2.2, v, v + 1.1, 0.12, i % 3 === 0 ? 0x111827 : i % 3 === 1 ? 0x78350f : 0x475569, { y0: 0.5 + (i % 4) * 0.5, deco: true }))
+    }
+    solids.push(rect(W - 1.8, W - 0.6, -D + 8, D - 12, 2.4, 0x374151))
+    for (let i = 0; i < 6; i++) {
+      const v = -D + 9 + i * ((2 * D - 24) / 6)
+      solids.push(rect(W - 2.2, W - 1.8, v, v + 1.3, 0.5, 0x1e3a8a, { y0: 0.6 + (i % 3) * 0.6, deco: true }), rect(W - 2.2, W - 1.8, v + 0.2, v + 1.1, 0.12, 0xfacc15, { y0: 1.0 + (i % 3) * 0.6, deco: true }))
+    }
+    for (const u of [-W + 12, -W + 17]) solids.push(rect(u, u + 0.9, -D + 9, -D + 9.9, 0.9, 0x6b7280), rect(u + 0.15, u + 0.75, -D + 9.15, -D + 9.75, 0.7, 0x1e293b, { y0: 0.9, deco: true }), rect(u + 0.2, u + 0.7, -D + 9.2, -D + 9.7, 0.3, 0xf97316, { y0: 1.6, deco: true }))
+    spot(-W + 10, D - 11.5, 4.6, 'weapons', 'Waffenladen öffnen')
   } else {
     const beds: NonNullable<Poi['beds']> = []
     let i = 0

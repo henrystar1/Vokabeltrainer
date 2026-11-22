@@ -18,7 +18,7 @@ export const BRIDGES: ReadonlyArray<{ bz: number; bx0: number; bx1: number }> = 
   { bz: 0, bx0: -240, bx1: 240 },
 ]
 
-export interface Bld { x: number; z: number; w: number; d: number; h: number; /** Unterkante (Sturz über einer Garageneinfahrt): darunter kann man durchfahren */ lo?: number; /** Farbvariante 0–5 */ c: number; /** feste Wandfarbe (Polizei) */ col?: number; /** Tür-Seite erzwingen (0 Süd, 1 West, 2 Nord, 3 Ost) */ door?: 0 | 1 | 2 | 3; /** Sonderhaus */ kind?: 'police' | 'hospital' }
+export interface Bld { x: number; z: number; w: number; d: number; h: number; /** Unterkante (Sturz über einer Garageneinfahrt): darunter kann man durchfahren */ lo?: number; /** Farbvariante 0–5 */ c: number; /** feste Wandfarbe (Polizei) */ col?: number; /** Tür-Seite erzwingen (0 Süd, 1 West, 2 Nord, 3 Ost) */ door?: 0 | 1 | 2 | 3; /** Sonderhaus */ kind?: 'police' | 'hospital' | 'bank' | 'weapons' }
 import { PARK, PARK_TUNNEL } from './parkhaus'
 export interface CityData { buildings: Bld[]; parks: Array<{ x: number; z: number; size: number }>; grid: Map<string, number[]> }
 
@@ -37,6 +37,7 @@ function blockLayout(cx: number, cz: number) {
 }
 export const POLICE = blockLayout(-420, 300)
 export const HOSPITAL = blockLayout(300, 300)
+export const BANK = blockLayout(180, -180)
 let cache: CityData | null = null
 
 function rng(seed: number) { let a = seed >>> 0; return () => { a = (a + 0x6d2b79f5) >>> 0; let t = a; t = Math.imul(t ^ (t >>> 15), t | 1); t ^= t + Math.imul(t ^ (t >>> 7), t | 61); return ((t ^ (t >>> 14)) >>> 0) / 4294967296 } }
@@ -79,11 +80,12 @@ export function city(): CityData {
     }
   }
   clearBlock(PARK.cx, PARK.cz)
-  for (const [L, kind, body, trim] of [[POLICE, 'police', 0x1e3a8a, 0xe5e7eb], [HOSPITAL, 'hospital', 0xf1f5f9, 0xdc2626]] as const) {
+  for (const [L, kind, body, trim] of [[POLICE, 'police', 0x1e3a8a, 0xe5e7eb], [HOSPITAL, 'hospital', 0xf1f5f9, 0xdc2626], [BANK, 'bank', 0xd8c9a0, 0]] as const) {
     // Sonderblock: zufällige Häuser raus, Haus + offene Garage (Wände, Dach mit Sturz) hinein
     clearBlock(L.cx, L.cz)
     const st = L.station, g = L.garage
     buildings.push({ x: st.x, z: st.z, w: st.w, d: st.d, h: 16, c: 3, col: body, door: 0, kind })
+    if (kind === 'bank') continue // die Bank hat nur den Parkplatz, keine Garage
     const gx = (g.x0 + g.x1) / 2, gz = (g.z0 + g.z1) / 2
     buildings.push(
       { x: gx, z: g.z1 - 1, w: g.x1 - g.x0, d: 2, h: 7, c: 0, col: 0xe5e7eb },

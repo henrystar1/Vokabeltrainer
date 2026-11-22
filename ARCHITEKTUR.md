@@ -963,3 +963,11 @@ Tabelle `book_library_hidden`; `in_library` blendet ein veröffentlichtes Buch d
 - **Rettung repariert**: Ziel ist nur noch das Krankenhaus-**Gelände** (`inHospGrounds`: Block + 20 m Straße), dann Aufwachen im Bett (Bot und Sanitäter-Spieler). Vorher fehlte das Setzen der Sanitäter-Figuren; jetzt werden sie pro Frame positioniert/animiert (Arme tragen), mit Notfall-Teleports bei Hängern (`stuckFor`).
 - **Krankenwagen** als eigene Art `ambulance` (stats.ts, scene.ts `addAmbulanceParts`: rote/gelbe Streifen, Kreuze, „AMBULANZ“ (vorn gespiegelt), Blaulichtbalken vorn/hinten, Hecktüren); **Sanitäter-Skin** (`medicSkin/makeMedic` in swatMan.ts).
 - Nicht im Browser getestet.
+
+## Update 144
+- **Bank** als echtes Haus (city.ts `BANK`, scene.ts `bankDecor`): Parkplatz, Eingangs-Säulen, Schilder, 6 zerschlagbare Glasscheiben (`RaceScene.smashGlass`; Schlag oder schnelles Auto an der Fassade → `tickBank`/`smashAt`), Geldautomaten innen und außen (Spot `atm` → `raceAtmPay`, 40 s Pause), Tresortür mit Rad und Gold (interiorMesh.ts).
+- **Waffenladen** (poi.ts `weapons`, Spot `weapons`, `WeaponShop.tsx`, `gear.ts`): Schussweste, Helm, Schlagstock, Pistole kaufen (`raceGearBuy`, Admin gratis). Wirkung: Weste ×0.55, Helm ×0.85 auf `hpCfg.armor`; Stock = `batonRef`; Pistole zu Fuß (Tippen/Klick, 150 m, Polizisten brauchen 3 Treffer). Sichtbar am Läufer (`addGear`, Payload `gr` für Mitspieler).
+- **SWAT-Geschütz für alle** im SWAT-Wagen: `fireGun('swat')`, 400 m, 3D-Zielen (Kamerastrahl mit Zielhilfe, auch nach oben/unten), Treffer per Linie–Punkt in 3D.
+- **Polizei-Taktik**: SWAT-Männer in 2 Gruppen (vorrücken / Feuerschutz im Wechsel, eigener Winkel um das Ziel), Pistole hebt beim Schuss den Arm; Fuß-Polizisten teilen sich in Deckungsschützen (12 m, schießen) und Nahkämpfer (umkreisen).
+- **Streifenwagen** (`patrols`, `tickPatrols`): 4 Wagen fahren lokal durch die Straßen (nicht synchronisiert); Rammen → `ramPatrol` startet eine Jagd.
+- SQL `0116_race_gear_atm.sql`. Nicht im Browser getestet. Hubschrauber folgen in Update 145.

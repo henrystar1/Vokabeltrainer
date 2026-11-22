@@ -79,10 +79,25 @@ export function makeInteriorViewer(THREE: THREE, scene: T.Scene, ext: { geo: T.B
       const ang = Math.atan2(pv.nx, pv.nz)
       pivot.position.set(pv.x + pv.nx * 0.16 - Math.cos(ang) * pv.w / 2, 1.4, pv.z + pv.nz * 0.16 + Math.sin(ang) * pv.w / 2)
       pivot.rotation.y = ang
-      const door = new THREE.Mesh(new THREE.BoxGeometry(pv.w, 2.6, 0.3), new THREE.MeshStandardMaterial({ color: 0x9ca3af, metalness: 0.6, roughness: 0.35 }))
+      const steel = new THREE.MeshStandardMaterial({ color: 0x9ca3af, metalness: 0.75, roughness: 0.3 })
+      const gold = new THREE.MeshStandardMaterial({ color: 0xfacc15, metalness: 0.9, roughness: 0.25 })
+      const door = new THREE.Mesh(new THREE.BoxGeometry(pv.w, 2.8, 0.42), steel)
       door.position.set(pv.w / 2, 0, 0); pivot.add(door)
-      const wheel = new THREE.Mesh(new THREE.TorusGeometry(0.6, 0.08, 8, 20), new THREE.MeshStandardMaterial({ color: 0xfacc15 }))
-      wheel.position.set(pv.w / 2, 0, 0.2); pivot.add(wheel)
+      const frame = new THREE.Mesh(new THREE.BoxGeometry(pv.w + 0.3, 3.0, 0.1), new THREE.MeshStandardMaterial({ color: 0x374151, metalness: 0.7, roughness: 0.4 }))
+      frame.position.set(pv.w / 2, 0, -0.2); pivot.add(frame)
+      const wheel = new THREE.Mesh(new THREE.TorusGeometry(0.62, 0.07, 10, 28), gold)
+      wheel.position.set(pv.w / 2, 0, 0.26); pivot.add(wheel)
+      for (let i = 0; i < 6; i++) { const sp = new THREE.Mesh(new THREE.BoxGeometry(0.07, 1.2, 0.07), gold); sp.rotation.z = (i * Math.PI) / 3; sp.position.set(pv.w / 2, 0, 0.26); pivot.add(sp) }
+      const hub = new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.2, 0.18, 14), gold); hub.rotation.x = Math.PI / 2; hub.position.set(pv.w / 2, 0, 0.3); pivot.add(hub)
+      for (let i = 0; i < 14; i++) { const a = (i / 14) * Math.PI * 2; const rv = new THREE.Mesh(new THREE.SphereGeometry(0.045, 6, 6), gold); rv.position.set(pv.w / 2 + Math.cos(a) * 1.05, Math.sin(a) * 1.05, 0.22); pivot.add(rv) }
+      for (const by of [-1, 0, 1]) { const bolt = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.08, 0.5, 8), steel); bolt.rotation.z = Math.PI / 2; bolt.position.set(pv.w - 0.1, by * 0.9, 0.05); pivot.add(bolt) }
+      // Beute hinter der Tür: Goldbarren-Stapel und Geldbündel
+      const loot = new THREE.Group()
+      for (let r = 0; r < 4; r++) for (let c = 0; c < 5 - r; c++) { const bar = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.2, 0.28), gold); bar.position.set(-1.2 + c * 0.55 + r * 0.27, 0.12 + r * 0.21, 0.1); loot.add(bar) }
+      for (let c = 0; c < 4; c++) for (let r = 0; r < 3; r++) { const cash = new THREE.Mesh(new THREE.BoxGeometry(0.4, 0.18, 0.25), new THREE.MeshStandardMaterial({ color: 0x4ade80, roughness: 0.8 })); cash.position.set(0.9 + c * 0.42, 0.1 + r * 0.19, 0.1); loot.add(cash) }
+      loot.position.set(pv.x + pv.nx * 0.1, 0, pv.z + pv.nz * 0.1)
+      loot.rotation.y = ang
+      g.add(loot)
       pivot.rotation.y = ang + (vaultOpen ? -1.9 : 0)
       vaultDoor = { pivot, ang }
       g.add(pivot)

@@ -17,11 +17,12 @@ describe('Besondere Häuser', () => {
   })
   it('Bank hat Tresor-Stelle, Krankenhaus Betten, Fitnessstudio Geräte, Shop eine Theke – alles im Haus', () => {
     for (const q of pois()) {
-      for (const s of q.spots) expect(buildingAt(s.x, s.z)).toBe(q.b)
+      for (const s of q.spots) if (s.kind !== 'atm' || buildingAt(s.x, s.z)) expect(buildingAt(s.x, s.z)).toBe(q.b)
       if (q.kind === 'bank') { expect(q.spots.some((s) => s.kind === 'vault')).toBe(true); expect(q.vault).toBeTruthy() }
       if (q.kind === 'hospital') { expect(q.beds!.length).toBeGreaterThan(3); for (const b of q.beds!) expect(buildingAt(b.x, b.z)).toBe(q.b) }
       if (q.kind === 'gym') expect(q.spots.filter((s) => s.kind === 'machine').length).toBeGreaterThan(5)
       if (q.kind === 'police') { expect(q.spots.some((s) => s.kind === 'armory')).toBe(true); expect(q.spots.some((s) => s.kind === 'steal')).toBe(true) }
+      if (q.kind === 'weapons') expect(q.spots.some((s) => s.kind === 'weapons')).toBe(true)
       if (q.kind === 'shop') expect(q.spots.some((s) => s.kind === 'counter')).toBe(true)
     }
   })
