@@ -1,5 +1,5 @@
 import { advance, inPolygon, pointAt, project, type Track } from './track'
-import { canFly, carKmh, flyConfig, flyHeight, isBike, kindDims, kindStats } from '../stats'
+import { canFly, carKmh, flyConfig, flyHeight, isBike, kindDims, kindStats, toughOf } from '../stats'
 import { hillH, hillSlope } from './mountains'
 import { treePush } from './forest'
 import { PARK, PARK_TOP, PARK_TUNNEL, inParkXZ, parkPush, parkShaft, parkSurfaces } from './parkhaus'
@@ -10,14 +10,14 @@ import { boxHit, corners, impactDamage, type Box } from './collide'
 import { botSteer, type RaceLine } from './line'
 
 /** Fahrwerte eines Autos: Höchstgeschwindigkeit (m/s), Beschleunigung, Lenkung, Bremse. */
-export interface CarStats { top: number; acc: number; turn: number; brake: number; len: number; wid: number; fly: boolean; bike: boolean }
+export interface CarStats { top: number; acc: number; turn: number; brake: number; len: number; wid: number; fly: boolean; bike: boolean; /** Schadensfaktor bei Aufprall (SWAT 0,24) */ tough?: number }
 /** Werte je Art; mit `kmh` (eigener Höchstwert des Autos) wird Tempo und Beschleunigung entsprechend skaliert. */
 export const statsFor = (kind: string, kmh?: number | null, up?: Up | null): CarStats => {
   const k = kindStats(kind)
   const f = carKmh(kind, kmh) / k.kmh
   const d = kindDims(kind)
   const u = up ? upFactors(up) : { top: 1, acc: 1, turn: 1, brake: 1 }
-  return { top: (k.kmh * f * u.top) / 3.6, acc: k.acc * Math.pow(f, 0.8) * u.acc, turn: k.turn * u.turn, brake: k.brake * Math.pow(f, 0.5) * u.brake, len: d.len, wid: d.wid, fly: canFly(kind), bike: isBike(kind) }
+  return { top: (k.kmh * f * u.top) / 3.6, acc: k.acc * Math.pow(f, 0.8) * u.acc, turn: k.turn * u.turn, brake: k.brake * Math.pow(f, 0.5) * u.brake, len: d.len, wid: d.wid, fly: canFly(kind), bike: isBike(kind), tough: toughOf(kind) }
 }
 export const STATS: Record<string, CarStats> = Object.fromEntries(['kleinwagen', 'limousine', 'kombi', 'suv', 'pickup', 'cabrio', 'sportwagen', 'bus', 'oldtimer', 'buggy', 'monstertruck', 'muscle', 'rallye', 'gt', 'hypercar', 'rennwagen'].map((k) => [k, statsFor(k)]))
 
@@ -184,7 +184,7 @@ export function stepCar(c: Car, inp: Input, dt: number, t: Track, st: CarStats, 
     const dd = wrap(tang - h)
     // Aufprall: Anteil der Geschwindigkeit quer zur Wand
     const vn = Math.abs(v) * Math.abs(Math.sin(dd)) + Math.min(6, worst * 4)
-    dmg = Math.min(DMG_MAX, dmg + impactDamage(vn))
+    dmg = Math.min(DMG_MAX, dmg + impactDamage(vn) * (st.tough ?? 1))
     h += dd * Math.min(1, 3 * dt)
     bump = Math.min(1, Math.abs(v) / 30)
     hit = Math.min(1, vn / 25)
@@ -220,7 +220,7 @@ export function stepCar(c: Car, inp: Input, dt: number, t: Track, st: CarStats, 
         const nx = x - cp.x, nz = z - cp.z, nl = Math.hypot(nx, nz) || 1
         x = cp.x; z = cp.z
         const vn = Math.abs(v) * Math.abs(Math.sin(moveH) * nx / nl + Math.cos(moveH) * nz / nl)
-        dmg = Math.min(DMG_MAX, dmg + impactDamage(vn))
+        dmg = Math.min(DMG_MAX, dmg + impactDamage(vn) * (st.tough ?? 1))
         v *= 1 - Math.min(0.9, (2.2 + vn * 0.04) * dt); bump = Math.max(bump, Math.min(1, Math.abs(v) / 30)); hit = Math.max(hit, Math.min(1, vn / 25))
       }
     }
@@ -323,7 +323,7 @@ export function crash(me: Car, my: CarStats, o: { x: number; z: number; h: numbe
   let c = { ...me, x: me.x + hit.nx * hit.depth * share, z: me.z + hit.nz * hit.depth * share }
   c.v = me.v * (1 - Math.min(0.5, vn * 0.012))
   c.hit = Math.max(c.hit, Math.min(1, vn / 25))
-  c = addDamage(c, impactDamage(vn) * dmgScale, cap)
+  c = addDamage(c, impactDamage(vn) * dmgScale * (my.tough ?? 1), cap)
   return c
 }
 

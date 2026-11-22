@@ -3,7 +3,7 @@ import { isBike } from '../stats'
 import { buildSpecCar, getSpec } from '../customCar'
 import { RoundedBoxGeometry } from 'three/examples/jsm/geometries/RoundedBoxGeometry.js'
 import { roadProximity, type Track } from './track'
-import { BRIDGES, CITY, type Bld, GARAGES, TUNNELS, bridgeH, city, tunnelD } from './city'
+import { BRIDGES, CITY, type Bld, GARAGES, POLICE, TUNNELS, bridgeH, city, tunnelD } from './city'
 import { PARK, PARK_TOP, PARK_TUNNEL } from './parkhaus'
 import { MOUNTAINS, OUT, RING, hillH, outRoads, ringPath } from './mountains'
 import { trees } from './forest'
@@ -335,7 +335,7 @@ export function buildScene(THREE: THREE, t: Track): RaceScene {
   }, showInterior, setVault }
 }
 
-interface Body { len: number; wid: number; hgt: number; cabLen: number; cabH: number; cabZ: number; wheelR: number; spoiler?: boolean; bed?: boolean; open?: boolean; tall?: boolean; cage?: boolean; scoop?: boolean; formula?: boolean; track?: number; wheelW?: number; stripe?: boolean }
+interface Body { swat?: boolean; len: number; wid: number; hgt: number; cabLen: number; cabH: number; cabZ: number; wheelR: number; spoiler?: boolean; bed?: boolean; open?: boolean; tall?: boolean; cage?: boolean; scoop?: boolean; formula?: boolean; track?: number; wheelW?: number; stripe?: boolean }
 const BODIES: Record<string, Body> = {
   kleinwagen: { len: 3.9, wid: 1.8, hgt: 0.75, cabLen: 2.1, cabH: 0.7, cabZ: -0.1, wheelR: 0.36 },
   limousine: { len: 4.8, wid: 1.9, hgt: 0.72, cabLen: 2.5, cabH: 0.62, cabZ: -0.2, wheelR: 0.38 },
@@ -354,6 +354,80 @@ const BODIES: Record<string, Body> = {
   hypercar: { len: 4.6, wid: 2.05, hgt: 0.42, cabLen: 1.6, cabH: 0.4, cabZ: 0, wheelR: 0.39, spoiler: true, stripe: true },
   rennwagen: { len: 5.0, wid: 0.9, hgt: 0.42, cabLen: 0.8, cabH: 0.35, cabZ: -0.2, wheelR: 0.42, formula: true, track: 1.85, wheelW: 0.55 },
   roadster: { len: 4.2, wid: 1.85, hgt: 0.5, cabLen: 1.0, cabH: 0.3, cabZ: -0.1, wheelR: 0.37, open: true, stripe: true },
+  swat: { len: 6.4, wid: 2.5, hgt: 1.3, cabLen: 3.4, cabH: 0.8, cabZ: 0.5, wheelR: 0.62, tall: true, swat: true },
+}
+
+/** SWAT-Panzerwagen: Panzerplatten, Rammbügel, Lichtbalken, Dachgeschütz und große „SWAT“-Schriftzüge (Seiten, Dach, Motorhaube, Heck) */
+/** Polizeiblock: Parkplatz mit Parkbuchten, Garage mit Boden und Schild, Schild und Lichtbalken an der Wache, weißes Band um das Dach */
+function policeDecor(THREE: THREE, scene: T.Scene, night: boolean): void {
+  const k = night ? 0.6 : 1
+  const mat = (c: number) => new THREE.MeshStandardMaterial({ color: new THREE.Color(c).multiplyScalar(k), roughness: 0.9 })
+  const flat = (m: T.Material, x0: number, x1: number, z0: number, z1: number, y: number, hgt = 0.05) => {
+    const b = new THREE.Mesh(new THREE.BoxGeometry(x1 - x0, hgt, z1 - z0), m); b.position.set((x0 + x1) / 2, y, (z0 + z1) / 2); scene.add(b); return b
+  }
+  const { lot, garage: g, station: st } = POLICE
+  flat(mat(0x2b2f36), lot.x0, lot.x1, lot.z0, lot.z1, 0.28, 0.06)
+  const white = new THREE.MeshBasicMaterial({ color: 0xe5e7eb })
+  // Parkbuchten an der Südkante und an der Westkante
+  for (let i = 0; i <= 12; i++) { const x = lot.x0 + 1 + i * 3.4; flat(white, x - 0.08, x + 0.08, lot.z0 + 0.5, lot.z0 + 6.5, 0.32, 0.02) }
+  for (let i = 0; i <= 4; i++) { const z = lot.z0 + 12 + i * 3.4; flat(white, lot.x0 + 0.5, lot.x0 + 6.5, z - 0.08, z + 0.08, 0.32, 0.02) }
+  flat(new THREE.MeshBasicMaterial({ color: 0x3b82f6 }), lot.x0, lot.x1, lot.z1 - 0.6, lot.z1, 0.32, 0.02)
+  const grd = swatText(THREE, 20, 3.6, 'POLIZEI', '#60a5fa'); grd.rotation.x = -Math.PI / 2; grd.rotation.z = Math.PI; grd.position.set(st.x - 25, 0.33, lot.z1 - 7); scene.add(grd)
+  // Garage: Boden, Streifen, Schild über der Einfahrt
+  flat(mat(0x4b5563), g.x0, g.x1, g.z0, g.z1, 0.28, 0.06)
+  flat(new THREE.MeshBasicMaterial({ color: 0xfacc15 }), g.x0 - 1, g.x0 + 0.5, g.z0 + 1, g.z1 - 1, 0.33, 0.02)
+  const gz = (g.z0 + g.z1) / 2
+  const sign = (w: number, h: number, txt: string, x: number, y: number, z: number, nx: number, nz: number, bg = 0x1e3a8a, fg = '#f8fafc') => {
+    const plate = new THREE.Mesh(new THREE.BoxGeometry(w + 0.6, h + 0.4, 0.3), new THREE.MeshBasicMaterial({ color: new THREE.Color(bg).multiplyScalar(k) }))
+    plate.position.set(x, y, z); plate.rotation.y = Math.atan2(nx, nz)
+    const t = swatText(THREE, w, h, txt, fg); t.position.set(x + nx * 0.2, y, z + nz * 0.2); t.rotation.y = Math.atan2(nx, nz)
+    scene.add(plate, t)
+  }
+  sign(14, 1.3, 'POLIZEI GARAGE', g.x0 - 0.2, 6.3, gz, -1, 0)
+  sign(9, 1.5, 'POLIZEI', st.x - 25, 4.7, st.z - st.d / 2 - 0.2, 0, -1)
+  sign(24, 2.6, 'POLIZEI', st.x, 14.2, st.z - st.d / 2 - 0.2, 0, -1)
+  // Dach: weißes Band, Lichtbalken
+  const band = new THREE.Mesh(new THREE.BoxGeometry(st.w + 0.5, 1.2, st.d + 0.5), mat(0xf1f5f9)); band.position.set(st.x, 12.6, st.z); scene.add(band)
+  const red = new THREE.MeshBasicMaterial({ color: 0xef4444 }), blue = new THREE.MeshBasicMaterial({ color: 0x3b82f6 })
+  for (const [dx, m] of [[-2, red], [2, blue]] as const) { const l = new THREE.Mesh(new THREE.BoxGeometry(4, 0.8, 1.6), m); l.position.set(st.x + dx * 2, 16.5, st.z); scene.add(l) }
+}
+function swatText(THREE: THREE, w: number, h: number, txt: string, fg = '#f8fafc'): T.Mesh {
+  const c = document.createElement('canvas'); c.width = 512; c.height = Math.round(512 * h / w)
+  const g = c.getContext('2d')
+  if (g) { g.clearRect(0, 0, c.width, c.height); g.fillStyle = fg; g.font = `900 ${Math.round(c.height * 0.92)}px Arial Black, Impact, sans-serif`; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText(txt, c.width / 2, c.height / 2 + c.height * 0.04) }
+  const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace
+  return new THREE.Mesh(new THREE.PlaneGeometry(w, h), new THREE.MeshBasicMaterial({ map: t, transparent: true, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -2 }))
+}
+function addSwatParts(THREE: THREE, g: T.Group, b: Body, clearance: number): void {
+  const steel = new THREE.MeshStandardMaterial({ color: 0x1f2937, roughness: 0.45, metalness: 0.7 })
+  const black = new THREE.MeshStandardMaterial({ color: 0x0a0c10, roughness: 0.6, metalness: 0.4 })
+  const yellow = new THREE.MeshStandardMaterial({ color: 0xfacc15, roughness: 0.4 })
+  const top = clearance + b.hgt
+  // Panzerplatten an den Seiten und Radkästen
+  for (const sx of [-1, 1]) {
+    const plate = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.55, b.len * 0.62), steel); plate.position.set(sx * (b.wid / 2 + 0.04), clearance + 0.55, 0.1); g.add(plate)
+    const step = new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.08, b.len * 0.5), black); step.position.set(sx * (b.wid / 2 + 0.12), clearance + 0.1, 0.1); g.add(step)
+    const yl = new THREE.Mesh(new THREE.BoxGeometry(0.14, 0.07, b.len * 0.9), yellow); yl.position.set(sx * (b.wid / 2 + 0.03), clearance + 0.95, 0); g.add(yl)
+  }
+  // Rammbügel vorn, Heckklappe hinten
+  const bull = new THREE.Mesh(new THREE.BoxGeometry(b.wid * 0.96, 0.7, 0.35), steel); bull.position.set(0, clearance + 0.45, b.len / 2 + 0.15); g.add(bull)
+  for (const sx of [-0.7, -0.25, 0.25, 0.7]) { const bar = new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.7, 0.1), black); bar.position.set(sx, clearance + 0.45, b.len / 2 + 0.36); g.add(bar) }
+  const rear = new THREE.Mesh(new THREE.BoxGeometry(b.wid * 0.9, 0.9, 0.2), steel); rear.position.set(0, clearance + 0.8, -b.len / 2 - 0.05); g.add(rear)
+  // Lichtbalken (rot/blau) und Dachgeschütz
+  const bar = new THREE.Mesh(new THREE.BoxGeometry(b.wid * 0.8, 0.16, 0.34), black); bar.position.set(0, top + b.cabH + 0.12, b.cabZ + b.cabLen / 2 - 0.2); g.add(bar)
+  const red = new THREE.Mesh(new THREE.BoxGeometry(b.wid * 0.38, 0.14, 0.3), new THREE.MeshBasicMaterial({ color: 0xff2a2a })); red.position.set(-b.wid * 0.2, top + b.cabH + 0.24, b.cabZ + b.cabLen / 2 - 0.2)
+  const blue = new THREE.Mesh(new THREE.BoxGeometry(b.wid * 0.38, 0.14, 0.3), new THREE.MeshBasicMaterial({ color: 0x2a6bff })); blue.position.set(b.wid * 0.2, top + b.cabH + 0.24, b.cabZ + b.cabLen / 2 - 0.2)
+  g.add(red, blue)
+  const turret = new THREE.Mesh(new THREE.CylinderGeometry(0.4, 0.46, 0.3, 14), steel); turret.position.set(0, top + b.cabH + 0.2, b.cabZ - 1.1); g.add(turret)
+  const gun = new THREE.Mesh(new THREE.CylinderGeometry(0.07, 0.07, 1.5, 8), black); gun.rotation.x = Math.PI / 2; gun.position.set(0, top + b.cabH + 0.32, b.cabZ - 0.45); g.add(gun)
+  const muzzle = new THREE.Mesh(new THREE.CylinderGeometry(0.1, 0.1, 0.18, 8), steel); muzzle.rotation.x = Math.PI / 2; muzzle.position.set(0, top + b.cabH + 0.32, b.cabZ + 0.35); g.add(muzzle)
+  // SWAT-Schriftzüge
+  for (const sx of [-1, 1]) {
+    const t = swatText(THREE, 3.0, 0.8, 'SWAT'); t.rotation.y = sx * Math.PI / 2; t.position.set(sx * (b.wid / 2 + 0.11), clearance + 0.55 + 0.05, 0.1); g.add(t)
+  }
+  const roof = swatText(THREE, 2.0, 0.9, 'SWAT', '#facc15'); roof.rotation.x = -Math.PI / 2; roof.rotation.z = Math.PI; roof.position.set(0, top + b.cabH + 0.02, b.cabZ - 0.1); g.add(roof)
+  const hood = swatText(THREE, 1.9, 0.6, 'SWAT', '#f8fafc'); hood.rotation.x = -Math.PI / 2; hood.position.set(0, top + 0.012, b.len / 2 - 1.1); g.add(hood)
+  const back = swatText(THREE, 1.8, 0.5, 'SWAT'); back.rotation.y = Math.PI; back.position.set(0, clearance + 0.85, -b.len / 2 - 0.17); g.add(back)
 }
 
 /** Flugdüsen unter dem Auto (zeigen nach unten): nur im Flug sichtbar. */
@@ -443,6 +517,7 @@ function buildCar(THREE: THREE, kind: string, color: string, name: string, isMe:
     const helmet = new THREE.Mesh(new THREE.SphereGeometry(0.22, 12, 10), new THREE.MeshStandardMaterial({ color: 0xfacc15, roughness: 0.3 })); helmet.position.set(0, clearance + 0.78, -0.1); g.add(helmet)
     const halo = new THREE.Mesh(new THREE.TorusGeometry(0.3, 0.035, 6, 14, Math.PI), dark); halo.rotation.set(0, Math.PI / 2, 0); halo.position.set(0, clearance + 0.7, 0.05); g.add(halo)
   }
+  if (b.swat) addSwatParts(THREE, g, b, clearance)
   // Rennstreifen
   if (b.stripe || kind === 'sportwagen' || kind === 'cabrio') {
     const st = new THREE.Mesh(new THREE.BoxGeometry(0.34, 0.02, b.len * 0.98), new THREE.MeshStandardMaterial({ color: 0xf8fafc, roughness: 0.4 }))
@@ -699,7 +774,7 @@ function buildCity(THREE: THREE, scene: T.Scene, ground: T.Mesh, night: boolean)
   const ranges = new Map<Bld, [number, number]>()
   for (const b of buildings) {
     const vStart = pos.length / 3
-    const x0 = b.x - b.w / 2, x1 = b.x + b.w / 2, z0 = b.z - b.d / 2, z1 = b.z + b.d / 2, h = b.h, c = pal[b.c], y0 = b.lo ?? 0
+    const x0 = b.x - b.w / 2, x1 = b.x + b.w / 2, z0 = b.z - b.d / 2, z1 = b.z + b.d / 2, h = b.h, c = b.col !== undefined ? new THREE.Color(b.col).multiplyScalar(night ? 0.6 : 1) : pal[b.c], y0 = b.lo ?? 0
     const tw = b.w / 6, td = b.d / 6, th = (h - y0) / 6
     face([[x0, y0, z1], [x1, y0, z1], [x1, h, z1], [x0, h, z1]], [0, 0, 1], tw, th, c)
     face([[x1, y0, z0], [x0, y0, z0], [x0, h, z0], [x1, h, z0]], [0, 0, -1], tw, th, c)
@@ -717,7 +792,7 @@ function buildCity(THREE: THREE, scene: T.Scene, ground: T.Mesh, night: boolean)
   {
     const dp: number[] = [], di: number[] = [], dc: number[] = []
     for (const b of buildings) {
-      if (b.lo !== undefined) continue
+      if (b.lo !== undefined || (b.col !== undefined && b.kind !== 'police')) continue
       const d = layoutOf(b).door, tx = d.nz !== 0 ? 1 : 0, tz = d.nx !== 0 ? 1 : 0
       const quad = (hw: number, hgt: number, off: number, col: number[]) => {
         const o = dp.length / 3
@@ -735,9 +810,11 @@ function buildCity(THREE: THREE, scene: T.Scene, ground: T.Mesh, night: boolean)
     dg.setAttribute('position', new THREE.Float32BufferAttribute(dp, 3)); dg.setAttribute('color', new THREE.Float32BufferAttribute(dc, 3)); dg.setIndex(di)
     scene.add(new THREE.Mesh(dg, new THREE.MeshBasicMaterial({ vertexColors: true, side: THREE.FrontSide, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 })))
   }
+  policeDecor(THREE, scene, night)
   const viewer = makeInteriorViewer(THREE, scene, { geo: bg, ranges }, night)
   const wallMats = pal.map((c) => new THREE.MeshStandardMaterial({ color: c, roughness: 0.85, side: THREE.DoubleSide }))
-  const showInterior: RaceScene['showInterior'] = (b) => { viewer.show(b as Bld | null, b ? wallMats[b.c] : wallMats[0]) }
+  const policeWall = new THREE.MeshStandardMaterial({ color: new THREE.Color(0xc7d6f5).multiplyScalar(night ? 0.6 : 1), roughness: 0.85, side: THREE.DoubleSide })
+  const showInterior: RaceScene['showInterior'] = (b) => { viewer.show(b as Bld | null, b ? ((b as Bld).kind === 'police' ? policeWall : wallMats[(b as Bld).c]) : wallMats[0]) }
 
   // Gehwege unter jedem Block (hellgrau, leicht erhöht) und Parks
   const walk = new THREE.MeshStandardMaterial({ color: night ? 0x5b6270 : 0x9ca3af, roughness: 1 })

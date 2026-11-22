@@ -19,6 +19,8 @@ export const KIND_STATS: Record<string, KindStats> = {
   rennwagen: { kmh: 320, acc: 33, turn: 2.2, brake: 52 },
   roadster: { kmh: 290, acc: 31, turn: 2.1, brake: 48 },
   supercar: { kmh: 330, acc: 31, turn: 2.1, brake: 50 },
+  /** SWAT-Panzerwagen: sehr schnell, schwer, hält viel aus (Schadensfaktor in KIND_TOUGH) */
+  swat: { kmh: 310, acc: 30, turn: 1.8, brake: 50 },
   chopper: { kmh: 190, acc: 17, turn: 2.1, brake: 30 },
   crossbike: { kmh: 175, acc: 24, turn: 2.7, brake: 34 },
   sportbike: { kmh: 260, acc: 30, turn: 2.6, brake: 44 },
@@ -34,7 +36,7 @@ export const KIND_DIMS: Record<string, { len: number; wid: number }> = {
   pickup: { len: 5.3, wid: 2.0 }, cabrio: { len: 4.3, wid: 1.85 }, sportwagen: { len: 4.5, wid: 1.95 }, bus: { len: 6.6, wid: 2.2 },
   oldtimer: { len: 4.4, wid: 1.8 }, buggy: { len: 3.4, wid: 1.9 }, monstertruck: { len: 4.8, wid: 2.4 }, muscle: { len: 4.9, wid: 1.95 },
   rallye: { len: 4.1, wid: 1.85 }, gt: { len: 4.7, wid: 2.0 }, hypercar: { len: 4.6, wid: 2.05 }, rennwagen: { len: 5.0, wid: 2.0 },
-  roadster: { len: 4.2, wid: 1.85 }, supercar: { len: 4.5, wid: 1.85 },
+  roadster: { len: 4.2, wid: 1.85 }, supercar: { len: 4.5, wid: 1.85 }, swat: { len: 6.4, wid: 2.5 },
   chopper: { len: 2.6, wid: 0.9 }, crossbike: { len: 2.1, wid: 0.8 }, sportbike: { len: 2.1, wid: 0.8 }, hyperbike: { len: 2.2, wid: 0.8 },
 }
 export const kindDims = (kind: string): { len: number; wid: number } => KIND_DIMS[kind] ?? KIND_DIMS.kleinwagen
@@ -46,7 +48,12 @@ export const isBike = (kind: string): boolean => BIKE_KINDS.includes(kind)
 /** Fliegen können der Sky-Roadster und das Admin-Supercar. */
 /** Eigene Autos (Admin), die fliegen können. */
 export const CUSTOM_FLY = new Set<string>()
-export const canFly = (kind: string): boolean => kind === 'roadster' || kind === 'supercar' || CUSTOM_FLY.has(kind)
+export const canFly = (kind: string): boolean => kind === 'roadster' || kind === 'supercar' || kind === 'swat' || CUSTOM_FLY.has(kind)
+/** Schadensfaktor bei Aufprall: SWAT-Wagen nehmen bei 200 km/h nur etwa 10 % Schaden (statt ~42 %) */
+export const KIND_TOUGH: Record<string, number> = { swat: 0.24 }
+export const toughOf = (kind: string): number => KIND_TOUGH[kind] ?? 1
+/** Plätze im Auto: SWAT-Wagen 10, sonst die Einstellung des Admins */
+export const seatsOf = (kind: string): number => (kind === 'swat' ? 10 : seatConfig.n)
 export const FLY_SECONDS = 2
 export const FLY_COOLDOWN = 20
 /** Vom Admin eingestellt (gilt für alle): Flugdauer, Ladezeit (Sekunden) und ob sich das Auto im Flug seitwärts rollt. */

@@ -18,11 +18,22 @@ export const BRIDGES: ReadonlyArray<{ bz: number; bx0: number; bx1: number }> = 
   { bz: 0, bx0: -240, bx1: 240 },
 ]
 
-export interface Bld { x: number; z: number; w: number; d: number; h: number; /** Unterkante (Sturz über einer Garageneinfahrt): darunter kann man durchfahren */ lo?: number; /** Farbvariante 0–5 */ c: number }
+export interface Bld { x: number; z: number; w: number; d: number; h: number; /** Unterkante (Sturz über einer Garageneinfahrt): darunter kann man durchfahren */ lo?: number; /** Farbvariante 0–5 */ c: number; /** feste Wandfarbe (Polizei) */ col?: number; /** Tür-Seite erzwingen (0 Süd, 1 West, 2 Nord, 3 Ost) */ door?: 0 | 1 | 2 | 3; /** Sonderhaus */ kind?: 'police' }
 import { PARK, PARK_TUNNEL } from './parkhaus'
 export interface CityData { buildings: Bld[]; parks: Array<{ x: number; z: number; size: number }>; grid: Map<string, number[]> }
 
 export const CELL = 40
+
+/** Polizeiblock: Wache hinten (Tür nach Süden zum Hof), davor der Parkplatz, rechts die offene Garage, aus der die Streifenwagen starten. Maße relativ zur Blockmitte. */
+const PB = { cx: -420, cz: 300 }
+export const POLICE = {
+  cx: PB.cx, cz: PB.cz,
+  station: { x: PB.cx, z: PB.cz + 25, w: 70, d: 38 },
+  lot: { x0: PB.cx - 46, x1: PB.cx - 4, z0: PB.cz - 44, z1: PB.cz + 5 },
+  garage: { x0: PB.cx + 8, x1: PB.cx + 42, z0: PB.cz - 42, z1: PB.cz - 10 },
+  /** Startplätze der Streifenwagen in der Garage (Blick nach Westen, zum Hof) */
+  slots: [16, 32].flatMap((dx) => [-35, -26, -17].map((dz) => ({ x: PB.cx + dx, z: PB.cz + dz, h: -Math.PI / 2 }))),
+}
 let cache: CityData | null = null
 
 function rng(seed: number) { let a = seed >>> 0; return () => { a = (a + 0x6d2b79f5) >>> 0; let t = a; t = Math.imul(t ^ (t >>> 15), t | 1); t ^= t + Math.imul(t ^ (t >>> 7), t | 61); return ((t ^ (t >>> 14)) >>> 0) / 4294967296 } }
@@ -65,6 +76,19 @@ export function city(): CityData {
     }
   }
   clearBlock(PARK.cx, PARK.cz)
+  {
+    // Polizeiblock: zufällige Häuser raus, Wache + offene Garage (Wände, Dach mit Sturz) hinein
+    clearBlock(PB.cx, PB.cz)
+    const st = POLICE.station, g = POLICE.garage, BLUE = 0x1e3a8a, WHITE = 0xe5e7eb
+    buildings.push({ x: st.x, z: st.z, w: st.w, d: st.d, h: 16, c: 3, col: BLUE, door: 0, kind: 'police' })
+    const gx = (g.x0 + g.x1) / 2, gz = (g.z0 + g.z1) / 2
+    buildings.push(
+      { x: gx, z: g.z1 - 1, w: g.x1 - g.x0, d: 2, h: 7, c: 0, col: WHITE },
+      { x: gx, z: g.z0 + 1, w: g.x1 - g.x0, d: 2, h: 7, c: 0, col: WHITE },
+      { x: g.x1 - 1, z: gz, w: 2, d: g.z1 - g.z0, h: 7, c: 0, col: WHITE },
+      { x: gx, z: gz, w: g.x1 - g.x0, d: g.z1 - g.z0, h: 7.4, lo: 5, c: 3, col: BLUE },
+    )
+  }
   const grid = new Map<string, number[]>()
   buildings.forEach((b, i) => {
     for (let gx = Math.floor((b.x - b.w / 2) / CELL); gx <= Math.floor((b.x + b.w / 2) / CELL); gx++)

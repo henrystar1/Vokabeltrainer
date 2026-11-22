@@ -27697,3 +27697,8 @@ begin
     if left(r.proname, 1) <> '_' then execute format('grant execute on function %s to authenticated', r.sig); end if;
   end loop;
 end $$;
+
+-- ===== 0114 SWAT-Panzerwagen =====
+insert into public.cars (id, name, kind, color, price, top_kmh, sort) values
+  ('swat', 'SWAT-Panzerwagen', 'swat', '#0b1220', 250000, 310, 90)
+on conflict (id) do update set name = excluded.name, kind = excluded.kind, color = excluded.color, price = excluded.price, top_kmh = excluded.top_kmh, sort = excluded.sort;

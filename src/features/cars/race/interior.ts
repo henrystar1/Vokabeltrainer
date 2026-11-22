@@ -36,6 +36,7 @@ export function buildingAt(x: number, z: number): Bld | null {
 
 /** Welche Seite hat die Tür? 0 = Süden (−z), 1 = Westen (−x), 2 = Norden (+z), 3 = Osten (+x): zur nächsten Straße (zum Blockrand) hin. */
 export function doorSide(b: Bld): 0 | 1 | 2 | 3 {
+  if (b.door !== undefined) return b.door
   const P = CITY.pitch
   const cx = P * Math.floor(b.x / P) + P / 2, cz = P * Math.floor(b.z / P) + P / 2
   const ox = b.x - cx, oz = b.z - cz

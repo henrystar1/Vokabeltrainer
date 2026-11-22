@@ -2,8 +2,8 @@ import { city, type Bld } from './city'
 import { canon, layoutOf, setSpecial, type Solid } from './interior'
 
 /** Besondere Häuser der Stadt mit Einrichtung: Bank (Tresen + Tresor), Shop (Theke), Fitnessstudio (Geräte), Krankenhaus (Betten, hier wacht man nach dem Tod auf). Feste Auswahl, überall gleich. */
-export type PoiKind = 'bank' | 'shop' | 'gym' | 'hospital'
-export type SpotKind = 'vault' | 'counter' | 'machine'
+export type PoiKind = 'bank' | 'shop' | 'gym' | 'hospital' | 'police'
+export type SpotKind = 'vault' | 'counter' | 'machine' | 'armory' | 'steal'
 export interface Spot { x: number; z: number; r: number; kind: SpotKind; label: string }
 export interface Poi {
   id: string; kind: PoiKind; name: string; b: Bld
@@ -15,8 +15,8 @@ export interface Poi {
   /** Bett-Plätze (Aufwachen nach dem Tod): Standort neben dem Bett und Blickrichtung */
   beds?: Array<{ x: number; z: number; h: number }>
 }
-export const POI_COLOR: Record<PoiKind, string> = { bank: '#facc15', shop: '#22d3ee', gym: '#f472b6', hospital: '#ef4444' }
-export const POI_LETTER: Record<PoiKind, string> = { bank: 'B', shop: 'S', gym: 'F', hospital: '+' }
+export const POI_COLOR: Record<PoiKind, string> = { bank: '#facc15', shop: '#22d3ee', gym: '#f472b6', hospital: '#ef4444', police: '#3b82f6' }
+export const POI_LETTER: Record<PoiKind, string> = { bank: 'B', shop: 'S', gym: 'F', hospital: '+', police: 'P' }
 /** Reichweite um die Tür (Karte, Leuchtsäule) */
 export const POI_RANGE = 7
 
@@ -39,6 +39,7 @@ export function pois(): Poi[] {
   }
   take('bank', 'Bank', 1, 0, (b) => Math.hypot(b.x - 180, b.z + 180))
   take('hospital', 'Krankenhaus', 1, 250, (b) => Math.hypot(b.x + 120, b.z - 120))
+  { const b = c.buildings.find((q) => q.kind === 'police'); if (b) out.push(furnish({ id: 'police0', kind: 'police', name: 'Polizeiwache', b, x: 0, z: 0, nx: 0, nz: 0, solids: [], spots: [] })) }
   take('shop', 'Shop', 4, 260, (b) => hash(b))
   take('gym', 'Fitnessstudio', 2, 300, (b) => hash(b, 1) + 1)
   cache = out
@@ -89,6 +90,17 @@ function furnish(p: Poi): Poi {
     }
     solids.push(rect(W - 2, W - 0.8, -D + 20, -D + 28, 0.9, 0x6b7280), rect(W - 2.1, W - 0.7, -D + 20.4, -D + 21.4, 0.3, 0x111827, { y0: 0.9, deco: true }))
     spot(W - 4, -D + 24, 2.6, 'machine', 'Hanteln')
+  } else if (p.kind === 'police') {
+    // Empfangstresen, Zellen an der Rückwand, Waffenkammer (Schlagstock) und Schlüsselbrett für den SWAT-Wagen
+    solids.push(rect(-W + 14, W - 22, -D + 11, -D + 12.4, 1.1, 0x64748b), rect(-W + 14, W - 22, -D + 11, -D + 12.4, 0.12, 0x3b82f6, { y0: 1.1, deco: true }))
+    for (let i = 0; i < 3; i++) {
+      const u = -W + 6 + i * 9
+      solids.push(rect(u, u + 6, D - 1.4, D - 0.6, 2.6, 0x475569), rect(u, u + 0.3, D - 6, D - 1.4, 2.6, 0x94a3b8), rect(u + 5.7, u + 6, D - 6, D - 1.4, 2.6, 0x94a3b8), rect(u, u + 6, D - 6, D - 5.7, 2.6, 0x94a3b8), rect(u + 1, u + 3.2, D - 3.2, D - 1.6, 0.5, 0x6b7280))
+    }
+    solids.push(rect(W - 12, W - 1.5, D - 12, D - 1.5, 2.4, 0x1e293b), rect(W - 11, W - 2.5, D - 12.1, D - 11.8, 1.2, 0x3b82f6, { y0: 1.0, deco: true }))
+    spot(W - 6.75, D - 14.4, 3.4, 'armory', 'Waffenkammer aufbrechen')
+    solids.push(rect(-W + 0.6, -W + 1.6, 4, 9, 1.8, 0x7c2d12), rect(-W + 0.5, -W + 1.7, 4.4, 8.6, 0.5, 0xfacc15, { y0: 1.0, deco: true }))
+    spot(-W + 4, 6.5, 3.2, 'steal', 'SWAT-Wagen klauen')
   } else {
     const beds: NonNullable<Poi['beds']> = []
     let i = 0
