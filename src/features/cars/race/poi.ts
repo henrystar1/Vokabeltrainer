@@ -3,7 +3,7 @@ import { canon, layoutOf, setSpecial, type Solid } from './interior'
 
 /** Besondere Häuser der Stadt mit Einrichtung: Bank (Tresen + Tresor), Shop (Theke), Fitnessstudio (Geräte), Krankenhaus (Betten, hier wacht man nach dem Tod auf). Feste Auswahl, überall gleich. */
 export type PoiKind = 'bank' | 'shop' | 'gym' | 'hospital' | 'police' | 'weapons' | 'army'
-export type SpotKind = 'vault' | 'counter' | 'machine' | 'armory' | 'steal' | 'dress' | 'atm' | 'weapons' | 'vest' | 'tank' | 'heli' | 'armycar'
+export type SpotKind = 'vault' | 'counter' | 'machine' | 'armory' | 'steal' | 'dress' | 'atm' | 'weapons' | 'vest' | 'tank' | 'heli' | 'armycar' | 'climb' | 'rifle' | 'sniper'
 export interface Spot { x: number; z: number; r: number; kind: SpotKind; label: string }
 export interface Poi {
   id: string; kind: PoiKind; name: string; b: Bld
@@ -122,7 +122,14 @@ function furnish(p: Poi): Poi {
     for (let i = 0; i < 4; i++) solids.push(rect(-W + 3 + i * 5, -W + 5.5 + i * 5, D - 1.6, D - 0.6, 2.2, 0x374151), rect(-W + 3.2 + i * 5, -W + 5.3 + i * 5, D - 1.7, D - 1.6, 0.12, 0x111827, { y0: 1.2, deco: true }))
     for (let i = 0; i < 3; i++) solids.push(rect(W - 12 + i * 3.2, W - 10.6 + i * 3.2, -D + 2, -D + 3.2, 1.7, 0x3f4a2f), rect(W - 11.8 + i * 3.2, W - 10.8 + i * 3.2, -D + 3.2, -D + 3.3, 0.5, 0x1f2937, { y0: 0.9, deco: true }))
     spot(W - 8, -D + 5.4, 3.0, 'vest', 'Schutzweste nehmen')
+    spot(-W + 7, D - 4, 3.2, 'rifle', 'Sturmgewehr nehmen')
+    spot(-W + 17, D - 4, 3.2, 'sniper', 'Scharfschützengewehr nehmen')
     solids.push(rect(-W + 10, -W + 16, -2, 2, 0.9, 0x78350f), rect(-W + 10.3, -W + 15.7, -1.7, 1.7, 0.05, 0xd1d5db, { y0: 0.9, deco: true }))
+    for (let t = -40; t <= 40; t += 10) {
+      const H = ARMY.half
+      spots.push({ x: ARMY.cx + t, z: ARMY.cz + H, r: 3.4, kind: 'climb', label: 'Zaun überklettern' }, { x: ARMY.cx - H, z: ARMY.cz + t, r: 3.4, kind: 'climb', label: 'Zaun überklettern' }, { x: ARMY.cx + H, z: ARMY.cz + t, r: 3.4, kind: 'climb', label: 'Zaun überklettern' })
+      if (Math.abs(t) > ARMY.gate + 3) spots.push({ x: ARMY.cx + t, z: ARMY.cz - H, r: 3.4, kind: 'climb', label: 'Zaun überklettern' })
+    }
     for (const v of ARMY.vehicles) spots.push({ x: v.x, z: v.z, r: v.kind === 'heli' ? 6 : 5, kind: v.kind, label: v.kind === 'tank' ? 'Panzer klauen' : v.kind === 'heli' ? 'Hubschrauber klauen' : 'Waffenauto klauen' })
   } else if (p.kind === 'weapons') {
     // Verkaufstresen mit Glasvitrine, Wandregale (Pistolen, Schlagstöcke), Puppen mit Weste und Helm, Probierzone

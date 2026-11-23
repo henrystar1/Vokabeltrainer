@@ -18,7 +18,7 @@ export const BRIDGES: ReadonlyArray<{ bz: number; bx0: number; bx1: number }> = 
   { bz: 0, bx0: -240, bx1: 240 },
 ]
 
-export interface Bld { x: number; z: number; w: number; d: number; h: number; /** Unterkante (Sturz über einer Garageneinfahrt): darunter kann man durchfahren */ lo?: number; /** Farbvariante 0–5 */ c: number; /** feste Wandfarbe (Polizei) */ col?: number; /** Tür-Seite erzwingen (0 Süd, 1 West, 2 Nord, 3 Ost) */ door?: 0 | 1 | 2 | 3; /** Sonderhaus */ kind?: 'police' | 'hospital' | 'bank' | 'weapons' | 'army' }
+export interface Bld { x: number; z: number; w: number; d: number; h: number; /** Unterkante (Sturz über einer Garageneinfahrt): darunter kann man durchfahren */ lo?: number; /** Farbvariante 0–5 */ c: number; /** feste Wandfarbe (Polizei) */ col?: number; /** Tür-Seite erzwingen (0 Süd, 1 West, 2 Nord, 3 Ost) */ door?: 0 | 1 | 2 | 3; /** Sonderhaus */ kind?: 'police' | 'hospital' | 'bank' | 'weapons' | 'army'; /** nicht als Kasten zeichnen (eigenes Modell), aber solide */ hid?: boolean }
 import { PARK, PARK_TUNNEL } from './parkhaus'
 export interface CityData { buildings: Bld[]; parks: Array<{ x: number; z: number; size: number }>; grid: Map<string, number[]> }
 
@@ -98,20 +98,20 @@ export function city(): CityData {
     clearBlock(ARMY.cx, ARMY.cz)
     const A = ARMY, H = A.half, fence = 0x6b7280, ft = 1
     buildings.push(
-      { x: A.cx, z: A.cz + H, w: 2 * H, d: ft, h: 2.6, c: 0, col: fence },
-      { x: A.cx - H, z: A.cz, w: ft, d: 2 * H, h: 2.6, c: 0, col: fence },
-      { x: A.cx + H, z: A.cz, w: ft, d: 2 * H, h: 2.6, c: 0, col: fence },
-      { x: A.cx - (H + A.gate) / 2, z: A.cz - H, w: H - A.gate, d: ft, h: 2.6, c: 0, col: fence },
-      { x: A.cx + (H + A.gate) / 2, z: A.cz - H, w: H - A.gate, d: ft, h: 2.6, c: 0, col: fence },
-      { x: A.barracks.x, z: A.barracks.z, w: A.barracks.w, d: A.barracks.d, h: 10, c: 2, col: 0x4d5d3a, door: 0, kind: 'army' },
+      { x: A.cx, z: A.cz + H, w: 2 * H, d: ft, h: 2.6, c: 0, col: fence, hid: true },
+      { x: A.cx - H, z: A.cz, w: ft, d: 2 * H, h: 2.6, c: 0, col: fence, hid: true },
+      { x: A.cx + H, z: A.cz, w: ft, d: 2 * H, h: 2.6, c: 0, col: fence, hid: true },
+      { x: A.cx - (H + A.gate) / 2, z: A.cz - H, w: H - A.gate, d: ft, h: 2.6, c: 0, col: fence, hid: true },
+      { x: A.cx + (H + A.gate) / 2, z: A.cz - H, w: H - A.gate, d: ft, h: 2.6, c: 0, col: fence, hid: true },
+      { x: A.barracks.x, z: A.barracks.z, w: A.barracks.w, d: A.barracks.d, h: 10, c: 2, col: 0x4d5d3a, door: 0, kind: 'army', hid: true },
     )
-    for (const sx of [-1, 1]) for (const sz of [-1, 1]) buildings.push({ x: A.cx + sx * H, z: A.cz + sz * H, w: 4, d: 4, h: 9, c: 0, col: 0x3f4a2f })
+    for (const sx of [-1, 1]) for (const sz of [-1, 1]) buildings.push({ x: A.cx + sx * H, z: A.cz + sz * H, w: 4, d: 4, h: 9, c: 0, col: 0x3f4a2f, hid: true })
   }
   for (const [L, kind, body, trim] of [[POLICE, 'police', 0x1e3a8a, 0xe5e7eb], [HOSPITAL, 'hospital', 0xf1f5f9, 0xdc2626], [BANK, 'bank', 0xd8c9a0, 0]] as const) {
     // Sonderblock: zufällige Häuser raus, Haus + offene Garage (Wände, Dach mit Sturz) hinein
     clearBlock(L.cx, L.cz)
     const st = L.station, g = L.garage
-    buildings.push({ x: st.x, z: st.z, w: st.w, d: st.d, h: 16, c: 3, col: body, door: 0, kind })
+    buildings.push({ x: st.x, z: st.z, w: st.w, d: st.d, h: 16, c: 3, col: body, door: 0, kind, hid: kind === 'bank' })
     if (kind === 'bank') continue // die Bank hat nur den Parkplatz, keine Garage
     const gx = (g.x0 + g.x1) / 2, gz = (g.z0 + g.z1) / 2
     buildings.push(

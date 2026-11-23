@@ -1,5 +1,6 @@
 import type * as T from 'three'
 import { addBaton } from './swatMan'
+import { makeGunModel } from './gunMesh'
 
 type THREE = typeof T
 
@@ -38,17 +39,15 @@ export function addGear(THREE: THREE, m: T.Group, mask: number): void {
     inner.add(helm, visor)
   }
   if (mask & 4 && !m.userData.bt) addBaton(THREE, m)
-  if (mask & 8 && !(done & 8)) {
-    const arm = m.userData.armL as T.Group | undefined
+  const gunBit = mask & 32 ? 32 : mask & 16 ? 16 : mask & 8 ? 8 : 0
+  if (gunBit !== ((m.userData.gunBit as number | undefined) ?? 0)) {
+    const arm = m.userData.armR as T.Group | undefined
     if (arm) {
-      const gun = new THREE.Group()
-      const body = new THREE.Mesh(new THREE.BoxGeometry(0.07, 0.13, 0.26), new THREE.MeshStandardMaterial({ color: 0x0b0f17, roughness: 0.5, metalness: 0.4 }))
-      body.position.set(0, 0, 0.14)
-      const barrel = new THREE.Mesh(new THREE.BoxGeometry(0.045, 0.045, 0.2), new THREE.MeshStandardMaterial({ color: 0x1f2937, metalness: 0.6 }))
-      barrel.position.set(0, 0.04, 0.3)
-      gun.add(body, barrel); gun.position.set(0, -0.6, 0.12)
-      arm.add(gun)
+      if (m.userData.gunMesh) arm.remove(m.userData.gunMesh as T.Object3D)
+      m.userData.gunMesh = undefined
+      if (gunBit) { const gm = makeGunModel(THREE, gunBit === 32 ? 'sniper' : gunBit === 16 ? 'rifle' : 'pistol'); arm.add(gm); m.userData.gunMesh = gm }
+      m.userData.gunBit = gunBit; m.userData.gunned = gunBit !== 0
     }
   }
-  m.userData.gr = done | (mask & 11)
+  m.userData.gr = mask
 }

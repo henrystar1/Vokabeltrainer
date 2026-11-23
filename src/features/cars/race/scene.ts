@@ -100,7 +100,7 @@ export interface RaceScene {
   makeWalker: (shirt: string, pants?: string, name?: string, skin?: string) => T.Group
   /** Innenraum des Hauses zeigen, in dem die Figur steht (null = keins). */
   /** zerschlägt Glasscheiben der Bank im Umkreis r um (x,z); liefert die Anzahl */
-  smashGlass: (x: number, z: number, r: number) => number
+  smashGlass: (x: number, z: number, r: number, y?: number) => number
   showInterior: (b: { x: number; z: number; w: number; d: number; h: number; c: number } | null) => void
   /** Tresortür der Bank öffnen/schließen */
   setVault: (open: boolean) => void
@@ -364,29 +364,87 @@ const BODIES: Record<string, Body> = {
 
 /** SWAT-Panzerwagen: Panzerplatten, Rammbügel, Lichtbalken, Dachgeschütz und große „SWAT“-Schriftzüge (Seiten, Dach, Motorhaube, Heck) */
 /** Polizeiblock: Parkplatz mit Parkbuchten, Garage mit Boden und Schild, Schild und Lichtbalken an der Wache, weißes Band um das Dach */
-/** Armee-Gelände: Asphalt, Landeplätze, Stacheldraht auf dem Zaun, Tor mit Schranke und Wachhäuschen, Schild */
-function armyDecor(THREE: THREE, scene: T.Scene, night: boolean): void {
+/** Armee-Gelände: Zaun mit Maschendraht und Stacheldraht, Kaserne, Wachtürme, Bunker, Fahrzeughalle, Tanks, Fahne, Tor mit Schranke */
+export function armyDecor(THREE: THREE, scene: T.Scene, night: boolean, buildings: Bld[]): void {
   const k = night ? 0.6 : 1
   const A = ARMY, H = A.half
-  const col = (c: number) => new THREE.MeshStandardMaterial({ color: new THREE.Color(c).multiplyScalar(k), roughness: 0.9 })
-  const asphalt = new THREE.Mesh(new THREE.BoxGeometry(2 * H - 2, 0.06, 2 * H - 2), col(0x3a3f36)); asphalt.position.set(A.cx, 0.28, A.cz); scene.add(asphalt)
+  const col = (c: number, o: { rough?: number; metal?: number } = {}) => new THREE.MeshStandardMaterial({ color: new THREE.Color(c).multiplyScalar(k), roughness: o.rough ?? 0.85, metalness: o.metal ?? 0.05 })
+  const bx = (w: number, h: number, d: number, m: T.Material, x: number, y: number, z: number) => { const b = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), m); b.position.set(x, y, z); scene.add(b); return b }
+  const cy = (r: number, h: number, m: T.Material, x: number, y: number, z: number, seg = 14) => { const c = new THREE.Mesh(new THREE.CylinderGeometry(r, r, h, seg), m); c.position.set(x, y, z); scene.add(c); return c }
+  const asphalt = bx(2 * H - 2, 0.06, 2 * H - 2, col(0x3a3f36, { rough: 0.95 }), A.cx, 0.28, A.cz)
+  void asphalt
   for (const v of A.vehicles) {
     if (v.kind !== 'heli') continue
     const ring = new THREE.Mesh(new THREE.RingGeometry(6.2, 7, 28), new THREE.MeshBasicMaterial({ color: 0xf8fafc, side: THREE.DoubleSide })); ring.rotation.x = -Math.PI / 2; ring.position.set(v.x, 0.33, v.z); scene.add(ring)
     const t = swatText(THREE, 5, 5, 'H', '#f8fafc'); t.rotation.x = -Math.PI / 2; t.rotation.z = Math.PI; t.position.set(v.x, 0.34, v.z); scene.add(t)
   }
-  const wire = new THREE.MeshStandardMaterial({ color: 0x9ca3af, metalness: 0.7, roughness: 0.4 })
-  const strips: Array<[number, number, number, number]> = [[A.cx, A.cz + H, 2 * H, 0.3], [A.cx - H, A.cz, 0.3, 2 * H], [A.cx + H, A.cz, 0.3, 2 * H], [A.cx - (H + A.gate) / 2, A.cz - H, H - A.gate, 0.3], [A.cx + (H + A.gate) / 2, A.cz - H, H - A.gate, 0.3]]
-  for (const [x, z, w, d] of strips) { const m = new THREE.Mesh(new THREE.BoxGeometry(w, 0.35, d), wire); m.position.set(x, 2.8, z); scene.add(m) }
-  // Tor: Pfosten, rot-weiße Schranke (hochgeklappt), Wachhäuschen
-  for (const sx of [-1, 1]) { const p = new THREE.Mesh(new THREE.BoxGeometry(0.6, 4, 0.6), col(0x4b5563)); p.position.set(A.cx + sx * A.gate, 2, A.cz - H); scene.add(p) }
-  const bar = new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.3, 7), new THREE.MeshStandardMaterial({ color: 0xdc2626 })); bar.position.set(A.cx + A.gate + 0.2, 4.4, A.cz - H + 3.5); bar.rotation.x = 0.0; scene.add(bar)
-  const booth = new THREE.Mesh(new THREE.BoxGeometry(3, 3, 3), col(0x4d5d3a)); booth.position.set(A.cx + A.gate + 4, 1.5, A.cz - H + 3); scene.add(booth)
+  // Fahrspuren-Markierung zum Tor
+  for (let i = 0; i < 6; i++) bx(0.35, 0.02, 3, new THREE.MeshBasicMaterial({ color: 0xfacc15 }), A.cx, 0.33, A.cz - H + 4 + i * 6)
+  // Zaun: Pfosten alle 4 m, Maschendraht (Rautenmuster), drei Stacheldrahtreihen auf Auslegern
+  const lat = document.createElement('canvas'); lat.width = 64; lat.height = 64
+  const lg = lat.getContext('2d')
+  if (lg) { lg.strokeStyle = 'rgba(210,218,226,0.85)'; lg.lineWidth = 3; for (let i = -64; i <= 128; i += 16) { lg.beginPath(); lg.moveTo(i, 0); lg.lineTo(i + 64, 64); lg.stroke(); lg.beginPath(); lg.moveTo(i + 64, 0); lg.lineTo(i, 64); lg.stroke() } }
+  const post = col(0x6b7280, { metal: 0.7, rough: 0.4 }), wire = col(0x9ca3af, { metal: 0.8, rough: 0.35 })
+  const segs: Array<[number, number, number, number]> = [[A.cx - H, A.cz + H, A.cx + H, A.cz + H], [A.cx - H, A.cz - H, A.cx - H, A.cz + H], [A.cx + H, A.cz - H, A.cx + H, A.cz + H], [A.cx - H, A.cz - H, A.cx - A.gate, A.cz - H], [A.cx + A.gate, A.cz - H, A.cx + H, A.cz - H]]
+  for (const [x0, z0, x1, z1] of segs) {
+    const len = Math.hypot(x1 - x0, z1 - z0), n = Math.max(1, Math.round(len / 4)), ux = (x1 - x0) / len, uz = (z1 - z0) / len, ang = Math.atan2(ux, uz)
+    for (let i = 0; i <= n; i++) {
+      const x = x0 + ux * len * i / n, z = z0 + uz * len * i / n
+      bx(0.16, 3.2, 0.16, post, x, 1.6, z)
+    }
+    const tex = new THREE.CanvasTexture(lat); tex.wrapS = tex.wrapT = THREE.RepeatWrapping; tex.repeat.set(len / 2, 1.3)
+    const pane = new THREE.Mesh(new THREE.PlaneGeometry(len, 2.8), new THREE.MeshBasicMaterial({ map: tex, transparent: true, side: THREE.DoubleSide, depthWrite: false, color: new THREE.Color(k, k, k) }))
+    pane.position.set((x0 + x1) / 2, 1.5, (z0 + z1) / 2); pane.rotation.y = ang - Math.PI / 2; scene.add(pane)
+    for (const y of [2.95, 3.12, 3.3]) { const w = new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.05, len), wire); w.position.set((x0 + x1) / 2, y, (z0 + z1) / 2); w.rotation.y = ang; scene.add(w) }
+    for (const y of [0.1, 1.5]) { const w = new THREE.Mesh(new THREE.BoxGeometry(0.07, 0.07, len), post); w.position.set((x0 + x1) / 2, y, (z0 + z1) / 2); w.rotation.y = ang; scene.add(w) }
+  }
+  // Wachtürme an den Ecken: vier Beine, Kabine mit Fensterband, Dach, Suchscheinwerfer
+  for (const sx of [-1, 1]) for (const sz of [-1, 1]) {
+    const x = A.cx + sx * H, z = A.cz + sz * H
+    for (const [dx, dz] of [[-1.4, -1.4], [1.4, -1.4], [-1.4, 1.4], [1.4, 1.4]]) bx(0.3, 8, 0.3, col(0x4b5563, { metal: 0.5 }), x + dx, 4, z + dz)
+    for (const y of [2.5, 5]) { bx(3.2, 0.14, 0.14, post, x, y, z - 1.4); bx(3.2, 0.14, 0.14, post, x, y, z + 1.4) }
+    bx(4.2, 0.3, 4.2, col(0x3f4a2f), x, 8.1, z)
+    bx(3.8, 1.6, 3.8, col(0x4d5d3a), x, 9, z)
+    bx(3.9, 0.7, 3.9, col(0x1e3a5f, { rough: 0.1, metal: 0.6 }), x, 9.2, z)
+    bx(4.6, 0.25, 4.6, col(0x2b3320), x, 10, z)
+    cy(0.28, 0.5, col(0xe5e7eb, { metal: 0.6 }), x + sx * -1.6, 10.4, z + sz * -1.6)
+  }
+  // Kaserne: Betonbau mit Fensterbändern, Dachkante, Klimaanlagen, Tür mit Vordach, Schild und Tarnstreifen
+  const bk = buildings.find((q) => q.kind === 'army')
+  if (bk) {
+    const B = A.barracks, hgt = bk.h
+    bx(B.w, hgt, B.d, col(0x6b7660), B.x, hgt / 2, B.z)
+    bx(B.w + 0.6, 0.6, B.d + 0.6, col(0x2b3320), B.x, hgt + 0.3, B.z)
+    for (let i = 0; i < 8; i++) { bx(3.4, 1.4, 0.06, col(0x1e3a5f, { rough: 0.1, metal: 0.6 }), B.x - B.w / 2 + 3.2 + i * 5.7, 6.6, B.z - B.d / 2 - 0.04); bx(3.4, 1.4, 0.06, col(0x1e3a5f, { rough: 0.1, metal: 0.6 }), B.x - B.w / 2 + 3.2 + i * 5.7, 2.9, B.z - B.d / 2 - 0.04) }
+    bx(B.w, 0.9, 0.08, col(0x3f4a2f), B.x, 4.7, B.z - B.d / 2 - 0.05)
+    for (let i = 0; i < 4; i++) bx(1.8, 0.9, 1.4, col(0x9ca3af, { metal: 0.5 }), B.x - 16 + i * 10, hgt + 1.0, B.z)
+    const dr = layoutOf(bk).door
+    bx(3.6, 3.2, 0.1, col(0x1f2937), dr.x, 1.6, dr.z - 0.06); bx(5, 0.25, 2.6, col(0x3f4a2f), dr.x, 3.7, dr.z - 1.2)
+    for (const dx of [-2.3, 2.3]) bx(0.25, 3.7, 0.25, col(0x3f4a2f), dr.x + dx, 1.85, dr.z - 2.3)
+    const sg = swatText(THREE, 10, 1.6, 'KASERNE', '#f8fafc'); sg.rotation.y = Math.PI; sg.position.set(B.x, 8.6, B.z - B.d / 2 - 0.12); scene.add(sg)
+  }
+  // Bunker (Kommando), Fahrzeughalle mit offenen Seiten, Tanks, Fahnenmast, Flutlicht, Sandsäcke, Kisten
+  bx(14, 3.2, 9, col(0x7c8470), A.cx - 34, 1.6, A.cz - 24); bx(14.8, 0.5, 9.8, col(0x4b5563), A.cx - 34, 3.4, A.cz - 24)
+  bx(2.4, 2.2, 0.15, col(0x111827), A.cx - 34, 1.1, A.cz - 28.5)
+  for (const [dx, dz] of [[-9, 3.8], [9, 3.8], [-9, -3.8], [9, -3.8]]) bx(0.4, 4.6, 0.4, col(0x4b5563, { metal: 0.5 }), A.cx - 26 + dx * 0.0 + (dx > 0 ? 8 : -8), 2.3, A.cz + 8 + dz)
+  bx(22, 0.5, 10, col(0x3f4a2f), A.cx - 26, 4.8, A.cz + 8)
+  for (let i = 0; i < 4; i++) bx(2, 0.12, 9.6, col(0x2b3320), A.cx - 34 + i * 5.5, 5.12, A.cz + 8)
+  for (const [x, z] of [[A.cx + 16, A.cz + 36], [A.cx + 20, A.cz - 30]]) { cy(2.4, 5, col(0x9ca3af, { metal: 0.6, rough: 0.4 }), x, 2.8, z, 18); cy(2.5, 0.3, col(0x4b5563), x, 5.4, z, 18); bx(1, 1, 1, col(0xdc2626), x + 2.8, 1, z) }
+  cy(0.14, 12, col(0xe5e7eb, { metal: 0.6 }), A.cx + 6, 6, A.cz - 20)
+  const flag = new THREE.Mesh(new THREE.PlaneGeometry(3.2, 2), new THREE.MeshBasicMaterial({ color: new THREE.Color(0x15803d).multiplyScalar(k), side: THREE.DoubleSide })); flag.position.set(A.cx + 7.7, 10.8, A.cz - 20); scene.add(flag)
+  const star = new THREE.Mesh(new THREE.CircleGeometry(0.5, 5), new THREE.MeshBasicMaterial({ color: 0xfacc15, side: THREE.DoubleSide })); star.position.set(A.cx + 7.7, 10.8, A.cz - 20.02); scene.add(star)
+  for (const [x, z] of [[-30, -4], [30, -20], [-30, 36], [10, 4]]) { cy(0.16, 9, col(0x6b7280, { metal: 0.6 }), A.cx + x, 4.5, A.cz + z); bx(1.2, 0.5, 0.8, col(0xfef9c3), A.cx + x, 9.1, A.cz + z) }
+  for (const sx of [-1, 1]) for (let i = 0; i < 6; i++) bx(1.6, 0.5, 0.7, col(0xa89f7a), A.cx + sx * (A.gate + 3) + (i % 3) * 1.4 * sx, 0.55 + Math.floor(i / 3) * 0.5, A.cz - H + 7)
+  for (let i = 0; i < 6; i++) bx(1.4, 1.1, 1.1, col(i % 2 ? 0x57534e : 0x3f4a2f), A.cx + 36 + (i % 2) * 1.5, 0.9 + Math.floor(i / 2) * 1.1, A.cz - 8 + (i % 2) * 0.2)
+  // Tor: Pfosten, rot-weiße Schranke, Wachhäuschen
+  for (const sx of [-1, 1]) bx(0.7, 4.2, 0.7, col(0x4b5563, { metal: 0.5 }), A.cx + sx * A.gate, 2.1, A.cz - H)
+  for (let i = 0; i < 7; i++) bx(1, 0.3, 0.3, new THREE.MeshStandardMaterial({ color: i % 2 ? 0xdc2626 : 0xf8fafc }), A.cx + A.gate + 0.2, 4.6, A.cz - H + 0.6 + i * 1.0)
+  bx(4, 3, 4, col(0x4d5d3a), A.cx + A.gate + 4.5, 1.5, A.cz - H + 3); bx(4.4, 0.3, 4.4, col(0x2b3320), A.cx + A.gate + 4.5, 3.1, A.cz - H + 3); bx(3, 1, 0.06, col(0x1e3a5f, { rough: 0.1, metal: 0.6 }), A.cx + A.gate + 4.5, 1.9, A.cz - H + 1)
   const sign = swatText(THREE, 12, 2.4, 'ARMEE – BETRETEN VERBOTEN', '#facc15'); sign.rotation.y = Math.PI; sign.position.set(A.cx, 7, A.cz - H - 0.3); scene.add(sign)
   const grd = swatText(THREE, 18, 3.6, 'ARMEE', '#f8fafc'); grd.rotation.x = -Math.PI / 2; grd.rotation.z = Math.PI; grd.position.set(A.cx, 0.35, A.cz - 24); scene.add(grd)
 }
 /** Bank: Parkplatz, goldenes Dach-Band und Schilder, Geldautomaten an der Fassade und große Glasscheiben, die man zerschlagen kann */
-function bankDecor(THREE: THREE, scene: T.Scene, night: boolean): RaceScene['smashGlass'] {
+export function bankDecor(THREE: THREE, scene: T.Scene, night: boolean): RaceScene['smashGlass'] {
   const k = night ? 0.6 : 1
   const { lot, station: st } = BANK
   const asphalt = new THREE.Mesh(new THREE.BoxGeometry(lot.x1 - lot.x0, 0.06, lot.z1 - lot.z0), new THREE.MeshStandardMaterial({ color: new THREE.Color(0x2b2f36).multiplyScalar(k), roughness: 0.9 }))
@@ -403,7 +461,6 @@ function bankDecor(THREE: THREE, scene: T.Scene, night: boolean): RaceScene['sma
   }
   plate(16, 2.8, 'BANK', st.x, 14.4, fz - 0.2, 0x14532d, '#facc15')
   plate(9, 1.4, 'TRESOR & KASSE', st.x - 25, 4.7, fz - 0.2, 0x14532d, '#f8fafc')
-  const band = new THREE.Mesh(new THREE.BoxGeometry(st.w + 0.5, 1.0, st.d + 0.5), new THREE.MeshStandardMaterial({ color: 0xfacc15, metalness: 0.6, roughness: 0.35 })); band.position.set(st.x, 12.6, st.z); scene.add(band)
   // Säulen am Eingang
   const stone = new THREE.MeshStandardMaterial({ color: new THREE.Color(0xf3f4f6).multiplyScalar(k), roughness: 0.6 })
   for (const dx of [-30, -20]) { const c = new THREE.Mesh(new THREE.CylinderGeometry(0.7, 0.8, 8, 16), stone); c.position.set(st.x + dx, 4.3, fz - 2.2); scene.add(c) }
@@ -416,24 +473,70 @@ function bankDecor(THREE: THREE, scene: T.Scene, night: boolean): RaceScene['sma
     const slot = new THREE.Mesh(new THREE.BoxGeometry(0.7, 0.12, 0.06), new THREE.MeshBasicMaterial({ color: 0x111827 })); slot.position.set(st.x + du, 1.2, fz - 1.03); scene.add(slot)
     const lab = swatText(THREE, 1.2, 0.3, 'ATM', '#facc15'); lab.rotation.y = Math.PI; lab.position.set(st.x + du, 2.4, fz - 1.03); scene.add(lab)
   }
-  // Glasscheiben (zerschlagbar): große Fensterfront ohne den Türbereich
-  const crack = document.createElement('canvas'); crack.width = 128; crack.height = 64
+  // Moderne Bank aus Stahlträgern und Glas: Stützen, Riegel, Decken und eine Glasfassade aus zerschlagbaren Scheiben (2 Reihen)
+  const crack = document.createElement('canvas'); crack.width = 128; crack.height = 128
   const cg = crack.getContext('2d')
   if (cg) {
-    cg.strokeStyle = 'rgba(220,240,255,0.9)'; cg.lineWidth = 2
-    for (let i = 0; i < 9; i++) { const a = (i / 9) * Math.PI * 2; cg.beginPath(); cg.moveTo(64, 32); cg.lineTo(64 + Math.cos(a) * 80, 32 + Math.sin(a) * 50); cg.stroke() }
-    cg.fillStyle = 'rgba(190,225,255,0.55)'; for (const [x, y] of [[4, 4], [112, 6], [8, 50], [108, 48]]) { cg.beginPath(); cg.moveTo(x, y); cg.lineTo(x + 14, y + 4); cg.lineTo(x + 4, y + 14); cg.fill() }
+    cg.strokeStyle = 'rgba(225,242,255,0.95)'; cg.lineWidth = 2
+    for (let i = 0; i < 11; i++) { const a = (i / 11) * Math.PI * 2 + 0.3; cg.beginPath(); cg.moveTo(64, 64); cg.lineTo(64 + Math.cos(a) * 90, 64 + Math.sin(a) * 90); cg.stroke() }
+    for (const rr of [18, 36]) { cg.beginPath(); for (let i = 0; i <= 11; i++) { const a = (i / 11) * Math.PI * 2 + 0.3; cg.lineTo(64 + Math.cos(a) * rr * (0.85 + (i % 3) * 0.1), 64 + Math.sin(a) * rr * (0.85 + (i % 2) * 0.12)) } cg.stroke() }
+    cg.fillStyle = 'rgba(190,225,255,0.5)'; for (const [x, y] of [[4, 4], [100, 6], [8, 100], [104, 98]]) { cg.beginPath(); cg.moveTo(x, y); cg.lineTo(x + 20, y + 6); cg.lineTo(x + 6, y + 22); cg.fill() }
   }
   const crackMat = new THREE.MeshBasicMaterial({ map: new THREE.CanvasTexture(crack), transparent: true, side: THREE.DoubleSide, depthWrite: false })
-  const glassMat = new THREE.MeshStandardMaterial({ color: 0x9fd4ff, transparent: true, opacity: 0.38, roughness: 0.05, metalness: 0.3, side: THREE.DoubleSide, depthWrite: false })
-  const panes: Array<{ m: T.Mesh; x: number; z: number; broken: boolean }> = []
-  for (const dx of [-12, -3, 6, 15, 24, 32]) {
-    const m = new THREE.Mesh(new THREE.PlaneGeometry(6.6, 3.4), glassMat); m.rotation.y = Math.PI; m.position.set(st.x + dx, 3.2, fz - 0.15); scene.add(m)
-    panes.push({ m, x: st.x + dx, z: fz, broken: false })
+  const glassMat = new THREE.MeshStandardMaterial({ color: 0x8ec9f5, transparent: true, opacity: 0.32, roughness: 0.04, metalness: 0.55, side: THREE.DoubleSide, depthWrite: false })
+  const steel = new THREE.MeshStandardMaterial({ color: new THREE.Color(0x9aa3ad).multiplyScalar(k), metalness: 0.85, roughness: 0.35 })
+  const darkSteel = new THREE.MeshStandardMaterial({ color: new THREE.Color(0x3b4048).multiplyScalar(k), metalness: 0.7, roughness: 0.5 })
+  const H = 16, X0 = st.x - st.w / 2, X1 = st.x + st.w / 2, Z0 = st.z - st.d / 2, Z1 = st.z + st.d / 2
+  const bx = (w: number, h: number, d: number, m: T.Material, x: number, y: number, z: number) => { const b = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), m); b.position.set(x, y, z); scene.add(b); return b }
+  const nx = Math.round(st.w / 7), nz = Math.round(st.d / 7.6)
+  const xs = Array.from({ length: nx + 1 }, (_, i) => X0 + (st.w / nx) * i), zs = Array.from({ length: nz + 1 }, (_, i) => Z0 + (st.d / nz) * i)
+  // Stützen (Doppel-T-Look: Steg + zwei Flansche) an allen Rastern des Umfangs
+  const column = (x: number, z: number) => { bx(0.5, H, 0.2, steel, x, H / 2, z); bx(0.2, H, 0.5, steel, x, H / 2, z); bx(0.62, H, 0.62, darkSteel, x, H / 2, z).scale.set(0.5, 1, 0.5) }
+  for (const x of xs) { column(x, Z0); column(x, Z1) }
+  for (const z of zs.slice(1, -1)) { column(X0, z); column(X1, z) }
+  // Riegel in drei Höhen rundum, Geschossdecken und Dach mit Überstand
+  for (const y of [0.35, 8, H - 0.2]) { bx(st.w + 0.5, 0.45, 0.45, steel, st.x, y, Z0); bx(st.w + 0.5, 0.45, 0.45, steel, st.x, y, Z1); bx(0.45, 0.45, st.d, steel, X0, y, st.z); bx(0.45, 0.45, st.d, steel, X1, y, st.z) }
+  bx(st.w - 0.4, 0.4, st.d - 0.4, darkSteel, st.x, 0.35, st.z)
+  bx(st.w - 0.4, 0.5, st.d - 0.4, new THREE.MeshStandardMaterial({ color: new THREE.Color(0x6b7280).multiplyScalar(k), roughness: 0.8 }), st.x, 7.9, st.z)
+  bx(st.w + 4, 0.6, st.d + 4, darkSteel, st.x, H + 0.3, st.z)
+  bx(st.w + 4.2, 0.5, 0.35, new THREE.MeshStandardMaterial({ color: 0xfacc15, metalness: 0.6, roughness: 0.35 }), st.x, H + 0.35, Z0 - 2.1)
+  for (let i = 0; i <= 8; i++) bx(0.3, 0.5, st.d + 3.4, steel, X0 - 1.5 + (st.w + 3) * i / 8, H - 0.3, st.z)
+  // X-Verstrebungen in je zwei Feldern der Seitenwände
+  for (const sz of [Z0, Z1]) for (const i of [2, nx - 3]) {
+    const ln = Math.hypot(st.w / nx, 7.5), ang = Math.atan2(7.5, st.w / nx)
+    for (const sg of [-1, 1]) { const br = bx(ln, 0.22, 0.22, steel, (xs[i] + xs[i + 1]) / 2, 11.9, sz); br.rotation.z = sg * ang }
   }
-  return (x, z, r) => {
+  // Schalterhalle (von außen durchs Glas zu sehen): Tresen, Tresorblock mit goldenem Rad, Deckenlampen, Schreibtische im Obergeschoss
+  bx(22, 1.1, 1.6, new THREE.MeshStandardMaterial({ color: new THREE.Color(0x78350f).multiplyScalar(k), roughness: 0.6 }), st.x - 6, 0.9, st.z + 3)
+  bx(22, 0.08, 1.8, stone, st.x - 6, 1.5, st.z + 3)
+  bx(12, 6.4, 9, darkSteel, st.x + 20, 3.6, Z1 - 6); const wheel = new THREE.Mesh(new THREE.TorusGeometry(1.5, 0.18, 8, 24), new THREE.MeshStandardMaterial({ color: 0xfacc15, metalness: 0.9, roughness: 0.25 })); wheel.position.set(st.x + 20, 3.6, Z1 - 10.6); scene.add(wheel)
+  for (let i = 0; i < 6; i++) bx(1.4, 0.12, 5, new THREE.MeshBasicMaterial({ color: 0xfff7d6 }), X0 + 6 + i * 11, 7.6, st.z)
+  for (let i = 0; i < 6; i++) bx(1.4, 0.12, 5, new THREE.MeshBasicMaterial({ color: 0xfff7d6 }), X0 + 6 + i * 11, 15.6, st.z)
+  for (let i = 0; i < 4; i++) { bx(3.2, 0.1, 1.6, stone, X0 + 10 + i * 14, 9.2, st.z + 5); bx(0.1, 1.2, 0.1, steel, X0 + 10 + i * 14, 8.6, st.z + 5) }
+  // Glasfassade: pro Raster zwei Scheiben übereinander (unten 0,6–7,6, oben 8,4–15,6); am Eingang bleibt unten ein Durchgang
+  const panes: Array<{ m: T.Mesh; x: number; y: number; z: number; broken: boolean }> = []
+  const doorX = st.x - 25
+  const addPane = (cx: number, cz: number, w: number, row: 0 | 1, alongX: boolean) => {
+    const hgt = 7, cy = row ? 12 : 4.1
+    const m = new THREE.Mesh(new THREE.PlaneGeometry(w - 0.4, hgt), glassMat)
+    if (!alongX) m.rotation.y = Math.PI / 2
+    m.position.set(cx, cy, cz); scene.add(m)
+    panes.push({ m, x: cx, y: cy, z: cz, broken: false })
+  }
+  for (const [i, z] of [[0, Z0], [0, Z1]] as const) for (let b = 0; b < nx; b++) {
+    const cx = (xs[b] + xs[b + 1]) / 2, w = xs[b + 1] - xs[b]
+    void i
+    if (!(z === Z0 && Math.abs(cx - doorX) < w * 0.7)) addPane(cx, z, w, 0, true)
+    addPane(cx, z, w, 1, true)
+  }
+  for (const x of [X0, X1]) for (let b = 0; b < nz; b++) { const cz = (zs[b] + zs[b + 1]) / 2, w = zs[b + 1] - zs[b]; addPane(x, cz, w, 0, false); addPane(x, cz, w, 1, false) }
+  return (x, z, r, y) => {
     let n = 0
-    for (const p of panes) if (!p.broken && Math.hypot(p.x - x, p.z - z) < r) { p.broken = true; p.m.material = crackMat; n++ }
+    for (const p of panes) {
+      if (p.broken || Math.hypot(p.x - x, p.z - z) > r) continue
+      if (y !== undefined ? Math.abs(p.y - y) > 4.2 : p.y > 8) continue
+      p.broken = true; p.m.material = crackMat; n++
+    }
     return n
   }
 }
@@ -902,6 +1005,7 @@ function buildCity(THREE: THREE, scene: T.Scene, ground: T.Mesh, night: boolean)
   const ranges = new Map<Bld, [number, number]>()
   for (const b of buildings) {
     const vStart = pos.length / 3
+    if (b.hid) { ranges.set(b, [vStart, vStart]); continue }
     const x0 = b.x - b.w / 2, x1 = b.x + b.w / 2, z0 = b.z - b.d / 2, z1 = b.z + b.d / 2, h = b.h, c = b.col !== undefined ? new THREE.Color(b.col).multiplyScalar(night ? 0.6 : 1) : pal[b.c], y0 = b.lo ?? 0
     const tw = b.w / 6, td = b.d / 6, th = (h - y0) / 6
     face([[x0, y0, z1], [x1, y0, z1], [x1, h, z1], [x0, h, z1]], [0, 0, 1], tw, th, c)
@@ -920,7 +1024,7 @@ function buildCity(THREE: THREE, scene: T.Scene, ground: T.Mesh, night: boolean)
   {
     const dp: number[] = [], di: number[] = [], dc: number[] = []
     for (const b of buildings) {
-      if (b.lo !== undefined || (b.col !== undefined && !b.kind)) continue
+      if (b.lo !== undefined || b.hid || (b.col !== undefined && !b.kind)) continue
       const d = layoutOf(b).door, tx = d.nz !== 0 ? 1 : 0, tz = d.nx !== 0 ? 1 : 0
       const quad = (hw: number, hgt: number, off: number, col: number[]) => {
         const o = dp.length / 3
@@ -939,13 +1043,13 @@ function buildCity(THREE: THREE, scene: T.Scene, ground: T.Mesh, night: boolean)
     scene.add(new THREE.Mesh(dg, new THREE.MeshBasicMaterial({ vertexColors: true, side: THREE.FrontSide, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 })))
   }
   const smashGlass = bankDecor(THREE, scene, night)
-  armyDecor(THREE, scene, night)
+  armyDecor(THREE, scene, night, buildings)
   blockDecor(THREE, scene, night, POLICE, false); blockDecor(THREE, scene, night, HOSPITAL, true)
   const viewer = makeInteriorViewer(THREE, scene, { geo: bg, ranges }, night)
   const wallMats = pal.map((c) => new THREE.MeshStandardMaterial({ color: c, roughness: 0.85, side: THREE.DoubleSide }))
   const policeWall = new THREE.MeshStandardMaterial({ color: new THREE.Color(0xc7d6f5).multiplyScalar(night ? 0.6 : 1), roughness: 0.85, side: THREE.DoubleSide })
   const hospWall = new THREE.MeshStandardMaterial({ color: new THREE.Color(0xf1f5f9).multiplyScalar(night ? 0.6 : 1), roughness: 0.85, side: THREE.DoubleSide })
-  const bankWall = new THREE.MeshStandardMaterial({ color: new THREE.Color(0xf3ead2).multiplyScalar(night ? 0.6 : 1), roughness: 0.8, side: THREE.DoubleSide })
+  const bankWall = new THREE.MeshStandardMaterial({ color: new THREE.Color(0xdbeafe).multiplyScalar(night ? 0.6 : 1), roughness: 0.2, side: THREE.DoubleSide, transparent: true, opacity: 0.14, depthWrite: false })
   const showInterior: RaceScene['showInterior'] = (b) => { viewer.show(b as Bld | null, b ? ((b as Bld).kind === 'police' ? policeWall : (b as Bld).kind === 'hospital' ? hospWall : (b as Bld).kind === 'bank' ? bankWall : wallMats[(b as Bld).c]) : wallMats[0]) }
 
   // Gehwege unter jedem Block (hellgrau, leicht erhöht) und Parks

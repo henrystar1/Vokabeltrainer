@@ -1,3 +1,4 @@
+import { makeGunModel } from './gunMesh'
 import type * as T from 'three'
 import { makeSkinWalker } from './walkerMesh'
 
@@ -37,15 +38,8 @@ export function swatSkin(): HTMLCanvasElement | null {
 export function makeSwatMan(THREE: THREE): T.Group {
   const sk = swatSkin()
   const m = sk ? makeSkinWalker(THREE, sk) : new THREE.Group()
-  const gun = new THREE.Group()
-  const body = new THREE.Mesh(new THREE.BoxGeometry(0.07, 0.13, 0.26), new THREE.MeshStandardMaterial({ color: 0x0b0f17, roughness: 0.5, metalness: 0.4 }))
-  body.position.set(0, 0, 0.14)
-  const barrel = new THREE.Mesh(new THREE.BoxGeometry(0.045, 0.045, 0.2), new THREE.MeshStandardMaterial({ color: 0x1f2937, metalness: 0.6 }))
-  barrel.position.set(0, 0.04, 0.3)
-  gun.add(body, barrel)
-  gun.position.set(0, -0.6, 0.12)
   const arm = m.userData.armR as T.Group | undefined
-  if (arm) { gun.rotation.x = 0; arm.add(gun) }
+  if (arm) { arm.add(makeGunModel(THREE, 'pistol')); m.userData.gunned = true }
   return m
 }
 
