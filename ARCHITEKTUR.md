@@ -993,3 +993,14 @@ Tabelle `book_library_hidden`; `in_library` blendet ein veröffentlichtes Buch d
 - **Zaun klettern**: Spots `climb` rund um den Zaun (G / Knopf) springen auf die andere Seite (`climbFence`). Soldaten schießen nur auf Ziele innerhalb des Geländes (`inBase`).
 - **Fahrzeug behalten**: Banditen in einer Polizeijagd behalten ihr Fahrzeug (`applyRole`, `carSwapped`) – also auch den geklauten Panzer oder Hubschrauber; nur Polizei bekommt Dienstfahrzeuge.
 - **Aussehen**: Panzer, Kampfhubschrauber (`armyMesh.ts`), Armee-Gelände (`armyDecor`: Zaun mit Maschendraht und Stacheldraht, Wachtürme, Kaserne mit Fensterbändern, Bunker, Fahrzeughalle, Tanks, Fahne, Flutlicht, Sandsäcke, Tor); Zaun/Türme/Kaserne sind `hid`. Vorschau per Playwright gerendert (Bank, Armee, Fahrzeuge), Spielszenen nicht.
+
+## Update 148 (Fahndung zu Fuß, Mord-Sterne, Dach-Fix, Iron Man, Heli-Sanitäter, Straßenroute)
+- `startWanted` gilt jetzt auch zu Fuß und ersetzt eine beendete Jagd; als Polizist im Dienst wechselt man bei eigener Straftat die Seite. `addStar` startet ab 2 Sternen ohne Jagd automatisch eine (`'crime'`).
+- Mord: `markHit(id)` merkt den zuletzt getroffenen Spieler (nur eigene Schläge/Schüsse), geht er innerhalb 8 s zu Boden (`dn` 0→1), gibt es +2 Sterne (`killedPlayer`, nicht für Polizisten).
+- Dach: `groundAt` (foot.ts) kennt die Dachhöhe (`bi.h`/`roofH`), man fällt nach dem Aussteigen auf einem Dach nicht mehr durch.
+- `route.ts`: `streetRoute` (Dijkstra auf dem Straßenraster, Start/Ziel auf nächstes Straßenstück) für die gestrichelte Linie; Test `route.test.ts`.
+- Autos ohne Fahrer (`parked`) explodieren nach 7 Treffern (`blowParked`, Armee-Fahrzeuge ausgenommen).
+- SQL `0117_revive_pro_free.sql`: Pro belebt gratis wieder (wie Admin).
+- Sanitäter-Einsatz: Patient > 260 m vom Krankenhaus → eigener Rettungshubschrauber (`heli`, `#f8fafc`, ohne Waffe), Aufladen/Abliefern nur in Bodennähe.
+- Iron Man (nur Admin, Taste I/Button): `ironman.ts` `stepIron` (E hoch, R runter, W/S, A/D, Shift schneller), schießt wie Sturmgewehr, Rüstung über `addGear` Bit 64 (synchron über `gr`).
+- Nicht im Browser getestet.

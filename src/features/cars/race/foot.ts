@@ -1,4 +1,4 @@
-import { bridgeH, cityPush, onDeck, tunnelAt, tunnelClamp, tunnelD } from './city'
+import { bridgeH, cityPush, onDeck, roofH, tunnelAt, tunnelClamp, tunnelD } from './city'
 import { hillH } from './mountains'
 import { treePush } from './forest'
 import { parkPush, parkSurfaces } from './parkhaus'
@@ -50,12 +50,18 @@ export function groundAt(x: number, z: number, y: number, lvl = 0): number {
     const is = interiorSurfaces(bi, x, z)
     let gi = -Infinity
     for (const h of is) if (h <= y + 0.6) gi = Math.max(gi, h)
+    // Hausdach: oben angekommen (z. B. aus dem Auto/Heli gestiegen) läuft man auf dem Dach, statt durchzufallen
+    if (bi.h > 3 && bi.h <= y + 0.6) gi = Math.max(gi, bi.h)
     return gi === -Infinity ? is[0] : gi
   }
   const ps = parkSurfaces(x, z)
-  if (!ps.length) return hillH(x, z)
+  // Hausdach: wer oben steht (Füße höchstens 0,6 m unter der Kante), läuft auf dem Dach statt durchzufallen
+  const roof = y > 3 ? roofH(x, z) : 0
+  const onRoof = roof > 0 && roof <= y + 0.6
+  if (!ps.length) return onRoof ? Math.max(roof, hillH(x, z)) : hillH(x, z)
   let g = -Infinity
   for (const h of ps) if (h <= y + 0.6) g = Math.max(g, h)
+  if (onRoof) g = Math.max(g, roof)
   return g === -Infinity ? ps[0] : g
 }
 

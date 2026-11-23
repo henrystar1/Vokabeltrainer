@@ -63,8 +63,10 @@ import { raceAtmPay, raceDutyPay, raceGearList, raceRevivePay } from '../../../s
 import WeaponShop from './WeaponShop'
 import { stepHeli } from './heli'
 import { addGear, gearFromList, gearMask, NO_GEAR, type GearSet } from './gear'
+import { streetRoute } from './route'
 import { armUp } from './gunMesh'
-import { HP_MAX, footConfig, hpCfg, carHit, exitFromCar, nearestCar, newWalker, stepWalker, type Walker } from './foot'
+import { HP_MAX, footConfig, groundAt, hpCfg, carHit, exitFromCar, nearestCar, newWalker, stepWalker, type Walker } from './foot'
+import { stepIron } from './ironman'
 import { poseWalker } from './walkerMesh'
 import { addBaton, makeMedic, makeSwatMan } from './swatMan'
 import { POI_COLOR, POI_LETTER, hospitalBed, pois, spotNear, type SpotKind } from './poi'
@@ -160,6 +162,9 @@ export default function RaceView({ trackId, custom, laps, me, assistOk = false, 
   const spawnArm = useRef(0)
   const punchReq = useRef(false)
   const heliDown = useRef(false)
+  const ironRef = useRef<() => void>(() => undefined)
+  const ironKeyRef = useRef<() => boolean>(() => false)
+  const [ironUi, setIronUi] = useState(false)
   const gearRef = useRef<GearSet>(NO_GEAR)
   const [gearUi, setGearUi] = useState<GearSet>(NO_GEAR)
   const batonRef = useRef((() => { try { return localStorage.getItem('vt-baton') === '1' } catch { return false } })())
@@ -411,7 +416,7 @@ export default function RaceView({ trackId, custom, laps, me, assistOk = false, 
 
       // Tastatur
       const keyMap: Record<string, Key> = { ArrowLeft: 'left', a: 'left', A: 'left', ArrowRight: 'right', d: 'right', D: 'right', ArrowUp: 'gas', w: 'gas', W: 'gas', ArrowDown: 'brake', s: 'brake', S: 'brake', ' ': 'brake', e: 'fly', E: 'fly' }
-      const kd = (e: KeyboardEvent) => { if ((e.target as HTMLElement | null)?.tagName === 'INPUT') return; if (e.key === 'z' || e.key === 'Z') zoomKey.current = true; else if (e.key === 'g' || e.key === 'G') { poiKey.current(); return } const k = keyMap[e.key]; if (k) { inp.current[k] = true; e.preventDefault() } else if (e.key === 'r' || e.key === 'R') { if (eff.kind === 'heli' && !foot) heliDown.current = true; else resetReq.current = true } else if (e.key === 'c' || e.key === 'C') toggleRef.current(); else if (e.key === 'f' || e.key === 'F') assistToggleRef.current(); else if (e.key === 'h' || e.key === 'H') toggleHide.current(); else if (e.key === 'x' || e.key === 'X') exitRef.current(); else if (e.key === 'q' || e.key === 'Q') punchReq.current = true; else if (e.key === 'n' || e.key === 'N') { spawnArm.current = performance.now() + 2500; spawnRef.current() } else if (e.key >= '1' && e.key <= '9' && performance.now() < spawnArm.current) { spawnArm.current = 0; spawnRef.current(undefined, Number(e.key)) } else if (e.key === 'Shift') runRef.current = true; if (e.key === ' ') inp.current.jump = true }
+      const kd = (e: KeyboardEvent) => { if ((e.target as HTMLElement | null)?.tagName === 'INPUT') return; if (e.key === 'z' || e.key === 'Z') zoomKey.current = true; else if (e.key === 'g' || e.key === 'G') { poiKey.current(); return } const k = keyMap[e.key]; if (k) { inp.current[k] = true; e.preventDefault() } else if (e.key === 'r' || e.key === 'R') { if ((eff.kind === 'heli' && !foot) || ironKeyRef.current()) heliDown.current = true; else resetReq.current = true } else if (e.key === 'c' || e.key === 'C') toggleRef.current(); else if (e.key === 'f' || e.key === 'F') assistToggleRef.current(); else if (e.key === 'h' || e.key === 'H') toggleHide.current(); else if (e.key === 'i' || e.key === 'I') ironRef.current(); else if (e.key === 'x' || e.key === 'X') exitRef.current(); else if (e.key === 'q' || e.key === 'Q') punchReq.current = true; else if (e.key === 'n' || e.key === 'N') { spawnArm.current = performance.now() + 2500; spawnRef.current() } else if (e.key >= '1' && e.key <= '9' && performance.now() < spawnArm.current) { spawnArm.current = 0; spawnRef.current(undefined, Number(e.key)) } else if (e.key === 'Shift') runRef.current = true; if (e.key === ' ') inp.current.jump = true }
       const ku = (e: KeyboardEvent) => { if (e.key === 'r' || e.key === 'R') heliDown.current = false; const k = keyMap[e.key]; if (k) { inp.current[k] = false; e.preventDefault() } else if (e.key === 'Shift') runRef.current = false; if (e.key === ' ') inp.current.jump = false }
       window.addEventListener('keydown', kd); window.addEventListener('keyup', ku)
       cleanups.push(() => { window.removeEventListener('keydown', kd); window.removeEventListener('keyup', ku) })
@@ -451,7 +456,7 @@ export default function RaceView({ trackId, custom, laps, me, assistOk = false, 
           r.hd = payload.hd === 1; r.lv = Number(payload.lv) || 0; r.yy = Number(payload.y) || 0; r.pt = Number(payload.pt) || 0
           r.tx = Number(payload.x) || 0; r.tz = Number(payload.z) || 0; r.th = Number(payload.h) || 0; r.v = Number(payload.v) || 0
           r.dmg = Number(payload.d) || 0; r.slip = Number(payload.sl) || 0; r.fl = Number(payload.fl) || 0
-          r.dn = !!payload.dn; r.dc = String(payload.dc ?? ''); r.od = String(payload.od ?? ''); r.bt = !!payload.bt; if (r.bt && r.mesh && r.wk && !r.mesh.userData.bt) addBaton(THREE, r.mesh)
+          { const wasDn = r.dn; r.dn = !!payload.dn; if (r.dn && !wasDn && lastHit.id === r.id && performance.now() - lastHit.t < 8000 && !r.id.startsWith('pb-')) { lastHit.id = ''; killedPlayer(r.name ?? 'Spieler') } } r.dc = String(payload.dc ?? ''); r.od = String(payload.od ?? ''); r.bt = !!payload.bt; if (r.bt && r.mesh && r.wk && !r.mesh.userData.bt) addBaton(THREE, r.mesh)
           r.gr = Number(payload.gr) || 0; if (r.gr && r.mesh && r.wk && (r.mesh.userData.gr ?? 0) !== r.gr) addGear(THREE, r.mesh, r.gr)
           r.total = Number(payload.t) || 0; r.ft = typeof payload.f === 'number' ? payload.f : null; r.seen = performance.now()
           if (typeof payload.k === 'string' && (payload.k !== r.kind || payload.c !== r.color || (r.mesh && r.mesh.userData.ro !== r.ro))) {
@@ -674,12 +679,20 @@ export default function RaceView({ trackId, custom, laps, me, assistOk = false, 
         if (nowT < starCd) return
         starCd = nowT + 3500
         setStars(stars + n); say(`Fahndungsstufe: ${'★'.repeat(stars)}`)
+        if (stars >= 2 && (!chase || chase.over || myRole === 'cop')) startWanted('crime', 'Die Polizei jagt dich – 6 Minuten durchhalten!')
         if (chase && !chase.over && myRole === 'bandit') { if (stars >= 3) callSwat(); if (stars >= 5) callSwat(); armyWave() }
       }
+      /** Wen habe ich zuletzt getroffen? Geht er innerhalb von 8 s zu Boden, zählt das als Mord */
+      const lastHit = { id: '', t: 0 }
+      const markHit = (id: string) => { lastHit.id = id; lastHit.t = performance.now() }
+      const killedPlayer = (name: string) => { if (myRole === 'cop') return; starCd = 0; addStar(2); say(`${name} getötet – die Polizei sucht dich!`) }
       const tickStars = (nowT: number) => { if (stars > 0 && nowT - starAt > 60000) { setStars(stars - 1); say(stars ? `Die Polizei sucht weniger: ${'★'.repeat(stars)}` : 'Du bist nicht mehr gesucht.') } }
       /** Polizei startet eine Jagd auf mich (Rammen, Passanten töten …) */
       const startWanted = (extra: string, text: string) => {
-        if (!online || chase || foot || ride) return
+        if (!online || ride || dead) return
+        // laufende Jagd: nur als Polizist (Dienst) zählt eine eigene Straftat – dann wechselt man die Seite; beendete Jagd wird ersetzt
+        if (chase && !chase.over) { if (myRole !== 'cop') return; chase = null; dutyChase = false }
+        else if (chase) chase = null
         const id = `${extra}-${online.userId}-${Date.now()}`
         const dc = dutyCops()
         if (dc.length) { const msg = { t: 'go', id, bandits: [online.userId], cops: dc, bots: 4, from: online.userId, ex: extra }; for (const dl of [0, 600, 1500]) window.setTimeout(() => { if (!dead) sendCh(msg) }, dl) }
@@ -998,6 +1011,19 @@ export default function RaceView({ trackId, custom, laps, me, assistOk = false, 
         if (parked.length > 8) { const o = parked.shift()!; scene.remove(o.mesh) }
         return p
       }
+      /** Auto ohne Fahrer sprengen (mehrere Schüsse): Feuerball, Druckwelle, weg */
+      const blowParked = (pk: Parked) => {
+        if (!parked.includes(pk)) return
+        const y0 = (pk.car.y ?? 0) + 0.8
+        for (let i = 0; i < 50; i++) {
+          const a = Math.random() * Math.PI * 2, sp = 4 + Math.random() * 14
+          fx.emit('fire', pk.car.x, y0, pk.car.z, Math.cos(a) * sp, 3 + Math.random() * 12, Math.sin(a) * sp, 0.7 + Math.random() * 0.7)
+          if (i % 2 === 0) fx.emit('smoke', pk.car.x, y0, pk.car.z, Math.cos(a) * sp * 0.5, 2 + Math.random() * 7, Math.sin(a) * sp * 0.5, 1.3 + Math.random())
+        }
+        blastAt(pk.car.x, y0, pk.car.z)
+        scene.remove(pk.mesh); parked = parked.filter((q) => q !== pk)
+        say('Das Auto ist explodiert!')
+      }
       const exitCar = () => {
         if (!isCity || finishedMs !== null) return
         if (ride) { leaveRide(); return }
@@ -1289,9 +1315,7 @@ export default function RaceView({ trackId, custom, laps, me, assistOk = false, 
         if (!routeTgt || nowT - routeAt < 1000) return
         routeAt = nowT
         const src = foot ?? car, P = CITY.pitch, T = routeTgt
-        const snap = (x: number, z: number): [number, number] => { const ai = Math.round(x / P), aj = Math.round(z / P); return Math.abs(x - ai * P) <= Math.abs(z - aj * P) ? [ai * P, z] : [x, aj * P] }
-        const a = snap(src.x, src.z), bb = snap(T.x, T.z)
-        const pts: Array<[number, number]> = [[src.x, src.z], a, [Math.round(a[0] / P) * P, Math.round(a[1] / P) * P], [Math.round(bb[0] / P) * P, Math.round(a[1] / P) * P], [Math.round(bb[0] / P) * P, Math.round(bb[1] / P) * P], bb, [T.x, T.z]]
+        const pts = streetRoute(src.x, src.z, T.x, T.z, P, 6)
         const m4 = new THREE.Matrix4(), qq = new THREE.Quaternion(), up = new THREE.Vector3(0, 1, 0), one = new THREE.Vector3(1, 1, 1)
         let n = 0
         for (let i = 0; i + 1 < pts.length && n < 520; i++) {
@@ -1327,21 +1351,22 @@ export default function RaceView({ trackId, custom, laps, me, assistOk = false, 
           const slot = HOSPITAL.slots[1]
           car = { ...car, x: slot.x, z: slot.z, h: slot.h, v: 0, y: 0, vy: 0, fly: 0, lvl: 0, dmg: 0, hit: 0, steer: 0, slip: 0 }
           foot = null; if (footMesh) { scene.remove(footMesh); footMesh = null }
-          setVehicle('ambulance', '#f8fafc', null, undefined, false); myMesh.visible = true
-          setRoute({ x: v.x, z: v.z }); say(`${v.name} braucht Hilfe! Fahr mit dem Krankenwagen hin (blaue Linie).`)
+          const farAway = Math.hypot(v.x - hospLot.x, v.z - hospLot.z) > 260
+          setVehicle(farAway ? 'heli' : 'ambulance', '#f8fafc', null, undefined, false); myMesh.visible = true
+          setRoute({ x: v.x, z: v.z }); say(farAway ? `${v.name} liegt weit weg! Flieg mit dem Rettungshubschrauber hin (E hoch, R runter) und lande neben ihm.` : `${v.name} braucht Hilfe! Fahr mit dem Krankenwagen hin (blaue Linie).`)
           return
         }
         const v = remotes.get(mission.victim)
         if (!v || !fresh(v) || !v.dn || nowT - mission.t0 > 150000) { say('Der Einsatz ist beendet.'); endMission(); return }
         if (mission.phase === 'drive') {
           setRoute({ x: v.x, z: v.z })
-          if (Math.hypot(v.x - car.x, v.z - car.z) < 10 && Math.abs(car.v) < 10) {
+          if (Math.hypot(v.x - car.x, v.z - car.z) < 10 && Math.abs(car.v) < 10 && (car.y ?? 0) < 5) {
             if (ready) void ch?.send({ type: 'broadcast', event: 'mp', payload: { to: v.id, by: online.userId } }).catch(() => undefined)
             mission.phase = 'back'; say('Patient aufgeladen! Bring ihn zum Krankenhaus.')
           }
         } else {
           setRoute({ x: hospLot.x, z: hospLot.z })
-          if (inHospGrounds(car.x, car.z)) {
+          if (inHospGrounds(car.x, car.z) && (car.y ?? 0) < 6) {
             if (ready) void ch?.send({ type: 'broadcast', event: 'mh', payload: { to: v.id } }).catch(() => undefined)
             void raceDutyPay('medic').then((r) => { if (dead || !r.coins) return; say(`Einsatz abgeschlossen: +${r.coins} Coins`); if (r.koins !== null) walletRef.current?.setBalance(r.koins) }).catch(() => undefined)
             endMission()
@@ -1388,7 +1413,8 @@ export default function RaceView({ trackId, custom, laps, me, assistOk = false, 
           return
         }
         const m = inp.current
-        w = stepWalker(w, { fwd: m.gas || joyRef.current.y > 0.3, back: (m.brake && !m.jump) || joyRef.current.y < -0.3, left: m.left, right: m.right, turn: joyTurnCurve(joyRef.current.x) * joyTurnRef.current * 2, run: m.fly || runRef.current || joyRef.current.y > 0.85, jump: m.jump }, dt)
+        if (ironOn && (w.lvl ?? 0) === 0 && adminRef.current) w = stepIron(w, { fwd: m.gas || joyRef.current.y > 0.3, back: (m.brake && !m.jump) || joyRef.current.y < -0.3, left: m.left, right: m.right, turn: joyTurnCurve(joyRef.current.x) * joyTurnRef.current * 2, up: m.fly || m.jump, down: heliDown.current, boost: runRef.current }, dt, (x, z, y) => groundAt(x, z, y, 0), roofH)
+        else w = stepWalker(w, { fwd: m.gas || joyRef.current.y > 0.3, back: (m.brake && !m.jump) || joyRef.current.y < -0.3, left: m.left, right: m.right, turn: joyTurnCurve(joyRef.current.x) * joyTurnRef.current * 2, run: m.fly || runRef.current || joyRef.current.y > 0.85, jump: m.jump }, dt)
         const hitBy = (cx: number, cz: number, ch: number, cv: number, len: number, wid: number, cy: number) => {
           const r = carHit(w!, { x: cx, z: cz, h: ch, v: cv, len, wid, y: cy })
           if (r) { w = r; lastRegenHit = nowT }
@@ -1425,7 +1451,7 @@ export default function RaceView({ trackId, custom, laps, me, assistOk = false, 
             if (!hitBot) { const sq = soldiers.find((q) => q.dead <= 0 && Math.hypot(q.w.x - w0.x, q.w.z - w0.z) < 2.4 && Math.abs(q.w.y - w0.y) < 2); if (sq) { killSoldier(sq); hitBot = true } }
             if (!hitBot && punchPed(w0, batonRef.current ? 22 : 8)) hitBot = true
             if (hitBot) say('Treffer – er geht zu Boden!')
-            else if (tgt && ready) { void ch?.send({ type: 'broadcast', event: 'pn', payload: { to: tgt.id, dx: Math.sin(w.h), dz: Math.cos(w.h), d: batonRef.current ? 22 : 8 } }).catch(() => undefined); say(batonRef.current ? `Schlagstock auf ${tgt.name}!` : `Schlag auf ${tgt.name}!`) }
+            else if (tgt && ready) { void (markHit(tgt.id), ch)?.send({ type: 'broadcast', event: 'pn', payload: { to: tgt.id, dx: Math.sin(w.h), dz: Math.cos(w.h), d: batonRef.current ? 22 : 8 } }).catch(() => undefined); say(batonRef.current ? `Schlagstock auf ${tgt.name}!` : `Schlag auf ${tgt.name}!`) }
             else say('Schlag ins Leere.')
             if (nearFacade(w.x + Math.sin(w.h) * 1.2, w.z + Math.cos(w.h) * 1.2, 4)) smashAt(w.x + Math.sin(w.h) * 1.5, w.z + Math.cos(w.h) * 1.5)
             w = { ...w, ph: w.ph + 2 }
@@ -1488,12 +1514,22 @@ export default function RaceView({ trackId, custom, laps, me, assistOk = false, 
         return rc.ray
       }
       let armyGun: 'rifle' | 'sniper' | null = null, zoomOn = false
-      const myMask = (): number => gearMask(gearRef.current) | (armyGun === 'rifle' ? 16 : armyGun === 'sniper' ? 32 : 0)
-      const curGun = (): 'pistol' | 'rifle' | 'sniper' => armyGun ?? 'pistol'
+      /** Iron-Man-Anzug (nur Admin): zu Fuß fliegen und mit den Handflächen schießen */
+      let ironOn = false
+      const myMask = (): number => ironOn ? 64 | (gearRef.current.baton ? 4 : 0) : gearMask(gearRef.current) | (armyGun === 'rifle' ? 16 : armyGun === 'sniper' ? 32 : 0)
+      const curGun = (): 'pistol' | 'rifle' | 'sniper' => ironOn ? 'rifle' : armyGun ?? 'pistol'
+      const toggleIron = () => {
+        if (!adminRef.current || !isCity) return
+        ironOn = !ironOn; setIronUi(ironOn)
+        if (foot) { const f = foot; makeFootMesh(); foot = f }
+        say(ironOn ? 'Iron-Man-Anzug an! W/S fliegen, A/D drehen, E hoch, R runter, Klick/Tippen schießt.' : 'Anzug aus.')
+      }
+      ironRef.current = toggleIron
+      ironKeyRef.current = () => ironOn && !!foot
       const takeGun = (k: 'rifle' | 'sniper') => { armyGun = k; zoomOn = false; setSniperUi(k === 'sniper'); say(k === 'sniper' ? 'Scharfschützengewehr! Z = Zoom, Tippen/Klick schießt (ein Treffer reicht).' : 'Sturmgewehr! Es schießt viel schneller als die Pistole.') }
-      const gunCar = () => eff.kind === 'swat' || eff.kind === 'tank' || eff.kind === 'heli'
+      const gunCar = () => eff.kind === 'swat' || eff.kind === 'tank' || (eff.kind === 'heli' && eff.color !== '#f8fafc')
       const swatArmed = () => gunCar() && !foot && !ride
-      const pistolArmed = () => !!foot && !rescue && footKo <= 0 && (gearRef.current.pistol || !!armyGun)
+      const pistolArmed = () => !!foot && !rescue && footKo <= 0 && (gearRef.current.pistol || !!armyGun || ironOn)
       const hitCount = new WeakMap<object, number>()
       const onPtrRot = (e: PointerEvent) => { if (lastPtr && (e.buttons & 1 || e.pointerType === 'touch') && !foot && !ride && (eff.kind === 'tank' || eff.kind === 'heli') && performance.now() - lastPtr.t < 120) car = { ...car, h: car.h - (e.clientX - lastPtr.x) * 0.006 } }
       const onPtrMove = (e: PointerEvent) => { lastPtr = { x: e.clientX, y: e.clientY, t: performance.now() } }
@@ -1523,7 +1559,16 @@ export default function RaceView({ trackId, custom, laps, me, assistOk = false, 
         for (const r of remotes.values()) {
           if (r.rd || nowT - r.seen > 2500 || r.id.startsWith('pb-') || r.id === online?.userId) continue
           const dm = gun === 'swat' ? (big ? (r.wk ? 28 : 22) : (r.wk ? 20 : 14)) : curGun() === 'sniper' ? (r.wk ? 40 : 30) : curGun() === 'rifle' ? (r.wk ? 6 : 3) : (r.wk ? 12 : 6)
-          tgs.push({ x: r.x, y: (r.yy ?? 0) + (r.wk ? 0.9 : 1), z: r.z, r: r.wk ? 0.9 : 2.4, apply: () => { if (ready) void ch?.send({ type: 'broadcast', event: 'sd', payload: { to: r.id, d: dm, k: r.wk ? 'f' : 'c' } }).catch(() => undefined) } })
+          tgs.push({ x: r.x, y: (r.yy ?? 0) + (r.wk ? 0.9 : 1), z: r.z, r: r.wk ? 0.9 : 2.4, apply: () => { if (ready) void (markHit(r.id), ch)?.send({ type: 'broadcast', event: 'sd', payload: { to: r.id, d: dm, k: r.wk ? 'f' : 'c' } }).catch(() => undefined) } })
+        }
+        // Autos ohne Fahrer: nach mehreren Treffern explodieren sie (Panzer/Heli-Geschütz schneller)
+        for (const pk of parked) {
+          if (isArmored(pk.kind)) continue
+          tgs.push({ x: pk.car.x, y: (pk.car.y ?? 0) + 1, z: pk.car.z, r: 2.4, apply: () => {
+            const n = (hitCount.get(pk) ?? 0) + (gun === 'swat' ? 3 : curGun() === 'sniper' ? 3 : curGun() === 'rifle' ? 1 : 1)
+            hitCount.set(pk, n)
+            if (n >= 7) blowParked(pk); else fx.emit('smoke', pk.car.x, (pk.car.y ?? 0) + 1.2, pk.car.z, 0, 2, 0, 0.8)
+          } })
         }
         for (const q of soldiers) if (q.dead <= 0) tgs.push({ x: q.w.x, y: q.w.y + 0.9, z: q.w.z, r: 0.9, apply: () => hits(q, 3, () => killSoldier(q)) })
         for (const pd of peds) if (pd.st !== 'dead') tgs.push({ x: pd.w.x, y: pd.w.y + 0.9, z: pd.w.z, r: 0.9, apply: () => killPed(pd) })
@@ -2401,8 +2446,11 @@ export default function RaceView({ trackId, custom, laps, me, assistOk = false, 
       {reviveUi.mine && (
         <div className="absolute inset-x-0 top-1/3 z-20 grid justify-items-center gap-2 px-4 text-center">
           <p className="pointer-events-none text-2xl font-black text-rose-200 [text-shadow:0_3px_12px_#000]">Du bist bewusstlos – Hilfe ist unterwegs</p>
-          <button type="button" disabled={reviveUi.busy} onClick={() => reviveRef.current()} className="min-h-[48px] rounded-xl border border-white/40 bg-emerald-400 px-4 text-sm font-bold text-slate-950 disabled:opacity-60">{isAdmin ? 'Sofort wiederbeleben (gratis)' : 'Sofort wiederbeleben (10 Coins)'}</button>
+          <button type="button" disabled={reviveUi.busy} onClick={() => reviveRef.current()} className="min-h-[48px] rounded-xl border border-white/40 bg-emerald-400 px-4 text-sm font-bold text-slate-950 disabled:opacity-60">{isAdmin || pro ? 'Sofort wiederbeleben (gratis)' : 'Sofort wiederbeleben (10 Coins)'}</button>
         </div>
+      )}
+      {isAdmin && def.mode === 'city' && (
+        <button type="button" onClick={() => ironRef.current()} className={`absolute left-3 top-28 z-20 min-h-[40px] rounded-xl border border-white/40 px-3 text-xs font-bold ${ironUi ? 'bg-red-600 text-amber-200' : 'bg-slate-800/80 text-white'}`}>{ironUi ? 'Iron Man: AN (I)' : 'Iron Man (I)'}</button>
       )}
       {isAdmin && reviveUi.other && !reviveUi.mine && (
         <button type="button" onClick={() => reviveUi.other && reviveOtherRef.current(reviveUi.other.id)} className="absolute bottom-40 left-1/2 z-20 min-h-[44px] -translate-x-1/2 rounded-xl border border-white/40 bg-emerald-400 px-4 text-sm font-bold text-slate-950">{reviveUi.other.name} gratis wiederbeleben</button>
