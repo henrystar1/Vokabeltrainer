@@ -1,6 +1,6 @@
 import type * as T from 'three'
 import type { Bld } from './city'
-import { FLOOR_H, layoutOf, type Rect } from './interior'
+import { layoutOf, type Rect } from './interior'
 import { poiOf } from './poi'
 
 type THREE = typeof T
@@ -35,11 +35,11 @@ export function makeInteriorViewer(THREE: THREE, scene: T.Scene, ext: { geo: T.B
     const L = layoutOf(b)
     const g = new THREE.Group()
     const x0 = b.x - b.w / 2, x1 = b.x + b.w / 2, z0 = b.z - b.d / 2, z1 = b.z + b.d / 2
-    const top = L.floors * FLOOR_H
+    const FH = L.fh, top = L.floors * FH
     for (let k = 0; k <= L.floors; k++) {
       // Platte k, über dem Lauf k−1 mit Loch (oberer Teil)
       const f = k >= 1 ? L.flights[k - 1] : undefined
-      const ya = k * FLOOR_H - 0.2, yb = k * FLOOR_H
+      const ya = k * FH - 0.2, yb = k * FH
       const m = k === L.floors ? mats.roof : mats.floor
       if (!f) { box(g, { x0, x1, z0, z1 }, ya, yb, m); continue }
       const axisX = f.lane.x1 - f.lane.x0 > f.lane.z1 - f.lane.z0
@@ -49,18 +49,18 @@ export function makeInteriorViewer(THREE: THREE, scene: T.Scene, ext: { geo: T.B
       box(g, { x0, x1: hole.x0, z0: hole.z0, z1: hole.z1 }, ya, yb, m); box(g, { x0: hole.x1, x1, z0: hole.z0, z1: hole.z1 }, ya, yb, m)
     }
     // Außenwände: Erdgeschoss mit Türöffnung, darüber geschlossen
-    for (const r of L.outerG) box(g, r, 0, FLOOR_H, wallMat)
-    for (const r of L.outerUp) box(g, r, FLOOR_H, top, wallMat)
+    for (const r of L.outerG) box(g, r, 0, FH, wallMat)
+    for (const r of L.outerUp) box(g, r, FH, top, wallMat)
     // Zwischenwände je Geschoss
-    for (let k = 0; k < L.floors; k++) for (const r of L.inner) box(g, r, k * FLOOR_H, (k + 1) * FLOOR_H - 0.2, mats.part)
+    for (let k = 0; k < L.floors; k++) for (const r of L.inner) box(g, r, k * FH, (k + 1) * FH - 0.2, mats.part)
     // Treppenstufen
     for (const f of L.flights) {
       const axisX = f.lane.x1 - f.lane.x0 > f.lane.z1 - f.lane.z0
-      const n = 16, len = f.hi - f.lo
+      const len = f.hi - f.lo, n = Math.max(16, Math.round(FH / 0.2))
       for (let i = 0; i < n; i++) {
         const t0 = i / n, t1 = (i + 1) / n
         const p0 = f.lo + (f.dir === 1 ? t0 : 1 - t1) * len, p1 = p0 + len / n
-        const y1 = f.k * FLOOR_H + ((i + 1) / n) * FLOOR_H
+        const y1 = f.k * FH + ((i + 1) / n) * FH
         box(g, axisX ? { x0: p0, x1: p1, z0: f.lane.z0, z1: f.lane.z1 } : { x0: f.lane.x0, x1: f.lane.x1, z0: p0, z1: p1 }, y1 - 0.2, y1, mats.step)
       }
     }

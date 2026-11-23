@@ -4,6 +4,7 @@ import { isBike } from '../stats'
 import { buildSpecCar, getSpec } from '../customCar'
 import { RoundedBoxGeometry } from 'three/examples/jsm/geometries/RoundedBoxGeometry.js'
 import { roadProximity, type Track } from './track'
+import { addGlassHole, clearGlassHoles } from './glass'
 import { ARMY, BRIDGES, CITY, type Bld, BANK, GARAGES, HOSPITAL, POLICE, TUNNELS, bridgeH, city, tunnelD } from './city'
 import { PARK, PARK_TOP, PARK_TUNNEL } from './parkhaus'
 import { MOUNTAINS, OUT, RING, hillH, outRoads, ringPath } from './mountains'
@@ -486,6 +487,7 @@ export function bankDecor(THREE: THREE, scene: T.Scene, night: boolean): RaceSce
   const glassMat = new THREE.MeshStandardMaterial({ color: 0x8ec9f5, transparent: true, opacity: 0.32, roughness: 0.04, metalness: 0.55, side: THREE.DoubleSide, depthWrite: false })
   const steel = new THREE.MeshStandardMaterial({ color: new THREE.Color(0x9aa3ad).multiplyScalar(k), metalness: 0.85, roughness: 0.35 })
   const darkSteel = new THREE.MeshStandardMaterial({ color: new THREE.Color(0x3b4048).multiplyScalar(k), metalness: 0.7, roughness: 0.5 })
+  clearGlassHoles()
   const H = 16, X0 = st.x - st.w / 2, X1 = st.x + st.w / 2, Z0 = st.z - st.d / 2, Z1 = st.z + st.d / 2
   const bx = (w: number, h: number, d: number, m: T.Material, x: number, y: number, z: number) => { const b = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), m); b.position.set(x, y, z); scene.add(b); return b }
   const nx = Math.round(st.w / 7), nz = Math.round(st.d / 7.6)
@@ -514,14 +516,14 @@ export function bankDecor(THREE: THREE, scene: T.Scene, night: boolean): RaceSce
   for (let i = 0; i < 6; i++) bx(1.4, 0.12, 5, new THREE.MeshBasicMaterial({ color: 0xfff7d6 }), X0 + 6 + i * 11, 15.6, st.z)
   for (let i = 0; i < 4; i++) { bx(3.2, 0.1, 1.6, stone, X0 + 10 + i * 14, 9.2, st.z + 5); bx(0.1, 1.2, 0.1, steel, X0 + 10 + i * 14, 8.6, st.z + 5) }
   // Glasfassade: pro Raster zwei Scheiben übereinander (unten 0,6–7,6, oben 8,4–15,6); am Eingang bleibt unten ein Durchgang
-  const panes: Array<{ m: T.Mesh; x: number; y: number; z: number; broken: boolean }> = []
+  const panes: Array<{ m: T.Mesh; x: number; y: number; z: number; broken: boolean; hw: number; alongX: boolean }> = []
   const doorX = st.x - 25
   const addPane = (cx: number, cz: number, w: number, row: 0 | 1, alongX: boolean) => {
     const hgt = 7, cy = row ? 12 : 4.1
     const m = new THREE.Mesh(new THREE.PlaneGeometry(w - 0.4, hgt), glassMat)
     if (!alongX) m.rotation.y = Math.PI / 2
     m.position.set(cx, cy, cz); scene.add(m)
-    panes.push({ m, x: cx, y: cy, z: cz, broken: false })
+    panes.push({ m, x: cx, y: cy, z: cz, broken: false, hw: w / 2 - 0.3, alongX })
   }
   for (const [i, z] of [[0, Z0], [0, Z1]] as const) for (let b = 0; b < nx; b++) {
     const cx = (xs[b] + xs[b + 1]) / 2, w = xs[b + 1] - xs[b]
@@ -536,6 +538,7 @@ export function bankDecor(THREE: THREE, scene: T.Scene, night: boolean): RaceSce
       if (p.broken || Math.hypot(p.x - x, p.z - z) > r) continue
       if (y !== undefined ? Math.abs(p.y - y) > 4.2 : p.y > 8) continue
       p.broken = true; p.m.material = crackMat; n++
+      addGlassHole(p.x, p.z, p.y, p.hw, p.alongX)
     }
     return n
   }

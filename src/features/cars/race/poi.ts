@@ -124,6 +124,10 @@ function furnish(p: Poi): Poi {
     spot(W - 8, -D + 5.4, 3.0, 'vest', 'Schutzweste nehmen')
     spot(-W + 7, D - 4, 3.2, 'rifle', 'Sturmgewehr nehmen')
     spot(-W + 17, D - 4, 3.2, 'sniper', 'Scharfschützengewehr nehmen')
+    // Schlüsselbrett: Fahrzeuge auch aus der Kaserne holen (nimmt das nächste freie draußen im Hof)
+    spot(-W + 27, D - 4, 3.2, 'tank', 'Panzer holen (Schlüsselbrett)')
+    spot(-W + 35, D - 4, 3.2, 'heli', 'Hubschrauber holen (Schlüsselbrett)')
+    spot(-W + 43, D - 4, 3.2, 'armycar', 'Waffenauto holen (Schlüsselbrett)')
     solids.push(rect(-W + 10, -W + 16, -2, 2, 0.9, 0x78350f), rect(-W + 10.3, -W + 15.7, -1.7, 1.7, 0.05, 0xd1d5db, { y0: 0.9, deco: true }))
     for (let t = -40; t <= 40; t += 10) {
       const H = ARMY.half
@@ -165,7 +169,8 @@ function furnish(p: Poi): Poi {
     for (let i = 0; i < 4; i++) solids.push(rect(-W + 28 + i * 2.6, -W + 30 + i * 2.6, -D + 0.6, -D + 1.8, 2.3, i % 2 ? 0xdc2626 : 0xf8fafc), rect(-W + 28.4 + i * 2.6, -W + 29.6 + i * 2.6, -D + 1.8, -D + 1.9, 0.3, 0xdc2626, { y0: 1.6, deco: true }))
     spot(-W + 33, -D + 4.4, 3.2, 'dress', 'Ankleidezimmer: Sanitäter-Dienst')
   }
-  setSpecial(p.b, solids)
+  // Bank (Schalterhalle + Obergeschoss auf Höhe 8,15) und Kaserne (2 Stockwerke à 5 m) haben ein 2. Stockwerk mit Treppe
+  setSpecial(p.b, solids, p.kind === 'bank' ? { floors: 2, fh: 8.15, stair: 15 } : p.kind === 'army' ? { floors: 2, fh: 5, stair: 11 } : undefined)
   const d = layoutOf(p.b).door
   return { ...p, x: d.x, z: d.z, nx: d.nx, nz: d.nz, solids, spots }
 }

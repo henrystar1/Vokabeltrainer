@@ -1004,3 +1004,16 @@ Tabelle `book_library_hidden`; `in_library` blendet ein veröffentlichtes Buch d
 - Sanitäter-Einsatz: Patient > 260 m vom Krankenhaus → eigener Rettungshubschrauber (`heli`, `#f8fafc`, ohne Waffe), Aufladen/Abliefern nur in Bodennähe.
 - Iron Man (nur Admin, Taste I/Button): `ironman.ts` `stepIron` (E hoch, R runter, W/S, A/D, Shift schneller), schießt wie Sturmgewehr, Rüstung über `addGear` Bit 64 (synchron über `gr`).
 - Nicht im Browser getestet.
+
+## Update 149 (Wände, Bank-/Kasernen-Obergeschoss, Raketen, Ego, Q-Schuss)
+- `shoot.ts`: `shotWallT/shotBlocked` – Kugeln und Raketen stoppen an Hauswänden (Bank-Glas und Zaun lassen durch, Türen offen, Dächer frei, im selben Haus zählen Innenwände nicht). `fireGun` und alle Schützen (SWAT-Männer, Polizeiautos, Soldaten, Heli) prüfen damit.
+- `glass.ts`: kaputte Bankscheiben (`addGlassHole`, von `smashGlass` in scene.ts) sind für Fußgänger durchlässig (`interiorPush` überspringt dort die Außenwand, je Geschoss).
+- `interior.ts`: `Layout.fh` (Geschosshöhe) und `setSpecial(b, solids, {floors, fh, stair})`: Bank 2 Geschosse (fh 8,15, Treppe 15 m), Kaserne 2 Geschosse (fh 5, Treppe 11 m). `interiorMesh.ts` und die Kamera nutzen `fh`.
+- Armee ab 4 Sternen (2 Heli + 3 Panzer, je Stern mehr). Panzer (Spieler) nehmen von Schüssen keinen Schaden, nur von Raketen/Panzerfaust (`hurtByShot(..., rocket)`). Armee-Heli (Bot) mit 140 Trefferpunkten abschießbar (`wreckBot`), Panzer-Bots nur durch Raketen.
+- Raketen (`launchRocket/tickRockets/rocketBlast`): Spieler im Armee-Heli startet mit M/Button eine Lenkrakete (Ziel vor dem Heli, ±30°, 520 m, 3,5 s Nachladen); jeder dritte Soldat feuert Panzerfäuste auf Fahrzeuge. Treffer tötet alles im Radius 7–8 m, Autos explodieren, Netz-Event `rk`.
+- Passanten brauchen 2 Treffer (Pistole), SWAT/Polizei 3.
+- Q schießt mit Waffe (Pistole/Gewehr/Sniper/Iron Man) automatisch auf das nächste Ziel in Bildmitte (`fireGun(.., auto)`).
+- Ego-Perspektive zu Fuß (V/Button), mit Sniper-Zoom immer (behebt den Zoom nach unten); eigene Figur dann unsichtbar.
+- Touch: RUNTER-Button im Heli (und Iron Man), RAKETE-Button.
+- Kaserne: Schlüsselbrett-Spots (Panzer/Heli/Waffenauto) holen das nächste freie Fahrzeug im Hof.
+- Nicht im Browser getestet.
