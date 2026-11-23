@@ -5,10 +5,10 @@ import { DMG_MAX, botInput, crash, packLimit, startCar, statsFor, stepCar, type 
 import { TRACKS, buildTrack, curveAhead, isOpen, pointAt, project, trackKey, type TrackDef } from './track'
 import { assistSteer, buildRaceLine } from './line'
 import { createFx } from './fx'
-import { canFly, carKmh, flyHeight, flyRoll, isBike, kindDims, seatsOf, toughOf } from '../stats'
+import { canFly, carKmh, flyHeight, flyRoll, isArmored, isBike, kindDims, seatsOf, toughOf } from '../stats'
 import { useRaceCars, type RaceCarOption } from './useRaceCars'
 import { PARK, PARK_TOP, parkSurfaces, inParkXZ } from './parkhaus'
-import { BRIDGES, CITY, GARAGES, HOSPITAL, POLICE, TUNNELS, bridgeH, city, inPark, roofH, tunnelClamp, tunnelD } from './city'
+import { ARMY, BRIDGES, CITY, GARAGES, HOSPITAL, POLICE, TUNNELS, bridgeH, city, inPark, roofH, tunnelClamp, tunnelD } from './city'
 import { MOUNTAINS, WORLD, hillH, hillSlope, outRoads } from './mountains'
 import { CHASE_MAX_MS, chaseCar, clearLine, copDrive, type BotMem, type Role } from './chase'
 import ChasePanel, { type ChaseApi, type ChaseUi, type Peer } from './ChasePanel'
@@ -61,6 +61,7 @@ interface Remote { gr?: number; id: string; name: string; kind: string; color: s
 import { buildingAt, walkNav, FLOOR_H } from './interior'
 import { raceAtmPay, raceDutyPay, raceGearList, raceRevivePay } from '../../../services/cars'
 import WeaponShop from './WeaponShop'
+import { stepHeli } from './heli'
 import { addGear, gearFromList, gearMask, NO_GEAR, type GearSet } from './gear'
 import { HP_MAX, footConfig, hpCfg, carHit, exitFromCar, nearestCar, newWalker, stepWalker, type Walker } from './foot'
 import { poseWalker } from './walkerMesh'
@@ -157,6 +158,7 @@ export default function RaceView({ trackId, custom, laps, me, assistOk = false, 
   const spawnRef = useRef<(o?: RaceCarOption, nth?: number) => void>(() => undefined)
   const spawnArm = useRef(0)
   const punchReq = useRef(false)
+  const heliDown = useRef(false)
   const gearRef = useRef<GearSet>(NO_GEAR)
   const [gearUi, setGearUi] = useState<GearSet>(NO_GEAR)
   const batonRef = useRef((() => { try { return localStorage.getItem('vt-baton') === '1' } catch { return false } })())
@@ -170,6 +172,7 @@ export default function RaceView({ trackId, custom, laps, me, assistOk = false, 
   const applyPerks = (p: RacePerks) => { const t = Date.now(); perkRef.current = { until: p.spawn_sec > 0 ? t + p.spawn_sec * 1000 : 0, speed: p.speed_sec > 0 ? t + p.speed_sec * 1000 : 0, jump: p.jump_sec > 0 ? t + p.jump_sec * 1000 : 0, armor: p.armor_sec > 0 ? t + p.armor_sec * 1000 : 0, hearts: p.hearts }; hpCfg.max = p.hearts; setPerksUi(p) }
   const [shopUi, setShopUi] = useState<'shop' | 'gym' | 'weapons' | null>(null)
   const [dutyUi, setDutyUi] = useState<'' | 'p' | 'm'>('')
+  const [starsUi, setStarsUi] = useState(0)
   const [reviveUi, setReviveUi] = useState<{ mine: boolean; sec: number; other: { id: string; name: string } | null; busy: boolean }>({ mine: false, sec: 0, other: null, busy: false })
   const [poiUi, setPoiUi] = useState<{ kind: SpotKind; label: string } | null>(null)
   const healRef = useRef(false)
@@ -405,8 +408,8 @@ export default function RaceView({ trackId, custom, laps, me, assistOk = false, 
 
       // Tastatur
       const keyMap: Record<string, Key> = { ArrowLeft: 'left', a: 'left', A: 'left', ArrowRight: 'right', d: 'right', D: 'right', ArrowUp: 'gas', w: 'gas', W: 'gas', ArrowDown: 'brake', s: 'brake', S: 'brake', ' ': 'brake', e: 'fly', E: 'fly' }
-      const kd = (e: KeyboardEvent) => { if ((e.target as HTMLElement | null)?.tagName === 'INPUT') return; if (e.key === 'g' || e.key === 'G') { poiKey.current(); return } const k = keyMap[e.key]; if (k) { inp.current[k] = true; e.preventDefault() } else if (e.key === 'r' || e.key === 'R') resetReq.current = true; else if (e.key === 'c' || e.key === 'C') toggleRef.current(); else if (e.key === 'f' || e.key === 'F') assistToggleRef.current(); else if (e.key === 'h' || e.key === 'H') toggleHide.current(); else if (e.key === 'x' || e.key === 'X') exitRef.current(); else if (e.key === 'q' || e.key === 'Q') punchReq.current = true; else if (e.key === 'n' || e.key === 'N') { spawnArm.current = performance.now() + 2500; spawnRef.current() } else if (e.key >= '1' && e.key <= '9' && performance.now() < spawnArm.current) { spawnArm.current = 0; spawnRef.current(undefined, Number(e.key)) } else if (e.key === 'Shift') runRef.current = true; if (e.key === ' ') inp.current.jump = true }
-      const ku = (e: KeyboardEvent) => { const k = keyMap[e.key]; if (k) { inp.current[k] = false; e.preventDefault() } else if (e.key === 'Shift') runRef.current = false; if (e.key === ' ') inp.current.jump = false }
+      const kd = (e: KeyboardEvent) => { if ((e.target as HTMLElement | null)?.tagName === 'INPUT') return; if (e.key === 'g' || e.key === 'G') { poiKey.current(); return } const k = keyMap[e.key]; if (k) { inp.current[k] = true; e.preventDefault() } else if (e.key === 'r' || e.key === 'R') { if (eff.kind === 'heli' && !foot) heliDown.current = true; else resetReq.current = true } else if (e.key === 'c' || e.key === 'C') toggleRef.current(); else if (e.key === 'f' || e.key === 'F') assistToggleRef.current(); else if (e.key === 'h' || e.key === 'H') toggleHide.current(); else if (e.key === 'x' || e.key === 'X') exitRef.current(); else if (e.key === 'q' || e.key === 'Q') punchReq.current = true; else if (e.key === 'n' || e.key === 'N') { spawnArm.current = performance.now() + 2500; spawnRef.current() } else if (e.key >= '1' && e.key <= '9' && performance.now() < spawnArm.current) { spawnArm.current = 0; spawnRef.current(undefined, Number(e.key)) } else if (e.key === 'Shift') runRef.current = true; if (e.key === ' ') inp.current.jump = true }
+      const ku = (e: KeyboardEvent) => { if (e.key === 'r' || e.key === 'R') heliDown.current = false; const k = keyMap[e.key]; if (k) { inp.current[k] = false; e.preventDefault() } else if (e.key === 'Shift') runRef.current = false; if (e.key === ' ') inp.current.jump = false }
       window.addEventListener('keydown', kd); window.addEventListener('keyup', ku)
       cleanups.push(() => { window.removeEventListener('keydown', kd); window.removeEventListener('keyup', ku) })
 
@@ -480,7 +483,7 @@ export default function RaceView({ trackId, custom, laps, me, assistOk = false, 
         ch.on('broadcast', { event: 'sd' }, ({ payload }) => {
           const p = payload as { to?: unknown; d?: unknown; k?: unknown }
           if (p.to !== online.userId) return
-          hurtByShot(Math.max(1, Math.min(40, Number(p.d) || 5)), p.k === 'f')
+          hurtByShot(Math.max(1, Math.min(40, Number(p.d) || 5)), p.k === 'f', (p as { a?: unknown }).a === 1)
         })
         ch.on('broadcast', { event: 'cl' }, ({ payload }) => onClaim(String((payload as { id?: unknown }).id ?? '')))
         const mine = ch
@@ -616,6 +619,7 @@ export default function RaceView({ trackId, custom, laps, me, assistOk = false, 
         if (!pb.w) return
         pb.w = undefined; if (pb.wm) { scene.remove(pb.wm); pb.wm = undefined }
         pb.carGone = true; scene.remove(pb.mesh)
+        addStar(1)
         say('Polizist ausgeschaltet – die Polizei ruft SWAT!')
         callSwat()
       }
@@ -654,20 +658,219 @@ export default function RaceView({ trackId, custom, laps, me, assistOk = false, 
           pt.car = stepCar(pt.car, inp, dt, track, pt.st, true)
         }
       }
-      /** Streifenwagen gerammt: die Polizei startet eine Jagd auf mich */
-      const ramPatrol = (pt: Patrol) => {
-        pt.sleep = 45
+      /** Fahndungsstufe (Sterne 0–5): Taten geben Sterne; ein Stern verschwindet nach 60 s ohne neue Tat, der Tod löscht alle */
+      let stars = 0, starAt = 0, starCd = 0
+      const setStars = (n: number) => { n = Math.max(0, Math.min(5, n)); if (n === stars) return; stars = n; starAt = performance.now(); setStarsUi(n) }
+      const addStar = (n = 1) => {
+        const nowT = performance.now()
+        if (nowT < starCd) return
+        starCd = nowT + 3500
+        setStars(stars + n); say(`Fahndungsstufe: ${'★'.repeat(stars)}`)
+        if (chase && !chase.over && myRole === 'bandit') { if (stars >= 3) callSwat(); if (stars >= 5) callSwat(); armyWave() }
+      }
+      const tickStars = (nowT: number) => { if (stars > 0 && nowT - starAt > 60000) { setStars(stars - 1); say(stars ? `Die Polizei sucht weniger: ${'★'.repeat(stars)}` : 'Du bist nicht mehr gesucht.') } }
+      /** Polizei startet eine Jagd auf mich (Rammen, Passanten töten …) */
+      const startWanted = (extra: string, text: string) => {
         if (!online || chase || foot || ride) return
-        const id = `ram-${online.userId}-${Date.now()}`
+        const id = `${extra}-${online.userId}-${Date.now()}`
         const dc = dutyCops()
-        if (dc.length) { const msg = { t: 'go', id, bandits: [online.userId], cops: dc, bots: 4, from: online.userId, ex: 'ram' }; for (const dl of [0, 600, 1500]) window.setTimeout(() => { if (!dead) sendCh(msg) }, dl) }
-        startChase(id, [online.userId], dc, 4, online.userId, 'bandit', false, 'ram')
-        say('Du hast einen Streifenwagen gerammt! Die Polizei verfolgt dich – 6 Minuten durchhalten!')
+        if (dc.length) { const msg = { t: 'go', id, bandits: [online.userId], cops: dc, bots: 4, from: online.userId, ex: extra }; for (const dl of [0, 600, 1500]) window.setTimeout(() => { if (!dead) sendCh(msg) }, dl) }
+        startChase(id, [online.userId], dc, 4, online.userId, 'bandit', false, extra)
+        say(text)
+      }
+      const ramPatrol = (pt: Patrol) => { pt.sleep = 45; startWanted('ram', 'Du hast einen Streifenwagen gerammt! Die Polizei verfolgt dich – 6 Minuten durchhalten!') }
+      /** Passanten: laufen auf den Gehwegen (nur bei mir), sterben beim Überfahren, kämpfen zurück oder fliehen, wenn man sie schlägt */
+      interface Ped { w: Walker; m: import('three').Group; ax: 0 | 1; lane: number; dir: number; st: 'walk' | 'flee' | 'fight' | 'dead'; t: number; hp: number; cd: number }
+      const peds: Ped[] = []
+      let pedHurt = 0
+      const PED_COL = ['#ef4444', '#22c55e', '#f59e0b', '#a855f7', '#06b6d4', '#f472b6', '#84cc16', '#94a3b8', '#fb923c']
+      const pedGoal = (pd: Ped) => { const L = CITY.half - 20; return pd.ax === 0 ? { x: pd.lane, z: Math.max(-L, Math.min(L, pd.w.z + pd.dir * 70)) } : { x: Math.max(-L, Math.min(L, pd.w.x + pd.dir * 70)), z: pd.lane } }
+      const spawnPed = (px: number, pz: number) => {
+        const P = CITY.pitch, L = CITY.half - 20, ax = Math.random() < 0.5 ? 0 : 1
+        const node = Math.round((ax === 0 ? px : pz) / P) + Math.floor(Math.random() * 3) - 1
+        const lane = node * P + (Math.random() < 0.5 ? -13 : 13)
+        const along = (ax === 0 ? pz : px) + (Math.random() - 0.5) * 230
+        if (Math.abs(lane) > L || Math.abs(along) > L) return
+        const x = ax === 0 ? lane : along, z = ax === 0 ? along : lane
+        if (Math.hypot(x - px, z - pz) < 25 || buildingAt(x, z)) return
+        const m = rs.makeWalker(PED_COL[Math.floor(Math.random() * PED_COL.length)], '#1f2937'); scene.add(m)
+        peds.push({ w: newWalker(x, z, 0, 0), m, ax: ax as 0 | 1, lane, dir: Math.random() < 0.5 ? -1 : 1, st: 'walk', t: 0, hp: 30, cd: 0 })
+      }
+      const killPed = (pd: Ped) => {
+        if (pd.st === 'dead') return
+        pd.st = 'dead'; pd.t = 6; pd.hp = 0
+        pd.m.rotation.x = -Math.PI / 2; pd.m.position.set(pd.w.x, pd.w.y + 0.25, pd.w.z)
+        if (stars < 2) addStar(1)
+        say('Passant getötet!')
+        if (stars >= 2 && !chase) startWanted('ped', 'Zeugen haben die Polizei gerufen – 6 Minuten durchhalten!')
+      }
+      const punchPed = (w0: Walker, d: number): boolean => {
+        for (const pd of peds) {
+          if (pd.st === 'dead') continue
+          const dx = pd.w.x - w0.x, dz = pd.w.z - w0.z
+          if (Math.hypot(dx, dz) > 2.6 || Math.abs(pd.w.y - w0.y) > 2) continue
+          let da = Math.atan2(dx, dz) - w0.h; while (da > Math.PI) da -= Math.PI * 2; while (da < -Math.PI) da += Math.PI * 2
+          if (Math.abs(da) > 1.2) continue
+          pd.hp -= d; pd.w = { ...pd.w, vx: pd.w.vx + Math.sin(w0.h) * 5, vz: pd.w.vz + Math.cos(w0.h) * 5 }
+          if (pd.hp <= 0) killPed(pd)
+          else { pd.st = Math.random() < 0.5 ? 'fight' : 'flee'; pd.t = 10 }
+          return true
+        }
+        return false
+      }
+      const tickPeds = (dt: number, nowT: number) => {
+        if (!isCity) return
+        const me = foot ?? car
+        if (peds.filter((q) => q.st !== 'dead').length < 16 && Math.random() < 0.3) spawnPed(me.x, me.z)
+        for (const pd of [...peds]) {
+          if (pd.st === 'dead') { pd.t -= dt; if (pd.t <= 0) { scene.remove(pd.m); peds.splice(peds.indexOf(pd), 1) } continue }
+          const d = Math.hypot(pd.w.x - me.x, pd.w.z - me.z)
+          if (d > 170) { scene.remove(pd.m); peds.splice(peds.indexOf(pd), 1); continue }
+          // überfahren
+          if (!foot && !ride && Math.abs(car.v) > 3 && d < 8 && Math.abs((car.y ?? 0) - pd.w.y) < 2.5) {
+            const dx = pd.w.x - car.x, dz = pd.w.z - car.z
+            const lon = dx * Math.sin(car.h) + dz * Math.cos(car.h), lat = dx * Math.cos(car.h) - dz * Math.sin(car.h)
+            if (Math.abs(lon) < myStats.len / 2 + 0.5 && Math.abs(lat) < myStats.wid / 2 + 0.5) { killPed(pd); continue }
+          }
+          pd.t -= dt; pd.cd -= dt
+          let goal = pedGoal(pd), run = false
+          if (pd.st === 'fight' && foot && !rescue && footKo <= 0 && pd.t > 0) {
+            goal = { x: foot.x, z: foot.z }; run = true
+            if (d < 1.8 && pd.cd <= 0 && Math.abs(foot.y - pd.w.y) < 2) { pd.cd = 1.1; pedHurt += 5; say('Ein Passant schlägt dich!') }
+          } else if (pd.st === 'flee' && pd.t > 0) { goal = { x: pd.w.x + (pd.w.x - me.x) * 3, z: pd.w.z + (pd.w.z - me.z) * 3 }; run = true }
+          else if (pd.st !== 'walk') pd.st = 'walk'
+          else if (Math.hypot(goal.x - pd.w.x, goal.z - pd.w.z) < 4) pd.dir = Math.random() < 0.7 ? -pd.dir : pd.dir
+          let dh = Math.atan2(goal.x - pd.w.x, goal.z - pd.w.z) - pd.w.h; while (dh > Math.PI) dh -= Math.PI * 2; while (dh < -Math.PI) dh += Math.PI * 2
+          pd.w = stepWalker(pd.w, { fwd: Math.abs(dh) < 1.3 && !(pd.st === 'fight' && d < 1.4), back: false, left: dh > 0.12, right: dh < -0.12, run }, dt)
+          pd.m.position.set(pd.w.x, pd.w.y, pd.w.z); pd.m.rotation.y = pd.w.h
+          poseWalker(pd.m, pd.w.ph, pd.w.sp, 0, false)
+        }
+        void nowT
+      }
+      cleanups.push(() => { for (const pd of peds) scene.remove(pd.m) })
+      /** Armee-Gelände: Fahrzeuge zum Klauen, Wachen (greifen nur an, was sie sehen), Schutzwesten; ab 3 Sternen rückt die Armee an (Hubschrauber + Panzer) */
+      const armyGone = new Map<number, number>()
+      const armyMeshes: Array<import('three').Group | undefined> = []
+      interface Soldier { w: Walker; m: import('three').Group; wp: number; cd: number; alert: number; dead: number }
+      const soldiers: Soldier[] = []
+      if (isCity) {
+        ARMY.vehicles.forEach((v, i) => { const m = rs.makeCar(v.kind, '#4d5d3a', '', false); m.position.set(v.x, 0.31, v.z); m.rotation.y = v.h; scene.add(m); armyMeshes[i] = m })
+        for (let i = 0; i < 6; i++) {
+          const P = ARMY.patrol[i % ARMY.patrol.length], m = rs.makeWalker('#4d5d3a', '#3f4f2f'); addGear(THREE, m, 1 | 2 | 8); scene.add(m)
+          soldiers.push({ w: newWalker(P.x + i, P.z, 0, 0), m, wp: (i + 1) % ARMY.patrol.length, cd: 1 + i * 0.3, alert: 0, dead: 0 })
+        }
+        cleanups.push(() => { for (const m of armyMeshes) if (m) scene.remove(m); for (const q of soldiers) scene.remove(q.m) })
+      }
+      let tempVest = false
+      const takeVest = () => {
+        if (gearRef.current.vest) { say('Du trägst schon eine Schutzweste.'); return }
+        tempVest = true; applyGear({ ...gearRef.current, vest: true }); say('Schutzweste genommen – sie hält bis zu deinem nächsten Tod.')
+      }
+      const killSoldier = (q: Soldier) => {
+        if (q.dead > 0) return
+        q.dead = 25; q.m.rotation.x = -Math.PI / 2; q.m.position.set(q.w.x, q.w.y + 0.25, q.w.z)
+        addStar(1); say('Soldat ausgeschaltet!')
+      }
+      const tickSoldiers = (dt: number) => {
+        if (!soldiers.length) return
+        const me = foot ?? car, my = foot ? foot.y : (car.y ?? 0)
+        if (Math.hypot(me.x - ARMY.cx, me.z - ARMY.cz) > 300) return
+        for (const q of soldiers) {
+          if (q.dead > 0) { q.dead -= dt; if (q.dead <= 0) { const P = ARMY.patrol[q.wp]; q.w = newWalker(P.x, P.z, 0, 0); q.m.rotation.x = 0; q.alert = 0 } continue }
+          const d = Math.hypot(me.x - q.w.x, me.z - q.w.z)
+          let dv = Math.atan2(me.x - q.w.x, me.z - q.w.z) - q.w.h; while (dv > Math.PI) dv -= Math.PI * 2; while (dv < -Math.PI) dv += Math.PI * 2
+          const sees = d < 60 && Math.abs(dv) < 1.2 && my - q.w.y < 60 && clearLine(q.w.x, q.w.z, me.x, me.z)
+          if (sees) q.alert = 4; else q.alert -= dt
+          if (q.alert > 0) {
+            q.w = stepWalker({ ...q.w, h: q.w.h + dv * Math.min(1, dt * 6) }, { fwd: false, back: false, left: false, right: false }, dt)
+            q.cd -= dt
+            if (sees && q.cd <= 0) {
+              q.cd = 1 + Math.random() * 0.8
+              const hit = Math.random() < 0.55
+              tracer(q.w.x, q.w.y + 1.3, q.w.z, me.x + (hit ? 0 : (Math.random() - 0.5) * 3), my + 1.1, me.z + (hit ? 0 : (Math.random() - 0.5) * 3))
+              if (hit) hurtByShot(foot ? 6 : 5, !!foot, true)
+            }
+          } else {
+            const P = ARMY.patrol[q.wp]
+            if (Math.hypot(P.x - q.w.x, P.z - q.w.z) < 2) q.wp = (q.wp + 1) % ARMY.patrol.length
+            let dh = Math.atan2(P.x - q.w.x, P.z - q.w.z) - q.w.h; while (dh > Math.PI) dh -= Math.PI * 2; while (dh < -Math.PI) dh += Math.PI * 2
+            q.w = stepWalker(q.w, { fwd: Math.abs(dh) < 1.3, back: false, left: dh > 0.12, right: dh < -0.12, run: false }, dt)
+          }
+          q.m.position.set(q.w.x, q.w.y, q.w.z); q.m.rotation.y = q.w.h
+          poseWalker(q.m, q.w.ph, q.w.sp, 0, false)
+          if (q.alert > 0) { const ar = q.m.userData.armL as import('three').Group | undefined; if (ar) ar.rotation.x = -1.45 }
+        }
+      }
+      const tickArmyBase = (nowT: number) => {
+        for (const [i, t] of [...armyGone]) if (nowT > t) { armyGone.delete(i); const m = armyMeshes[i]; if (m) m.visible = true }
+      }
+      const stealArmy = (spot: { x: number; z: number }) => {
+        const i = ARMY.vehicles.findIndex((v) => Math.hypot(v.x - spot.x, v.z - spot.z) < 0.5), v = ARMY.vehicles[i]
+        if (!v || !foot) return
+        if (armyGone.has(i)) { say('Das Fahrzeug ist weg – es kommt bald ein neues.'); return }
+        armyGone.set(i, performance.now() + 120000); const am = armyMeshes[i]; if (am) am.visible = false
+        car = { ...car, x: v.x, z: v.z, h: v.h, v: 0, y: v.kind === 'heli' ? 1 : 0, vy: 0, fly: 0, lvl: 0, dmg: 0, hit: 0, steer: 0, slip: 0 }
+        foot = null; if (footMesh) { scene.remove(footMesh); footMesh = null }
+        setVehicle(v.kind, '#4d5d3a', null, undefined, false); myMesh.visible = true
+        setStars(Math.max(stars, v.kind === 'heli' ? 4 : v.kind === 'tank' ? 3 : 2))
+        say(v.kind === 'heli' ? 'Hubschrauber geklaut! W/S fliegen, A/D drehen, E hoch, R runter, Q/Tippen schießt.' : v.kind === 'tank' ? 'Panzer geklaut! Pfeile/Wischen drehen, W/S fahren, Q/Tippen schießt.' : 'Waffenauto geklaut!')
+        if (!chase) startWanted('army', 'Armee-Fahrzeug geklaut – die Polizei und die Armee jagen dich!')
+        armyWave()
+      }
+      let armyReq = { id: '', h: 0, t: 0 }
+      const mkArmy = (kind: 'tank' | 'heli', i: number): PBot => {
+        const name = kind === 'tank' ? `Panzer ${i + 1}` : `Kampfheli ${i + 1}`
+        const mesh = rs.makeCar(kind, '#4d5d3a', name, false); scene.add(mesh)
+        const pads = ARMY.vehicles.filter((q) => q.kind === 'heli')
+        const pos = kind === 'tank' ? { x: ARMY.cx - 12 + (i % 3) * 12, z: ARMY.cz - 54, h: Math.PI } : { x: pads[i % pads.length].x + (i >= 2 ? 6 : 0), z: ARMY.cz - 8, h: 0 }
+        return { id: `pb-${(online?.userId ?? 'x').slice(0, 6)}-a${kind[0]}${i}`, name, kind, color: '#4d5d3a', car: { ...startCar(track, 0), x: pos.x, z: pos.z, h: pos.h, v: 0, y: kind === 'heli' ? 1 : 0 }, st: statsFor(kind, kind === 'tank' ? 70 : 250), mem: { stuck: 0 }, mesh }
+      }
+      /** 3 Sterne: 2 Hubschrauber + 3 Panzer; jeder weitere Stern +1 Hubschrauber und +1 Panzer */
+      const armyWave = () => {
+        const c = chase
+        if (!c || c.over || c.from !== online?.userId || stars < 3) return
+        if (armyReq.id !== c.id) armyReq = { id: c.id, h: 0, t: 0 }
+        const wantH = 2 + (stars - 3), wantT = 3 + (stars - 3)
+        let k = 0
+        const announce = armyReq.h + armyReq.t === 0
+        for (; armyReq.h < wantH; armyReq.h++) { const n = armyReq.h; window.setTimeout(() => { if (!dead && chase === c && !c.over) pbots.push(mkArmy('heli', n)) }, 2500 + 1400 * k++) }
+        for (; armyReq.t < wantT; armyReq.t++) { const n = armyReq.t; window.setTimeout(() => { if (!dead && chase === c && !c.over) pbots.push(mkArmy('tank', n)) }, 2500 + 1400 * k++) }
+        if (announce && k > 0) say('Die Armee rückt an – Kampfhubschrauber und Panzer!')
+      }
+      /** Kampfhubschrauber: umkreist das Ziel in ~28 m, steigt über Dächer und schießt von oben */
+      const heliAI = (pb: PBot, tg: { id: string; x: number; z: number; y?: number; wk?: boolean }, dt: number) => {
+        const dx = tg.x - pb.car.x, dz = tg.z - pb.car.z, d = Math.hypot(dx, dz), ring = 28
+        const aim = Math.atan2(dx, dz) + (d < ring ? Math.PI / 2 : 0)
+        let dh = aim - pb.car.h; while (dh > Math.PI) dh -= Math.PI * 2; while (dh < -Math.PI) dh += Math.PI * 2
+        const wantY = Math.max((tg.y ?? 0) + 18, roofH(pb.car.x, pb.car.z) + 8, 14), cy = pb.car.y ?? 0
+        pb.car = stepHeli(pb.car, { gas: d > ring * 0.7 || Math.abs(dh) < 0.4, brake: false, left: dh > 0.08, right: dh < -0.08, fly: cy < wantY - 1 }, cy > wantY + 2, dt, camGround)
+        pb.fcd = (pb.fcd ?? 0) - dt
+        if (d < 110 && pb.fcd <= 0 && cy > 6) {
+          pb.fcd = 0.5
+          const hit = Math.random() < 0.5
+          tracer(pb.car.x, cy + 0.6, pb.car.z, tg.x + (hit ? 0 : (Math.random() - 0.5) * 4), (tg.y ?? 0) + 1, tg.z + (hit ? 0 : (Math.random() - 0.5) * 4))
+          if (hit) { if (tg.id === online?.userId) hurtByShot(5, !!tg.wk, true); else if (ready) void ch?.send({ type: 'broadcast', event: 'sd', payload: { to: tg.id, d: 5, k: tg.wk ? 'f' : 'c', a: 1 } }).catch(() => undefined) }
+        }
+      }
+      /** Panzer: feuert aus dem Rohr auf alles Sichtbare in ~130 m vor sich */
+      const tankFire = (pb: PBot, tg: { id: string; x: number; z: number; y?: number; wk?: boolean }, dt: number) => {
+        pb.fcd = (pb.fcd ?? 0) - dt
+        if (pb.fcd > 0) return
+        const dx = tg.x - pb.car.x, dz = tg.z - pb.car.z, d = Math.hypot(dx, dz)
+        if (d > 130 || d < 5) return
+        let da = Math.atan2(dx, dz) - pb.car.h; while (da > Math.PI) da -= Math.PI * 2; while (da < -Math.PI) da += Math.PI * 2
+        if (Math.abs(da) > 0.5 || !clearLine(pb.car.x, pb.car.z, tg.x, tg.z)) return
+        pb.fcd = 1.6
+        tracer(pb.car.x + Math.sin(pb.car.h) * 5, (pb.car.y ?? 0) + 2.1, pb.car.z + Math.cos(pb.car.h) * 5, tg.x, (tg.y ?? 0) + 1, tg.z)
+        if (tg.id === online?.userId) hurtByShot(12, !!tg.wk, true)
+        else if (ready) void ch?.send({ type: 'broadcast', event: 'sd', payload: { to: tg.id, d: 12, k: tg.wk ? 'f' : 'c', a: 1 } }).catch(() => undefined)
       }
       const startChase = (id: string, bandits: string[], cops: string[], bots: number, from: string, role: Role, heist = false, extra = '') => {
         if (!online || chase) return
         iCaught = false
         chase = { id, bandits, got: new Set<string>(), cops, bots, t0: performance.now(), from, over: false, heist, extra, sw: 0 }
+        if (role === 'bandit') setStars(Math.max(stars, extra === 'steal' ? 2 : 1))
+        window.setTimeout(() => { if (!dead) armyWave() }, 1500)
         // Bankraub: Tresor auf, Fluchtautos (eins je Räuber) stehen vor der Tür; man bleibt zu Fuß
         const bank = heist ? pois().find((p) => p.kind === 'bank') : extra === 'armory' ? pois().find((p) => p.kind === 'police') : undefined
         const station = pois().find((p) => p.kind === 'police')
@@ -886,6 +1089,18 @@ export default function RaceView({ trackId, custom, laps, me, assistOk = false, 
         const mesh = rs.makeCar('ambulance', '#f8fafc', 'Krankenwagen', false); scene.add(mesh)
         return { id: `pb-amb-${(online?.userId ?? 'x').slice(0, 6)}`, name: 'Krankenwagen', kind: 'ambulance', color: '#f8fafc', car: { ...startCar(track, 0), x: slot.x, z: slot.z, h: slot.h, v: 0 }, st: statsFor('ambulance', 190), mem: { stuck: 0 }, mesh }
       }
+      const mkMedHeli = (): PBot => {
+        const mesh = rs.makeCar('heli', '#f8fafc', 'Rettungshubschrauber', false); scene.add(mesh)
+        return { id: `pb-mheli-${(online?.userId ?? 'x').slice(0, 6)}`, name: 'Rettungshubschrauber', kind: 'heli', color: '#f8fafc', car: { ...startCar(track, 0), x: hospLot.x, z: hospLot.z, h: 0, v: 0, y: 1 }, st: statsFor('heli', 250), mem: { stuck: 0 }, mesh }
+      }
+      /** Rettungshubschrauber fliegt zu einem Punkt (Reiseflug über den Dächern, am Ziel im Sinkflug) */
+      const heliTo = (a: PBot, tx: number, tz: number, dt: number, land: boolean) => {
+        const dx = tx - a.car.x, dz = tz - a.car.z, d = Math.hypot(dx, dz)
+        let dh = Math.atan2(dx, dz) - a.car.h; while (dh > Math.PI) dh -= Math.PI * 2; while (dh < -Math.PI) dh += Math.PI * 2
+        const cy = a.car.y ?? 0, alt = land && d < 26 ? 0 : Math.max(26, roofH(a.car.x, a.car.z) + 10)
+        a.car = stepHeli(a.car, { gas: d > 16 && Math.abs(dh) < 0.8, brake: d < 14 && a.car.v > 5, left: dh > 0.06, right: dh < -0.06, fly: cy < alt - 1 }, cy > alt + 1, dt, camGround)
+      }
+      const holdCar = (a: PBot, dt: number) => { a.car = a.kind === 'heli' ? stepHeli(a.car, { gas: false, brake: true, left: false, right: false }, true, dt, camGround) : stepCar(a.car, { ...idleIn, brake: true }, dt, track, a.st, true) }
       const mkStretcher = (): import('three').Group => {
         const g = new THREE.Group()
         const frame = new THREE.Mesh(new THREE.BoxGeometry(0.8, 0.08, 2.0), new THREE.MeshStandardMaterial({ color: 0xe5e7eb, roughness: 0.6 }))
@@ -908,6 +1123,8 @@ export default function RaceView({ trackId, custom, laps, me, assistOk = false, 
         say('Ein Sanitäter ist auf dem Weg zu dir!')
       }
       const startRescue = (msg: string) => {
+        setStars(0)
+        if (tempVest) { tempVest = false; applyGear({ ...gearRef.current, vest: false }) }
         if (!hospitalBed || !pois().some((q) => q.kind === 'hospital') || rescue) { hospitalWake(msg); return }
         const bx = foot ? foot.x : car.x, bz = foot ? foot.z : car.z, bh = foot ? foot.h : car.h, by = foot ? foot.y : (car.y ?? 0)
         // Gefangen ist man nur noch, wenn man in der Jagd stirbt
@@ -966,10 +1183,11 @@ export default function RaceView({ trackId, custom, laps, me, assistOk = false, 
         const stuckFor = (nowT - phaseT) / 1000
         const hasMedic = [...remotes.values()].some((x) => x.od === 'm' && fresh(x) && !x.dn)
         if (r.phase === 'wait') {
-          if (t > (hasMedic ? 14 : 5)) { r.amb = mkAmb(); r.phase = 'go'; say('Ein Krankenwagen fährt zu dir.') }
+          if (t > (hasMedic ? 14 : 5)) { const far = Math.hypot(b.x - hospLot.x, b.z - hospLot.z) > 260; r.amb = far ? mkMedHeli() : mkAmb(); r.phase = 'go'; say(far ? 'Ein Rettungshubschrauber fliegt zu dir.' : 'Ein Krankenwagen fährt zu dir.') }
         } else if (r.phase === 'go' && r.amb) {
           const a = r.amb, dd = Math.hypot(b.x - a.car.x, b.z - a.car.z)
-          if (dd < 20 && Math.abs(a.car.v) < 3) {
+          const isH = a.kind === 'heli'
+          if (isH ? dd < 7 && (a.car.y ?? 0) < 3.5 && Math.abs(a.car.v) < 3 : dd < 20 && Math.abs(a.car.v) < 3) {
             // mit etwas Abstand geparkt: zwei Sanitäter steigen aus und bringen die Trage
             const sx = Math.cos(a.car.h), sz = -Math.sin(a.car.h)
             r.medics = [-1, 1].map((sd) => {
@@ -979,7 +1197,8 @@ export default function RaceView({ trackId, custom, laps, me, assistOk = false, 
             })
             r.stretcher = mkStretcher(); scene.add(r.stretcher)
             r.phase = 'walk'
-          } else if (dd < 20) a.car = stepCar(a.car, { ...idleIn, brake: true }, dt, track, a.st, true)
+          } else if (isH) heliTo(a, b.x, b.z, dt, true)
+          else if (dd < 20) holdCar(a, dt)
           else {
             steerTo(a, b.x, b.z, dt)
             if (stuckFor > 45) {
@@ -994,7 +1213,7 @@ export default function RaceView({ trackId, custom, laps, me, assistOk = false, 
           if (r.stretcher) { const m0 = r.medics[0].w, m1 = r.medics[1].w; r.stretcher.position.set((m0.x + m1.x) / 2, m0.y + 0.7, (m0.z + m1.z) / 2); r.stretcher.rotation.y = Math.atan2(m1.x - m0.x, m1.z - m0.z) + Math.PI / 2 }
           if (stuckFor > 25) for (const [i, m] of r.medics.entries()) m.w = { ...m.w, x: b.x + (i ? 2 : -2), z: b.z + 0.5, y: b.y }
           if (d0 < 2.2 && d1 < 2.2) { r.phase = 'carry'; say('Die Sanitäter legen dich auf die Trage …') }
-          if (a) a.car = stepCar(a.car, { ...idleIn, brake: true }, dt, track, a.st, true)
+          if (a) holdCar(a, dt)
         } else if (r.phase === 'carry' && r.amb) {
           const a = r.amb, bx = a.car.x - Math.sin(a.car.h) * 4.2, bz = a.car.z - Math.cos(a.car.h) * 4.2
           const d0 = walkTo(r.medics[0], bx - Math.cos(a.car.h) * 0.9, bz + Math.sin(a.car.h) * 0.9, dt), d1 = walkTo(r.medics[1], bx + Math.cos(a.car.h) * 0.9, bz - Math.sin(a.car.h) * 0.9, dt)
@@ -1003,7 +1222,7 @@ export default function RaceView({ trackId, custom, laps, me, assistOk = false, 
           if (r.stretcher) { r.stretcher.position.set(mx, m0.y + 0.7, mz); r.stretcher.rotation.y = Math.atan2(m1.x - m0.x, m1.z - m0.z) + Math.PI / 2 }
           foot = { ...foot, x: mx, z: mz, y: m0.y + 0.95, h: Math.atan2(m1.x - m0.x, m1.z - m0.z) + Math.PI / 2 }
           if (stuckFor > 25) for (const [i, m] of r.medics.entries()) m.w = { ...m.w, x: a.car.x - Math.sin(a.car.h) * 3 + (i ? 1 : -1), z: a.car.z - Math.cos(a.car.h) * 3 }
-          a.car = stepCar(a.car, { ...idleIn, brake: true }, dt, track, a.st, true)
+          holdCar(a, dt)
           if (d0 < 2.6 && d1 < 2.6) {
             for (const m of r.medics) scene.remove(m.m)
             if (r.stretcher) scene.remove(r.stretcher)
@@ -1013,7 +1232,7 @@ export default function RaceView({ trackId, custom, laps, me, assistOk = false, 
           }
         } else if (r.phase === 'back' && r.amb) {
           const a = r.amb
-          steerTo(a, hospLot.x, hospLot.z, dt)
+          if (a.kind === 'heli') heliTo(a, hospLot.x, hospLot.z, dt, true); else steerTo(a, hospLot.x, hospLot.z, dt)
           foot = { ...foot, x: a.car.x, z: a.car.z, y: a.car.y ?? 0 }
           if (inHospGrounds(a.car.x, a.car.z)) finishRescue()
         } else if (r.phase === 'carried') {
@@ -1183,8 +1402,10 @@ export default function RaceView({ trackId, custom, laps, me, assistOk = false, 
               const near = (x: number, z: number, y: number) => { const dx = x - w0.x, dz = z - w0.z; if (Math.hypot(dx, dz) > 2.6 || Math.abs(y - w0.y) > 2) return false; let da = Math.atan2(dx, dz) - w0.h; while (da > Math.PI) da -= Math.PI * 2; while (da < -Math.PI) da += Math.PI * 2; return Math.abs(da) < 1.2 }
               if (pb.w && near(pb.w.x, pb.w.z, pb.w.y)) { killCop(pb); hitBot = true; break }
               const mn = (pb.men ?? []).find((m) => near(m.w.x, m.w.z, m.w.y))
-              if (mn) { killMan(pb, mn); hitBot = true; break }
+              if (mn) { killMan(pb, mn); addStar(1); hitBot = true; break }
             }
+            if (!hitBot) { const sq = soldiers.find((q) => q.dead <= 0 && Math.hypot(q.w.x - w0.x, q.w.z - w0.z) < 2.4 && Math.abs(q.w.y - w0.y) < 2); if (sq) { killSoldier(sq); hitBot = true } }
+            if (!hitBot && punchPed(w0, batonRef.current ? 22 : 8)) hitBot = true
             if (hitBot) say('Treffer – er geht zu Boden!')
             else if (tgt && ready) { void ch?.send({ type: 'broadcast', event: 'pn', payload: { to: tgt.id, dx: Math.sin(w.h), dz: Math.cos(w.h), d: batonRef.current ? 22 : 8 } }).catch(() => undefined); say(batonRef.current ? `Schlagstock auf ${tgt.name}!` : `Schlag auf ${tgt.name}!`) }
             else say('Schlag ins Leere.')
@@ -1192,6 +1413,7 @@ export default function RaceView({ trackId, custom, laps, me, assistOk = false, 
             w = { ...w, ph: w.ph + 2 }
           }
         }
+        if (pedHurt > 0) { w = { ...w, hp: Math.max(0, w.hp - pedHurt * hpCfg.armor), stun: Math.max(w.stun, 0.2) }; pedHurt = 0; lastRegenHit = nowT }
         if (w.hp <= 0) { hospitalRespawn('Du bist gestorben – du wachst im Krankenhaus auf.'); return }
         else if (w.hp < hpCfg.max && w.stun <= 0 && nowT - lastRegenHit > 6000) w = { ...w, hp: Math.min(hpCfg.max, w.hp + 2 * dt) }
         foot = w
@@ -1202,6 +1424,10 @@ export default function RaceView({ trackId, custom, laps, me, assistOk = false, 
         if (footMesh && (footMesh.userData.gr ?? 0) !== gearMask(gearRef.current)) addGear(THREE, footMesh, gearMask(gearRef.current))
         tickBank()
         tickPatrols(dt)
+        tickPeds(dt, performance.now())
+        tickStars(performance.now())
+        tickSoldiers(dt)
+        tickArmyBase(performance.now())
         tickTracers(dt)
         tickDuty(performance.now())
         for (const p of parked) {
@@ -1221,13 +1447,14 @@ export default function RaceView({ trackId, custom, laps, me, assistOk = false, 
       }
       const tickTracers = (dt: number) => { for (let i = tracers.length - 1; i >= 0; i--) { const t = tracers[i]; t.t -= dt; if (t.t <= 0) { scene.remove(t.m); t.m.geometry.dispose(); tracers.splice(i, 1) } } }
       cleanups.push(() => { for (const t of tracers) scene.remove(t.m) })
-      function hurtByShot(d: number, onFootHit: boolean) {
+      function hurtByShot(d: number, onFootHit: boolean, army = false) {
         if (foot) {
           if (footKo > 0 || foot.inv > 0.2) return
           foot = { ...foot, hp: Math.max(0, foot.hp - d * hpCfg.armor), stun: Math.max(foot.stun, 0.12), vx: foot.vx + (Math.random() - 0.5) * 2, vz: foot.vz + (Math.random() - 0.5) * 2 }
           lastRegenHit = performance.now(); say('Du wirst beschossen!')
         } else if (!ride && !onFootHit) {
           if (eff.kind === 'swat') swatHurt += d * 0.55
+          else if (eff.kind === 'tank' || eff.kind === 'heli') { if (!army) return; swatHurt += d * 0.55 }
           else car = { ...car, dmg: Math.min(DMG_MAX, car.dmg + d * toughOf(eff.kind)) }
           say('Dein Auto wird beschossen!')
         }
@@ -1241,39 +1468,44 @@ export default function RaceView({ trackId, custom, laps, me, assistOk = false, 
         rc.setFromCamera(new THREE.Vector2(((lastPtr.x - r.left) / r.width) * 2 - 1, -(((lastPtr.y - r.top) / r.height) * 2 - 1)), camera)
         return rc.ray
       }
-      const swatArmed = () => eff.kind === 'swat' && !foot && !ride
+      const gunCar = () => eff.kind === 'swat' || eff.kind === 'tank' || eff.kind === 'heli'
+      const swatArmed = () => gunCar() && !foot && !ride
       const pistolArmed = () => !!foot && !rescue && footKo <= 0 && gearRef.current.pistol
       const hitCount = new WeakMap<object, number>()
+      const onPtrRot = (e: PointerEvent) => { if (lastPtr && (e.buttons & 1 || e.pointerType === 'touch') && !foot && !ride && (eff.kind === 'tank' || eff.kind === 'heli') && performance.now() - lastPtr.t < 120) car = { ...car, h: car.h - (e.clientX - lastPtr.x) * 0.006 } }
       const onPtrMove = (e: PointerEvent) => { lastPtr = { x: e.clientX, y: e.clientY, t: performance.now() } }
       const onPtrDown = (e: PointerEvent) => { onPtrMove(e); if (swatArmed()) fireGun('swat'); else if (pistolArmed()) fireGun('pistol') }
-      renderer.domElement.addEventListener('pointermove', onPtrMove); renderer.domElement.addEventListener('pointerdown', onPtrDown)
-      cleanups.push(() => { renderer.domElement.removeEventListener('pointermove', onPtrMove); renderer.domElement.removeEventListener('pointerdown', onPtrDown) })
+      renderer.domElement.addEventListener('pointermove', onPtrRot); renderer.domElement.addEventListener('pointermove', onPtrMove); renderer.domElement.addEventListener('pointerdown', onPtrDown)
+      cleanups.push(() => { renderer.domElement.removeEventListener('pointermove', onPtrRot); renderer.domElement.removeEventListener('pointermove', onPtrMove); renderer.domElement.removeEventListener('pointerdown', onPtrDown) })
       /** SWAT-Geschütz (jeder im SWAT-Wagen, 400 m, auch nach oben/unten) und Pistole zu Fuß (150 m). Zielt dorthin, wo man auf den Bildschirm tippt – inkl. Höhe. */
-      const fireGun = (gun: 'swat' | 'pistol') => {
-        if (gun === 'swat' ? (eff.kind !== 'swat' || foot || ride) : !pistolArmed()) return
+      const fireGun = (gun: 'swat' | 'pistol', straight = false) => {
+        if (gun === 'swat' ? (!gunCar() || foot || ride) : !pistolArmed()) return
         const nowT = performance.now()
-        if (nowT - lastShot < (gun === 'swat' ? 330 : 450)) return
+        if (nowT - lastShot < (gun === 'pistol' ? 450 : eff.kind === 'heli' ? 170 : eff.kind === 'tank' ? 800 : 330)) return
         lastShot = nowT
         const ox = gun === 'swat' ? car.x : foot!.x, oz = gun === 'swat' ? car.z : foot!.z, hd = gun === 'swat' ? car.h : foot!.h
-        const oy = gun === 'swat' ? (car.y ?? 0) + 2.1 : foot!.y + 1.3
-        const RANGE = gun === 'swat' ? 400 : 150, MUZ = gun === 'swat' ? 3.6 : 0.9
+        const big = gun === 'swat' && eff.kind !== 'swat'
+        const oy = gun === 'swat' ? (car.y ?? 0) + (eff.kind === 'heli' ? 1.2 : eff.kind === 'tank' ? 2.6 : 2.1) : foot!.y + 1.3
+        const RANGE = gun === 'pistol' ? 150 : eff.kind === 'heli' ? 260 : eff.kind === 'tank' ? 320 : 400, MUZ = gun === 'pistol' ? 0.9 : eff.kind === 'tank' ? 5 : eff.kind === 'heli' ? 4.5 : 3.6
         type Tg = { x: number; y: number; z: number; r: number; apply: () => void }
         const tgs: Tg[] = []
         const dmgCar = (b: { car: Car; kind: string }, k: number) => { b.car = { ...b.car, dmg: Math.min(DMG_MAX, b.car.dmg + k * toughOf(b.kind)) } }
         const hits = (o: object, need: number, kill: () => void) => { if (gun === 'swat') { kill(); return } const n = (hitCount.get(o) ?? 0) + 1; hitCount.set(o, n); if (n >= need) kill() }
-        for (const b of botList) tgs.push({ x: b.car.x, y: (b.car.y ?? 0) + 1, z: b.car.z, r: 2.4, apply: () => dmgCar(b, gun === 'swat' ? 14 : 5) })
+        for (const b of botList) tgs.push({ x: b.car.x, y: (b.car.y ?? 0) + 1, z: b.car.z, r: 2.4, apply: () => dmgCar(b, gun === 'swat' ? (big ? 24 : 14) : 5) })
         for (const pb of pbots) {
-          if (!pb.carGone) tgs.push({ x: pb.car.x, y: (pb.car.y ?? 0) + 1, z: pb.car.z, r: 2.6, apply: () => dmgCar(pb, gun === 'swat' ? 14 : 4) })
+          if (!pb.carGone) tgs.push({ x: pb.car.x, y: (pb.car.y ?? 0) + 1, z: pb.car.z, r: 2.6, apply: () => dmgCar(pb, gun === 'swat' ? (big ? 24 : 14) : 4) })
           if (pb.w) tgs.push({ x: pb.w.x, y: pb.w.y + 0.9, z: pb.w.z, r: 0.9, apply: () => hits(pb, 3, () => killCop(pb)) })
-          for (const mn of pb.men ?? []) tgs.push({ x: mn.w.x, y: mn.w.y + 0.9, z: mn.w.z, r: 0.9, apply: () => hits(mn, 3, () => killMan(pb, mn)) })
+          for (const mn of pb.men ?? []) tgs.push({ x: mn.w.x, y: mn.w.y + 0.9, z: mn.w.z, r: 0.9, apply: () => hits(mn, 3, () => { killMan(pb, mn); addStar(1) }) })
         }
         for (const r of remotes.values()) {
           if (r.rd || nowT - r.seen > 2500 || r.id.startsWith('pb-') || r.id === online?.userId) continue
-          const dm = gun === 'swat' ? (r.wk ? 20 : 14) : (r.wk ? 12 : 6)
+          const dm = gun === 'swat' ? (big ? (r.wk ? 28 : 22) : (r.wk ? 20 : 14)) : (r.wk ? 12 : 6)
           tgs.push({ x: r.x, y: (r.yy ?? 0) + (r.wk ? 0.9 : 1), z: r.z, r: r.wk ? 0.9 : 2.4, apply: () => { if (ready) void ch?.send({ type: 'broadcast', event: 'sd', payload: { to: r.id, d: dm, k: r.wk ? 'f' : 'c' } }).catch(() => undefined) } })
         }
+        for (const q of soldiers) if (q.dead <= 0) tgs.push({ x: q.w.x, y: q.w.y + 0.9, z: q.w.z, r: 0.9, apply: () => hits(q, 3, () => killSoldier(q)) })
+        for (const pd of peds) if (pd.st !== 'dead') tgs.push({ x: pd.w.x, y: pd.w.y + 0.9, z: pd.w.z, r: 0.9, apply: () => killPed(pd) })
         let dx = Math.sin(hd), dy = 0, dz = Math.cos(hd)
-        const ray = aimRay()
+        const ray = straight ? null : aimRay()
         if (ray) {
           const ro = ray.origin, rd = ray.direction
           let pick: Tg | null = null, pa = 1e9
@@ -1422,6 +1654,8 @@ export default function RaceView({ trackId, custom, laps, me, assistOk = false, 
         if (sn.spot.kind === 'vault') heistRef.current()
         else if (sn.spot.kind === 'dress') toggleDuty(sn.poi.kind === 'police' ? 'p' : 'm')
         else if (sn.spot.kind === 'armory' || sn.spot.kind === 'steal') crimeRef.current(sn.spot.kind === 'armory' ? 'armory' : 'steal')
+        else if (sn.spot.kind === 'tank' || sn.spot.kind === 'heli' || sn.spot.kind === 'armycar') stealArmy(sn.spot)
+        else if (sn.spot.kind === 'vest') takeVest()
         else if (sn.spot.kind === 'atm') atmRob()
         else setShopUi(sn.spot.kind === 'weapons' ? 'weapons' : sn.spot.kind === 'counter' ? 'shop' : 'gym')
       }
@@ -1617,6 +1851,7 @@ export default function RaceView({ trackId, custom, laps, me, assistOk = false, 
             if (bands.length && go) {
               let tg = bands[0]
               for (const bd of bands) if (Math.hypot(bd.x - pb.car.x, bd.z - pb.car.z) < Math.hypot(tg.x - pb.car.x, tg.z - pb.car.z)) tg = bd
+              if (pb.kind === 'heli') { heliAI(pb, tg, dt); continue }
               if (pb.swat && pb.men?.length) { swatMen(pb, tg, dt); pb.car = stepCar(pb.car, idleIn, dt, track, pb.st, true); continue }
               if (pb.w) {
                 // Polizist zu Fuß: läuft zum Bandit (wenn der zu Fuß ist oder das Auto weg ist), sonst zurück zu seinem Auto
@@ -1652,7 +1887,7 @@ export default function RaceView({ trackId, custom, laps, me, assistOk = false, 
                 continue
               }
               if (pb.carGone) continue
-              if (tg.wk && pb.car.v < 14 && Math.hypot(tg.x - pb.car.x, tg.z - pb.car.z) < 26) {
+              if (tg.wk && pb.car.v < 14 && pb.kind !== 'tank' && Math.hypot(tg.x - pb.car.x, tg.z - pb.car.z) < 26) {
                 if (pb.swat) { deploySwat(pb); continue }
                 pb.w = exitFromCar({ ...pb.car, wid: pb.st.wid }, 1)
                 pb.wm = rs.makeWalker('#1d4ed8', '#0f172a', pb.name); addBaton(THREE, pb.wm); scene.add(pb.wm)
@@ -1667,6 +1902,7 @@ export default function RaceView({ trackId, custom, laps, me, assistOk = false, 
               const want = inParkXZ(tg.x, tg.z, 8) ? !botIn && inParkXZ(pb.car.x, pb.car.z, 45) : (tg.y ?? 0) > (pb.car.y ?? 0) + 2.5 && !botIn
               pb.car = stepCar(pb.car, { ...d.inp, fly: want, chase: true }, dt, track, pb.st, true)
               if (pb.swat && !tg.wk) swatTruckFire(pb, tg, dt)
+              if (pb.kind === 'tank') tankFire(pb, tg, dt)
             }
           }
           if (chase && nowT - chase.t0 > CHASE_MAX_MS) finishChase('bandit', chase.from === online.userId)
@@ -1689,8 +1925,12 @@ export default function RaceView({ trackId, custom, laps, me, assistOk = false, 
         } else if (!foot && !ride) {
         const nSub = Math.max(1, Math.min(240, Math.ceil(Math.abs(car.v) * dt / 1.6)))
         for (let k = 0; k < nSub; k++) {
-          car = stepCar(car, chase && !chase.over ? { ...input, chase: true } : input, dt / nSub, track, myStats, go, true)
-          if (car.fly > 0) continue
+          if (eff.kind === 'heli') car = stepHeli(car, input, heliDown.current, dt / nSub, camGround)
+          else {
+            if (eff.kind === 'tank' && Math.abs(car.v) < 3) { const tr = (input.left ? 1 : 0) - (input.right ? 1 : 0); if (tr) car = { ...car, h: car.h + tr * 1.25 * dt / nSub } }
+            car = stepCar(car, chase && !chase.over ? { ...input, chase: true } : input, dt / nSub, track, myStats, go, true)
+          }
+          if (car.fly > 0 || eff.kind === 'heli') continue
           for (const b of botList) {
             const pre = car
             const sc = now - (hitAt.get(b) ?? -1e9) < 250 ? 0 : 1
@@ -1708,7 +1948,7 @@ export default function RaceView({ trackId, custom, laps, me, assistOk = false, 
             const sc = now - (hitAt.get(pb) ?? -1e9) < 250 ? 0 : 1
             const c1 = crash(pre, myStats, { x: pb.car.x, z: pb.car.z, h: pb.car.h, v: pb.car.v }, pb.st, 0.5, DMG_MAX, sc)
             if (!c1) continue
-            if (sc && !pb.swat && Math.abs(pre.v) > 10 && Math.abs(pre.v) > Math.abs(pb.car.v)) callSwat()
+            if (sc && !pb.swat && Math.abs(pre.v) > 10 && Math.abs(pre.v) > Math.abs(pb.car.v)) { callSwat(); addStar(1) }
             if (eff.kind === 'swat' && sc && Math.abs(pb.car.v) > Math.abs(pre.v)) swatHurt += Math.max(0, c1.dmg - pre.dmg) * 3
             car = c1; bumped = true
             const c2 = crash(pb.car, pb.st, { x: pre.x, z: pre.z, h: pre.h, v: pre.v, slip: pre.slip }, myStats, 0.5, 85, sc)
@@ -1751,7 +1991,7 @@ export default function RaceView({ trackId, custom, laps, me, assistOk = false, 
         }
         // mein Auto überfährt Polizisten zu Fuß
         if (!foot && Math.abs(car.v) > 3) for (const pb of pbots) if (pb.w) { const r = carHit(pb.w, { x: car.x, z: car.z, h: car.h, v: car.v, len: myStats.len, wid: myStats.wid, y: car.y ?? 0 }); if (r) pb.w = r }
-        if (!foot && punchReq.current) { punchReq.current = false; if (!ride) fireGun('swat') }
+        if (!foot && punchReq.current) { punchReq.current = false; if (!ride) fireGun('swat', true) }
         tickParked(dt)
 
         // Bots
@@ -1798,6 +2038,8 @@ export default function RaceView({ trackId, custom, laps, me, assistOk = false, 
         const place = (m: import('three').Group, x: number, z: number, h: number, v: number, steer: number, dmg = 0, slip = 0, fly = 0, lv = 0, yy = 0, pitch = 0) => {
           rs.damageCar(m, dmg, slip, v, now / 1000)
           m.rotation.order = 'YXZ'; m.position.set(x, carY({ fly, lvl: lv, x, z, y: yy }), z); m.rotation.y = h; m.rotation.x = pitch
+          const rotor = m.userData.rotor as import('three').Group | undefined; if (rotor) rotor.rotation.y = now / 25
+          const trot = m.userData.tailRotor as import('three').Object3D | undefined; if (trot) trot.rotation.x = now / 20
           const lean = m.userData.lean as import('three').Group | undefined
           if (lean) { m.rotation.z = 0; lean.rotation.z += ((-Math.max(-0.85, Math.min(0.85, steer * Math.min(1, Math.abs(v) / 20) * 0.9 + slip * 0.5))) - lean.rotation.z) * Math.min(1, dt * 9) }
           else m.rotation.z = -steer * Math.min(1, Math.abs(v) / 40) * 0.05 - flyRoll(fly)
@@ -1814,6 +2056,7 @@ export default function RaceView({ trackId, custom, laps, me, assistOk = false, 
           if (pb.w && pb.wm) { pb.wm.position.set(pb.w.x, pb.w.y, pb.w.z); pb.wm.rotation.y = pb.w.h; poseWalker(pb.wm, pb.w.ph, pb.w.sp, pb.w.stun, pb.w.vy > 1, (now - (pb.pa ?? -1e9)) / 320) }
           for (const mn of pb.men ?? []) { mn.m.position.set(mn.w.x, mn.w.y, mn.w.z); mn.m.rotation.y = mn.w.h; poseWalker(mn.m, mn.w.ph, mn.w.sp, mn.w.stun, mn.w.vy > 1); if (now - (mn.aimT ?? -1e9) < 450 || (mn.w.sp < 0.5 && mn.cd < 1.2)) { const ar = mn.m.userData.armR as import('three').Group | undefined; if (ar) ar.rotation.x = -1.45 } }
         }
+        if (rescue?.amb) { const ra = rescue.amb; place(ra.mesh, ra.car.x, ra.car.z, ra.car.h, ra.car.v, ra.car.steer, ra.car.dmg, ra.car.slip, 0, ra.car.lvl ?? 0, ra.car.y ?? 0, 0); rs.tickSiren(ra.mesh, now) }
         for (const pt of patrols) if (pt.sleep <= 0) { place(pt.mesh, pt.car.x, pt.car.z, pt.car.h, pt.car.v, pt.car.steer, pt.car.dmg, pt.car.slip, 0, pt.car.lvl ?? 0, pt.car.y ?? 0, 0); rs.tickSiren(pt.mesh, now) }
         for (const p of parked) { place(p.mesh, p.car.x, p.car.z, p.car.h, p.car.v, 0, p.car.dmg, p.car.slip, 0, p.car.lvl ?? 0, p.car.y ?? 0, pitchOf(p.car)); if (p.siren) rs.tickSiren(p.mesh, now) }
         if (foot && footMesh) { footMesh.position.set(foot.x, foot.y, foot.z); footMesh.rotation.y = foot.h; poseWalker(footMesh, foot.ph, foot.sp, foot.stun, foot.vy > 1, (now - lastPunch) / 320) }
@@ -1886,7 +2129,7 @@ export default function RaceView({ trackId, custom, laps, me, assistOk = false, 
         }
         if (isCity && !foot && !ride && wreck <= 0) {
           // Leben im Auto: Schaden am Auto und Feuer kosten Leben
-          const armored = eff.kind === 'swat'
+          const armored = isArmored(eff.kind)
           if (armored) { myHp -= swatHurt; swatHurt = 0; car = { ...car, dmg: 0 }; prevDmg = 0 }
           const dd = armored ? 0 : car.dmg - prevDmg
           if (dd > 0) myHp -= dd * 0.9
@@ -2118,7 +2361,7 @@ export default function RaceView({ trackId, custom, laps, me, assistOk = false, 
       )}
       {def.mode === 'city' && !footUi.on && footUi.seat && <div className="pointer-events-none absolute left-1/2 top-12 -translate-x-1/2 rounded-full bg-black/55 px-3 py-0.5 text-xs font-bold text-white" role="status">{footUi.ride ? 'Mitfahrer' : 'Fahrer'} · 👥 {footUi.seat}</div>}
       {poiUi && footUi.on && !shopUi && (
-        <button type="button" onClick={() => poiKey.current()} disabled={poiUi.kind === 'vault' && (bankWait > 0 || !!chaseUi.over)} className="absolute bottom-52 left-1/2 z-20 min-h-[48px] -translate-x-1/2 rounded-xl border border-white/40 px-4 text-sm font-bold text-slate-950 disabled:opacity-60" style={{ background: poiUi.kind === 'vault' ? POI_COLOR.bank : poiUi.kind === 'counter' ? POI_COLOR.shop : poiUi.kind === 'armory' || poiUi.kind === 'steal' ? POI_COLOR.police : poiUi.kind === 'dress' ? '#a5b4fc' : poiUi.kind === 'weapons' ? POI_COLOR.weapons : poiUi.kind === 'atm' ? POI_COLOR.bank : POI_COLOR.gym }}>
+        <button type="button" onClick={() => poiKey.current()} disabled={poiUi.kind === 'vault' && (bankWait > 0 || !!chaseUi.over)} className="absolute bottom-52 left-1/2 z-20 min-h-[48px] -translate-x-1/2 rounded-xl border border-white/40 px-4 text-sm font-bold text-slate-950 disabled:opacity-60" style={{ background: poiUi.kind === 'vault' ? POI_COLOR.bank : poiUi.kind === 'counter' ? POI_COLOR.shop : poiUi.kind === 'armory' || poiUi.kind === 'steal' ? POI_COLOR.police : poiUi.kind === 'dress' ? '#a5b4fc' : poiUi.kind === 'weapons' ? POI_COLOR.weapons : poiUi.kind === 'vest' || poiUi.kind === 'tank' || poiUi.kind === 'heli' || poiUi.kind === 'armycar' ? POI_COLOR.army : poiUi.kind === 'atm' ? POI_COLOR.bank : POI_COLOR.gym }}>
           {poiUi.kind === 'vault' ? (bankWait > 0 ? `Bank ruht noch ${Math.ceil(bankWait / 60)} Min` : 'TRESOR ÖFFNEN (G) – danach 6 Min Polizeijagd') : poiUi.kind === 'armory' ? 'WAFFENKAMMER AUFBRECHEN (G) – Schlagstock, 6 Min Polizeijagd' : poiUi.kind === 'steal' ? 'SWAT-WAGEN KLAUEN (G) – 6 Min Polizeijagd' : poiUi.kind === 'dress' ? `${poiUi.label} (G) – an/aus` : `${poiUi.label} (G)`}
         </button>
       )}
@@ -2131,6 +2374,7 @@ export default function RaceView({ trackId, custom, laps, me, assistOk = false, 
       {isAdmin && reviveUi.other && !reviveUi.mine && (
         <button type="button" onClick={() => reviveUi.other && reviveOtherRef.current(reviveUi.other.id)} className="absolute bottom-40 left-1/2 z-20 min-h-[44px] -translate-x-1/2 rounded-xl border border-white/40 bg-emerald-400 px-4 text-sm font-bold text-slate-950">{reviveUi.other.name} gratis wiederbeleben</button>
       )}
+      {starsUi > 0 && <div className="pointer-events-none absolute left-1/2 top-28 -translate-x-1/2 rounded-full bg-black/60 px-3 py-0.5 text-lg font-black tracking-widest text-amber-300" role="status" aria-label={`Fahndungsstufe ${starsUi} von 5`}>{'★'.repeat(starsUi)}<span className="text-white/30">{'★'.repeat(5 - starsUi)}</span></div>}
       {dutyUi && <div className="pointer-events-none absolute left-1/2 top-20 -translate-x-1/2 rounded-full px-3 py-0.5 text-xs font-bold text-white" style={{ background: dutyUi === 'p' ? '#2563eb' : '#dc2626' }} role="status">{dutyUi === 'p' ? '👮 Im Dienst: Polizei' : '🚑 Im Dienst: Sanitäter'}</div>}
       {shopUi === 'weapons' && <WeaponShop isAdmin={isAdmin} coins={wallet?.balance ?? null} owned={gearUi} onOwned={applyGear} onKoins={(k) => walletRef.current?.setBalance(k)} onClose={() => setShopUi(null)} />}
       {(shopUi === 'shop' || shopUi === 'gym') && <VocabShop kind={shopUi} perks={perksUi} isAdmin={isAdmin} onPerks={applyPerks} onBought={(it) => { if (it === 'heal') healRef.current = true }} onClose={() => setShopUi(null)} />}

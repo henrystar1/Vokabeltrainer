@@ -1,9 +1,10 @@
+import { makeArmyModel } from './armyMesh'
 import type * as T from 'three'
 import { isBike } from '../stats'
 import { buildSpecCar, getSpec } from '../customCar'
 import { RoundedBoxGeometry } from 'three/examples/jsm/geometries/RoundedBoxGeometry.js'
 import { roadProximity, type Track } from './track'
-import { BRIDGES, CITY, type Bld, BANK, GARAGES, HOSPITAL, POLICE, TUNNELS, bridgeH, city, tunnelD } from './city'
+import { ARMY, BRIDGES, CITY, type Bld, BANK, GARAGES, HOSPITAL, POLICE, TUNNELS, bridgeH, city, tunnelD } from './city'
 import { PARK, PARK_TOP, PARK_TUNNEL } from './parkhaus'
 import { MOUNTAINS, OUT, RING, hillH, outRoads, ringPath } from './mountains'
 import { trees } from './forest'
@@ -363,6 +364,27 @@ const BODIES: Record<string, Body> = {
 
 /** SWAT-Panzerwagen: Panzerplatten, Rammbügel, Lichtbalken, Dachgeschütz und große „SWAT“-Schriftzüge (Seiten, Dach, Motorhaube, Heck) */
 /** Polizeiblock: Parkplatz mit Parkbuchten, Garage mit Boden und Schild, Schild und Lichtbalken an der Wache, weißes Band um das Dach */
+/** Armee-Gelände: Asphalt, Landeplätze, Stacheldraht auf dem Zaun, Tor mit Schranke und Wachhäuschen, Schild */
+function armyDecor(THREE: THREE, scene: T.Scene, night: boolean): void {
+  const k = night ? 0.6 : 1
+  const A = ARMY, H = A.half
+  const col = (c: number) => new THREE.MeshStandardMaterial({ color: new THREE.Color(c).multiplyScalar(k), roughness: 0.9 })
+  const asphalt = new THREE.Mesh(new THREE.BoxGeometry(2 * H - 2, 0.06, 2 * H - 2), col(0x3a3f36)); asphalt.position.set(A.cx, 0.28, A.cz); scene.add(asphalt)
+  for (const v of A.vehicles) {
+    if (v.kind !== 'heli') continue
+    const ring = new THREE.Mesh(new THREE.RingGeometry(6.2, 7, 28), new THREE.MeshBasicMaterial({ color: 0xf8fafc, side: THREE.DoubleSide })); ring.rotation.x = -Math.PI / 2; ring.position.set(v.x, 0.33, v.z); scene.add(ring)
+    const t = swatText(THREE, 5, 5, 'H', '#f8fafc'); t.rotation.x = -Math.PI / 2; t.rotation.z = Math.PI; t.position.set(v.x, 0.34, v.z); scene.add(t)
+  }
+  const wire = new THREE.MeshStandardMaterial({ color: 0x9ca3af, metalness: 0.7, roughness: 0.4 })
+  const strips: Array<[number, number, number, number]> = [[A.cx, A.cz + H, 2 * H, 0.3], [A.cx - H, A.cz, 0.3, 2 * H], [A.cx + H, A.cz, 0.3, 2 * H], [A.cx - (H + A.gate) / 2, A.cz - H, H - A.gate, 0.3], [A.cx + (H + A.gate) / 2, A.cz - H, H - A.gate, 0.3]]
+  for (const [x, z, w, d] of strips) { const m = new THREE.Mesh(new THREE.BoxGeometry(w, 0.35, d), wire); m.position.set(x, 2.8, z); scene.add(m) }
+  // Tor: Pfosten, rot-weiße Schranke (hochgeklappt), Wachhäuschen
+  for (const sx of [-1, 1]) { const p = new THREE.Mesh(new THREE.BoxGeometry(0.6, 4, 0.6), col(0x4b5563)); p.position.set(A.cx + sx * A.gate, 2, A.cz - H); scene.add(p) }
+  const bar = new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.3, 7), new THREE.MeshStandardMaterial({ color: 0xdc2626 })); bar.position.set(A.cx + A.gate + 0.2, 4.4, A.cz - H + 3.5); bar.rotation.x = 0.0; scene.add(bar)
+  const booth = new THREE.Mesh(new THREE.BoxGeometry(3, 3, 3), col(0x4d5d3a)); booth.position.set(A.cx + A.gate + 4, 1.5, A.cz - H + 3); scene.add(booth)
+  const sign = swatText(THREE, 12, 2.4, 'ARMEE – BETRETEN VERBOTEN', '#facc15'); sign.rotation.y = Math.PI; sign.position.set(A.cx, 7, A.cz - H - 0.3); scene.add(sign)
+  const grd = swatText(THREE, 18, 3.6, 'ARMEE', '#f8fafc'); grd.rotation.x = -Math.PI / 2; grd.rotation.z = Math.PI; grd.position.set(A.cx, 0.35, A.cz - 24); scene.add(grd)
+}
 /** Bank: Parkplatz, goldenes Dach-Band und Schilder, Geldautomaten an der Fassade und große Glasscheiben, die man zerschlagen kann */
 function bankDecor(THREE: THREE, scene: T.Scene, night: boolean): RaceScene['smashGlass'] {
   const k = night ? 0.6 : 1
@@ -560,6 +582,7 @@ function nameSprite(THREE: THREE, name: string, y: number): T.Sprite {
 
 /** Schönes Auto aus abgerundeten Teilen: Karosserie, Kabine mit Glas, Räder mit Felgen, Lichter, je Art Besonderheiten. */
 function buildCar(THREE: THREE, kind: string, color: string, name: string, isMe: boolean): T.Group {
+  if (kind === 'tank' || kind === 'heli' || kind === 'armycar') { const ag = makeArmyModel(THREE, kind, color); if (!isMe) ag.add(nameSprite(THREE, name, kind === 'heli' ? 5.5 : 4)); return ag }
   const sp = getSpec(kind)
   if (sp) {
     const g = buildSpecCar(THREE, sp, color)
@@ -916,6 +939,7 @@ function buildCity(THREE: THREE, scene: T.Scene, ground: T.Mesh, night: boolean)
     scene.add(new THREE.Mesh(dg, new THREE.MeshBasicMaterial({ vertexColors: true, side: THREE.FrontSide, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 })))
   }
   const smashGlass = bankDecor(THREE, scene, night)
+  armyDecor(THREE, scene, night)
   blockDecor(THREE, scene, night, POLICE, false); blockDecor(THREE, scene, night, HOSPITAL, true)
   const viewer = makeInteriorViewer(THREE, scene, { geo: bg, ranges }, night)
   const wallMats = pal.map((c) => new THREE.MeshStandardMaterial({ color: c, roughness: 0.85, side: THREE.DoubleSide }))

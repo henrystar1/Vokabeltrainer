@@ -18,7 +18,7 @@ export const BRIDGES: ReadonlyArray<{ bz: number; bx0: number; bx1: number }> = 
   { bz: 0, bx0: -240, bx1: 240 },
 ]
 
-export interface Bld { x: number; z: number; w: number; d: number; h: number; /** Unterkante (Sturz über einer Garageneinfahrt): darunter kann man durchfahren */ lo?: number; /** Farbvariante 0–5 */ c: number; /** feste Wandfarbe (Polizei) */ col?: number; /** Tür-Seite erzwingen (0 Süd, 1 West, 2 Nord, 3 Ost) */ door?: 0 | 1 | 2 | 3; /** Sonderhaus */ kind?: 'police' | 'hospital' | 'bank' | 'weapons' }
+export interface Bld { x: number; z: number; w: number; d: number; h: number; /** Unterkante (Sturz über einer Garageneinfahrt): darunter kann man durchfahren */ lo?: number; /** Farbvariante 0–5 */ c: number; /** feste Wandfarbe (Polizei) */ col?: number; /** Tür-Seite erzwingen (0 Süd, 1 West, 2 Nord, 3 Ost) */ door?: 0 | 1 | 2 | 3; /** Sonderhaus */ kind?: 'police' | 'hospital' | 'bank' | 'weapons' | 'army' }
 import { PARK, PARK_TUNNEL } from './parkhaus'
 export interface CityData { buildings: Bld[]; parks: Array<{ x: number; z: number; size: number }>; grid: Map<string, number[]> }
 
@@ -38,6 +38,19 @@ function blockLayout(cx: number, cz: number) {
 export const POLICE = blockLayout(-420, 300)
 export const HOSPITAL = blockLayout(300, 300)
 export const BANK = blockLayout(180, -180)
+/** Armee-Gelände am Nordrand der Stadt (zur Rennstrecke hin): Zaun mit Tor im Süden, Kaserne, Panzer, Hubschrauber, Waffenautos, Wachposten */
+const AX = 420, AZ = 660
+export const ARMY = {
+  cx: AX, cz: AZ, half: 44, gate: 7,
+  barracks: { x: AX - 18, z: AZ + 30, w: 48, d: 20 },
+  vehicles: [
+    { kind: 'tank', x: AX + 28, z: AZ + 31, h: -Math.PI / 2 }, { kind: 'tank', x: AX + 28, z: AZ + 16, h: -Math.PI / 2 }, { kind: 'tank', x: AX + 28, z: AZ + 1, h: -Math.PI / 2 },
+    { kind: 'heli', x: AX - 22, z: AZ - 8, h: 0 }, { kind: 'heli', x: AX + 12, z: AZ - 8, h: 0 },
+    { kind: 'armycar', x: AX - 32, z: AZ + 8, h: 0 }, { kind: 'armycar', x: AX - 20, z: AZ + 8, h: 0 },
+  ] as Array<{ kind: 'tank' | 'heli' | 'armycar'; x: number; z: number; h: number }>,
+  /** Rundgang der Wachen (innerhalb des Zauns) */
+  patrol: [{ x: AX - 36, z: AZ - 36 }, { x: AX + 36, z: AZ - 36 }, { x: AX + 36, z: AZ + 8 }, { x: AX - 36, z: AZ + 8 }, { x: AX, z: AZ - 10 }],
+}
 let cache: CityData | null = null
 
 function rng(seed: number) { let a = seed >>> 0; return () => { a = (a + 0x6d2b79f5) >>> 0; let t = a; t = Math.imul(t ^ (t >>> 15), t | 1); t ^= t + Math.imul(t ^ (t >>> 7), t | 61); return ((t ^ (t >>> 14)) >>> 0) / 4294967296 } }
@@ -80,6 +93,20 @@ export function city(): CityData {
     }
   }
   clearBlock(PARK.cx, PARK.cz)
+  {
+    // Armee-Gelände: Zaun (niedrig genug zum Überklettern), Tor im Süden, Wachtürme, Kaserne
+    clearBlock(ARMY.cx, ARMY.cz)
+    const A = ARMY, H = A.half, fence = 0x6b7280, ft = 1
+    buildings.push(
+      { x: A.cx, z: A.cz + H, w: 2 * H, d: ft, h: 2.6, c: 0, col: fence },
+      { x: A.cx - H, z: A.cz, w: ft, d: 2 * H, h: 2.6, c: 0, col: fence },
+      { x: A.cx + H, z: A.cz, w: ft, d: 2 * H, h: 2.6, c: 0, col: fence },
+      { x: A.cx - (H + A.gate) / 2, z: A.cz - H, w: H - A.gate, d: ft, h: 2.6, c: 0, col: fence },
+      { x: A.cx + (H + A.gate) / 2, z: A.cz - H, w: H - A.gate, d: ft, h: 2.6, c: 0, col: fence },
+      { x: A.barracks.x, z: A.barracks.z, w: A.barracks.w, d: A.barracks.d, h: 10, c: 2, col: 0x4d5d3a, door: 0, kind: 'army' },
+    )
+    for (const sx of [-1, 1]) for (const sz of [-1, 1]) buildings.push({ x: A.cx + sx * H, z: A.cz + sz * H, w: 4, d: 4, h: 9, c: 0, col: 0x3f4a2f })
+  }
   for (const [L, kind, body, trim] of [[POLICE, 'police', 0x1e3a8a, 0xe5e7eb], [HOSPITAL, 'hospital', 0xf1f5f9, 0xdc2626], [BANK, 'bank', 0xd8c9a0, 0]] as const) {
     // Sonderblock: zufällige Häuser raus, Haus + offene Garage (Wände, Dach mit Sturz) hinein
     clearBlock(L.cx, L.cz)

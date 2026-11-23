@@ -1,9 +1,9 @@
-import { city, type Bld } from './city'
+import { ARMY, city, type Bld } from './city'
 import { canon, layoutOf, setSpecial, type Solid } from './interior'
 
 /** Besondere Häuser der Stadt mit Einrichtung: Bank (Tresen + Tresor), Shop (Theke), Fitnessstudio (Geräte), Krankenhaus (Betten, hier wacht man nach dem Tod auf). Feste Auswahl, überall gleich. */
-export type PoiKind = 'bank' | 'shop' | 'gym' | 'hospital' | 'police' | 'weapons'
-export type SpotKind = 'vault' | 'counter' | 'machine' | 'armory' | 'steal' | 'dress' | 'atm' | 'weapons'
+export type PoiKind = 'bank' | 'shop' | 'gym' | 'hospital' | 'police' | 'weapons' | 'army'
+export type SpotKind = 'vault' | 'counter' | 'machine' | 'armory' | 'steal' | 'dress' | 'atm' | 'weapons' | 'vest' | 'tank' | 'heli' | 'armycar'
 export interface Spot { x: number; z: number; r: number; kind: SpotKind; label: string }
 export interface Poi {
   id: string; kind: PoiKind; name: string; b: Bld
@@ -15,8 +15,8 @@ export interface Poi {
   /** Bett-Plätze (Aufwachen nach dem Tod): Standort neben dem Bett und Blickrichtung */
   beds?: Array<{ x: number; z: number; h: number }>
 }
-export const POI_COLOR: Record<PoiKind, string> = { bank: '#facc15', shop: '#22d3ee', gym: '#f472b6', hospital: '#ef4444', police: '#3b82f6', weapons: '#f97316' }
-export const POI_LETTER: Record<PoiKind, string> = { bank: 'B', shop: 'S', gym: 'F', hospital: '+', police: 'P', weapons: 'W' }
+export const POI_COLOR: Record<PoiKind, string> = { bank: '#facc15', shop: '#22d3ee', gym: '#f472b6', hospital: '#ef4444', police: '#3b82f6', weapons: '#f97316', army: '#65a30d' }
+export const POI_LETTER: Record<PoiKind, string> = { bank: 'B', shop: 'S', gym: 'F', hospital: '+', police: 'P', weapons: 'W', army: 'A' }
 /** Reichweite um die Tür (Karte, Leuchtsäule) */
 export const POI_RANGE = 7
 
@@ -40,6 +40,7 @@ export function pois(): Poi[] {
   { const b = c.buildings.find((q) => q.kind === 'bank'); if (b) out.push(furnish({ id: 'bank0', kind: 'bank', name: 'Bank', b, x: 0, z: 0, nx: 0, nz: 0, solids: [], spots: [] })) }
   { const b = c.buildings.find((q) => q.kind === 'hospital'); if (b) out.push(furnish({ id: 'hospital0', kind: 'hospital', name: 'Krankenhaus', b, x: 0, z: 0, nx: 0, nz: 0, solids: [], spots: [] })) }
   { const b = c.buildings.find((q) => q.kind === 'police'); if (b) out.push(furnish({ id: 'police0', kind: 'police', name: 'Polizeiwache', b, x: 0, z: 0, nx: 0, nz: 0, solids: [], spots: [] })) }
+  { const b = c.buildings.find((q) => q.kind === 'army'); if (b) out.push(furnish({ id: 'army0', kind: 'army', name: 'Armee-Gelände', b, x: 0, z: 0, nx: 0, nz: 0, solids: [], spots: [] })) }
   take('shop', 'Shop', 4, 260, (b) => hash(b))
   take('gym', 'Fitnessstudio', 2, 300, (b) => hash(b, 1) + 1)
   take('weapons', 'Waffenladen', 1, 260, (b) => hash(b, 2) + 2)
@@ -116,6 +117,13 @@ function furnish(p: Poi): Poi {
     // Ankleidezimmer: Spinde an der Südwand, hier wird man Polizist (Dienst an/aus)
     for (let i = 0; i < 5; i++) solids.push(rect(W - 15 + i * 2.6, W - 13 + i * 2.6, -D + 0.6, -D + 1.8, 2.3, i % 2 ? 0x1e40af : 0x1d4ed8), rect(W - 14.6 + i * 2.6, W - 13.4 + i * 2.6, -D + 1.8, -D + 1.9, 0.3, 0xe5e7eb, { y0: 1.6, deco: true }))
     spot(W - 8, -D + 4.4, 3.2, 'dress', 'Ankleidezimmer: Polizei-Dienst')
+  } else if (p.kind === 'army') {
+    // Kaserne: Waffenregale, Westenständer (Spot), Kartentisch; draußen im Gelände die Fahrzeuge zum Klauen
+    for (let i = 0; i < 4; i++) solids.push(rect(-W + 3 + i * 5, -W + 5.5 + i * 5, D - 1.6, D - 0.6, 2.2, 0x374151), rect(-W + 3.2 + i * 5, -W + 5.3 + i * 5, D - 1.7, D - 1.6, 0.12, 0x111827, { y0: 1.2, deco: true }))
+    for (let i = 0; i < 3; i++) solids.push(rect(W - 12 + i * 3.2, W - 10.6 + i * 3.2, -D + 2, -D + 3.2, 1.7, 0x3f4a2f), rect(W - 11.8 + i * 3.2, W - 10.8 + i * 3.2, -D + 3.2, -D + 3.3, 0.5, 0x1f2937, { y0: 0.9, deco: true }))
+    spot(W - 8, -D + 5.4, 3.0, 'vest', 'Schutzweste nehmen')
+    solids.push(rect(-W + 10, -W + 16, -2, 2, 0.9, 0x78350f), rect(-W + 10.3, -W + 15.7, -1.7, 1.7, 0.05, 0xd1d5db, { y0: 0.9, deco: true }))
+    for (const v of ARMY.vehicles) spots.push({ x: v.x, z: v.z, r: v.kind === 'heli' ? 6 : 5, kind: v.kind, label: v.kind === 'tank' ? 'Panzer klauen' : v.kind === 'heli' ? 'Hubschrauber klauen' : 'Waffenauto klauen' })
   } else if (p.kind === 'weapons') {
     // Verkaufstresen mit Glasvitrine, Wandregale (Pistolen, Schlagstöcke), Puppen mit Weste und Helm, Probierzone
     solids.push(rect(-W + 12, W - 10, D - 9, D - 7.8, 1.1, 0x1f2937), rect(-W + 12, W - 10, D - 9, D - 7.8, 0.12, 0xf97316, { y0: 1.1, deco: true }), rect(-W + 12.2, W - 10.2, D - 8.8, D - 8.0, 0.5, 0x93c5fd, { y0: 1.25, deco: true }))

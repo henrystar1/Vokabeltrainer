@@ -971,3 +971,17 @@ Tabelle `book_library_hidden`; `in_library` blendet ein veröffentlichtes Buch d
 - **Polizei-Taktik**: SWAT-Männer in 2 Gruppen (vorrücken / Feuerschutz im Wechsel, eigener Winkel um das Ziel), Pistole hebt beim Schuss den Arm; Fuß-Polizisten teilen sich in Deckungsschützen (12 m, schießen) und Nahkämpfer (umkreisen).
 - **Streifenwagen** (`patrols`, `tickPatrols`): 4 Wagen fahren lokal durch die Straßen (nicht synchronisiert); Rammen → `ramPatrol` startet eine Jagd.
 - SQL `0116_race_gear_atm.sql`. Nicht im Browser getestet. Hubschrauber folgen in Update 145.
+
+## Update 145
+- **Fahndungsstufe (Sterne 0–5)** in RaceView (`stars`, `setStars`, `addStar`, `tickStars`, `startWanted`): Jagdstart gibt 1 Stern (SWAT-Auto klauen 2), jede weitere Tat +1 (Polizist/SWAT-Mann ausgeschaltet, Polizeiauto hart gerammt, Passanten getötet bis 2 Sterne), 3 Sterne rufen SWAT, 5 doppelt. Pro 60 s ohne neue Tat verschwindet ein Stern, Tod (`startRescue`) löscht alle. Mindestabstand 3,5 s zwischen Sternen. HUD oben mittig.
+- **Passanten** (`peds`, `tickPeds`, `spawnPed`, `killPed`, `punchPed`): bis 16 Läufer auf den Gehwegen um den Spieler (nur lokal, nicht synchronisiert); sterben beim Überfahren, per Schlag, Pistole oder Geschütz; wer geschlagen wird kämpft zurück (5 Schaden über `pedHurt` im Fuß-Tick) oder flieht. 2 getötete Passanten → Zeugen rufen die Polizei (`startWanted('ped')`).
+- Geplant: 146 Hubschrauber, 147 Armee-Gelände. Nicht im Browser getestet.
+
+## Update 146 (Armee, Hubschrauber, Panzer, Rettungshubschrauber)
+- **Fahrzeuge**: `stats.ts` kennt `tank`, `heli`, `armycar` (`isArmored`: swat/tank/heli); Modelle in `armyMesh.ts` (`makeArmyModel`, von `scene.ts buildCar` benutzt; Rotor dreht in `place`). Der Hubschrauber hat eigene Flugphysik `heli.ts` (`stepHeli`: W/S vor/zurück, A/D/Pfeile drehen, E hoch, R runter, bleibt über Dächern).
+- **Armee-Gelände** am Nordrand (city.ts `ARMY` bei 420/660): Zaun 2,6 m (überkletterbar) mit Tor im Süden, Wachtürme, Kaserne (Spot `vest` = Schutzweste bis zum Tod), Parkplatz-Decor `armyDecor`. POI `army` mit Spots `tank/heli/armycar` (Fahrzeug klauen per G → `stealArmy`: Waffenauto 2, Panzer 3, Hubschrauber 4 Sterne; Fahrzeug kommt nach 120 s wieder).
+- **Wachen** (`soldiers`, `tickSoldiers`): 6 Soldaten patrouillieren und schießen nur, was sie sehen (Blickkegel + `clearLine`); sie sind per Schlag, Pistole, Geschütz ausschaltbar (+Stern).
+- **Armee-Angriff** (`armyWave`, `mkArmy`, `heliAI`, `tankFire`): ab 3 Sternen 2 Kampfhubschrauber + 3 Panzer, jeder weitere Stern +1/+1 (nur beim Jagd-Besitzer). Hubschrauber umkreisen in 28 m und schießen von oben, Panzer feuern aufs Ziel. Schüsse mit `a:1` verletzen Panzer/Heli-Fahrer; Rammen und Polizei nicht (`hurtByShot(d, onFoot, army)`).
+- **Steuerung Panzer/Heli**: Geschütz über `fireGun('swat')` (Panzer 320 m, Heli 260 m, Q = geradeaus, Tippen = Zielpunkt), Wischen/Ziehen dreht (`onPtrRot`), Panzer dreht auf der Stelle.
+- **Rettungshubschrauber** (`mkMedHeli`, `heliTo`, `holdCar`): stirbt man mehr als 260 m vom Krankenhaus entfernt, fliegt ein Heli zur Leiche, landet, die Sanitäter tragen wie beim Krankenwagen und er fliegt zum Krankenhaus zurück. Außerdem wird das Rettungsauto jetzt lokal sichtbar platziert (`place` für `rescue.amb`).
+- Offen: Polizeihubschrauber (mit SWAT), Armee-Fahrzeuge werden nur beim Jagd-Besitzer simuliert, Passanten/Wachen/Streifenwagen nur lokal. Nichts im Browser getestet.
