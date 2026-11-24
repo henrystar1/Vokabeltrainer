@@ -14,6 +14,7 @@ import Showroom from '../features/cars/Showroom'
 import { getPick, setPick as setPickLocal } from '../features/cars/carPrefs'
 import { useRaceCars } from '../features/cars/race/useRaceCars'
 import { Link } from 'react-router-dom'
+import LangToggle from '../features/cars/LangToggle'
 import { carBuy, carList } from '../services/cars'
 import { canFly, carKmh } from '../features/cars/stats'
 import { upFactors } from '../features/cars/tuning'
@@ -55,6 +56,7 @@ export default function Cars() {
   return (
     <div className="space-y-5">
       <PageHeader eyebrow="Kaufe Autos mit deinen Coins und sammle sie in deiner Garage" title="Autohaus" />
+      <div className="flex justify-end"><LangToggle /></div>
       {list.error && <ErrorBox message={list.error} onRetry={list.reload} />}
       {list.loading && !list.data && <Spinner />}
       <div className="flex gap-2" role="tablist" aria-label="Bereich">

@@ -65,6 +65,7 @@ import { stepHeli } from './heli'
 import { addGear, gearFromList, gearMask, NO_GEAR, type GearSet } from './gear'
 import { streetRoute } from './route'
 import { shotBlocked, shotWallT } from './shoot'
+import { suitReady } from './ironSuit'
 import { armUp } from './gunMesh'
 import { HP_MAX, footConfig, groundAt, hpCfg, carHit, exitFromCar, nearestCar, newWalker, stepWalker, type Walker } from './foot'
 import { stepIron } from './ironman'
@@ -76,6 +77,7 @@ import { racePerkInfo, raceBankClaim, raceBankPay, raceBankStatus, type RacePerk
 import { useAuthOptional } from '../../auth/AuthProvider'
 import { usePlusOptional } from '../../plus/PlusProvider'
 import { cityPush } from './city'
+import LangToggle from '../LangToggle'
 import { errorMessage } from '../../../lib/errors'
 import { hillH as hillHeight } from './mountains'
 
@@ -679,14 +681,14 @@ export default function RaceView({ trackId, custom, laps, me, assistOk = false, 
       }
       /** Fahndungsstufe (Sterne 0–5): Taten geben Sterne; ein Stern verschwindet nach 60 s ohne neue Tat, der Tod löscht alle */
       let stars = 0, starAt = 0, starCd = 0
-      const setStars = (n: number) => { n = Math.max(0, Math.min(5, n)); if (n === stars) return; stars = n; starAt = performance.now(); setStarsUi(n) }
+      const setStars = (n: number) => { n = Math.max(0, Math.min(7, n)); if (n === stars) return; stars = n; starAt = performance.now(); setStarsUi(n) }
       const addStar = (n = 1) => {
         const nowT = performance.now()
         if (nowT < starCd) return
         starCd = nowT + 3500
         setStars(stars + n); say(`Fahndungsstufe: ${'★'.repeat(stars)}`)
         if (stars >= 2 && (!chase || chase.over || myRole === 'cop')) startWanted('crime', 'Die Polizei jagt dich – 6 Minuten durchhalten!')
-        if (chase && !chase.over && myRole === 'bandit') { if (stars >= 3) callSwat(); if (stars >= 5) callSwat(); armyWave() }
+        if (chase && !chase.over && myRole === 'bandit') { if (stars >= 3) callSwat(); if (stars >= 5) callSwat(); armyWave(); ironWave() }
       }
       /** Wen habe ich zuletzt getroffen? Geht er innerhalb von 8 s zu Boden, zählt das als Mord */
       const lastHit = { id: '', t: 0 }
@@ -876,6 +878,58 @@ export default function RaceView({ trackId, custom, laps, me, assistOk = false, 
         return { id: `pb-${(online?.userId ?? 'x').slice(0, 6)}-a${kind[0]}${i}`, name, kind, color: '#4d5d3a', car: { ...startCar(track, 0), x: pos.x, z: pos.z, h: pos.h, v: 0, y: kind === 'heli' ? 1 : 0 }, st: statsFor(kind, kind === 'tank' ? 70 : 250), mem: { stuck: 0 }, mesh }
       }
       /** 4 Sterne: 2 Hubschrauber + 3 Panzer; jeder weitere Stern +1 Hubschrauber und +1 Panzer */
+      /** Feindliche Iron Mans (ab 6 Sternen): fliegen um dich, feuern Lenkraketen, die sogar Panzer zerstören */
+      type IronBot = { m: import('three').Group; x: number; y: number; z: number; h: number; cd: number; hits: number; dead: number; ph: number }
+      const ironBots: IronBot[] = []
+      let ironReq = { id: '', n: 0 }
+      const mkIronBot = () => {
+        const me = foot ?? car, a = Math.random() * Math.PI * 2
+        const m = rs.makeWalker('#1f2937', '#111827'); addGear(THREE, m, 64); scene.add(m)
+        ironBots.push({ m, x: me.x + Math.sin(a) * 150, y: 45, z: me.z + Math.cos(a) * 150, h: 0, cd: 2.5 + Math.random() * 2, hits: 0, dead: 0, ph: Math.random() * 6 })
+      }
+      const ironWave = () => {
+        const c = chase
+        if (!c || c.over || c.from !== online?.userId || stars < 6) return
+        if (ironReq.id !== c.id) ironReq = { id: c.id, n: 0 }
+        const want = 2 + (stars - 6), announce = ironReq.n === 0
+        for (let k = 0; ironReq.n < want; ironReq.n++, k++) window.setTimeout(() => { if (!dead && chase === c && !c.over) mkIronBot() }, 2500 + 1800 * k)
+        if (announce) say('Zwei Iron Mans greifen an – ihre Raketen zerstören sogar Panzer!')
+      }
+      const killIronBot = (ib: IronBot) => {
+        if (ib.dead > 0) return
+        ib.dead = 3; blastAt(ib.x, ib.y + 1, ib.z); say('Ein Iron Man ist abgestürzt!')
+      }
+      const dropIronBot = (ib: IronBot) => { scene.remove(ib.m); ironBots.splice(ironBots.indexOf(ib), 1) }
+      const tickIronBots = (dt: number) => {
+        if (ironBots.length && (!chase || chase.over || stars < 6)) { for (const ib of [...ironBots]) dropIronBot(ib); ironReq = { id: '', n: 0 } }
+        const me = foot ?? car, my = foot ? foot.y : (car.y ?? 0)
+        for (const ib of [...ironBots]) {
+          ib.ph += dt
+          if (ib.dead > 0) {
+            ib.dead -= dt; ib.y -= 22 * dt; ib.m.rotation.x += dt * 3; ib.m.rotation.z += dt * 2
+            fx.emit('fire', ib.x, ib.y + 1, ib.z, 0, 1, 0, 0.5)
+            if (ib.y <= 0 || ib.dead <= 0) { blastAt(ib.x, Math.max(ib.y, 0.5) + 1, ib.z); dropIronBot(ib); continue }
+          } else {
+            const dx = me.x - ib.x, dz = me.z - ib.z, d = Math.hypot(dx, dz) || 1
+            ib.h = Math.atan2(dx, dz)
+            const want = d > 30 ? 1 : d < 18 ? -0.5 : 0, side = Math.sin(ib.ph * 0.7) * 10
+            ib.x += (dx / d * want * 34 + dz / d * side) * dt; ib.z += (dz / d * want * 34 - dx / d * side) * dt
+            const wy = Math.max(my + 14 + Math.sin(ib.ph) * 3, roofH(ib.x, ib.z) + 6)
+            ib.y += Math.max(-12, Math.min(12, wy - ib.y)) * dt * 1.5
+            ib.cd -= dt
+            if (ib.cd <= 0 && d < 300) {
+              ib.cd = 3.6 + Math.random() * 1.6
+              launchRocket(ib.x + Math.sin(ib.h) * 0.7, ib.y + 1.2, ib.z + Math.cos(ib.h) * 0.7, me.x - ib.x, my + 1 - (ib.y + 1.2), me.z - ib.z, false, () => { const m2 = foot ?? car; return { x: m2.x, y: (foot ? foot.y : (car.y ?? 0)) + 1, z: m2.z } }, 48, 1.5, true)
+            }
+            fx.emit('fire', ib.x, ib.y + 0.05, ib.z, (Math.random() - 0.5) * 2, -7, (Math.random() - 0.5) * 2, 0.3)
+            ib.m.rotation.set(0, ib.h, 0)
+          }
+          ib.m.position.set(ib.x, ib.y, ib.z)
+          poseWalker(ib.m, ib.ph * 2, 0, 0, false)
+          ib.m.children[0].rotation.x = ib.dead > 0 ? ib.m.children[0].rotation.x : -0.25
+        }
+      }
+      cleanups.push(() => { for (const ib of ironBots) scene.remove(ib.m) })
       const armyWave = () => {
         const c = chase
         if (!c || c.over || c.from !== online?.userId || stars < 4) return
@@ -1434,8 +1488,15 @@ export default function RaceView({ trackId, custom, laps, me, assistOk = false, 
           return
         }
         const m = inp.current
-        if (ironOn && (w.lvl ?? 0) === 0 && adminRef.current) w = stepIron(w, { fwd: m.gas || joyRef.current.y > 0.3, back: (m.brake && !m.jump) || joyRef.current.y < -0.3, left: m.left, right: m.right, turn: joyTurnCurve(joyRef.current.x) * joyTurnRef.current * 2, up: m.fly || m.jump, down: heliDown.current, boost: runRef.current }, dt, (x, z, y) => groundAt(x, z, y, 0), roofH)
+        const suitBusy = ironOn && !suitReady(footMesh)
+        if (suitBusy) w = stepWalker(w, { fwd: false, back: false, left: false, right: false, run: false }, dt)
+        else if (ironOn && (w.lvl ?? 0) === 0 && adminRef.current) w = stepIron(w, { fwd: m.gas || joyRef.current.y > 0.3, back: (m.brake && !m.jump) || joyRef.current.y < -0.3, left: m.left, right: m.right, turn: joyTurnCurve(joyRef.current.x) * joyTurnRef.current * 2, up: m.fly || m.jump, down: heliDown.current, boost: runRef.current }, dt, (x, z, y) => groundAt(x, z, y, 0), roofH)
         else w = stepWalker(w, { fwd: m.gas || joyRef.current.y > 0.3, back: (m.brake && !m.jump) || joyRef.current.y < -0.3, left: m.left, right: m.right, turn: joyTurnCurve(joyRef.current.x) * joyTurnRef.current * 2, run: m.fly || runRef.current || joyRef.current.y > 0.85, jump: m.jump }, dt)
+        if (ironOn) {
+          w = { ...w, hp: hpCfg.max }
+          const gy = groundAt(w.x, w.z, w.y, 0)
+          if (!suitBusy && w.y > gy + 0.6) for (let i = 0; i < 2; i++) fx.emit('fire', w.x + (Math.random() - 0.5) * 0.4, w.y + 0.05, w.z + (Math.random() - 0.5) * 0.4, (Math.random() - 0.5) * 2, -7 - Math.random() * 3, (Math.random() - 0.5) * 2, 0.35)
+        }
         const hitBy = (cx: number, cz: number, ch: number, cv: number, len: number, wid: number, cy: number) => {
           const r = carHit(w!, { x: cx, z: cz, h: ch, v: cv, len, wid, y: cy })
           if (r) { w = r; lastRegenHit = nowT }
@@ -1495,6 +1556,7 @@ export default function RaceView({ trackId, custom, laps, me, assistOk = false, 
         tickStars(performance.now())
         tickSoldiers(dt)
         tickRockets(dt)
+        tickIronBots(dt)
         tickArmyBase(performance.now())
         tickTracers(dt)
         tickDuty(performance.now())
@@ -1515,7 +1577,6 @@ export default function RaceView({ trackId, custom, laps, me, assistOk = false, 
       }
       const tickTracers = (dt: number) => { for (let i = tracers.length - 1; i >= 0; i--) { const t = tracers[i]; t.t -= dt; if (t.t <= 0) { scene.remove(t.m); t.m.geometry.dispose(); tracers.splice(i, 1) } } }
       cleanups.push(() => { for (const t of tracers) scene.remove(t.m) })
-      const centreRay = () => { const rc = new THREE.Raycaster(); rc.setFromCamera(new THREE.Vector2(0, 0), camera); return rc.ray }
       /** Armee-Hubschrauber abgeschossen / Panzer zerstört */
       const wreckBot = (pb: PBot) => {
         if (!pbots.includes(pb)) return
@@ -1527,16 +1588,16 @@ export default function RaceView({ trackId, custom, laps, me, assistOk = false, 
         say(pb.kind === 'heli' ? 'Kampfhubschrauber abgeschossen!' : 'Panzer zerstört!')
       }
       /** Raketen: Lenkraketen des Armee-Helis (ich) und Panzerfäuste der Soldaten */
-      type Rocket = { m: import('three').Mesh; x: number; y: number; z: number; dx: number; dy: number; dz: number; t: number; mine: boolean; home: (() => { x: number; y: number; z: number } | null) | null; sp: number; turn: number }
+      type Rocket = { m: import('three').Mesh; x: number; y: number; z: number; dx: number; dy: number; dz: number; t: number; mine: boolean; home: (() => { x: number; y: number; z: number } | null) | null; sp: number; turn: number; mega?: boolean }
       const rockets: Rocket[] = []
       const rkMat = new THREE.MeshBasicMaterial({ color: 0xf1f5f9 }), rkGeo = new THREE.CylinderGeometry(0.13, 0.13, 1.6, 8)
-      const launchRocket = (x: number, y: number, z: number, dx: number, dy: number, dz: number, mine: boolean, home: Rocket['home'], sp = 64, turn = 3.2) => {
+      const launchRocket = (x: number, y: number, z: number, dx: number, dy: number, dz: number, mine: boolean, home: Rocket['home'], sp = 64, turn = 3.2, mega = false) => {
         const m = new THREE.Mesh(rkGeo, rkMat); m.position.set(x, y, z); scene.add(m)
         const l = Math.hypot(dx, dy, dz) || 1
-        rockets.push({ m, x, y, z, dx: dx / l, dy: dy / l, dz: dz / l, t: 0, mine, home, sp, turn })
+        rockets.push({ m, x, y, z, dx: dx / l, dy: dy / l, dz: dz / l, t: 0, mine, home, sp, turn, mega })
       }
-      const rocketHitMe = () => { hurtByShot(eff.kind === 'tank' && !foot ? 55 : 999, !!foot, true, true) }
-      const rocketBlast = (x: number, y: number, z: number, mine: boolean) => {
+      const rocketHitMe = (mega = false) => { hurtByShot(eff.kind === 'tank' && !foot && !mega ? 55 : 9999, !!foot, true, true) }
+      const rocketBlast = (x: number, y: number, z: number, mine: boolean, mega = false) => {
         blastAt(x, y, z)
         const near = (px: number, py: number, pz: number, r = 7) => Math.hypot(px - x, py - y, pz - z) < r
         for (const q of soldiers) if (q.dead <= 0 && near(q.w.x, q.w.y + 0.9, q.w.z)) killSoldier(q)
@@ -1547,9 +1608,10 @@ export default function RaceView({ trackId, custom, laps, me, assistOk = false, 
           for (const mn of pb.men ?? []) if (near(mn.w.x, mn.w.y + 0.9, mn.w.z)) { killMan(pb, mn); if (mine) addStar(1) }
         }
         for (const pk of [...parked]) if (near(pk.car.x, (pk.car.y ?? 0) + 1, pk.car.z, 8)) blowParked(pk)
+        if (mine) for (const ib of [...ironBots]) if (ib.dead <= 0 && near(ib.x, ib.y + 1, ib.z, 8)) killIronBot(ib)
         for (const b of botList) if (near(b.car.x, (b.car.y ?? 0) + 1, b.car.z, 8)) b.car = { ...b.car, dmg: DMG_MAX }
         if (mine) for (const r of remotes.values()) { if (r.rd || r.id.startsWith('pb-') || r.id === online?.userId) continue; if (near(r.x, (r.yy ?? 0) + 1, r.z, 8) && ready) void (markHit(r.id), ch)?.send({ type: 'broadcast', event: 'rk', payload: { to: r.id } }).catch(() => undefined) }
-        else { const me = foot ?? car; if (near(me.x, (foot ? foot.y : (car.y ?? 0)) + 1, me.z, 6)) rocketHitMe() }
+        else { const me = foot ?? car; if (near(me.x, (foot ? foot.y : (car.y ?? 0)) + 1, me.z, 6)) rocketHitMe(mega) }
       }
       const tickRockets = (dt: number) => {
         for (let i = rockets.length - 1; i >= 0; i--) {
@@ -1567,24 +1629,22 @@ export default function RaceView({ trackId, custom, laps, me, assistOk = false, 
           r.x = nx; r.y = ny; r.z = nz
           r.m.position.set(nx, ny, nz); r.m.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), new THREE.Vector3(r.dx, r.dy, r.dz))
           fx.emit('smoke', nx - r.dx * 1.2, ny - r.dy * 1.2, nz - r.dz * 1.2, 0, 0.6, 0, 0.9)
-          if (boom) { scene.remove(r.m); rockets.splice(i, 1); rocketBlast(nx, ny, nz, r.mine) }
+          if (boom) { scene.remove(r.m); rockets.splice(i, 1); rocketBlast(nx, ny, nz, r.mine, r.mega) }
         }
       }
       cleanups.push(() => { for (const r of rockets) scene.remove(r.m) })
       let lastRocket = 0
       /** Lenkrakete des Armee-Helis: sucht das Ziel, das am besten vor dem Heli liegt (±30°, bis 520 m) */
-      const fireRocket = () => {
-        if (foot || ride || eff.kind !== 'heli' || eff.color === '#f8fafc') return
-        const nowT = performance.now()
-        if (nowT - lastRocket < 3500) { say('Raketen laden nach …'); return }
-        type C = { x: number; y: number; z: number }
-        const pick: { get: (() => C | null) | null; sc: number } = { get: null, sc: 1e9 }
-        const consider = (get: () => C | null) => {
+      type RC = { x: number; y: number; z: number }
+      /** Bestes Ziel vor (px, pz) in Blickrichtung h (±cone, bis 520 m): Getter, der die aktuelle Position liefert */
+      const pickRocketTarget = (px: number, pz: number, h: number, cone: number): (() => RC | null) | null => {
+        const pick: { get: (() => RC | null) | null; sc: number } = { get: null, sc: 1e9 }
+        const consider = (get: () => RC | null) => {
           const p = get(); if (!p) return
-          const dx = p.x - car.x, dz = p.z - car.z, d = Math.hypot(dx, dz)
-          if (d < 12 || d > 520) return
-          let da = Math.atan2(dx, dz) - car.h; while (da > Math.PI) da -= Math.PI * 2; while (da < -Math.PI) da += Math.PI * 2
-          if (Math.abs(da) > 0.55) return
+          const dx = p.x - px, dz = p.z - pz, d = Math.hypot(dx, dz)
+          if (d < 8 || d > 520) return
+          let da = Math.atan2(dx, dz) - h; while (da > Math.PI) da -= Math.PI * 2; while (da < -Math.PI) da += Math.PI * 2
+          if (Math.abs(da) > cone) return
           const sc = d * (1 + Math.abs(da) * 3)
           if (sc < pick.sc) { pick.sc = sc; pick.get = get }
         }
@@ -1597,12 +1657,34 @@ export default function RaceView({ trackId, custom, laps, me, assistOk = false, 
         for (const q of soldiers) consider(() => q.dead <= 0 ? { x: q.w.x, y: q.w.y + 1, z: q.w.z } : null)
         for (const pd of peds) consider(() => pd.st !== 'dead' ? { x: pd.w.x, y: pd.w.y + 1, z: pd.w.z } : null)
         for (const pk of parked) consider(() => parked.includes(pk) ? { x: pk.car.x, y: (pk.car.y ?? 0) + 1, z: pk.car.z } : null)
+        for (const ib of ironBots) consider(() => ib.dead <= 0 ? { x: ib.x, y: ib.y + 1, z: ib.z } : null)
+        return pick.get
+      }
+      const fireRocket = () => {
+        if (foot || ride || eff.kind !== 'heli' || eff.color === '#f8fafc') return
+        const nowT = performance.now()
+        if (nowT - lastRocket < 3500) { say('Raketen laden nach …'); return }
+        const tg = pickRocketTarget(car.x, car.z, car.h, 0.55)
         lastRocket = nowT
-        launchRocket(car.x + Math.sin(car.h) * 3, (car.y ?? 0) + 0.6, car.z + Math.cos(car.h) * 3, Math.sin(car.h), -0.14, Math.cos(car.h), true, pick.get, 72, 3.6)
-        say(pick.get ? 'Lenkrakete gestartet!' : 'Rakete ohne Ziel gestartet.')
+        launchRocket(car.x + Math.sin(car.h) * 3, (car.y ?? 0) + 0.6, car.z + Math.cos(car.h) * 3, Math.sin(car.h), -0.14, Math.cos(car.h), true, tg, 72, 3.6)
+        say(tg ? 'Lenkrakete gestartet!' : 'Rakete ohne Ziel gestartet.')
+      }
+      /** Iron Man: Lenkrakete aus der Handfläche, ohne Wartezeit; Q zielt aufs nächste Ziel vor mir, Tippen in die Zielrichtung des Fingers */
+      let lastIronRk = 0
+      const fireIronRocket = (auto: boolean) => {
+        if (!foot || !ironOn) return
+        const nowT = performance.now(); if (nowT - lastIronRk < 90) return
+        lastIronRk = nowT
+        let h = foot.h
+        const ray = auto ? null : aimRay()
+        if (ray) h = Math.atan2(ray.direction.x, ray.direction.z)
+        const tg = pickRocketTarget(foot.x, foot.z, h, auto ? 0.95 : 0.45)
+        const o = foot.y + 1.2
+        launchRocket(foot.x + Math.sin(h) * 0.7, o, foot.z + Math.cos(h) * 0.7, Math.sin(h), ray ? Math.max(-0.5, Math.min(0.4, ray.direction.y)) : 0.02, Math.cos(h), true, tg, 82, 4.4)
       }
       rocketRef.current = fireRocket
       function hurtByShot(d: number, onFootHit: boolean, army = false, rocket = false) {
+        if (ironOn && foot) return // Iron-Man-Anzug: kein Schaden
         if (foot) {
           if (footKo > 0 || foot.inv > 0.2) return
           foot = { ...foot, hp: Math.max(0, foot.hp - d * hpCfg.armor), stun: Math.max(foot.stun, 0.12), vx: foot.vx + (Math.random() - 0.5) * 2, vz: foot.vz + (Math.random() - 0.5) * 2 }
@@ -1653,6 +1735,7 @@ export default function RaceView({ trackId, custom, laps, me, assistOk = false, 
       /** SWAT-Geschütz (jeder im SWAT-Wagen, 400 m, auch nach oben/unten) und Pistole zu Fuß (150 m). Zielt dorthin, wo man auf den Bildschirm tippt – inkl. Höhe. */
       const fireGun = (gun: 'swat' | 'pistol', straight = false, auto = false) => {
         if (gun === 'swat' ? (!gunCar() || foot || ride) : !pistolArmed()) return
+        if (gun === 'pistol' && ironOn) { if (suitReady(footMesh)) fireIronRocket(auto); return }
         const nowT = performance.now()
         if (nowT - lastShot < (gun === 'pistol' ? (curGun() === 'rifle' ? 110 : curGun() === 'sniper' ? 1100 : 450) : eff.kind === 'heli' ? 170 : eff.kind === 'tank' ? 800 : 330)) return
         lastShot = nowT
@@ -1690,10 +1773,30 @@ export default function RaceView({ trackId, custom, laps, me, assistOk = false, 
             if (n >= 7) blowParked(pk); else fx.emit('smoke', pk.car.x, (pk.car.y ?? 0) + 1.2, pk.car.z, 0, 2, 0, 0.8)
           } })
         }
+        for (const ib of ironBots) if (ib.dead <= 0) tgs.push({ x: ib.x, y: ib.y + 1, z: ib.z, r: 1.3, apply: () => {
+          ib.hits += gun === 'swat' ? 4 : curGun() === 'sniper' ? 6 : curGun() === 'rifle' ? 2 : 1
+          if (ib.hits >= 24) killIronBot(ib); else fx.emit('smoke', ib.x, ib.y + 1, ib.z, 0, 1, 0, 0.4)
+        } })
         for (const q of soldiers) if (q.dead <= 0) tgs.push({ x: q.w.x, y: q.w.y + 0.9, z: q.w.z, r: 0.9, apply: () => hits(q, 3, () => killSoldier(q)) })
         for (const pd of peds) if (pd.st !== 'dead') tgs.push({ x: pd.w.x, y: pd.w.y + 0.9, z: pd.w.z, r: 0.9, apply: () => hits(pd, 2, () => killPed(pd)) })
         let dx = Math.sin(hd), dy = 0, dz = Math.cos(hd)
-        const ray = straight ? null : auto ? centreRay() : aimRay()
+        if (auto) {
+          // Q: nächste Person vor mir (±55°), sonst nächstes Ziel; unmittelbar auf sie zielen
+          let pk: Tg | null = null, pd = 1e9
+          for (const pass of [0, 1]) {
+            for (const t of tgs) {
+              if (pass === 0 && t.r >= 1) continue
+              const vx = t.x - ox, vz = t.z - oz, dd = Math.hypot(vx, vz)
+              if (dd < 1.5 || dd > RANGE) continue
+              let da = Math.atan2(vx, vz) - hd; while (da > Math.PI) da -= Math.PI * 2; while (da < -Math.PI) da += Math.PI * 2
+              if (Math.abs(da) > 0.95 || shotBlocked(ox, oy, oz, t.x, t.y, t.z)) continue
+              if (dd < pd) { pd = dd; pk = t }
+            }
+            if (pk) break
+          }
+          if (pk) { const l = Math.hypot(pk.x - ox, pk.y - oy, pk.z - oz) || 1; dx = (pk.x - ox) / l; dy = (pk.y - oy) / l; dz = (pk.z - oz) / l }
+        }
+        const ray = straight || auto ? null : aimRay()
         if (ray) {
           const ro = ray.origin, rd = ray.direction
           let pick: Tg | null = null, pa = 1e9
@@ -2577,6 +2680,7 @@ export default function RaceView({ trackId, custom, laps, me, assistOk = false, 
         </div>
       )}
       {def.mode === 'city' && <button type="button" onClick={() => egoRef.current()} className={`absolute left-3 top-40 z-20 min-h-[40px] rounded-xl border border-white/40 px-3 text-xs font-bold ${egoUi ? 'bg-sky-600 text-white' : 'bg-slate-800/80 text-white'}`}>{egoUi ? 'Ego: AN (V)' : 'Ego (V)'}</button>}
+      <LangToggle className="absolute left-3 top-52 z-20" />
       {isAdmin && def.mode === 'city' && (
         <button type="button" onClick={() => ironRef.current()} className={`absolute left-3 top-28 z-20 min-h-[40px] rounded-xl border border-white/40 px-3 text-xs font-bold ${ironUi ? 'bg-red-600 text-amber-200' : 'bg-slate-800/80 text-white'}`}>{ironUi ? 'Iron Man: AN (I)' : 'Iron Man (I)'}</button>
       )}

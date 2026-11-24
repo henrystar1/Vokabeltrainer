@@ -1017,3 +1017,9 @@ Tabelle `book_library_hidden`; `in_library` blendet ein veröffentlichtes Buch d
 - Touch: RUNTER-Button im Heli (und Iron Man), RAKETE-Button.
 - Kaserne: Schlüsselbrett-Spots (Panzer/Heli/Waffenauto) holen das nächste freie Fahrzeug im Hof.
 - Nicht im Browser getestet.
+
+## Update 150
+- Q-Auto-Aim zielt auf die nächste Person im Blickfeld (±55°) statt blind geradeaus.
+- `race/ironSuit.ts`: Iron-Man-Rüstung (rot/gold) mit Anlege-Animation (`SUIT_MS`, `tickSuit`, `suitReady`); Gear-Bit 64. Iron Man ist unverwundbar und schießt Lenkraketen ohne Cooldown.
+- Sterne bis 7; ab 6 Sternen greifen 2 feindliche Iron Men an (`ironBots`, `ironWave`), ihre Mega-Raketen zerstören auch Panzer.
+- `cars/fr.ts`: Französisch per Wörterbuch (`FR`) + Muster (`PATTERNS`) und MutationObserver-DOM-Übersetzer (Texte, aria-label, title, placeholder), Wahl in localStorage `vt-race-lang`; `LangToggle.tsx` in Cars-Seite und RaceView. Neue deutsche Texte brauchen einen Eintrag in `fr.ts`.

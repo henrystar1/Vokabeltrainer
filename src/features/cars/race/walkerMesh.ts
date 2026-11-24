@@ -1,4 +1,5 @@
 import type * as T from 'three'
+import { tickSuit } from './ironSuit'
 type THREE = typeof import('three')
 
 /** Spielfigur (Blickrichtung +z, Ursprung an den Füßen): Beine, Arme, Rumpf, Kopf – aus einfachen Quadern. */
@@ -25,6 +26,7 @@ export function makeWalkerModel(THREE: THREE, shirt: string, pants = '#1f2937'):
 
 /** Haltung: Laufphase `ph`, Tempo `sp` (m/s); umgeworfen (`stun` > 0) liegt die Figur, in der Luft (`air`) kippt sie nach hinten. */
 export function poseWalker(m: T.Group, ph: number, sp: number, stun: number, air: boolean, punch = 0): void {
+  tickSuit(m)
   const u = m.userData as Record<string, T.Group>
   const sw = Math.sin(ph) * Math.min(1, sp / 3.5) * 0.9
   u.legL.rotation.x = sw; u.legR.rotation.x = -sw

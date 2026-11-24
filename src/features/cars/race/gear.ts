@@ -1,6 +1,7 @@
 import type * as T from 'three'
 import { addBaton } from './swatMan'
 import { makeGunModel } from './gunMesh'
+import { addIronSuit } from './ironSuit'
 
 type THREE = typeof T
 
@@ -38,31 +39,7 @@ export function addGear(THREE: THREE, m: T.Group, mask: number): void {
     visor.position.set(0, 1.78, 0.25)
     inner.add(helm, visor)
   }
-  if (mask & 64 && !(done & 64)) {
-    // Iron-Man-Anzug (Admin): rot-goldene Rüstung, leuchtender Reaktor, Gesichtsplatte, Düsen an Händen und Füßen
-    const red = new THREE.MeshStandardMaterial({ color: 0xb91c1c, roughness: 0.3, metalness: 0.75 })
-    const gold = new THREE.MeshStandardMaterial({ color: 0xfbbf24, roughness: 0.3, metalness: 0.8 })
-    const glow = new THREE.MeshBasicMaterial({ color: 0x7dd3fc })
-    const add = (g: T.BufferGeometry, mt: T.Material, x: number, y: number, z: number) => { const o = new THREE.Mesh(g, mt); o.position.set(x, y, z); inner.add(o); return o }
-    add(new THREE.BoxGeometry(0.56, 0.58, 0.32), red, 0, 1.08, 0)
-    add(new THREE.BoxGeometry(0.34, 0.2, 0.05), gold, 0, 0.84, 0.17)
-    add(new THREE.CylinderGeometry(0.09, 0.09, 0.05, 14), glow, 0, 1.14, 0.18).rotation.x = Math.PI / 2
-    add(new THREE.BoxGeometry(0.54, 0.26, 0.54), red, 0, 1.82, 0)
-    add(new THREE.BoxGeometry(0.38, 0.18, 0.06), gold, 0, 1.8, 0.28)
-    add(new THREE.BoxGeometry(0.1, 0.03, 0.02), glow, -0.1, 1.84, 0.315)
-    add(new THREE.BoxGeometry(0.1, 0.03, 0.02), glow, 0.1, 1.84, 0.315)
-    add(new THREE.BoxGeometry(0.62, 0.14, 0.3), gold, 0, 1.42, 0)
-    add(new THREE.BoxGeometry(0.2, 0.3, 0.22), red, -0.14, 0.34, 0)
-    add(new THREE.BoxGeometry(0.2, 0.3, 0.22), red, 0.14, 0.34, 0)
-    add(new THREE.CylinderGeometry(0.07, 0.07, 0.04, 12), glow, -0.14, 0.04, 0)
-    add(new THREE.CylinderGeometry(0.07, 0.07, 0.04, 12), glow, 0.14, 0.04, 0)
-    for (const k of ['armR', 'armL'] as const) {
-      const a = m.userData[k] as T.Group | undefined
-      if (!a) continue
-      const sleeve = new THREE.Mesh(new THREE.BoxGeometry(0.2, 0.5, 0.2), red); sleeve.position.set(0, -0.3, 0); a.add(sleeve)
-      const palm = new THREE.Mesh(new THREE.CylinderGeometry(0.07, 0.07, 0.04, 12), glow); palm.position.set(0, -0.64, 0); a.add(palm)
-    }
-  }
+  if (mask & 64 && !(done & 64)) addIronSuit(THREE, m)
   if (mask & 4 && !m.userData.bt) addBaton(THREE, m)
   const gunBit = mask & 32 ? 32 : mask & 16 ? 16 : mask & 8 ? 8 : 0
   if (gunBit !== ((m.userData.gunBit as number | undefined) ?? 0)) {
