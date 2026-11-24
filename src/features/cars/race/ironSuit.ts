@@ -65,6 +65,7 @@ export function addIronSuit(THREE: THREE, m: T.Group): void {
   for (const x of [-0.085, 0.085]) { const eye = new THREE.Mesh(B(0.09, 0.03, 0.02), glow); eye.position.set(x, -0.08, 0.035); suit.face.add(eye) }
   const chin = new THREE.Mesh(B(0.12, 0.05, 0.05), red); chin.position.set(0, -0.28, 0.01); suit.face.add(chin)
   suit.face.rotation.x = -1.25
+  if (m.userData.skinned) for (const pc of suit.list) if (pc.g.parent === u.legL || pc.g.parent === u.legR) { pc.home.y *= 0.86; pc.g.scale.y = 0.86 } // Skin-Beine sind kürzer
   m.userData.suit = suit
 }
 

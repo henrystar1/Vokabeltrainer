@@ -1023,3 +1023,10 @@ Tabelle `book_library_hidden`; `in_library` blendet ein veröffentlichtes Buch d
 - `race/ironSuit.ts`: Iron-Man-Rüstung (rot/gold) mit Anlege-Animation (`SUIT_MS`, `tickSuit`, `suitReady`); Gear-Bit 64. Iron Man ist unverwundbar und schießt Lenkraketen ohne Cooldown.
 - Sterne bis 7; ab 6 Sternen greifen 2 feindliche Iron Men an (`ironBots`, `ironWave`), ihre Mega-Raketen zerstören auch Panzer.
 - `cars/fr.ts`: Französisch per Wörterbuch (`FR`) + Muster (`PATTERNS`) und MutationObserver-DOM-Übersetzer (Texte, aria-label, title, placeholder), Wahl in localStorage `vt-race-lang`; `LangToggle.tsx` in Cars-Seite und RaceView. Neue deutsche Texte brauchen einen Eintrag in `fr.ts`.
+
+## Update 151
+- Absturz bei ≥6 Sternen: Sterne-Anzeige rief `'★'.repeat(5 - stars)` mit negativer Zahl auf (RangeError → schwarzer Bildschirm); jetzt `Math.max(0, …)`.
+- Explosionen (`blastAt`): feste 2 Lichter + geteilte Geometrien, höchstens 6 gleichzeitig, höchstens 24 Raketen – neue PointLights/Geometrien pro Explosion ließen bei Raketen-Salven den WebGL-Kontext abstürzen.
+- `blowPbot`: Streifen-/SWAT-Wagen explodieren bei Raketen oder vollem Schaden (SWAT).
+- Iron Man: Admin kann ihn per Broadcast `ig` vergeben/nehmen (nur für die Sitzung, kein SQL); Teleport (T) zu Spielern in der Stadt; Iron-Man-Raketen zielen auf Polizei/Soldaten/SWAT/Spieler, nicht auf Passanten oder geparkte Autos (`pickRocketTarget(..., humans)`).
+- Skin: nach dem asynchronen Skin-Tausch werden Anzug/Weste/Helm/Stock/Waffe neu angelegt (`scene.makeWalker`).

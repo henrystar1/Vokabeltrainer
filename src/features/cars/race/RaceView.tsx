@@ -172,6 +172,12 @@ export default function RaceView({ trackId, custom, laps, me, assistOk = false, 
   const [heliUi, setHeliUi] = useState(false)
   const ironKeyRef = useRef<() => boolean>(() => false)
   const [ironUi, setIronUi] = useState(false)
+  const [ironOk, setIronOk] = useState(false)
+  const ironGrantRef = useRef(false)
+  const [grantUi, setGrantUi] = useState<{ id: string; name: string; on: boolean } | null>(null)
+  const ironGiveRef = useRef<(id: string) => void>(() => undefined)
+  const ironOffRef = useRef<() => void>(() => undefined)
+  const ironTpRef = useRef<() => void>(() => undefined)
   const gearRef = useRef<GearSet>(NO_GEAR)
   const [gearUi, setGearUi] = useState<GearSet>(NO_GEAR)
   const batonRef = useRef((() => { try { return localStorage.getItem('vt-baton') === '1' } catch { return false } })())
@@ -320,24 +326,37 @@ export default function RaceView({ trackId, custom, laps, me, assistOk = false, 
       const fx = createFx(THREE, rs.scene)
       cleanups.push(() => fx.dispose())
       // Explosionen: Feuerball, Druckwelle, Lichtblitz und fliegende Trümmer
-      interface Blast { t: number; ball: import('three').Mesh; ring: import('three').Mesh; light: import('three').PointLight; debris: Array<{ m: import('three').Mesh; vx: number; vy: number; vz: number; rx: number; rz: number }> }
+      interface Blast { t: number; ball: import('three').Mesh; ring: import('three').Mesh; light: import('three').PointLight | null; debris: Array<{ m: import('three').Mesh; vx: number; vy: number; vz: number; rx: number; rz: number }> }
       const blasts: Blast[] = []
+      // Geteilte Geometrie/Material und feste Lichter: neue Lichter oder Geometrien pro Explosion ließen bei Raketen-Salven den WebGL-Kontext abstürzen (weißer Bildschirm)
+      const blGeo = { ball: new THREE.SphereGeometry(1, 12, 8), ring: new THREE.RingGeometry(0.8, 1, 24), box: new THREE.BoxGeometry(1, 1, 1) }
+      const blDebrisMat = new THREE.MeshBasicMaterial({ color: '#2b2b2b' })
+      const blLights: Array<{ l: import('three').PointLight; used: boolean }> = [0, 1].map(() => { const l = new THREE.PointLight('#ff7a1a', 0, 90); l.visible = true; rs.scene.add(l); return { l, used: false } })
+      cleanups.push(() => { for (const o of blLights) rs.scene.remove(o.l); blGeo.ball.dispose(); blGeo.ring.dispose(); blGeo.box.dispose(); blDebrisMat.dispose() })
+      const dropBlast = (b: Blast) => {
+        rs.scene.remove(b.ball, b.ring); for (const d of b.debris) rs.scene.remove(d.m)
+        ;(b.ball.material as import('three').Material).dispose(); (b.ring.material as import('three').Material).dispose()
+        if (b.light) { b.light.intensity = 0; const o = blLights.find((q) => q.l === b.light); if (o) o.used = false }
+      }
       const blastAt = (x: number, y: number, z: number, color = '#ff7a1a') => {
-        const ball = new THREE.Mesh(new THREE.SphereGeometry(1, 16, 12), new THREE.MeshBasicMaterial({ color: '#ffb347', transparent: true, opacity: 0.95, depthWrite: false }))
+        while (blasts.length >= 6) { const o = blasts.shift(); if (o) dropBlast(o) }
+        const ball = new THREE.Mesh(blGeo.ball, new THREE.MeshBasicMaterial({ color: '#ffb347', transparent: true, opacity: 0.95, depthWrite: false }))
         ball.position.set(x, y, z)
-        const ring = new THREE.Mesh(new THREE.RingGeometry(0.8, 1, 32), new THREE.MeshBasicMaterial({ color: '#fff3d6', transparent: true, opacity: 0.8, side: THREE.DoubleSide, depthWrite: false }))
+        const ring = new THREE.Mesh(blGeo.ring, new THREE.MeshBasicMaterial({ color: '#fff3d6', transparent: true, opacity: 0.8, side: THREE.DoubleSide, depthWrite: false }))
         ring.rotation.x = -Math.PI / 2; ring.position.set(x, y - 0.6, z)
-        const light = new THREE.PointLight(color, 60, 90); light.position.set(x, y + 1, z)
+        const slot = blLights.find((q) => !q.used)
+        let light: import('three').PointLight | null = null
+        if (slot) { slot.used = true; light = slot.l; light.color.set(color); light.position.set(x, y + 1, z); light.intensity = 60 }
         const debris: Blast['debris'] = []
-        const dm = new THREE.MeshStandardMaterial({ color: '#2b2b2b', roughness: 0.8 })
-        for (let i = 0; i < 14; i++) {
-          const m = new THREE.Mesh(new THREE.BoxGeometry(0.3 + Math.random() * 0.7, 0.15 + Math.random() * 0.3, 0.3 + Math.random() * 0.6), dm)
+        for (let i = 0; i < 8; i++) {
+          const m = new THREE.Mesh(blGeo.box, blDebrisMat)
+          m.scale.set(0.3 + Math.random() * 0.7, 0.15 + Math.random() * 0.3, 0.3 + Math.random() * 0.6)
           m.position.set(x, y, z)
           const a = Math.random() * Math.PI * 2, sp = 5 + Math.random() * 12
           debris.push({ m, vx: Math.cos(a) * sp, vy: 6 + Math.random() * 12, vz: Math.sin(a) * sp, rx: (Math.random() - 0.5) * 14, rz: (Math.random() - 0.5) * 14 })
           rs.scene.add(m)
         }
-        rs.scene.add(ball, ring, light)
+        rs.scene.add(ball, ring)
         blasts.push({ t: 0, ball, ring, light, debris })
       }
       const tickBlasts = (dt: number) => {
@@ -347,15 +366,12 @@ export default function RaceView({ trackId, custom, laps, me, assistOk = false, 
           const bs = 1 + Math.min(1, b.t / 0.45) * 6.5
           b.ball.scale.setScalar(bs); (b.ball.material as import('three').MeshBasicMaterial).opacity = Math.max(0, 0.95 - b.t / 0.8)
           b.ring.scale.setScalar(1 + b.t * 34); (b.ring.material as import('three').MeshBasicMaterial).opacity = Math.max(0, 0.8 - b.t / 0.7)
-          b.light.intensity = Math.max(0, 60 * (1 - b.t / 0.9))
+          if (b.light) b.light.intensity = Math.max(0, 60 * (1 - b.t / 0.9))
           for (const d of b.debris) { d.vy -= 22 * dt; d.m.position.x += d.vx * dt; d.m.position.y = Math.max(0.1, d.m.position.y + d.vy * dt); d.m.position.z += d.vz * dt; d.m.rotation.x += d.rx * dt; d.m.rotation.z += d.rz * dt }
-          if (k >= 1) {
-            rs.scene.remove(b.ball, b.ring, b.light); for (const d of b.debris) rs.scene.remove(d.m)
-            b.ball.geometry.dispose(); b.ring.geometry.dispose(); blasts.splice(i, 1)
-          }
+          if (k >= 1) { dropBlast(b); blasts.splice(i, 1) }
         }
       }
-      cleanups.push(() => { for (const b of blasts) { rs.scene.remove(b.ball, b.ring, b.light); for (const d of b.debris) rs.scene.remove(d.m) } blasts.length = 0 })
+      cleanups.push(() => { for (const b of blasts) dropBlast(b); blasts.length = 0 })
       let exN = 0
       let fxTick = 0
       const carFx = (kind: string, x: number, z: number, h: number, v: number, slip: number, fly: number, gas: boolean, dt2: number, alt = 0) => {
@@ -423,7 +439,7 @@ export default function RaceView({ trackId, custom, laps, me, assistOk = false, 
 
       // Tastatur
       const keyMap: Record<string, Key> = { ArrowLeft: 'left', a: 'left', A: 'left', ArrowRight: 'right', d: 'right', D: 'right', ArrowUp: 'gas', w: 'gas', W: 'gas', ArrowDown: 'brake', s: 'brake', S: 'brake', ' ': 'brake', e: 'fly', E: 'fly' }
-      const kd = (e: KeyboardEvent) => { if ((e.target as HTMLElement | null)?.tagName === 'INPUT') return; if (e.key === 'z' || e.key === 'Z') zoomKey.current = true; else if (e.key === 'g' || e.key === 'G') { poiKey.current(); return } const k = keyMap[e.key]; if (k) { inp.current[k] = true; e.preventDefault() } else if (e.key === 'r' || e.key === 'R') { if ((eff.kind === 'heli' && !foot) || ironKeyRef.current()) heliDown.current = true; else resetReq.current = true } else if (e.key === 'c' || e.key === 'C') toggleRef.current(); else if (e.key === 'f' || e.key === 'F') assistToggleRef.current(); else if (e.key === 'h' || e.key === 'H') toggleHide.current(); else if (e.key === 'i' || e.key === 'I') ironRef.current(); else if (e.key === 'x' || e.key === 'X') exitRef.current(); else if (e.key === 'm' || e.key === 'M') rocketRef.current(); else if (e.key === 'v' || e.key === 'V') egoRef.current(); else if (e.key === 'q' || e.key === 'Q') punchReq.current = true; else if (e.key === 'n' || e.key === 'N') { spawnArm.current = performance.now() + 2500; spawnRef.current() } else if (e.key >= '1' && e.key <= '9' && performance.now() < spawnArm.current) { spawnArm.current = 0; spawnRef.current(undefined, Number(e.key)) } else if (e.key === 'Shift') runRef.current = true; if (e.key === ' ') inp.current.jump = true }
+      const kd = (e: KeyboardEvent) => { if ((e.target as HTMLElement | null)?.tagName === 'INPUT') return; if (e.key === 'z' || e.key === 'Z') zoomKey.current = true; else if (e.key === 'g' || e.key === 'G') { poiKey.current(); return } const k = keyMap[e.key]; if (k) { inp.current[k] = true; e.preventDefault() } else if (e.key === 'r' || e.key === 'R') { if ((eff.kind === 'heli' && !foot) || ironKeyRef.current()) heliDown.current = true; else resetReq.current = true } else if (e.key === 'c' || e.key === 'C') toggleRef.current(); else if (e.key === 'f' || e.key === 'F') assistToggleRef.current(); else if (e.key === 'h' || e.key === 'H') toggleHide.current(); else if (e.key === 'i' || e.key === 'I') ironRef.current(); else if (e.key === 't' || e.key === 'T') ironTpRef.current(); else if (e.key === 'x' || e.key === 'X') exitRef.current(); else if (e.key === 'm' || e.key === 'M') rocketRef.current(); else if (e.key === 'v' || e.key === 'V') egoRef.current(); else if (e.key === 'q' || e.key === 'Q') punchReq.current = true; else if (e.key === 'n' || e.key === 'N') { spawnArm.current = performance.now() + 2500; spawnRef.current() } else if (e.key >= '1' && e.key <= '9' && performance.now() < spawnArm.current) { spawnArm.current = 0; spawnRef.current(undefined, Number(e.key)) } else if (e.key === 'Shift') runRef.current = true; if (e.key === ' ') inp.current.jump = true }
       const ku = (e: KeyboardEvent) => { if (e.key === 'r' || e.key === 'R') heliDown.current = false; const k = keyMap[e.key]; if (k) { inp.current[k] = false; e.preventDefault() } else if (e.key === 'Shift') runRef.current = false; if (e.key === ' ') inp.current.jump = false }
       window.addEventListener('keydown', kd); window.addEventListener('keyup', ku)
       cleanups.push(() => { window.removeEventListener('keydown', kd); window.removeEventListener('keyup', ku) })
@@ -494,6 +510,7 @@ export default function RaceView({ trackId, custom, laps, me, assistOk = false, 
         ch.on('broadcast', { event: 'mc' }, ({ payload }) => { const p = payload as { to?: unknown; by?: unknown }; if (p.to === online.userId && rescue && !rescue.claimed && typeof p.by === 'string') rescueClaim(p.by) })
         ch.on('broadcast', { event: 'mp' }, ({ payload }) => { const p = payload as { to?: unknown; by?: unknown }; if (p.to === online.userId && rescue && rescue.claimed === p.by) { rescue.phase = 'carried'; say('Die Sanitäter haben dich aufgeladen – ab ins Krankenhaus!') } })
         ch.on('broadcast', { event: 'mh' }, ({ payload }) => { const p = payload as { to?: unknown }; if (p.to === online.userId && rescue) finishRescue() })
+        ch.on('broadcast', { event: 'ig' }, ({ payload }) => { const p = payload as { to?: unknown; on?: unknown }; if (p.to !== online.userId) return; ironGrantRef.current = !!p.on; setIronOk(!!p.on); say(p.on ? 'Der Admin hat dir den Iron-Man-Anzug gegeben! (I)' : 'Der Admin hat dir den Iron-Man-Anzug wieder genommen.'); if (!p.on && !adminRef.current) ironOffRef.current() })
         ch.on('broadcast', { event: 'rv' }, ({ payload }) => { const p = payload as { to?: unknown }; if (p.to === online.userId && rescue) reviveHere('Der Admin hat dich wiederbelebt!') })
         ch.on('broadcast', { event: 'sd' }, ({ payload }) => {
           const p = payload as { to?: unknown; d?: unknown; k?: unknown }
@@ -899,7 +916,7 @@ export default function RaceView({ trackId, custom, laps, me, assistOk = false, 
         if (ib.dead > 0) return
         ib.dead = 3; blastAt(ib.x, ib.y + 1, ib.z); say('Ein Iron Man ist abgestürzt!')
       }
-      const dropIronBot = (ib: IronBot) => { scene.remove(ib.m); ironBots.splice(ironBots.indexOf(ib), 1) }
+      const dropIronBot = (ib: IronBot) => { scene.remove(ib.m); const ix = ironBots.indexOf(ib); if (ix >= 0) ironBots.splice(ix, 1) }
       const tickIronBots = (dt: number) => {
         if (ironBots.length && (!chase || chase.over || stars < 6)) { for (const ib of [...ironBots]) dropIronBot(ib); ironReq = { id: '', n: 0 } }
         const me = foot ?? car, my = foot ? foot.y : (car.y ?? 0)
@@ -1410,6 +1427,8 @@ export default function RaceView({ trackId, custom, laps, me, assistOk = false, 
         if (nowT - lastDuty < 500) return
         lastDuty = nowT
         { const mineNow = !!rescue, oth = adminRef.current ? [...remotes.values()].find((x) => x.dn && fresh(x) && Math.hypot(x.x - (foot ?? car).x, x.z - (foot ?? car).z) < 90) : undefined
+        { const near = adminRef.current ? [...remotes.values()].filter((x) => !x.rd && !x.id.startsWith('pb-') && x.id !== online?.userId && fresh(x) && Math.hypot(x.x - (foot ?? car).x, x.z - (foot ?? car).z) < 60).sort((a, b) => Math.hypot(a.x - (foot ?? car).x, a.z - (foot ?? car).z) - Math.hypot(b.x - (foot ?? car).x, b.z - (foot ?? car).z))[0] : undefined
+          setGrantUi((g) => (near ? (g && g.id === near.id ? g : { id: near.id, name: near.name, on: granted.has(near.id) }) : g ? null : g)) }
           setReviveUi((o) => (o.mine === mineNow && o.other?.id === oth?.id ? o : { ...o, mine: mineNow, other: oth ? { id: oth.id, name: oth.name } : null })) }
         // Polizist im Dienst: Weg zum nächsten Gangster
         if (chase && !chase.over && myRole === 'cop' && dutyRef.current === 'p') {
@@ -1490,7 +1509,7 @@ export default function RaceView({ trackId, custom, laps, me, assistOk = false, 
         const m = inp.current
         const suitBusy = ironOn && !suitReady(footMesh)
         if (suitBusy) w = stepWalker(w, { fwd: false, back: false, left: false, right: false, run: false }, dt)
-        else if (ironOn && (w.lvl ?? 0) === 0 && adminRef.current) w = stepIron(w, { fwd: m.gas || joyRef.current.y > 0.3, back: (m.brake && !m.jump) || joyRef.current.y < -0.3, left: m.left, right: m.right, turn: joyTurnCurve(joyRef.current.x) * joyTurnRef.current * 2, up: m.fly || m.jump, down: heliDown.current, boost: runRef.current }, dt, (x, z, y) => groundAt(x, z, y, 0), roofH)
+        else if (ironOn && (w.lvl ?? 0) === 0 && (adminRef.current || ironGrantRef.current)) w = stepIron(w, { fwd: m.gas || joyRef.current.y > 0.3, back: (m.brake && !m.jump) || joyRef.current.y < -0.3, left: m.left, right: m.right, turn: joyTurnCurve(joyRef.current.x) * joyTurnRef.current * 2, up: m.fly || m.jump, down: heliDown.current, boost: runRef.current }, dt, (x, z, y) => groundAt(x, z, y, 0), roofH)
         else w = stepWalker(w, { fwd: m.gas || joyRef.current.y > 0.3, back: (m.brake && !m.jump) || joyRef.current.y < -0.3, left: m.left, right: m.right, turn: joyTurnCurve(joyRef.current.x) * joyTurnRef.current * 2, run: m.fly || runRef.current || joyRef.current.y > 0.85, jump: m.jump }, dt)
         if (ironOn) {
           w = { ...w, hp: hpCfg.max }
@@ -1587,11 +1606,25 @@ export default function RaceView({ trackId, custom, laps, me, assistOk = false, 
         pbots = pbots.filter((q) => q !== pb)
         say(pb.kind === 'heli' ? 'Kampfhubschrauber abgeschossen!' : 'Panzer zerstört!')
       }
+      /** Streifen-/SWAT-Wagen explodiert: Feuerball, Wagen weg, ausgestiegene Männer fallen mit */
+      const blowPbot = (pb: PBot, byMe: boolean) => {
+        if (!pbots.includes(pb)) return
+        const y0 = (pb.car.y ?? 0) + 1
+        for (let i = 0; i < 30; i++) { const a = Math.random() * Math.PI * 2, sp = 3 + Math.random() * 12; fx.emit('fire', pb.car.x, y0, pb.car.z, Math.cos(a) * sp, 2 + Math.random() * 10, Math.sin(a) * sp, 0.8 + Math.random() * 0.8) }
+        blastAt(pb.car.x, y0, pb.car.z)
+        scene.remove(pb.mesh); if (pb.wm) scene.remove(pb.wm)
+        for (const mn of pb.men ?? []) scene.remove(mn.m)
+        pb.men = []; pb.w = undefined; pb.wm = undefined; pb.carGone = true
+        pbots = pbots.filter((q) => q !== pb)
+        if (byMe) addStar(1)
+        say(pb.swat ? 'SWAT-Wagen explodiert!' : 'Streifenwagen explodiert!')
+      }
       /** Raketen: Lenkraketen des Armee-Helis (ich) und Panzerfäuste der Soldaten */
       type Rocket = { m: import('three').Mesh; x: number; y: number; z: number; dx: number; dy: number; dz: number; t: number; mine: boolean; home: (() => { x: number; y: number; z: number } | null) | null; sp: number; turn: number; mega?: boolean }
       const rockets: Rocket[] = []
       const rkMat = new THREE.MeshBasicMaterial({ color: 0xf1f5f9 }), rkGeo = new THREE.CylinderGeometry(0.13, 0.13, 1.6, 8)
       const launchRocket = (x: number, y: number, z: number, dx: number, dy: number, dz: number, mine: boolean, home: Rocket['home'], sp = 64, turn = 3.2, mega = false) => {
+        while (rockets.length >= 24) { const o = rockets.shift(); if (o) scene.remove(o.m) }
         const m = new THREE.Mesh(rkGeo, rkMat); m.position.set(x, y, z); scene.add(m)
         const l = Math.hypot(dx, dy, dz) || 1
         rockets.push({ m, x, y, z, dx: dx / l, dy: dy / l, dz: dz / l, t: 0, mine, home, sp, turn, mega })
@@ -1603,7 +1636,7 @@ export default function RaceView({ trackId, custom, laps, me, assistOk = false, 
         for (const q of soldiers) if (q.dead <= 0 && near(q.w.x, q.w.y + 0.9, q.w.z)) killSoldier(q)
         for (const pd of peds) if (pd.st !== 'dead' && near(pd.w.x, pd.w.y + 0.9, pd.w.z)) killPed(pd)
         for (const pb of [...pbots]) {
-          if (!pb.carGone && near(pb.car.x, (pb.car.y ?? 0) + 1, pb.car.z, 8)) { if (pb.kind === 'heli' || pb.kind === 'tank') { if (mine) wreckBot(pb) } else pb.car = { ...pb.car, dmg: DMG_MAX } }
+          if (!pb.carGone && near(pb.car.x, (pb.car.y ?? 0) + 1, pb.car.z, 8)) { if (pb.kind === 'heli' || pb.kind === 'tank') { if (mine) wreckBot(pb) } else blowPbot(pb, mine) }
           if (pb.w && near(pb.w.x, pb.w.y + 0.9, pb.w.z)) killCop(pb)
           for (const mn of pb.men ?? []) if (near(mn.w.x, mn.w.y + 0.9, mn.w.z)) { killMan(pb, mn); if (mine) addStar(1) }
         }
@@ -1637,7 +1670,7 @@ export default function RaceView({ trackId, custom, laps, me, assistOk = false, 
       /** Lenkrakete des Armee-Helis: sucht das Ziel, das am besten vor dem Heli liegt (±30°, bis 520 m) */
       type RC = { x: number; y: number; z: number }
       /** Bestes Ziel vor (px, pz) in Blickrichtung h (±cone, bis 520 m): Getter, der die aktuelle Position liefert */
-      const pickRocketTarget = (px: number, pz: number, h: number, cone: number): (() => RC | null) | null => {
+      const pickRocketTarget = (px: number, pz: number, h: number, cone: number, humans = false): (() => RC | null) | null => {
         const pick: { get: (() => RC | null) | null; sc: number } = { get: null, sc: 1e9 }
         const consider = (get: () => RC | null) => {
           const p = get(); if (!p) return
@@ -1649,14 +1682,15 @@ export default function RaceView({ trackId, custom, laps, me, assistOk = false, 
           if (sc < pick.sc) { pick.sc = sc; pick.get = get }
         }
         for (const pb of pbots) {
+          if (humans && pb.w) consider(() => pb.w && pbots.includes(pb) ? { x: pb.w.x, y: pb.w.y + 1, z: pb.w.z } : null)
           if (!pb.carGone) consider(() => pbots.includes(pb) ? { x: pb.car.x, y: (pb.car.y ?? 0) + 1, z: pb.car.z } : null)
           for (const mn of pb.men ?? []) consider(() => mn.w.hp > 0 ? { x: mn.w.x, y: mn.w.y + 1, z: mn.w.z } : null)
         }
         for (const b of botList) consider(() => ({ x: b.car.x, y: (b.car.y ?? 0) + 1, z: b.car.z }))
         for (const r of remotes.values()) { if (r.rd || r.id.startsWith('pb-') || r.id === online?.userId) continue; consider(() => performance.now() - r.seen < 2500 ? { x: r.x, y: (r.yy ?? 0) + 1, z: r.z } : null) }
         for (const q of soldiers) consider(() => q.dead <= 0 ? { x: q.w.x, y: q.w.y + 1, z: q.w.z } : null)
-        for (const pd of peds) consider(() => pd.st !== 'dead' ? { x: pd.w.x, y: pd.w.y + 1, z: pd.w.z } : null)
-        for (const pk of parked) consider(() => parked.includes(pk) ? { x: pk.car.x, y: (pk.car.y ?? 0) + 1, z: pk.car.z } : null)
+        if (!humans) for (const pd of peds) consider(() => pd.st !== 'dead' ? { x: pd.w.x, y: pd.w.y + 1, z: pd.w.z } : null)
+        if (!humans) for (const pk of parked) consider(() => parked.includes(pk) ? { x: pk.car.x, y: (pk.car.y ?? 0) + 1, z: pk.car.z } : null)
         for (const ib of ironBots) consider(() => ib.dead <= 0 ? { x: ib.x, y: ib.y + 1, z: ib.z } : null)
         return pick.get
       }
@@ -1673,12 +1707,12 @@ export default function RaceView({ trackId, custom, laps, me, assistOk = false, 
       let lastIronRk = 0
       const fireIronRocket = (auto: boolean) => {
         if (!foot || !ironOn) return
-        const nowT = performance.now(); if (nowT - lastIronRk < 90) return
+        const nowT = performance.now(); if (nowT - lastIronRk < 130) return
         lastIronRk = nowT
         let h = foot.h
         const ray = auto ? null : aimRay()
         if (ray) h = Math.atan2(ray.direction.x, ray.direction.z)
-        const tg = pickRocketTarget(foot.x, foot.z, h, auto ? 0.95 : 0.45)
+        const tg = pickRocketTarget(foot.x, foot.z, h, auto ? 0.95 : 0.45, true)
         const o = foot.y + 1.2
         launchRocket(foot.x + Math.sin(h) * 0.7, o, foot.z + Math.cos(h) * 0.7, Math.sin(h), ray ? Math.max(-0.5, Math.min(0.4, ray.direction.y)) : 0.02, Math.cos(h), true, tg, 82, 4.4)
       }
@@ -1715,12 +1749,30 @@ export default function RaceView({ trackId, custom, laps, me, assistOk = false, 
       const myMask = (): number => ironOn ? 64 | (gearRef.current.baton ? 4 : 0) : gearMask(gearRef.current) | (armyGun === 'rifle' ? 16 : armyGun === 'sniper' ? 32 : 0)
       const curGun = (): 'pistol' | 'rifle' | 'sniper' => ironOn ? 'rifle' : armyGun ?? 'pistol'
       const toggleIron = () => {
-        if (!adminRef.current || !isCity) return
+        if (!(adminRef.current || ironGrantRef.current) || !isCity) return
         ironOn = !ironOn; setIronUi(ironOn)
         if (foot) { const f = foot; makeFootMesh(); foot = f }
         say(ironOn ? 'Iron-Man-Anzug an! W/S fliegen, A/D drehen, E hoch, R runter, Klick/Tippen schießt.' : 'Anzug aus.')
       }
       ironRef.current = toggleIron
+      ironOffRef.current = () => { if (ironOn) toggleIron() }
+      const granted = new Set<string>()
+      ironGiveRef.current = (id) => {
+        if (!adminRef.current || !ready) return
+        const on = !granted.has(id); if (on) granted.add(id); else granted.delete(id)
+        void ch?.send({ type: 'broadcast', event: 'ig', payload: { to: id, on } }).catch(() => undefined)
+        setGrantUi((g) => (g && g.id === id ? { ...g, on } : g)); say(on ? 'Iron Man vergeben.' : 'Iron Man genommen.')
+      }
+      let tpIdx = 0
+      ironTpRef.current = () => {
+        if (!ironOn || !foot || !suitReady(footMesh)) return
+        const list = [...remotes.values()].filter((r) => !r.rd && !r.id.startsWith('pb-') && r.id !== online?.userId && fresh(r) && (r.lv ?? 0) === 0)
+        if (!list.length) { say('Niemand sonst ist gerade in der Stadt.'); return }
+        const r = list[tpIdx++ % list.length]
+        const a = Math.random() * Math.PI * 2, ty = Math.max(r.yy ?? 0, roofH(r.x, r.z)) + 2
+        foot = { ...foot, x: r.x + Math.sin(a) * 3, z: r.z + Math.cos(a) * 3, y: ty, vx: 0, vy: 0, vz: 0 }
+        say(`Teleport zu ${r.name}!`)
+      }
       ironKeyRef.current = () => ironOn && !!foot
       const takeGun = (k: 'rifle' | 'sniper') => { armyGun = k; zoomOn = false; setSniperUi(k === 'sniper'); say(k === 'sniper' ? 'Scharfschützengewehr! Z = Zoom, Tippen/Klick schießt (ein Treffer reicht).' : 'Sturmgewehr! Es schießt viel schneller als die Pistole.') }
       const gunCar = () => eff.kind === 'swat' || eff.kind === 'tank' || (eff.kind === 'heli' && eff.color !== '#f8fafc')
@@ -2354,6 +2406,7 @@ export default function RaceView({ trackId, custom, laps, me, assistOk = false, 
         place(myMesh, car.x, car.z, car.h, car.v, car.steer, car.dmg, car.slip, car.fly, car.lvl ?? 0, car.y ?? 0, pitchOf(car))
         carFx(eff.kind, car.x, car.z, car.h, car.v, car.slip, car.fly, input.gas, dt, isCity && (car.lvl ?? 0) === 0 && (car.y ?? 0) > camGround(car.x, car.z) + 1 ? car.y ?? 0 : 0)
         if (myRole === 'cop') rs.tickSiren(myMesh, now)
+        for (const pb of [...pbots]) if (pb.swat && !pb.carGone && pb.car.dmg >= DMG_MAX) blowPbot(pb, true)
         for (const pb of pbots) {
           if (!pb.carGone) { place(pb.mesh, pb.car.x, pb.car.z, pb.car.h, pb.car.v, pb.car.steer, pb.car.dmg, pb.car.slip, 0, pb.car.lvl ?? 0, pb.car.y ?? 0, 0); rs.tickSiren(pb.mesh, now) }
           if (pb.w && pb.wm) { pb.wm.position.set(pb.w.x, pb.w.y, pb.w.z); pb.wm.rotation.y = pb.w.h; poseWalker(pb.wm, pb.w.ph, pb.w.sp, pb.w.stun, pb.w.vy > 1, (now - (pb.pa ?? -1e9)) / 320) }
@@ -2681,14 +2734,16 @@ export default function RaceView({ trackId, custom, laps, me, assistOk = false, 
       )}
       {def.mode === 'city' && <button type="button" onClick={() => egoRef.current()} className={`absolute left-3 top-40 z-20 min-h-[40px] rounded-xl border border-white/40 px-3 text-xs font-bold ${egoUi ? 'bg-sky-600 text-white' : 'bg-slate-800/80 text-white'}`}>{egoUi ? 'Ego: AN (V)' : 'Ego (V)'}</button>}
       <LangToggle className="absolute left-3 top-52 z-20" />
-      {isAdmin && def.mode === 'city' && (
+      {(isAdmin || ironOk) && def.mode === 'city' && (
         <button type="button" onClick={() => ironRef.current()} className={`absolute left-3 top-28 z-20 min-h-[40px] rounded-xl border border-white/40 px-3 text-xs font-bold ${ironUi ? 'bg-red-600 text-amber-200' : 'bg-slate-800/80 text-white'}`}>{ironUi ? 'Iron Man: AN (I)' : 'Iron Man (I)'}</button>
       )}
+      {ironUi && def.mode === 'city' && <button type="button" onClick={() => ironTpRef.current()} className="absolute left-3 top-[15.5rem] z-20 min-h-[40px] rounded-xl border border-white/40 bg-slate-800/80 px-3 text-xs font-bold text-white">Teleport (T)</button>}
+      {isAdmin && grantUi && <button type="button" onClick={() => ironGiveRef.current(grantUi.id)} className="absolute bottom-52 left-1/2 z-20 min-h-[44px] -translate-x-1/2 rounded-xl border border-white/40 bg-red-600 px-4 text-sm font-bold text-amber-200">{grantUi.on ? `Iron Man von ${grantUi.name} nehmen` : `${grantUi.name} Iron Man geben`}</button>}
       {isAdmin && reviveUi.other && !reviveUi.mine && (
         <button type="button" onClick={() => reviveUi.other && reviveOtherRef.current(reviveUi.other.id)} className="absolute bottom-40 left-1/2 z-20 min-h-[44px] -translate-x-1/2 rounded-xl border border-white/40 bg-emerald-400 px-4 text-sm font-bold text-slate-950">{reviveUi.other.name} gratis wiederbeleben</button>
       )}
       {sniperUi && <button type="button" onClick={() => { zoomKey.current = true }} className="absolute bottom-44 left-3 z-20 min-h-[44px] rounded-xl bg-black/60 px-3 text-sm font-bold text-white">🔭 Zoom (Z)</button>}
-      {starsUi > 0 && <div className="pointer-events-none absolute left-1/2 top-28 -translate-x-1/2 rounded-full bg-black/60 px-3 py-0.5 text-lg font-black tracking-widest text-amber-300" role="status" aria-label={`Fahndungsstufe ${starsUi} von 5`}>{'★'.repeat(starsUi)}<span className="text-white/30">{'★'.repeat(5 - starsUi)}</span></div>}
+      {starsUi > 0 && <div className="pointer-events-none absolute left-1/2 top-28 -translate-x-1/2 rounded-full bg-black/60 px-3 py-0.5 text-lg font-black tracking-widest text-amber-300" role="status" aria-label={`Fahndungsstufe ${starsUi} von ${Math.max(5, starsUi)}`}>{'★'.repeat(starsUi)}<span className="text-white/30">{'★'.repeat(Math.max(0, 5 - starsUi))}</span></div>}
       {dutyUi && <div className="pointer-events-none absolute left-1/2 top-20 -translate-x-1/2 rounded-full px-3 py-0.5 text-xs font-bold text-white" style={{ background: dutyUi === 'p' ? '#2563eb' : '#dc2626' }} role="status">{dutyUi === 'p' ? '👮 Im Dienst: Polizei' : '🚑 Im Dienst: Sanitäter'}</div>}
       {shopUi === 'weapons' && <WeaponShop isAdmin={isAdmin} coins={wallet?.balance ?? null} owned={gearUi} onOwned={applyGear} onKoins={(k) => walletRef.current?.setBalance(k)} onClose={() => setShopUi(null)} />}
       {(shopUi === 'shop' || shopUi === 'gym') && <VocabShop kind={shopUi} perks={perksUi} isAdmin={isAdmin} onPerks={applyPerks} onBought={(it) => { if (it === 'heal') healRef.current = true }} onClose={() => setShopUi(null)} />}

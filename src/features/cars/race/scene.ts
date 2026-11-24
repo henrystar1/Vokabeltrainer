@@ -333,6 +333,8 @@ export function buildScene(THREE: THREE, t: Track): RaceScene {
         const sg = makeSkinWalker(THREE, c), si = sg.children[0]
         sg.remove(si); g.remove(g.children[0]); g.add(si); g.children.splice(g.children.indexOf(si), 1); g.children.unshift(si)
         Object.assign(g.userData, sg.userData)
+        // Der Körper wurde ausgetauscht: Anzug, Weste, Helm, Stock und Waffe hingen am alten Körper und werden neu angelegt
+        g.userData.suit = undefined; g.userData.gr = 0; g.userData.bt = undefined; g.userData.gunBit = 0; g.userData.gunMesh = undefined; g.userData.skinned = true
       }
       img.src = skin
     }
