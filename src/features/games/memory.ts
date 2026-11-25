@@ -1,4 +1,4 @@
-import { shuffle, type Rng } from '../learning/random'
+import { shuffle, type Rng } from '../vocabApi'
 
 /** Kartenmotive (Symbole werden in MemoryGame als farbige Kacheln mit Icon gezeichnet). */
 export const MEMORY_SYMBOLS = ['cherry', 'citrus', 'clover', 'bell', 'gem', 'star', 'rocket', 'moon', 'flame', 'heart', 'anchor', 'leaf', 'crown', 'zap', 'cat', 'fish']

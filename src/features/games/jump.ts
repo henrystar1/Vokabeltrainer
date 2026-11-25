@@ -1,4 +1,4 @@
-import type { Rng } from '../learning/random'
+import type { Rng } from '../vocabApi'
 
 export const JW = 480
 export const JH = 320

@@ -2,9 +2,9 @@ import { ARMY, city, type Bld } from './city'
 import { canon, layoutOf, setSpecial, type Solid } from './interior'
 
 /** Besondere Häuser der Stadt mit Einrichtung: Bank (Tresen + Tresor), Shop (Theke), Fitnessstudio (Geräte), Krankenhaus (Betten, hier wacht man nach dem Tod auf). Feste Auswahl, überall gleich. */
-export type PoiKind = 'bank' | 'shop' | 'gym' | 'hospital' | 'police' | 'weapons' | 'army'
-export type SpotKind = 'vault' | 'counter' | 'machine' | 'armory' | 'steal' | 'dress' | 'atm' | 'weapons' | 'vest' | 'tank' | 'heli' | 'armycar' | 'climb' | 'rifle' | 'sniper'
-export interface Spot { x: number; z: number; r: number; kind: SpotKind; label: string }
+export type PoiKind = 'bank' | 'shop' | 'gym' | 'hospital' | 'police' | 'weapons' | 'army' | 'fire'
+export type SpotKind = 'vault' | 'counter' | 'machine' | 'armory' | 'steal' | 'dress' | 'atm' | 'weapons' | 'vest' | 'tank' | 'heli' | 'armycar' | 'climb' | 'rifle' | 'sniper' | 'pole' | 'rest' | 'kitchen'
+export interface Spot { x: number; z: number; r: number; kind: SpotKind; label: string; /** Geschoss (0 unten, 1 oben) */ fl?: number }
 export interface Poi {
   id: string; kind: PoiKind; name: string; b: Bld
   /** Tür (Welt) und Blick nach draußen */
@@ -15,8 +15,8 @@ export interface Poi {
   /** Bett-Plätze (Aufwachen nach dem Tod): Standort neben dem Bett und Blickrichtung */
   beds?: Array<{ x: number; z: number; h: number }>
 }
-export const POI_COLOR: Record<PoiKind, string> = { bank: '#facc15', shop: '#22d3ee', gym: '#f472b6', hospital: '#ef4444', police: '#3b82f6', weapons: '#f97316', army: '#65a30d' }
-export const POI_LETTER: Record<PoiKind, string> = { bank: 'B', shop: 'S', gym: 'F', hospital: '+', police: 'P', weapons: 'W', army: 'A' }
+export const POI_COLOR: Record<PoiKind, string> = { bank: '#facc15', shop: '#22d3ee', gym: '#f472b6', hospital: '#ef4444', police: '#3b82f6', weapons: '#f97316', army: '#65a30d', fire: '#f59e0b' }
+export const POI_LETTER: Record<PoiKind, string> = { bank: 'B', shop: 'S', gym: 'F', hospital: '+', police: 'P', weapons: 'W', army: 'A', fire: 'F' }
 /** Reichweite um die Tür (Karte, Leuchtsäule) */
 export const POI_RANGE = 7
 
@@ -40,6 +40,7 @@ export function pois(): Poi[] {
   { const b = c.buildings.find((q) => q.kind === 'bank'); if (b) out.push(furnish({ id: 'bank0', kind: 'bank', name: 'Bank', b, x: 0, z: 0, nx: 0, nz: 0, solids: [], spots: [] })) }
   { const b = c.buildings.find((q) => q.kind === 'hospital'); if (b) out.push(furnish({ id: 'hospital0', kind: 'hospital', name: 'Krankenhaus', b, x: 0, z: 0, nx: 0, nz: 0, solids: [], spots: [] })) }
   { const b = c.buildings.find((q) => q.kind === 'police'); if (b) out.push(furnish({ id: 'police0', kind: 'police', name: 'Polizeiwache', b, x: 0, z: 0, nx: 0, nz: 0, solids: [], spots: [] })) }
+  { const b = c.buildings.find((q) => q.kind === 'fire'); if (b) out.push(furnish({ id: 'fire0', kind: 'fire', name: 'Feuerwache', b, x: 0, z: 0, nx: 0, nz: 0, solids: [], spots: [] })) }
   { const b = c.buildings.find((q) => q.kind === 'army'); if (b) out.push(furnish({ id: 'army0', kind: 'army', name: 'Armee-Gelände', b, x: 0, z: 0, nx: 0, nz: 0, solids: [], spots: [] })) }
   take('shop', 'Shop', 4, 260, (b) => hash(b))
   take('gym', 'Fitnessstudio', 2, 300, (b) => hash(b, 1) + 1)
@@ -57,7 +58,7 @@ function furnish(p: Poi): Poi {
     return { x0: Math.min(a.x, b.x), x1: Math.max(a.x, b.x), z0: Math.min(a.z, b.z), z1: Math.max(a.z, b.z), h, color, ...o }
   }
   const solids: Solid[] = [], spots: Spot[] = []
-  const spot = (u: number, v: number, r: number, kind: SpotKind, label: string) => { const w = toW(u, v); spots.push({ x: w.x, z: w.z, r, kind, label }) }
+  const spot = (u: number, v: number, r: number, kind: SpotKind, label: string, fl = 0) => { const w = toW(u, v); spots.push({ x: w.x, z: w.z, r, kind, label, fl }) }
   const wood = 0x8b5a2b
   if (p.kind === 'bank') {
     solids.push(rect(-W + 14, W - 13, -D + 11, -D + 12.4, 1.1, wood), rect(-W + 14, W - 13, -D + 11, -D + 12.4, 0.12, 0xfacc15, { y0: 1.1, deco: true }))
@@ -117,6 +118,26 @@ function furnish(p: Poi): Poi {
     // Ankleidezimmer: Spinde an der Südwand, hier wird man Polizist (Dienst an/aus)
     for (let i = 0; i < 5; i++) solids.push(rect(W - 15 + i * 2.6, W - 13 + i * 2.6, -D + 0.6, -D + 1.8, 2.3, i % 2 ? 0x1e40af : 0x1d4ed8), rect(W - 14.6 + i * 2.6, W - 13.4 + i * 2.6, -D + 1.8, -D + 1.9, 0.3, 0xe5e7eb, { y0: 1.6, deco: true }))
     spot(W - 8, -D + 4.4, 3.2, 'dress', 'Ankleidezimmer: Polizei-Dienst')
+  } else if (p.kind === 'fire') {
+    // Erdgeschoss: Spindraum (Ankleidezimmer – hier wird man Feuerwehrmann), Atemschutz-Regale, Schlauchwand, Besprechungstisch
+    for (let i = 0; i < 6; i++) solids.push(rect(-W + 12 + i * 2.6, -W + 14 + i * 2.6, -D + 0.6, -D + 1.8, 2.3, i % 2 ? 0xb91c1c : 0x991b1b), rect(-W + 12.4 + i * 2.6, -W + 13.6 + i * 2.6, -D + 1.8, -D + 1.9, 0.3, 0xfacc15, { y0: 1.4, deco: true }))
+    spot(-W + 20, -D + 4.4, 3.2, 'dress', 'Ankleidezimmer: Feuerwehr-Dienst')
+    solids.push(rect(W - 14, W - 2, -D + 8, -D + 9.4, 1.0, 0x64748b), rect(W - 14, W - 2, -D + 8, -D + 9.4, 0.1, 0xfacc15, { y0: 1.0, deco: true }))
+    for (let i = 0; i < 4; i++) solids.push(rect(W - 13 + i * 2.8, W - 11.4 + i * 2.8, D - 1.6, D - 0.6, 2.2, 0x374151), rect(W - 12.8 + i * 2.8, W - 11.6 + i * 2.8, D - 1.7, D - 1.6, 0.7, 0xdc2626, { y0: 1.0, deco: true }))
+    // Rutschstange: Loch im Obergeschoss (unten Matte), Stange von oben bis unten
+    solids.push(rect(-W + 30, -W + 31, 0, 1, 5, 0xcbd5e1, { deco: true }), rect(-W + 28.6, -W + 32.4, -1.4, 2.4, 0.06, 0x1e293b, { deco: true }))
+    // Obergeschoss (Höhe 5 m): Schlafsaal mit Stockbetten, Küche, Sofaecke, Tisch, Stangenzimmer
+    const fl = 5
+    for (let i = 0; i < 6; i++) {
+      const u = -W + 6 + i * 5.5
+      solids.push(rect(u, u + 1.6, D - 5.2, D - 0.8, 0.5, 0x1e3a8a, { y0: fl, deco: true }), rect(u, u + 1.6, D - 5.2, D - 0.8, 0.12, 0xf8fafc, { y0: fl + 0.5, deco: true }), rect(u + 0.2, u + 1.4, D - 4.9, D - 4.1, 0.2, 0xfde68a, { y0: fl + 0.62, deco: true }))
+      spot(u + 0.8, D - 6.2, 2.0, 'rest', 'Im Bett ausruhen (Leben auffüllen)', 1)
+    }
+    solids.push(rect(W - 18, W - 2, D - 3.2, D - 1.6, 1.0, 0x6b7280, { y0: fl, deco: true }), rect(W - 18, W - 2, D - 3.2, D - 1.6, 0.1, 0xf8fafc, { y0: fl + 1.0, deco: true }), rect(W - 15, W - 12, D - 9, D - 7, 0.8, 0x8b5a2b, { y0: fl, deco: true }), rect(W - 8, W - 5, D - 14, D - 12, 0.5, 0xdc2626, { y0: fl, deco: true }), rect(W - 8, W - 5, D - 12.4, D - 12, 0.8, 0xb91c1c, { y0: fl, deco: true }))
+    spot(W - 10, D - 5.5, 2.8, 'kitchen', 'Küche: etwas essen (Leben auffüllen)', 1)
+    solids.push(rect(-W + 24, -W + 36, -3, 3, 0.1, 0xfacc15, { y0: fl, deco: true }), rect(-W + 28.6, -W + 32.4, -1.4, 2.4, 0.5, 0x1e293b, { y0: fl, deco: true }))
+    spot(-W + 30.5, 0.5, 2.6, 'pole', 'Rutschstange: runter in die Fahrzeughalle', 1)
+    for (let i = 0; i < 4; i++) solids.push(rect(-W + 4 + i * 2.4, -W + 5.6 + i * 2.4, -D + 0.6, -D + 1.8, 2.3, 0xb91c1c, { y0: fl, deco: true }))
   } else if (p.kind === 'army') {
     // Kaserne: Waffenregale, Westenständer (Spot), Kartentisch; draußen im Gelände die Fahrzeuge zum Klauen
     for (let i = 0; i < 4; i++) solids.push(rect(-W + 3 + i * 5, -W + 5.5 + i * 5, D - 1.6, D - 0.6, 2.2, 0x374151), rect(-W + 3.2 + i * 5, -W + 5.3 + i * 5, D - 1.7, D - 1.6, 0.12, 0x111827, { y0: 1.2, deco: true }))
@@ -170,7 +191,7 @@ function furnish(p: Poi): Poi {
     spot(-W + 33, -D + 4.4, 3.2, 'dress', 'Ankleidezimmer: Sanitäter-Dienst')
   }
   // Bank (Schalterhalle + Obergeschoss auf Höhe 8,15) und Kaserne (2 Stockwerke à 5 m) haben ein 2. Stockwerk mit Treppe
-  setSpecial(p.b, solids, p.kind === 'bank' ? { floors: 2, fh: 8.15, stair: 15 } : p.kind === 'army' ? { floors: 2, fh: 5, stair: 11 } : undefined)
+  setSpecial(p.b, solids, p.kind === 'bank' ? { floors: 2, fh: 8.15, stair: 15 } : p.kind === 'army' ? { floors: 2, fh: 5, stair: 11 } : p.kind === 'fire' ? { floors: 2, fh: 5, stair: 12 } : undefined)
   const d = layoutOf(p.b).door
   return { ...p, x: d.x, z: d.z, nx: d.nx, nz: d.nz, solids, spots }
 }
@@ -186,9 +207,11 @@ export function poiNear(x: number, z: number, y = 0): Poi | null {
 
 /** Bedienstelle (Tresor, Theke, Gerät) in Reichweite, wenn man im Haus steht */
 export function spotNear(x: number, z: number, y = 0): { poi: Poi; spot: Spot } | null {
-  if (y > 3) return null
+  if (y > 9) return null
+  const fl = y > 3 ? 1 : 0
   let best: { poi: Poi; spot: Spot; d: number } | null = null
   for (const p of pois()) for (const s of p.spots) {
+    if ((s.fl ?? 0) !== fl) continue
     const d = Math.hypot(s.x - x, s.z - z)
     if (d < s.r && (!best || d < best.d)) best = { poi: p, spot: s, d }
   }

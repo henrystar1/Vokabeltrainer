@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { mulberry32 } from '../learning/random'
+import { mulberry32 } from '../vocabApi'
 import { SNAKE_SIZE, newSnake, snakeDelay, step, turn } from './snake'
 import { COLS, ROWS, cells, fits, hardDrop, move, newTetris, rotate, tick, type TetrisState } from './tetris'
 import { flap, newFlappy, stepFlappy, FH } from './flappy'

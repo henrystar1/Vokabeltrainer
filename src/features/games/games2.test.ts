@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { mulberry32 } from '../learning/random'
+import { mulberry32 } from '../vocabApi'
 import { addTile, canMove, move, newBoard, slideRow } from './game2048'
 import { MEMORY_LIVES, heartsAfterRound, isAvoidableMiss, makeDeck, pairsForLevel } from './memory'
 import { freeHole, moleGap, moleMaxUp, molePoints, moleUpTime, pickKind, MOLE_HOLES } from './mole'

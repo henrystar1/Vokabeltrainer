@@ -1,4 +1,4 @@
-import type { Rng } from '../learning/random'
+import type { Rng } from '../vocabApi'
 
 export const MOLE_HOLES = 9
 export const MOLE_LIVES = 3

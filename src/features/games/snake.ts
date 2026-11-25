@@ -1,4 +1,4 @@
-import type { Rng } from '../learning/random'
+import type { Rng } from '../vocabApi'
 
 export interface Point { x: number; y: number }
 export type Dir = 'up' | 'down' | 'left' | 'right'

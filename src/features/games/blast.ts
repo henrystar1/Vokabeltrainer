@@ -1,4 +1,4 @@
-import type { Rng } from '../learning/random'
+import type { Rng } from '../vocabApi'
 
 export const BLAST_SIZE = 8
 

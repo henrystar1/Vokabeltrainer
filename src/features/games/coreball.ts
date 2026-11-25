@@ -1,4 +1,4 @@
-import type { Rng } from '../learning/random'
+import type { Rng } from '../vocabApi'
 
 /** Coreball: Schieß Kugeln auf den drehenden Kern. Berührt eine Kugel eine schon steckende, ist es vorbei. Jedes Level wird schwerer. */
 export const CW = 360

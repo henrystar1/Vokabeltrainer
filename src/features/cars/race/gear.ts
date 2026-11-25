@@ -40,6 +40,20 @@ export function addGear(THREE: THREE, m: T.Group, mask: number): void {
     inner.add(helm, visor)
   }
   if (mask & 64 && !(done & 64)) addIronSuit(THREE, m)
+  if (mask & 128 && !(done & 128)) {
+    // Feuerwehr-Einsatzjacke: roter Mantel mit gelben Reflexstreifen, gelber Helm mit Nackenschutz, Atemluftflasche, Axt am Gürtel
+    const coat = new THREE.Mesh(new THREE.BoxGeometry(0.56, 0.62, 0.32), new THREE.MeshStandardMaterial({ color: 0xb91c1c, roughness: 0.7 })); coat.position.set(0, 1.12, 0)
+    const hem = new THREE.Mesh(new THREE.BoxGeometry(0.58, 0.18, 0.34), new THREE.MeshStandardMaterial({ color: 0x7f1d1d, roughness: 0.7 })); hem.position.set(0, 0.74, 0)
+    const refl = new THREE.MeshStandardMaterial({ color: 0xfde047, roughness: 0.4, emissive: 0x403300 })
+    const s1 = new THREE.Mesh(new THREE.BoxGeometry(0.58, 0.06, 0.34), refl); s1.position.set(0, 1.0, 0)
+    const s2 = new THREE.Mesh(new THREE.BoxGeometry(0.58, 0.06, 0.34), refl); s2.position.set(0, 0.84, 0)
+    const tank = new THREE.Mesh(new THREE.CylinderGeometry(0.1, 0.1, 0.5, 10), new THREE.MeshStandardMaterial({ color: 0x94a3b8, roughness: 0.3, metalness: 0.7 })); tank.position.set(0, 1.15, -0.26)
+    const helm = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.2, 0.5), new THREE.MeshStandardMaterial({ color: 0xfacc15, roughness: 0.35, metalness: 0.2 })); helm.position.set(0, 1.84, 0)
+    const brim = new THREE.Mesh(new THREE.BoxGeometry(0.56, 0.04, 0.2), new THREE.MeshStandardMaterial({ color: 0xfacc15, roughness: 0.35 })); brim.position.set(0, 1.76, 0.33)
+    const nape = new THREE.Mesh(new THREE.BoxGeometry(0.52, 0.2, 0.06), new THREE.MeshStandardMaterial({ color: 0xfacc15, roughness: 0.35 })); nape.position.set(0, 1.72, -0.27)
+    const crest = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.06, 0.5), new THREE.MeshStandardMaterial({ color: 0xdc2626 })); crest.position.set(0, 1.96, 0)
+    inner.add(coat, hem, s1, s2, tank, helm, brim, nape, crest)
+  }
   if (mask & 4 && !m.userData.bt) addBaton(THREE, m)
   const gunBit = mask & 32 ? 32 : mask & 16 ? 16 : mask & 8 ? 8 : 0
   if (gunBit !== ((m.userData.gunBit as number | undefined) ?? 0)) {

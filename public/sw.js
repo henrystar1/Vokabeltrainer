@@ -35,3 +35,23 @@ self.addEventListener('notificationclick', (event) => {
     }),
   )
 })
+
+/* Offline-Hülle: die App (Seiten, Skripte, Bilder, Schriften) wird zwischengespeichert, damit sie ohne Internet startet. Daten (Supabase) laufen nie über den Cache. */
+const SHELL = 'vt-shell-v1'
+self.addEventListener('activate', (e) => e.waitUntil(caches.keys().then((ks) => Promise.all(ks.filter((k) => k.startsWith('vt-shell-') && k !== SHELL).map((k) => caches.delete(k))))))
+self.addEventListener('fetch', (event) => {
+  const req = event.request
+  if (req.method !== 'GET') return
+  const url = new URL(req.url)
+  if (url.origin !== self.location.origin) return
+  if (req.mode === 'navigate') {
+    // Seite: erst Netz (immer die neueste Version), ohne Netz die gemerkte Startseite
+    event.respondWith(fetch(req).then((res) => { const c = res.clone(); void caches.open(SHELL).then((ch) => ch.put(self.registration.scope, c)); return res }).catch(() => caches.match(self.registration.scope).then((r) => r || caches.match(req)).then((r) => r || new Response('Offline', { status: 503 }))))
+    return
+  }
+  // Dateien: aus dem Cache, im Hintergrund erneuern
+  event.respondWith(caches.open(SHELL).then((ch) => ch.match(req).then((hit) => {
+    const net = fetch(req).then((res) => { if (res.ok) void ch.put(req, res.clone()); return res }).catch(() => hit || new Response('', { status: 504 }))
+    return hit || net
+  })))
+})

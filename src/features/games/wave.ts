@@ -1,4 +1,4 @@
-import type { Rng } from '../learning/random'
+import type { Rng } from '../vocabApi'
 
 /** „Wave“: Die Spitze fliegt immer im 45°-Winkel – Halten = hoch, Loslassen = runter. Stacheln und Decke/Boden töten. */
 export const WW = 288

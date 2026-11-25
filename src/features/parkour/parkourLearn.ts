@@ -1,9 +1,9 @@
 import type { Direction } from '../../types'
-import { getLearningPool } from '../../services/learning'
-import { getBookEntries } from '../../services/books'
+import { getLearningPool } from '../vocabApi'
+import { getBookEntries } from '../vocabApi'
 import { listPublicBooks } from '../../services/community'
-import { buildIndexes, makeQuestion, type Indexes, type Question, type VocabLike } from '../learning/questions'
-import { shuffle, type Rng } from '../learning/random'
+import { buildIndexes, makeQuestion, type Indexes, type Question, type VocabLike } from '../vocabApi'
+import { shuffle, type Rng } from '../vocabApi'
 
 /** Lernen im Parkour: Speedups verlangen 1 Vokabel, der Wechsel ins nächste Level 2. */
 export const LEARN_PER_LEVEL = 2

@@ -5,7 +5,8 @@ import { buildSpecCar, getSpec } from '../customCar'
 import { RoundedBoxGeometry } from 'three/examples/jsm/geometries/RoundedBoxGeometry.js'
 import { roadProximity, type Track } from './track'
 import { addGlassHole, clearGlassHoles } from './glass'
-import { ARMY, BRIDGES, CITY, type Bld, BANK, GARAGES, HOSPITAL, POLICE, TUNNELS, bridgeH, city, tunnelD } from './city'
+import { facadeFor, wantsFacade, type Geo as FacadeGeo } from './facade'
+import { ARMY, BRIDGES, CITY, type Bld, BANK, FIRE, GARAGES, HOSPITAL, POLICE, TUNNELS, bridgeH, city, tunnelD } from './city'
 import { PARK, PARK_TOP, PARK_TUNNEL } from './parkhaus'
 import { MOUNTAINS, OUT, RING, hillH, outRoads, ringPath } from './mountains'
 import { trees } from './forest'
@@ -342,7 +343,7 @@ export function buildScene(THREE: THREE, t: Track): RaceScene {
   }, showInterior, setVault, smashGlass }
 }
 
-interface Body { swat?: boolean; amb?: boolean; len: number; wid: number; hgt: number; cabLen: number; cabH: number; cabZ: number; wheelR: number; spoiler?: boolean; bed?: boolean; open?: boolean; tall?: boolean; cage?: boolean; scoop?: boolean; formula?: boolean; track?: number; wheelW?: number; stripe?: boolean }
+interface Body { swat?: boolean; amb?: boolean; fire?: boolean; len: number; wid: number; hgt: number; cabLen: number; cabH: number; cabZ: number; wheelR: number; spoiler?: boolean; bed?: boolean; open?: boolean; tall?: boolean; cage?: boolean; scoop?: boolean; formula?: boolean; track?: number; wheelW?: number; stripe?: boolean }
 const BODIES: Record<string, Body> = {
   kleinwagen: { len: 3.9, wid: 1.8, hgt: 0.75, cabLen: 2.1, cabH: 0.7, cabZ: -0.1, wheelR: 0.36 },
   limousine: { len: 4.8, wid: 1.9, hgt: 0.72, cabLen: 2.5, cabH: 0.62, cabZ: -0.2, wheelR: 0.38 },
@@ -362,6 +363,7 @@ const BODIES: Record<string, Body> = {
   rennwagen: { len: 5.0, wid: 0.9, hgt: 0.42, cabLen: 0.8, cabH: 0.35, cabZ: -0.2, wheelR: 0.42, formula: true, track: 1.85, wheelW: 0.55 },
   roadster: { len: 4.2, wid: 1.85, hgt: 0.5, cabLen: 1.0, cabH: 0.3, cabZ: -0.1, wheelR: 0.37, open: true, stripe: true },
   swat: { len: 6.4, wid: 2.5, hgt: 1.3, cabLen: 3.4, cabH: 0.8, cabZ: 0.5, wheelR: 0.62, tall: true, swat: true },
+  firetruck: { len: 9.4, wid: 2.5, hgt: 1.75, cabLen: 2.6, cabH: 0.75, cabZ: 3.0, wheelR: 0.62, tall: true, fire: true },
   ambulance: { len: 6.2, wid: 2.3, hgt: 1.45, cabLen: 3.6, cabH: 0.5, cabZ: -0.5, wheelR: 0.5, tall: true, amb: true },
 }
 
@@ -545,14 +547,14 @@ export function bankDecor(THREE: THREE, scene: T.Scene, night: boolean): RaceSce
     return n
   }
 }
-function blockDecor(THREE: THREE, scene: T.Scene, night: boolean, L: typeof POLICE, hosp: boolean): void {
+function blockDecor(THREE: THREE, scene: T.Scene, night: boolean, L: typeof POLICE, hosp: boolean, fire = false): void {
   const k = night ? 0.6 : 1
   const mat = (c: number) => new THREE.MeshStandardMaterial({ color: new THREE.Color(c).multiplyScalar(k), roughness: 0.9 })
   const flat = (m: T.Material, x0: number, x1: number, z0: number, z1: number, y: number, hgt = 0.05) => {
     const b = new THREE.Mesh(new THREE.BoxGeometry(x1 - x0, hgt, z1 - z0), m); b.position.set((x0 + x1) / 2, y, (z0 + z1) / 2); scene.add(b); return b
   }
   const { lot, garage: g, station: st } = L
-  const ACC = hosp ? 0xdc2626 : 0x1e3a8a, ACC2 = hosp ? '#fecaca' : '#60a5fa', NAME = hosp ? 'KRANKENHAUS' : 'POLIZEI'
+  const ACC = hosp ? 0xdc2626 : fire ? 0xb91c1c : 0x1e3a8a, ACC2 = hosp ? '#fecaca' : fire ? '#fde68a' : '#60a5fa', NAME = hosp ? 'KRANKENHAUS' : fire ? 'FEUERWEHR' : 'POLIZEI'
   flat(mat(0x2b2f36), lot.x0, lot.x1, lot.z0, lot.z1, 0.28, 0.06)
   const white = new THREE.MeshBasicMaterial({ color: 0xe5e7eb })
   // Parkbuchten an der Südkante und an der Westkante
@@ -570,11 +572,11 @@ function blockDecor(THREE: THREE, scene: T.Scene, night: boolean, L: typeof POLI
     const t = swatText(THREE, w, h, txt, fg); t.position.set(x + nx * 0.2, y, z + nz * 0.2); t.rotation.y = Math.atan2(nx, nz)
     scene.add(plate, t)
   }
-  sign(14, 1.3, hosp ? 'RETTUNGSWAGEN' : 'POLIZEI GARAGE', g.x0 - 0.2, 6.3, gz, -1, 0, ACC)
-  sign(hosp ? 12 : 9, 1.5, hosp ? 'NOTAUFNAHME' : 'POLIZEI', st.x - 25, 4.7, st.z - st.d / 2 - 0.2, 0, -1, ACC)
-  sign(hosp ? 34 : 24, 2.6, NAME, st.x, 14.2, st.z - st.d / 2 - 0.2, 0, -1, ACC)
+  sign(14, 1.3, hosp ? 'RETTUNGSWAGEN' : fire ? 'LÖSCHZÜGE' : 'POLIZEI GARAGE', g.x0 - 0.2, 6.3, gz, -1, 0, ACC)
+  sign(hosp ? 12 : 9, 1.5, hosp ? 'NOTAUFNAHME' : fire ? 'NOTRUF 112' : 'POLIZEI', st.x - 25, 4.7, st.z - st.d / 2 - 0.2, 0, -1, ACC)
+  sign(hosp ? 34 : fire ? 28 : 24, 2.6, NAME, st.x, 14.2, st.z - st.d / 2 - 0.2, 0, -1, ACC)
   // Dach: weißes Band, Lichtbalken
-  const band = new THREE.Mesh(new THREE.BoxGeometry(st.w + 0.5, 1.2, st.d + 0.5), mat(hosp ? 0xdc2626 : 0xf1f5f9)); band.position.set(st.x, 12.6, st.z); scene.add(band)
+  const band = new THREE.Mesh(new THREE.BoxGeometry(st.w + 0.5, 1.2, st.d + 0.5), mat(hosp ? 0xdc2626 : fire ? 0xfacc15 : 0xf1f5f9)); band.position.set(st.x, 12.6, st.z); scene.add(band)
   const red = new THREE.MeshBasicMaterial({ color: 0xef4444 }), blue = new THREE.MeshBasicMaterial({ color: hosp ? 0xef4444 : 0x3b82f6 })
   if (hosp) {
     // großes rotes Kreuz auf dem Dach
@@ -583,8 +585,76 @@ function blockDecor(THREE: THREE, scene: T.Scene, night: boolean, L: typeof POLI
     const a1 = new THREE.Mesh(new THREE.BoxGeometry(11, 0.6, 3.4), red); a1.position.set(st.x, 16.5, st.z)
     const a2 = new THREE.Mesh(new THREE.BoxGeometry(3.4, 0.6, 11), red); a2.position.set(st.x, 16.5, st.z)
     scene.add(b0, a1, a2)
+  } else if (fire) {
+    // Schlauchturm mit rot-weißen Streifen und Blaulicht obenauf, Alarmleuchte über der Garage
+    for (let i = 0; i < 6; i++) { const seg = new THREE.Mesh(new THREE.BoxGeometry(6, 4, 6), mat(i % 2 ? 0xf8fafc : 0xdc2626)); seg.position.set(st.x - st.w / 2 + 5, 16 + 2 + i * 4, st.z + st.d / 2 - 5); scene.add(seg) }
+    const beacon = new THREE.Mesh(new THREE.SphereGeometry(1.6, 12, 8), blue); beacon.position.set(st.x - st.w / 2 + 5, 16 + 26, st.z + st.d / 2 - 5); scene.add(beacon)
+    const alarm = new THREE.Mesh(new THREE.BoxGeometry(1.4, 0.8, 1.4), red); alarm.position.set(g.x0 - 0.4, 7.4, gz); scene.add(alarm)
+    // Hydranten am Hof
+    for (let i = 0; i < 4; i++) { const h = new THREE.Mesh(new THREE.CylinderGeometry(0.28, 0.34, 0.9, 10), red); h.position.set(lot.x0 + 8 + i * 9, 0.75, lot.z1 + 1.2); scene.add(h) }
   } else for (const [dx, m] of [[-2, red], [2, blue]] as const) { const l = new THREE.Mesh(new THREE.BoxGeometry(4, 0.8, 1.6), m); l.position.set(st.x + dx * 2, 16.5, st.z); scene.add(l) }
 }
+/** Löschzug: roter Aufbau, Geräteklappen, Schlauchtrommeln, Blaulichter und eine ausfahrbare Drehleiter auf dem Dach (`setFireLadder`). */
+function addFireParts(THREE: THREE, g: T.Group, b: Body, clearance: number): void {
+  const red = new THREE.MeshStandardMaterial({ color: 0xdc2626, roughness: 0.35, metalness: 0.3 })
+  const white = new THREE.MeshStandardMaterial({ color: 0xf8fafc, roughness: 0.4 })
+  const dark = new THREE.MeshStandardMaterial({ color: 0x111827, roughness: 0.6, metalness: 0.4 })
+  const chrome = new THREE.MeshStandardMaterial({ color: 0xcbd5e1, roughness: 0.25, metalness: 0.8 })
+  const yellow = new THREE.MeshStandardMaterial({ color: 0xfacc15, roughness: 0.5 })
+  const top = clearance + b.hgt, W = b.wid, L = b.len
+  // Aufbau hinten (Geräteraum) – höher als der Rahmen, Klappen mit Griffen
+  const body = new THREE.Mesh(new THREE.BoxGeometry(W * 0.98, 1.0, L * 0.58), red); body.position.set(0, top + 0.5, -L * 0.2); g.add(body)
+  for (const sx of [-1, 1]) {
+    const x = sx * (W / 2 + 0.02)
+    const band = new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.14, L * 0.98), yellow); band.position.set(x, clearance + 0.55, 0); g.add(band)
+    for (let i = 0; i < 4; i++) {
+      const z = -L * 0.2 - L * 0.22 + i * (L * 0.15)
+      const door = new THREE.Mesh(new THREE.BoxGeometry(0.04, 0.8, L * 0.12), dark); door.position.set(sx * (W * 0.49 + 0.02), top + 0.5, z); g.add(door)
+      const handle = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.05, L * 0.06), chrome); handle.position.set(sx * (W * 0.49 + 0.06), top + 0.5, z); g.add(handle)
+    }
+    const t = swatText(THREE, 3.4, 0.5, 'FEUERWEHR', '#f8fafc'); t.rotation.y = sx * Math.PI / 2; t.position.set(sx * (W / 2 + 0.06), clearance + 1.0, -L * 0.1); g.add(t)
+    const mir = new THREE.Mesh(new THREE.BoxGeometry(0.28, 0.24, 0.08), dark); mir.position.set(sx * (W / 2 + 0.2), top + 0.1, L / 2 - 2.1); g.add(mir)
+  }
+  // Heck: Warnstreifen rot-weiß
+  for (let i = 0; i < 8; i++) { const st = new THREE.Mesh(new THREE.BoxGeometry(W / 8, 0.5, 0.05), i % 2 ? white : red); st.position.set(-W / 2 + W / 16 + i * (W / 8), clearance + 0.55, -L / 2 - 0.02); g.add(st) }
+  // Front: Stoßstange, Grill, Schrift
+  const bump = new THREE.Mesh(new THREE.BoxGeometry(W * 0.99, 0.28, 0.22), chrome); bump.position.set(0, clearance + 0.3, L / 2 + 0.06); g.add(bump)
+  const front = swatText(THREE, 2.2, 0.4, 'FEUERWEHR', '#f8fafc'); front.scale.x = -1; front.position.set(0, top - 0.2, L / 2 + 0.04); g.add(front)
+  // Blaulichter (Dachbalken über dem Fahrerhaus) + Sirenen am Bug
+  const roofY = top + b.cabH
+  const bar = new THREE.Mesh(new THREE.BoxGeometry(W * 0.8, 0.14, 0.34), dark); bar.position.set(0, roofY + 0.1, L / 2 - 1.6); g.add(bar)
+  for (const [dx, col] of [[-1, 0x2a6bff], [1, 0x2a6bff], [0, 0xff2a2a]] as const) { const l = new THREE.Mesh(new THREE.BoxGeometry(W * 0.22, 0.14, 0.3), new THREE.MeshBasicMaterial({ color: col })); l.position.set(dx * W * 0.28, roofY + 0.2, L / 2 - 1.6); g.add(l) }
+  // Schlauchtrommel und Pumpenarmaturen am Heck
+  const reel = new THREE.Mesh(new THREE.CylinderGeometry(0.34, 0.34, 0.4, 14), yellow); reel.rotation.z = Math.PI / 2; reel.position.set(0, top + 1.18, -L * 0.42); g.add(reel)
+  // Drehleiter: Drehkranz auf dem Aufbau, Leiter (Holme + Sprossen) in drei Teilen, die sich ausfahren
+  const turret = new THREE.Mesh(new THREE.CylinderGeometry(0.5, 0.6, 0.3, 16), dark); turret.position.set(0, top + 1.15, -L * 0.38); g.add(turret)
+  const pivot = new THREE.Group(); pivot.position.set(0, top + 1.5, -L * 0.38); g.add(pivot)
+  const secs: T.Group[] = []
+  const LEN = L * 0.55
+  for (let k = 0; k < 3; k++) {
+    const sec = new THREE.Group(), w = 0.9 - k * 0.14
+    for (const sx of [-1, 1]) { const r = new THREE.Mesh(new THREE.BoxGeometry(0.07, 0.14, LEN), k % 2 ? chrome : red); r.position.set(sx * w / 2, 0, LEN / 2); sec.add(r) }
+    for (let i = 0; i <= 8; i++) { const rung = new THREE.Mesh(new THREE.BoxGeometry(w, 0.04, 0.05), chrome); rung.position.set(0, 0.02, (i / 8) * LEN); sec.add(rung) }
+    sec.position.y = k * 0.16
+    pivot.add(sec); secs.push(sec)
+  }
+  // Rettungskorb am Ende der Leiter
+  const basket = new THREE.Mesh(new THREE.BoxGeometry(1.1, 0.5, 1.0), new THREE.MeshStandardMaterial({ color: 0xdc2626, roughness: 0.5 })); basket.position.set(0, 0.25, LEN + 0.4); secs[2].add(basket)
+  g.userData.ladder = { pivot, secs, LEN }
+  setFireLadder(g, 0)
+}
+
+/** Drehleiter einstellen: k = 0 eingeklappt auf dem Dach, k = 1 steil aufgerichtet und voll ausgefahren (zielt nach vorn). */
+export function setFireLadder(g: T.Group, k: number): void {
+  const l = g.userData.ladder as { pivot: T.Group; secs: T.Group[]; LEN: number } | undefined
+  if (!l) return
+  const e = Math.max(0, Math.min(1, k))
+  l.pivot.rotation.x = -e * 0.95 // hoch (Spitze nach vorn oben, Blick in +z)
+  // Teile schieben sich nach vorn auseinander
+  l.secs[1].position.z = e * l.LEN * 0.8
+  l.secs[2].position.z = e * l.LEN * 1.6
+}
+
 function swatText(THREE: THREE, w: number, h: number, txt: string, fg = '#f8fafc'): T.Mesh {
   const c = document.createElement('canvas'); c.width = 512; c.height = Math.round(512 * h / w)
   const g = c.getContext('2d')
@@ -754,6 +824,7 @@ function buildCar(THREE: THREE, kind: string, color: string, name: string, isMe:
   }
   if (b.swat) addSwatParts(THREE, g, b, clearance)
   if (b.amb) addAmbulanceParts(THREE, g, b, clearance)
+  if (b.fire) addFireParts(THREE, g, b, clearance)
   // Rennstreifen
   if (b.stripe || kind === 'sportwagen' || kind === 'cabrio') {
     const st = new THREE.Mesh(new THREE.BoxGeometry(0.34, 0.02, b.len * 0.98), new THREE.MeshStandardMaterial({ color: 0xf8fafc, roughness: 0.4 }))
@@ -1047,15 +1118,24 @@ function buildCity(THREE: THREE, scene: T.Scene, ground: T.Mesh, night: boolean)
     dg.setAttribute('position', new THREE.Float32BufferAttribute(dp, 3)); dg.setAttribute('color', new THREE.Float32BufferAttribute(dc, 3)); dg.setIndex(di)
     scene.add(new THREE.Mesh(dg, new THREE.MeshBasicMaterial({ vertexColors: true, side: THREE.FrontSide, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 })))
   }
+  // Fassadendetails (Dachrand, Gesims, Sockel, Dachaufbauten, Vordächer) als ein Mesh
+  {
+    const fg: FacadeGeo = { pos: [], nor: [], col: [], idx: [] }
+    for (const b of buildings) if (wantsFacade(b)) facadeFor(b, b.lo !== undefined ? null : layoutOf(b).door, fg, night ? 0.6 : 1)
+    const geo = new THREE.BufferGeometry()
+    geo.setAttribute('position', new THREE.Float32BufferAttribute(fg.pos, 3)); geo.setAttribute('normal', new THREE.Float32BufferAttribute(fg.nor, 3)); geo.setAttribute('color', new THREE.Float32BufferAttribute(fg.col, 3))
+    geo.setIndex(fg.idx)
+    scene.add(new THREE.Mesh(geo, new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.85 })))
+  }
   const smashGlass = bankDecor(THREE, scene, night)
   armyDecor(THREE, scene, night, buildings)
-  blockDecor(THREE, scene, night, POLICE, false); blockDecor(THREE, scene, night, HOSPITAL, true)
+  blockDecor(THREE, scene, night, POLICE, false); blockDecor(THREE, scene, night, HOSPITAL, true); blockDecor(THREE, scene, night, FIRE, false, true)
   const viewer = makeInteriorViewer(THREE, scene, { geo: bg, ranges }, night)
   const wallMats = pal.map((c) => new THREE.MeshStandardMaterial({ color: c, roughness: 0.85, side: THREE.DoubleSide }))
   const policeWall = new THREE.MeshStandardMaterial({ color: new THREE.Color(0xc7d6f5).multiplyScalar(night ? 0.6 : 1), roughness: 0.85, side: THREE.DoubleSide })
   const hospWall = new THREE.MeshStandardMaterial({ color: new THREE.Color(0xf1f5f9).multiplyScalar(night ? 0.6 : 1), roughness: 0.85, side: THREE.DoubleSide })
   const bankWall = new THREE.MeshStandardMaterial({ color: new THREE.Color(0xdbeafe).multiplyScalar(night ? 0.6 : 1), roughness: 0.2, side: THREE.DoubleSide, transparent: true, opacity: 0.14, depthWrite: false })
-  const showInterior: RaceScene['showInterior'] = (b) => { viewer.show(b as Bld | null, b ? ((b as Bld).kind === 'police' ? policeWall : (b as Bld).kind === 'hospital' ? hospWall : (b as Bld).kind === 'bank' ? bankWall : wallMats[(b as Bld).c]) : wallMats[0]) }
+  const showInterior: RaceScene['showInterior'] = (b) => { viewer.show(b as Bld | null, b ? ((b as Bld).kind === 'police' ? policeWall : (b as Bld).kind === 'hospital' || (b as Bld).kind === 'fire' ? hospWall : (b as Bld).kind === 'bank' ? bankWall : wallMats[(b as Bld).c]) : wallMats[0]) }
 
   // Gehwege unter jedem Block (hellgrau, leicht erhöht) und Parks
   const walk = new THREE.MeshStandardMaterial({ color: night ? 0x5b6270 : 0x9ca3af, roughness: 1 })

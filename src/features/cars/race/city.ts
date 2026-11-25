@@ -18,7 +18,7 @@ export const BRIDGES: ReadonlyArray<{ bz: number; bx0: number; bx1: number }> = 
   { bz: 0, bx0: -240, bx1: 240 },
 ]
 
-export interface Bld { x: number; z: number; w: number; d: number; h: number; /** Unterkante (Sturz über einer Garageneinfahrt): darunter kann man durchfahren */ lo?: number; /** Farbvariante 0–5 */ c: number; /** feste Wandfarbe (Polizei) */ col?: number; /** Tür-Seite erzwingen (0 Süd, 1 West, 2 Nord, 3 Ost) */ door?: 0 | 1 | 2 | 3; /** Sonderhaus */ kind?: 'police' | 'hospital' | 'bank' | 'weapons' | 'army'; /** nicht als Kasten zeichnen (eigenes Modell), aber solide */ hid?: boolean }
+export interface Bld { x: number; z: number; w: number; d: number; h: number; /** Unterkante (Sturz über einer Garageneinfahrt): darunter kann man durchfahren */ lo?: number; /** Farbvariante 0–5 */ c: number; /** feste Wandfarbe (Polizei) */ col?: number; /** Tür-Seite erzwingen (0 Süd, 1 West, 2 Nord, 3 Ost) */ door?: 0 | 1 | 2 | 3; /** Sonderhaus */ kind?: 'police' | 'hospital' | 'bank' | 'weapons' | 'army' | 'fire'; /** nicht als Kasten zeichnen (eigenes Modell), aber solide */ hid?: boolean }
 import { PARK, PARK_TUNNEL } from './parkhaus'
 export interface CityData { buildings: Bld[]; parks: Array<{ x: number; z: number; size: number }>; grid: Map<string, number[]> }
 
@@ -38,6 +38,8 @@ function blockLayout(cx: number, cz: number) {
 export const POLICE = blockLayout(-420, 300)
 export const HOSPITAL = blockLayout(300, 300)
 export const BANK = blockLayout(180, -180)
+/** Feuerwache: Haus mit Obergeschoss (Schlafsaal, Küche, Rutschstange) und offene Fahrzeughalle mit Löschzügen */
+export const FIRE = blockLayout(-300, -420)
 /** Armee-Gelände am Nordrand der Stadt (zur Rennstrecke hin): Zaun mit Tor im Süden, Kaserne, Panzer, Hubschrauber, Waffenautos, Wachposten */
 const AX = 420, AZ = 660
 export const ARMY = {
@@ -107,7 +109,7 @@ export function city(): CityData {
     )
     for (const sx of [-1, 1]) for (const sz of [-1, 1]) buildings.push({ x: A.cx + sx * H, z: A.cz + sz * H, w: 4, d: 4, h: 9, c: 0, col: 0x3f4a2f, hid: true })
   }
-  for (const [L, kind, body, trim] of [[POLICE, 'police', 0x1e3a8a, 0xe5e7eb], [HOSPITAL, 'hospital', 0xf1f5f9, 0xdc2626], [BANK, 'bank', 0xd8c9a0, 0]] as const) {
+  for (const [L, kind, body, trim] of [[POLICE, 'police', 0x1e3a8a, 0xe5e7eb], [HOSPITAL, 'hospital', 0xf1f5f9, 0xdc2626], [FIRE, 'fire', 0xb91c1c, 0xfacc15], [BANK, 'bank', 0xd8c9a0, 0]] as const) {
     // Sonderblock: zufällige Häuser raus, Haus + offene Garage (Wände, Dach mit Sturz) hinein
     clearBlock(L.cx, L.cz)
     const st = L.station, g = L.garage

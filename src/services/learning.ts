@@ -25,7 +25,7 @@ export const submitSession = (i: SubmitInput) =>
   })
 
 export const addRepeatAnswers = (sessionId: string, answers: AnswerRecord[]) =>
-  rpc<number>('add_repeat_answers', { p_session_id: sessionId, p_answers: answers })
+  sessionId.startsWith('offline-') ? Promise.resolve(0) : rpc<number>('add_repeat_answers', { p_session_id: sessionId, p_answers: answers })
 
 export type BookBox = { book_id: string; fach: number[] }
 /** Fächer-Verteilung je Buch (Migration 0082). */

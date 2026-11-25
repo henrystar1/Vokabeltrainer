@@ -11,8 +11,11 @@ import ThemeApplier from './features/shop/ThemeProvider'
 import { SettingsProvider } from './features/settings/SettingsProvider'
 import './index.css'
 import { registerServiceWorker } from './lib/serviceWorker'
+import { flushOfflineQueue } from './services/rpc'
 
 registerServiceWorker()
+void flushOfflineQueue().catch(() => undefined)
+window.addEventListener('online', () => { void flushOfflineQueue().catch(() => undefined) })
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>

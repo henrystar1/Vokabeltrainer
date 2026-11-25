@@ -71,6 +71,15 @@ export const FR: Record<string, string> = {
   'Wen einladen? (nur wer gerade in der Stadt ist)': 'Qui inviter ? (seulement ceux qui sont en ville)', 'Gerade ist niemand sonst in der Stadt. Du kannst trotzdem mit Polizei-Bots spielen.': 'Personne d’autre n’est en ville. Tu peux quand même jouer avec des bots de police.',
   'Wer sind die Banditen? (mehrere möglich, der Rest ist Polizei)': 'Qui sont les bandits ? (plusieurs possibles, les autres sont la police)', 'Polizei-Bots': 'Bots de police',
   'Banditen fahren ein schnelleres, fliegendes Auto und sind immer auf der Karte zu sehen. Die Polizei hat Blaulicht und ist etwas langsamer. Rammt ein Polizist einen Banditen, ist er gefangen; sind alle gefangen, gewinnt die Polizei. Nach 6 Minuten gewinnen die Banditen.': 'Les bandits conduisent une voiture plus rapide qui vole et sont toujours visibles sur la carte. La police a un gyrophare et est un peu plus lente. Si un policier percute un bandit, il est capturé ; si tous sont capturés, la police gagne. Après 6 minutes, les bandits gagnent.',
+  // Feuerwehr
+  'Ankleidezimmer: Feuerwehr-Dienst': 'Vestiaire : service des pompiers', 'Rutschstange: runter in die Fahrzeughalle': 'Perche de descente : vers le garage des véhicules', 'Im Bett ausruhen (Leben auffüllen)': 'Se reposer au lit (refaire le plein de vie)', 'Küche: etwas essen (Leben auffüllen)': 'Cuisine : manger quelque chose (refaire le plein de vie)',
+  '🚒 Im Dienst: Feuerwehr': '🚒 En service : pompiers', Feuerwehr: 'Pompiers', Feuerwache: 'Caserne de pompiers',
+  'Du bist jetzt Feuerwehrmann! Bei einem Brand ertönt der Alarm – du rutschst die Stange runter und fährst mit dem Löschzug los (Coins für jedes gelöschte Feuer).': 'Tu es maintenant pompier ! En cas d’incendie, l’alarme retentit – tu glisses le long de la perche et pars avec le camion de pompiers (des pièces pour chaque feu éteint).',
+  '🔥 Brand! Ein Haus steht in Flammen – die Feuerwehr rückt aus.': '🔥 Incendie ! Une maison est en flammes – les pompiers interviennent.', '🚨 ALARM! Brand in der Stadt – ab zur Rutschstange!': '🚨 ALARME ! Incendie en ville – direction la perche !', 'Du rutschst die Stange runter …': 'Tu glisses le long de la perche…',
+  'Los! Zum Brand – die blaue Linie zeigt den Weg. Q/Tippen spritzt Wasser.': 'Allez ! Vers l’incendie – la ligne bleue montre le chemin. Q/toucher projette de l’eau.', 'Feuer gelöscht! Gut gemacht.': 'Feu éteint ! Bien joué.', 'Das Feuer ist gelöscht.': 'Le feu est éteint.',
+  'Du ruhst dich aus – volle Leben.': 'Tu te reposes – vie pleine.', 'Du isst etwas – volle Leben.': 'Tu manges quelque chose – vie pleine.', 'Streifenwagen explodiert!': 'Voiture de patrouille explosée !', 'SWAT-Wagen explodiert!': 'Fourgon SWAT explosé !',
+  'Der Admin hat dir den Iron-Man-Anzug gegeben! (I)': 'L’admin t’a donné l’armure d’Iron Man ! (I)', 'Der Admin hat dir den Iron-Man-Anzug wieder genommen.': 'L’admin t’a repris l’armure d’Iron Man.', 'Iron Man vergeben.': 'Iron Man donné.', 'Iron Man genommen.': 'Iron Man retiré.', 'Niemand sonst ist gerade in der Stadt.': 'Personne d’autre n’est en ville.', 'Teleport (T)': 'Téléportation (T)',
+  '↻ Auf Updates prüfen / Seite neu laden': '↻ Vérifier les mises à jour / recharger la page',
   // Hauptspiel: HUD / Buttons
   'Vollbild beenden': 'Quitter le plein écran', '⤢ Vollbild aus': '⤢ Plein écran off', '⤢ Vollbild': '⤢ Plein écran', 'Reichweite der Karte': 'Portée de la carte', 'Größe der Karte': 'Taille de la carte', Groß: 'Grand',
   'Fliegen: Taste halten (E)': 'Voler : maintenir la touche (E)', 'Flug bereit (E)': 'Vol prêt (E)', '◀◀ Linkskurve': '◀◀ Virage à gauche', 'Rechtskurve ▶▶': 'Virage à droite ▶▶', 'TRESOR ÖFFNEN (G) – danach 6 Min Polizeijagd': 'OUVRIR LE COFFRE (G) – puis 6 min de chasse',
@@ -181,6 +190,10 @@ export const PATTERNS: Array<[RegExp, (...m: string[]) => string]> = [
   [/^Verbessern · ([\d.,]+)$/, (_, n) => `Améliorer · ${n}`],
   [/^Kaufen · ([\d.,]+) Coins$/, (_, n) => `Acheter · ${n} pièces`],
   [/^Verkaufen · ca\. ([\d.,]+) Coins$/, (_, n) => `Vendre · env. ${n} pièces`],
+  [/^Einsatz abgeschlossen: \+(\d+) Coins$/, (_, n) => `Intervention terminée : +${n} pièces`],
+  [/^Teleport zu (.+)!$/, (_, n) => `Téléportation vers ${n} !`],
+  [/^Iron Man von (.+) nehmen$/, (_, n) => `Retirer Iron Man à ${n}`],
+  [/^(.+) Iron Man geben$/, (_, n) => `Donner Iron Man à ${n}`],
   [/^Farbe (.+)$/, (_, c) => `Couleur ${c}`],
   [/^Meine Garage \((\d+)\)$/, (_, n) => `Mon garage (${n})`],
 ]

@@ -1,4 +1,4 @@
-import { shuffle, type Rng } from '../learning/random'
+import { shuffle, type Rng } from '../vocabApi'
 
 export const COLS = 10
 export const ROWS = 20

@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
-import { isAnswerCorrect } from '../learning/answer'
-import type { Question } from '../learning/questions'
+import { isAnswerCorrect } from '../vocabApi'
+import type { Question } from '../vocabApi'
 import { useSettings } from '../settings/SettingsProvider'
 import { loadLearnPool, nextQuestion, type LearnPool } from './parkourLearn'
 

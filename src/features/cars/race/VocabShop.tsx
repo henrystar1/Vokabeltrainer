@@ -1,9 +1,9 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { getLearningPool } from '../../../services/learning'
+import { getLearningPool } from '../../vocabApi'
 import { racePerkAnswer, racePerkBuy, type PerkItem, type RacePerks } from '../../../services/cars'
 import { errorMessage } from '../../../lib/errors'
-import { isAnswerCorrect } from '../../learning/answer'
-import { buildIndexes, makeQuestion, type Question } from '../../learning/questions'
+import { isAnswerCorrect } from '../../vocabApi'
+import { buildIndexes, makeQuestion, type Question } from '../../vocabApi'
 import type { PoolVocab } from '../../../types'
 
 /** Vokabel-Abfrage im Shop (Auto-Spawns) oder Fitnessstudio (Leben): jede richtige Antwort zählt, nach 10 gibt es die Belohnung (Server zählt und prüft). */

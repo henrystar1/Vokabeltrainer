@@ -36,7 +36,7 @@ export default function AppShell() {
         >
           <div className="mx-auto max-w-6xl animate-rise">
             <Outlet />
-            <VersionTag className="mt-10" />
+            <VersionTag className="mt-10" withButton />
           </div>
         </main>
         {!focus && <CardBoxDock open={dock} onOpen={setDock} />}
