@@ -27,6 +27,8 @@ export const KIND_STATS: Record<string, KindStats> = {
   tank: { kmh: 70, acc: 9, turn: 1.3, brake: 30 },
   heli: { kmh: 250, acc: 20, turn: 2.0, brake: 30 },
   armycar: { kmh: 250, acc: 28, turn: 2.3, brake: 45 },
+  /** KSK-Quad: wendig, schnell, unzerstörbar */
+  quad: { kmh: 130, acc: 22, turn: 2.2, brake: 40 },
   chopper: { kmh: 190, acc: 17, turn: 2.1, brake: 30 },
   crossbike: { kmh: 175, acc: 24, turn: 2.7, brake: 34 },
   sportbike: { kmh: 260, acc: 30, turn: 2.6, brake: 44 },
@@ -42,7 +44,7 @@ export const KIND_DIMS: Record<string, { len: number; wid: number }> = {
   pickup: { len: 5.3, wid: 2.0 }, cabrio: { len: 4.3, wid: 1.85 }, sportwagen: { len: 4.5, wid: 1.95 }, bus: { len: 6.6, wid: 2.2 },
   oldtimer: { len: 4.4, wid: 1.8 }, buggy: { len: 3.4, wid: 1.9 }, monstertruck: { len: 4.8, wid: 2.4 }, muscle: { len: 4.9, wid: 1.95 },
   rallye: { len: 4.1, wid: 1.85 }, gt: { len: 4.7, wid: 2.0 }, hypercar: { len: 4.6, wid: 2.05 }, rennwagen: { len: 5.0, wid: 2.0 },
-  roadster: { len: 4.2, wid: 1.85 }, supercar: { len: 4.5, wid: 1.85 }, swat: { len: 6.4, wid: 2.5 }, ambulance: { len: 6.2, wid: 2.3 }, firetruck: { len: 9.4, wid: 2.5 }, tank: { len: 7.4, wid: 3.6 }, heli: { len: 8.5, wid: 3.0 }, armycar: { len: 4.8, wid: 2.2 },
+  roadster: { len: 4.2, wid: 1.85 }, supercar: { len: 4.5, wid: 1.85 }, swat: { len: 6.4, wid: 2.5 }, ambulance: { len: 6.2, wid: 2.3 }, firetruck: { len: 9.4, wid: 2.5 }, tank: { len: 7.4, wid: 3.6 }, quad: { len: 2.8, wid: 1.6 }, heli: { len: 8.5, wid: 3.0 }, armycar: { len: 4.8, wid: 2.2 },
   chopper: { len: 2.6, wid: 0.9 }, crossbike: { len: 2.1, wid: 0.8 }, sportbike: { len: 2.1, wid: 0.8 }, hyperbike: { len: 2.2, wid: 0.8 },
 }
 export const kindDims = (kind: string): { len: number; wid: number } => KIND_DIMS[kind] ?? KIND_DIMS.kleinwagen
@@ -56,12 +58,12 @@ export const isBike = (kind: string): boolean => BIKE_KINDS.includes(kind)
 export const CUSTOM_FLY = new Set<string>()
 export const canFly = (kind: string): boolean => kind === 'roadster' || kind === 'supercar' || kind === 'swat' || CUSTOM_FLY.has(kind)
 /** Schadensfaktor bei Aufprall: SWAT-Wagen nehmen bei 200 km/h nur etwa 10 % Schaden (statt ~42 %) */
-export const KIND_TOUGH: Record<string, number> = { swat: 0.24, tank: 0.04, heli: 0.04, armycar: 0.35 }
+export const KIND_TOUGH: Record<string, number> = { swat: 0.24, tank: 0.04, heli: 0.04, armycar: 0.35, quad: 0 }
 /** Armee-Fahrzeuge: nur Beschuss der Armee verletzt den Fahrer (Rammen und Polizei nicht) */
-export const isArmored = (kind: string): boolean => kind === 'swat' || kind === 'tank' || kind === 'heli'
+export const isArmored = (kind: string): boolean => kind === 'swat' || kind === 'tank' || kind === 'heli' || kind === 'quad'
 export const toughOf = (kind: string): number => KIND_TOUGH[kind] ?? 1
 /** Plätze im Auto: SWAT-Wagen 10, sonst die Einstellung des Admins */
-export const seatsOf = (kind: string): number => (kind === 'swat' ? 10 : seatConfig.n)
+export const seatsOf = (kind: string): number => (kind === 'swat' ? 10 : kind === 'quad' ? 2 : seatConfig.n)
 export const FLY_SECONDS = 2
 export const FLY_COOLDOWN = 20
 /** Vom Admin eingestellt (gilt für alle): Flugdauer, Ladezeit (Sekunden) und ob sich das Auto im Flug seitwärts rollt. */

@@ -1,4 +1,5 @@
 import { makeArmyModel } from './armyMesh'
+import { makeQuadModel } from './quad'
 import type * as T from 'three'
 import { isBike } from '../stats'
 import { buildSpecCar, getSpec } from '../customCar'
@@ -760,6 +761,7 @@ function nameSprite(THREE: THREE, name: string, y: number): T.Sprite {
 
 /** Schönes Auto aus abgerundeten Teilen: Karosserie, Kabine mit Glas, Räder mit Felgen, Lichter, je Art Besonderheiten. */
 function buildCar(THREE: THREE, kind: string, color: string, name: string, isMe: boolean): T.Group {
+  if (kind === 'quad') { const q = makeQuadModel(THREE, color); if (!isMe) q.add(nameSprite(THREE, name, 2.8)); return q }
   if (kind === 'tank' || kind === 'heli' || kind === 'armycar') { const ag = makeArmyModel(THREE, kind, color); if (!isMe) ag.add(nameSprite(THREE, name, kind === 'heli' ? 5.5 : 4)); return ag }
   const sp = getSpec(kind)
   if (sp) {

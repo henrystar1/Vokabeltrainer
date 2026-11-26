@@ -54,6 +54,36 @@ export function addGear(THREE: THREE, m: T.Group, mask: number): void {
     const crest = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.06, 0.5), new THREE.MeshStandardMaterial({ color: 0xdc2626 })); crest.position.set(0, 1.96, 0)
     inner.add(coat, hem, s1, s2, tank, helm, brim, nape, crest)
   }
+  if (mask & 256 && !(done & 256)) {
+    // KSK-Spezialausrüstung: schwarz-olivgrüner Kampfanzug, Plattenträger mit Taschen, Kampfhelm mit Nachtsichtgerät und Sturmhaube, Funkgerät, Knie- und Ellenbogenschützer
+    const mt = (c: number, r = 0.7, me = 0.2, em = 0) => new THREE.MeshStandardMaterial({ color: c, roughness: r, metalness: me, emissive: em, emissiveIntensity: em ? 1.3 : 0 })
+    const olive = mt(0x2b3326, 0.85, 0.05), black = mt(0x0b0d10, 0.55, 0.4), tan = mt(0x8a7a52, 0.8, 0.05), steel = mt(0x6b7280, 0.35, 0.8), glow = mt(0x22d3ee, 0.3, 0.3, 0x0891b2), warn = mt(0xdc2626, 0.5, 0.1, 0x7f1d1d)
+    const add = (w: number, h: number, d: number, mm: T.Material, x: number, y: number, z: number, p: T.Object3D = inner) => { const b = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), mm); b.position.set(x, y, z); p.add(b); return b }
+    add(0.58, 0.68, 0.34, black, 0, 1.12, 0) // Plattenträger
+    add(0.5, 0.4, 0.06, olive, 0, 1.18, 0.19); add(0.5, 0.4, 0.06, olive, 0, 1.18, -0.19) // Panzerplatten
+    for (const sx of [-1, 1]) { add(0.13, 0.17, 0.09, tan, sx * 0.16, 0.95, 0.2); add(0.13, 0.03, 0.095, olive, sx * 0.16, 1.03, 0.2); add(0.1, 0.14, 0.08, tan, sx * 0.3, 1.0, 0.18) } // Magazintaschen
+    add(0.56, 0.1, 0.36, olive, 0, 0.8, 0) // Koppel
+    add(0.1, 0.16, 0.06, black, 0.24, 0.8, 0.2) // Holster
+    add(0.07, 0.14, 0.05, black, -0.2, 1.38, 0.2); add(0.015, 0.1, 0.015, steel, -0.2, 1.5, 0.2) // Funkgerät + Antenne
+    add(0.04, 0.04, 0.02, glow, 0, 1.28, 0.225) // Brustlicht
+    add(0.3, 0.1, 0.04, warn, 0, 1.4, -0.225) // Erkennungsband am Rücken
+    add(0.36, 0.2, 0.2, olive, 0, 0.58, -0.22) // Rucksack-Unterteil
+    for (const sx of [-1, 1]) {
+      add(0.16, 0.16, 0.2, black, sx * 0.14, 0.62, 0.08) // Knieschoner
+      add(0.18, 0.1, 0.2, black, sx * 0.14, 0.14, 0.02) // Stiefel
+      add(0.17, 0.12, 0.17, black, sx * 0.35, 1.28, 0) // Schulterschutz
+    }
+    // Helm: Kampfhelm, Nachtsichtgerät mit leuchtendem Okular, Sturmhaube, Headset
+    add(0.52, 0.22, 0.52, olive, 0, 1.86, 0); add(0.46, 0.06, 0.46, olive, 0, 1.98, 0)
+    add(0.54, 0.04, 0.18, olive, 0, 1.78, 0.3) // Schirm
+    add(0.34, 0.12, 0.3, black, 0, 1.64, 0.02) // Sturmhaube über Mund/Nase
+    add(0.38, 0.1, 0.1, black, 0, 1.76, 0.27); add(0.26, 0.05, 0.03, glow, 0, 1.76, 0.33) // Nachtsicht-Balken
+    add(0.1, 0.1, 0.12, black, 0, 1.9, 0.3); add(0.04, 0.04, 0.02, glow, 0, 1.9, 0.37) // Kamera am Helm
+    for (const sx of [-1, 1]) { add(0.06, 0.16, 0.16, black, sx * 0.27, 1.74, 0); add(0.02, 0.1, 0.02, steel, sx * 0.27, 1.88, -0.08) } // Headset
+    // Taktische Handschuhe
+    for (const sx of [-1, 1]) add(0.15, 0.12, 0.17, black, sx * 0.35, 0.78, 0)
+    inner.userData.ksk = true
+  }
   if (mask & 4 && !m.userData.bt) addBaton(THREE, m)
   const gunBit = mask & 32 ? 32 : mask & 16 ? 16 : mask & 8 ? 8 : 0
   if (gunBit !== ((m.userData.gunBit as number | undefined) ?? 0)) {
