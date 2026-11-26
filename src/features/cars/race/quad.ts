@@ -105,19 +105,28 @@ export function makeQuadModel(THREE: THREE, color?: string): T.Group {
   cyl(0.26, 0.3, 0.1, steel, 0, 0, 0, 'y', ring, 16)
   cyl(0.1, 0.12, 0.7, dark, 0, 0.4, 0, 'y', ring, 10) // Säule
   const gunYaw = new THREE.Group(); gunYaw.position.y = 0.78; ring.add(gunYaw)
-  box(0.36, 0.3, 0.5, black, 0, 0, 0, gunYaw); box(0.4, 0.08, 0.56, steel, 0, 0.16, 0, gunYaw)
-  box(0.34, 0.2, 0.3, tan, 0.28, -0.1, -0.1, gunYaw) // Munitionskasten
-  const belt = new THREE.Group(); gunYaw.add(belt)
+  const mini = new THREE.Group(); gunYaw.add(mini)
+  const pods = new THREE.Group(); pods.visible = false; gunYaw.add(pods)
+  box(0.36, 0.3, 0.5, black, 0, 0, 0, mini); box(0.4, 0.08, 0.56, steel, 0, 0.16, 0, mini)
+  box(0.34, 0.2, 0.3, tan, 0.28, -0.1, -0.1, mini) // Munitionskasten
+  const belt = new THREE.Group(); mini.add(belt)
   for (let i = 0; i < 6; i++) box(0.05, 0.05, 0.05, warn, 0.2 + i * 0.01, -0.02 + i * 0.015, -0.08 + i * 0.02, belt)
-  box(0.03, 0.4, 0.5, steel, 0, 0.08, 0.4, gunYaw) // Schutzschild
-  const barrels = new THREE.Group(); barrels.position.set(0, 0, 0.3); gunYaw.add(barrels)
+  box(0.03, 0.4, 0.5, steel, 0, 0.08, 0.4, mini) // Schutzschild
+  const barrels = new THREE.Group(); barrels.position.set(0, 0, 0.3); mini.add(barrels)
   cyl(0.07, 0.07, 0.9, dark, 0, 0, 0.3, 'z', barrels, 10)
   for (let i = 0; i < 6; i++) { const a = (i / 6) * Math.PI * 2; cyl(0.022, 0.022, 0.95, steel, Math.cos(a) * 0.09, Math.sin(a) * 0.09, 0.32, 'z', barrels, 6) }
   for (const z of [0.0, 0.35, 0.75]) cyl(0.12, 0.12, 0.04, steel, 0, 0, z, 'z', barrels, 12)
-  cyl(0.06, 0.06, 0.14, warn, 0, 0, 0.82, 'z', gunYaw, 10) // Mündungsring
+  cyl(0.06, 0.06, 0.14, warn, 0, 0, 0.82, 'z', mini, 10) // Mündungsring
   const muz = new THREE.Mesh(new THREE.SphereGeometry(0.16, 8, 6), new THREE.MeshBasicMaterial({ color: 0xffd36a, transparent: true, opacity: 0.9 }))
   muz.position.set(0, 0, 1.35); muz.visible = false; gunYaw.add(muz)
-  tube(0.2, 0.0, -0.2, 0.2, 0.0, 0.25, 0.02, steel, gunYaw); tube(-0.2, 0.0, -0.2, -0.2, 0.0, 0.25, 0.02, steel, gunYaw) // Griffe
+  tube(0.2, 0.0, -0.2, 0.2, 0.0, 0.25, 0.02, steel, mini); tube(-0.2, 0.0, -0.2, -0.2, 0.0, 0.25, 0.02, steel, mini) // Griffe
+    // Raketenwerfer (Alternative zur Minigun): zwei Rohrpakete mit je 6 Raketen
+  for (const sx of [-1, 1]) {
+    box(0.42, 0.34, 0.9, steel, sx * 0.3, 0.05, 0.25, pods); box(0.46, 0.04, 0.94, black, sx * 0.3, 0.24, 0.25, pods)
+    for (let a = 0; a < 3; a++) for (let b = 0; b < 2; b++) { cyl(0.065, 0.065, 1.0, dark, sx * 0.3 + (a - 1) * 0.12, b * 0.14 - 0.02, 0.3, 'z', pods, 8); cyl(0.04, 0.04, 0.06, red, sx * 0.3 + (a - 1) * 0.12, b * 0.14 - 0.02, 0.84, 'z', pods, 6) }
+  }
+  box(0.5, 0.2, 0.4, black, 0, -0.05, -0.1, pods)
+  g.userData.setWeapon = (w: string) => { mini.visible = w !== 'rocket'; pods.visible = w === 'rocket' }
   g.userData.barrels = barrels; g.userData.gunYaw = gunYaw; g.userData.muzzle = muz
   // ── KSK-Fahrer und Beifahrer (einfache sitzende Figuren; der eigene Fahrer wird durch die Skin-Figur ersetzt) ──
   const rider = (zSeat: number, ySeat: number): T.Group => {
@@ -149,4 +158,10 @@ export function seatWalker(w: T.Group, zSeat = -0.28, ySeat = 0.62): void {
   const u = w.userData as Record<string, T.Group>
   if (u.legL) { u.legL.rotation.x = -1.35; u.legR.rotation.x = -1.35 }
   if (u.armL) { u.armL.rotation.x = -1.25; u.armR.rotation.x = -1.25 }
+}
+
+/** Heckwaffe des Quads umschalten: 'minigun' oder 'rocket' */
+export function setQuadWeapon(g: T.Group, weapon: string): void {
+  const f = g.userData.setWeapon as ((w: string) => void) | undefined
+  f?.(weapon); g.userData.weapon = weapon
 }

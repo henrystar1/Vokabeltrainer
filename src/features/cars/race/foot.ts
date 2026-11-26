@@ -1,3 +1,4 @@
+import { BUNKER, bunkerClamp } from './bunker'
 import { bridgeH, cityPush, onDeck, roofH, tunnelAt, tunnelClamp, tunnelD } from './city'
 import { hillH } from './mountains'
 import { treePush } from './forest'
@@ -21,7 +22,7 @@ export interface Walker {
   ph: number
   /** Geschwindigkeit in m/s (für die Animation) */
   sp: number
-  /** Ebene: 0 Straße/Gelände, −1 Tunnel, 1 Brücke */
+  /** Ebene: 0 Straße/Gelände, −1 Tunnel, 1 Brücke, −2 KSK-Bunker */
   lvl?: number
 }
 export interface WalkInput { fwd: boolean; back: boolean; left: boolean; right: boolean; run?: boolean; jump?: boolean; turn?: number }
@@ -43,6 +44,7 @@ export const newWalker = (x: number, z: number, h: number, y?: number): Walker =
 
 /** Boden unter der Figur: Gelände oder Parkhaus-Ebene, die höchstens 0,6 m über den Füßen liegt. */
 export function groundAt(x: number, z: number, y: number, lvl = 0): number {
+  if (lvl === -2) return BUNKER.y
   if (lvl === -1) return -tunnelD(x, z)
   if (lvl === 1) return bridgeH(x, z)
   const bi = buildingAt(x, z)
@@ -101,6 +103,7 @@ function stepOnce(w: Walker, inp: WalkInput, dt: number): Walker {
     const d = tunnelD(x, z)
     if (d > 0.05 && d < 1.4 && w.y <= 0.3 && tunnelAt(x, z)) lvl = -1
     else if (onDeck(x, z) && bridgeH(x, z) > 0.05 && w.y >= bridgeH(x, z) - 0.6 && w.y <= bridgeH(x, z) + 1) lvl = 1
+  } else if (lvl === -2) { const c = bunkerClamp(x, z); x = c.x; z = c.z
   } else if (lvl === -1) { if (!tunnelAt(x, z)) lvl = 0 } else if (lvl === 1 && !onDeck(x, z)) lvl = 0
   if (lvl === -1 && tunnelD(x, z) > 1.5) { const c = tunnelClamp(x, z); if (c) { x = c.x; z = c.z } }
   // Kollision: vier Punkte um die Figur

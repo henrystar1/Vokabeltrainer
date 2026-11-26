@@ -1,3 +1,4 @@
+import { BUNKER } from './bunker'
 import { MOUNTAINS, OUT, RING, hillH, outRoads, type Pt } from './mountains'
 
 /** Wald an und um die Berge: feste (deterministische) Baumpositionen, abseits der Straßen. */
@@ -35,6 +36,7 @@ export function trees(): Tree[] {
       if (x < OUT.x0 + 12 || x > OUT.x1 - 12 || z > OUT.z1 - 12 || z < RING.h + RING.w + 40) continue
       if (hillH(x, z) > m.H * 0.72) continue            // Gipfel bleiben kahl
       if (Math.abs(x) < 24) continue                      // Hauptstraße
+      if (Math.hypot(x - BUNKER.ex, z - BUNKER.ez) < 26) continue // Bunker-Eingang bleibt frei
       if (nearRoad(roads, x, z, 15)) continue
       out.push({ x, z, s: 0.8 + rnd() * 0.9 })
     }
