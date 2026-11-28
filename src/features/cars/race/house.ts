@@ -31,10 +31,17 @@ export interface GarageDoor { x: number; z: number; nx: number; nz: number; /** 
 export function garageDoor(b: Bld): GarageDoor {
   const d = layoutOf(b).door, tx = -d.nz, tz = d.nx
   const len = d.nz !== 0 ? b.w : b.d
-  const c = d.nz !== 0 ? b.x : b.z, p = d.nz !== 0 ? d.x : d.z
-  const room = len / 2 - 4.5
-  const off = Math.abs(p - c) < 1 ? Math.min(room, 9) * (b.c % 2 ? 1 : -1) : (p > c ? -1 : 1) * Math.min(room, 9)
-  return { x: d.x + tx * off, z: d.z + tz * off, nx: d.nx, nz: d.nz, tx, tz, w: 5, h: 3.2 }
+  const ct = b.x * tx + b.z * tz, td = d.x * tx + d.z * tz // Tangentenkoordinate: Wandmitte und Haustür
+  const lim = len / 2 - 3.4 // das Tor (5 m breit + Rahmen) muss ganz auf die Wand passen
+  const pref = b.c % 2 ? 1 : -1
+  for (const off of [9 * pref, -9 * pref, 7.5 * pref, -7.5 * pref, 6.5 * pref, -6.5 * pref]) {
+    const t = td + off
+    if (Math.abs(t - ct) <= lim) return { x: d.x + tx * off, z: d.z + tz * off, nx: d.nx, nz: d.nz, tx, tz, w: 5, h: 3.2 }
+  }
+  // Wand zu kurz: Tor mittig an der Rückseite
+  const back = { nx: -d.nx, nz: -d.nz }
+  const px = b.x + back.nx * (b.w / 2), pz = b.z + back.nz * (b.d / 2)
+  return { x: d.nx !== 0 ? px : b.x, z: d.nz !== 0 ? pz : b.z, nx: back.nx, nz: back.nz, tx: -back.nz, tz: back.nx, w: 5, h: 3.2 }
 }
 /** Punkt 4 m vor dem Tor (Wagen rollt hier ein und wieder heraus) */
 export const garageOut = (g: GarageDoor, dist = 4): { x: number; z: number } => ({ x: g.x + g.nx * dist, z: g.z + g.nz * dist })
@@ -69,13 +76,22 @@ export function sanitizeGarage(j: unknown): StoredCar[] {
   if (!Array.isArray(j)) return []
   return (j as Array<Record<string, unknown>>).filter((o) => o && typeof o.kind === 'string' && typeof o.color === 'string' && /^#[0-9a-fA-F]{6}$/.test(o.color)).slice(0, MAX_GARAGE).map((o) => ({ kind: o.kind as string, color: o.color as string }))
 }
-export interface HouseData { bld: number; furn: Furn[]; garage: StoredCar[] }
+/** Wandfarben (Außen und Innen); null = Original mit Fenstertextur */
+export const WALL_COLORS: ReadonlyArray<{ hex: string; name: string }> = [
+  { hex: '#f1ead8', name: 'Creme' }, { hex: '#ffffff', name: 'Weiß' }, { hex: '#e5c07b', name: 'Sand' }, { hex: '#c2410c', name: 'Ziegelrot' },
+  { hex: '#93c5fd', name: 'Himmelblau' }, { hex: '#86efac', name: 'Mintgrün' }, { hex: '#fca5a5', name: 'Rosé' }, { hex: '#a8a29e', name: 'Betongrau' },
+  { hex: '#1f2937', name: 'Anthrazit' }, { hex: '#fde047', name: 'Gelb' },
+]
+export const sanitizeWall = (j: unknown): string | null => (typeof j === 'string' && /^#[0-9a-fA-F]{6}$/.test(j) ? j : null)
+/** Wandfarben der gekauften Häuser (Hausnummer → Farbe), vom Spiel gepflegt und vom Innenraum gelesen */
+export const wallColors = new Map<number, string>()
+export interface HouseData { bld: number; furn: Furn[]; garage: StoredCar[]; wall: string | null }
 export function parseHouses(j: unknown): HouseData[] {
   if (!Array.isArray(j)) return []
   const out: HouseData[] = []
   for (const o of j as Array<Record<string, unknown>>) {
     const bld = Number(o?.bld), b = Number.isInteger(bld) ? houseById(bld) : null
-    if (b) out.push({ bld, furn: sanitizeFurn(o.furniture, b), garage: sanitizeGarage(o.garage) })
+    if (b) out.push({ bld, furn: sanitizeFurn(o.furniture, b), garage: sanitizeGarage(o.garage), wall: sanitizeWall(o.wall) })
   }
   return out
 }
@@ -90,9 +106,14 @@ export function wallCams(): WallCam[] {
   city().buildings.forEach((b, i) => {
     if (b.hid || b.lo !== undefined || b.w < 12 || b.d < 12) return
     const d = layoutOf(b).door, tx = -d.nz, tz = d.nx
-    const len = d.nz !== 0 ? b.w : b.d, s = (len / 2 - 1.1) * (i % 2 ? 1 : -1)
-    // Blick leicht an der Wand entlang, damit die Straße im Bild ist
-    cams!.push({ id: i, x: d.x + tx * s + d.nx * 0.5, y: Math.min(b.h - 1, 4.6), z: d.z + tz * s + d.nz * 0.5, yaw: Math.atan2(d.nx, d.nz) })
+    const len = d.nz !== 0 ? b.w : b.d
+    const ct = b.x * tx + b.z * tz, td = d.x * tx + d.z * tz
+    // Ecke der Eingangswand (Abstand von der Wandmitte), weit genug von der Tür; immer auf der Wand
+    let t = ct + (len / 2 - 1.2) * (i % 2 ? 1 : -1)
+    if (Math.abs(t - td) < 2.8) t = ct - (len / 2 - 1.2) * (i % 2 ? 1 : -1)
+    t = Math.max(ct - len / 2 + 1, Math.min(ct + len / 2 - 1, t))
+    const off = t - td
+    cams!.push({ id: i, x: d.x + tx * off + d.nx * 0.5, y: Math.min(b.h - 1, 4.6), z: d.z + tz * off + d.nz * 0.5, yaw: Math.atan2(d.nx, d.nz) })
   })
   return cams
 }

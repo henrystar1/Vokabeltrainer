@@ -9,6 +9,10 @@ export interface HouseWorld {
   /** Möbel eines Hauses sofort neu zeichnen (Editor) */
   setFurn: (bld: number, f: Furn[]) => void
   setDoor: (bld: number, open: boolean) => void
+  /** Wandfarbe eines Hauses (null = Original) */
+  setWall: (bld: number, color: string | null) => void
+  /** Haus, in dem man gerade steht (-1 = keins): Außenfarbhülle ausblenden */
+  setInside: (bld: number) => void
   tick: (px: number, pz: number, dt: number) => void
   doorK: (bld: number) => number
   dispose: () => void
@@ -19,7 +23,8 @@ export function makeHouseWorld(THREE: THREE, scene: T.Scene): HouseWorld {
   const geo = new THREE.BoxGeometry(1, 1, 1)
   const mats = new Map<number, T.MeshStandardMaterial>()
   const mat = (c: number) => { let m = mats.get(c); if (!m) { m = new THREE.MeshStandardMaterial({ color: c, roughness: 0.8 }); mats.set(c, m) } return m }
-  interface Entry { bld: number; door: GarageDoor; panel: T.Group; k: number; want: number; furn: T.Group; cx: number; cz: number }
+  interface Entry { bld: number; door: GarageDoor; panel: T.Group; k: number; want: number; furn: T.Group; cx: number; cz: number; shell: T.Mesh | null }
+  let inside = -1
   const entries = new Map<number, Entry>()
   const buildFurn = (g: T.Group, f: Furn[]) => {
     g.clear()
@@ -46,7 +51,14 @@ export function makeHouseWorld(THREE: THREE, scene: T.Scene): HouseWorld {
     frame.add(panel)
     return { frame, panel }
   }
-  const clear = () => { for (const e of entries.values()) root.remove(e.panel.parent!, e.furn); entries.clear() }
+  const shellMat = new THREE.MeshStandardMaterial({ roughness: 0.9, polygonOffset: true, polygonOffsetFactor: -1, polygonOffsetUnits: -1 })
+  const paintShell = (e: Entry, color: string | null) => {
+    const b = houseById(e.bld); if (!b) return
+    if (!color) { if (e.shell) { root.remove(e.shell); e.shell.material instanceof THREE.Material && e.shell.material.dispose(); e.shell = null } return }
+    if (!e.shell) { const m = new THREE.Mesh(geo, shellMat.clone()); m.scale.set(b.w + 0.04, b.h - 0.06, b.d + 0.04); m.position.set(b.x, (b.h - 0.06) / 2, b.z); root.add(m); e.shell = m }
+    ;(e.shell.material as T.MeshStandardMaterial).color.set(color)
+  }
+  const clear = () => { for (const e of entries.values()) { root.remove(e.panel.parent!, e.furn); if (e.shell) { root.remove(e.shell); (e.shell.material as T.Material).dispose() } } entries.clear() }
   return {
     setHouses(list) {
       clear()
@@ -55,20 +67,24 @@ export function makeHouseWorld(THREE: THREE, scene: T.Scene): HouseWorld {
         const d = garageDoor(b), { frame, panel } = makeDoor(d)
         const furn = new THREE.Group(); furn.position.set(b.x, 0, b.z); buildFurn(furn, h.furn)
         root.add(frame, furn)
-        entries.set(h.bld, { bld: h.bld, door: d, panel, k: 0, want: 0, furn, cx: b.x, cz: b.z })
+        const en: Entry = { bld: h.bld, door: d, panel, k: 0, want: 0, furn, cx: b.x, cz: b.z, shell: null }
+        entries.set(h.bld, en); paintShell(en, h.wall)
       }
     },
     setFurn(bld, f) { const e = entries.get(bld); if (e) buildFurn(e.furn, f) },
+    setWall(bld, color) { const e = entries.get(bld); if (e) paintShell(e, color) },
+    setInside(bld) { inside = bld },
     setDoor(bld, open) { const e = entries.get(bld); if (e) e.want = open ? 1 : 0 },
     tick(px, pz, dt) {
       for (const e of entries.values()) {
         e.k += Math.sign(e.want - e.k) * Math.min(Math.abs(e.want - e.k), dt / 1.4)
         e.panel.scale.y = Math.max(0.06, 1 - e.k)
         e.furn.visible = Math.hypot(px - e.cx, pz - e.cz) < 80
+        if (e.shell) e.shell.visible = e.bld !== inside
       }
     },
     doorK: (bld) => entries.get(bld)?.k ?? 0,
-    dispose() { clear(); scene.remove(root); geo.dispose(); for (const m of mats.values()) m.dispose() },
+    dispose() { clear(); scene.remove(root); geo.dispose(); shellMat.dispose(); for (const m of mats.values()) m.dispose() },
   }
 }
 

@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import type { Bld } from './city'
 import { CITY } from './city'
-import { FURNITURE, MAX_FURN, furnDef, type Furn, type StoredCar } from './house'
+import { FURNITURE, MAX_FURN, WALL_COLORS, furnDef, type Furn, type StoredCar } from './house'
 import { layoutOf } from './interior'
 import { BUNKER } from './bunker'
 import { MOUNTAINS, WORLD } from './mountains'
@@ -10,7 +10,7 @@ const box = 'absolute inset-0 z-30 grid place-items-center bg-black/65 p-3'
 const card = 'max-h-full w-full overflow-auto rounded-2xl border border-white/30 bg-slate-900/95 p-4 text-white shadow-2xl'
 
 /** Möbel-Editor: Grundriss des Erdgeschosses von oben, Möbel antippen oder aus der Leiste platzieren. */
-export function FurnitureEditor({ b, furn, onChange, onClose }: { b: Bld; furn: Furn[]; onChange: (f: Furn[]) => void; onClose: () => void }) {
+export function FurnitureEditor({ b, furn, wall, onChange, onWall, onClose }: { b: Bld; furn: Furn[]; wall: string | null; onChange: (f: Furn[]) => void; onWall: (c: string | null) => void; onClose: () => void }) {
   const ref = useRef<HTMLCanvasElement>(null)
   const [tool, setTool] = useState<string | null>('sofa')
   const [sel, setSel] = useState<number | null>(null)
@@ -57,6 +57,11 @@ export function FurnitureEditor({ b, furn, onChange, onClose }: { b: Bld; furn: 
         <canvas ref={ref} width={W} height={H} onPointerDown={tap} className="mb-2 w-full touch-none rounded-xl border border-white/30" />
         <div className="mb-2 flex flex-wrap gap-1.5">
           {FURNITURE.map((f) => <button key={f.id} type="button" aria-pressed={tool === f.id} onClick={() => { setTool(tool === f.id ? null : f.id); setSel(null) }} className={`min-h-[44px] rounded-lg border px-2 text-xs font-bold ${tool === f.id ? 'border-amber-300 bg-sky-600' : 'border-white/30 bg-white/10'}`}>{f.icon} {f.name}</button>)}
+        </div>
+        <h3 className="mb-1 text-sm font-bold">Wandfarbe (außen und innen)</h3>
+        <div className="mb-2 flex flex-wrap items-center gap-2">
+          <button type="button" aria-pressed={wall === null} onClick={() => onWall(null)} className={`min-h-[44px] rounded-lg border px-2 text-xs font-bold ${wall === null ? 'border-amber-300 bg-sky-600' : 'border-white/30 bg-white/10'}`}>Original</button>
+          {WALL_COLORS.map((c) => <button key={c.hex} type="button" aria-label={c.name} aria-pressed={wall === c.hex} onClick={() => onWall(c.hex)} className={`h-11 w-11 rounded-full border-2 ${wall === c.hex ? 'border-amber-300 ring-2 ring-amber-300' : 'border-white/40'}`} style={{ background: c.hex }} />)}
         </div>
         <div className="flex flex-wrap gap-2">
           <button type="button" disabled={sel === null} onClick={() => sel !== null && onChange(furn.map((f, i) => (i === sel ? { ...f, r: f.r ? 0 : 1 } : f)))} className="min-h-[44px] rounded-lg bg-white/10 px-3 text-sm font-bold disabled:opacity-40">↻ Drehen</button>

@@ -2,12 +2,15 @@ import type * as T from 'three'
 import type { Bld } from './city'
 import { layoutOf, type Rect } from './interior'
 import { poiOf } from './poi'
+import { houseId, wallColors } from './house'
+import { WIN, windowSlots, windowsWanted, type WinSlot } from './windows'
 
 type THREE = typeof T
 
 /** Sichtbarer Innenraum eines Hauses: wird nur für das Haus gebaut, in dem die Figur steht; die Außenhaut des Hauses wird dann ausgeblendet. */
 export function makeInteriorViewer(THREE: THREE, scene: T.Scene, ext: { geo: T.BufferGeometry; ranges: Map<Bld, [number, number]> }, night: boolean) {
   let cur: Bld | null = null
+  let lastWall: T.Material | null = null
   let group: T.Group | null = null
   let saved: { b: Bld; arr: Float32Array } | null = null
   let vaultDoor: { pivot: T.Group; ang: number } | null = null
@@ -31,8 +34,32 @@ export function makeInteriorViewer(THREE: THREE, scene: T.Scene, ext: { geo: T.B
     const mesh = new THREE.Mesh(new THREE.BoxGeometry(r.x1 - r.x0, y1 - y0, r.z1 - r.z0), m)
     mesh.position.set((r.x0 + r.x1) / 2, (y0 + y1) / 2, (r.z0 + r.z1) / 2); g.add(mesh)
   }
-  const build = (b: Bld, wallMat: T.Material) => {
+  const glassMat = new THREE.MeshStandardMaterial({ color: 0x9cc7e8, transparent: true, opacity: 0.22, roughness: 0.1, metalness: 0.1, side: THREE.DoubleSide, depthWrite: false })
+  const frameMat = new THREE.MeshStandardMaterial({ color: 0xf2f2ee, roughness: 0.7 })
+  /** Wandstück mit Fensteröffnungen (Brüstung, Sturz, Rahmen und leicht getöntes Glas); Fenster außerhalb des Stücks werden übersprungen */
+  const wallWin = (g: T.Group, r: Rect, y0: number, y1: number, slots: WinSlot[], m: T.Material) => {
+    const alongX = r.x1 - r.x0 > r.z1 - r.z0
+    const c = alongX ? (r.z0 + r.z1) / 2 : (r.x0 + r.x1) / 2
+    const lo = alongX ? r.x0 : r.z0, hi = alongX ? r.x1 : r.z1
+    const mine = slots.filter((s) => (alongX ? s.nz !== 0 && Math.abs(s.z - c) < 0.9 : s.nx !== 0 && Math.abs(s.x - c) < 0.9)).map((s) => (alongX ? s.x : s.z)).filter((u) => u - 1.2 > lo && u + 1.2 < hi).sort((a, b) => a - b)
+    const seg = (a: number, z: number, ya: number, yb: number) => box(g, alongX ? { x0: a, x1: z, z0: r.z0, z1: r.z1 } : { x0: r.x0, x1: r.x1, z0: a, z1: z }, ya, yb, m)
+    const sill = y0 + WIN.mid - WIN.fh / 2 + 0.1, head = y0 + WIN.mid + WIN.fh / 2 - 0.1
+    let cur0 = lo
+    for (const u of mine) {
+      seg(cur0, u - 1.1, y0, y1)
+      seg(u - 1.1, u + 1.1, y0, sill); seg(u - 1.1, u + 1.1, head, y1)
+      const pm = (w: number, h: number, d: number, px: number, py: number, mat: T.Material) => { const q = new THREE.Mesh(new THREE.BoxGeometry(alongX ? w : d, h, alongX ? d : w), mat); q.position.set(alongX ? px : c, py, alongX ? c : px); g.add(q) }
+      pm(2.0, head - sill, 0.04, u, (sill + head) / 2, glassMat)
+      pm(2.2, 0.08, 0.14, u, sill + 0.04, frameMat); pm(2.2, 0.08, 0.14, u, head - 0.04, frameMat)
+      pm(0.08, head - sill, 0.14, u - 1.06, (sill + head) / 2, frameMat); pm(0.08, head - sill, 0.14, u + 1.06, (sill + head) / 2, frameMat); pm(0.06, head - sill, 0.14, u, (sill + head) / 2, frameMat)
+      cur0 = u + 1.1
+    }
+    seg(cur0, hi, y0, y1)
+  }
+  const build = (b: Bld, wallMat0: T.Material) => {
     const L = layoutOf(b)
+    const wc = wallColors.get(houseId(b))
+    const wallMat: T.Material = wc ? new THREE.MeshStandardMaterial({ color: new THREE.Color(wc).multiplyScalar(dim), roughness: 0.9, side: THREE.DoubleSide }) : wallMat0
     const g = new THREE.Group()
     const x0 = b.x - b.w / 2, x1 = b.x + b.w / 2, z0 = b.z - b.d / 2, z1 = b.z + b.d / 2
     const FH = L.fh, top = L.floors * FH
@@ -49,8 +76,14 @@ export function makeInteriorViewer(THREE: THREE, scene: T.Scene, ext: { geo: T.B
       box(g, { x0, x1: hole.x0, z0: hole.z0, z1: hole.z1 }, ya, yb, m); box(g, { x0: hole.x1, x1, z0: hole.z0, z1: hole.z1 }, ya, yb, m)
     }
     // Außenwände: Erdgeschoss mit Türöffnung, darüber geschlossen
-    for (const r of L.outerG) box(g, r, 0, FH, wallMat)
-    for (const r of L.outerUp) box(g, r, FH, top, wallMat)
+    if (windowsWanted(b)) {
+      const sG = windowSlots(b, true), sU = windowSlots(b, false), nf = Math.min(L.floors, WIN.floorCap)
+      for (const r of L.outerG) wallWin(g, r, 0, FH, sG, wallMat)
+      for (const r of L.outerUp) { for (let k = 1; k < L.floors; k++) { if (k < nf) wallWin(g, r, k * FH, (k + 1) * FH, sU, wallMat); else box(g, r, k * FH, (k + 1) * FH, wallMat) } }
+    } else {
+      for (const r of L.outerG) box(g, r, 0, FH, wallMat)
+      for (const r of L.outerUp) box(g, r, FH, top, wallMat)
+    }
     // Zwischenwände je Geschoss
     for (let k = 0; k < L.floors; k++) for (const r of L.inner) box(g, r, k * FH, (k + 1) * FH - 0.2, mats.part)
     // Treppenstufen
@@ -107,7 +140,7 @@ export function makeInteriorViewer(THREE: THREE, scene: T.Scene, ext: { geo: T.B
   const setVault = (open: boolean) => { vaultOpen = open; if (vaultDoor) vaultDoor.pivot.rotation.y = vaultDoor.ang + (open ? -1.9 : 0) }
   const show = (b: Bld | null, wallMat: T.Material) => {
     if (b === cur) return
-    restore(); clear(); cur = b
+    restore(); clear(); cur = b; lastWall = wallMat
     if (!b) return
     const r = ext.ranges.get(b)
     if (r) {
@@ -118,5 +151,6 @@ export function makeInteriorViewer(THREE: THREE, scene: T.Scene, ext: { geo: T.B
     }
     group = build(b, wallMat); scene.add(group)
   }
-  return { show, setVault }
+  const refresh = () => { const b = cur; if (!b || !lastWall) return; cur = null; show(b, lastWall) }
+  return { show, setVault, refresh }
 }

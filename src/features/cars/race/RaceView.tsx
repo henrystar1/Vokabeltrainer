@@ -74,8 +74,9 @@ import { BUNKER, DEFAULT_LOADOUT, HATCH_MS, LIFT_MS, bunkerSpotNear, inBunkerHal
 import { buildBunker } from './bunkerMesh'
 import { DronePanel, QuadTunePanel, type DroneData } from './BunkerPanel'
 import { raceKskGet, raceHouseBuy, raceHouseList, raceHouseSave, raceKskMissionPay } from '../../../services/cars'
-import { HOUSE_PRICE, MAX_GARAGE, garageDoor, garageOut, houseById, houseEligible, houseId, parseHouses, wallCams, type Furn, type HouseData, type StoredCar, type WallCam } from './house'
+import { HOUSE_PRICE, MAX_GARAGE, wallColors, garageDoor, garageOut, houseById, houseEligible, houseId, parseHouses, wallCams, type Furn, type HouseData, type StoredCar, type WallCam } from './house'
 import { makeHouseWorld, makeWallCamMeshes } from './houseMesh'
+import { nightness } from './daynight'
 import { FurnitureEditor, GaragePanel, MissionPanel, PlaneMapPanel } from './HousePanels'
 import type { Bld } from './city'
 import { armUp } from './gunMesh'
@@ -204,7 +205,7 @@ export default function RaceView({ trackId, custom, laps, me, assistOk = false, 
   const [kskUi, setKskUi] = useState(false)
   const [bunkerUi, setBunkerUi] = useState<'tune' | 'drone' | 'mission' | 'plane' | null>(null)
   const [acts, setActs] = useState<Array<{ k: string; label: string }>>([])
-  const [furnUi, setFurnUi] = useState<{ b: Bld; furn: Furn[] } | null>(null)
+  const [furnUi, setFurnUi] = useState<{ b: Bld; furn: Furn[]; wall: string | null } | null>(null)
   const [garageUi, setGarageUi] = useState<StoredCar[] | null>(null)
   const [missionTxt, setMissionTxt] = useState('')
   const [camUi, setCamUi] = useState<{ n: number; i: number; who: string } | null>(null)
@@ -2177,8 +2178,10 @@ export default function RaceView({ trackId, custom, laps, me, assistOk = false, 
       let houses: HouseData[] = []
       const houseOf = (id: number) => houses.find((h) => h.bld === id)
       const setHouse = (h: HouseData) => { houses = houses.some((o) => o.bld === h.bld) ? houses.map((o) => (o.bld === h.bld ? h : o)) : [...houses, h] }
-      const saveHouse = (h: HouseData) => { void raceHouseSave(h.bld, h.furn, h.garage).catch((e) => say(errorMessage(e))) }
-      if (online && isCity) void raceHouseList().then((j) => { if (dead) return; houses = parseHouses(j); houseWorld.setHouses(houses) }).catch(() => undefined)
+      const saveHouse = (h: HouseData) => { void raceHouseSave(h.bld, h.furn, h.garage, h.wall).catch((e) => say(errorMessage(e))) }
+      const syncWalls = () => { wallColors.clear(); for (const h of houses) if (h.wall) wallColors.set(h.bld, h.wall) }
+      let furnOpen: { b: Bld; furn: Furn[]; wall: string | null } | null = null
+      if (online && isCity) void raceHouseList().then((j) => { if (dead) return; houses = parseHouses(j); syncWalls(); houseWorld.setHouses(houses) }).catch(() => undefined)
       let homeCache: Bld[] | null = null
       const homes = () => (homeCache ??= city().buildings.filter(houseEligible))
       let inGarage: { bld: number } | null = null
@@ -2374,6 +2377,7 @@ export default function RaceView({ trackId, custom, laps, me, assistOk = false, 
       interface CamEntry { cam: WallCam; find: () => CamPick | null }
       let camS: { list: CamEntry[]; i: number } | null = null
       let camUiT = 0
+      let dayT = 0, dayN = -1
       const openCams = () => {
         const persons: Array<{ x: number; y: number; z: number; name: string; w: number; find: () => CamPick | null }> = []
         for (const r of remotes.values()) if (!r.id.startsWith('pb-') && !r.id.startsWith('pk-') && !r.id.endsWith('w') && !r.rd && fresh(r) && !r.hd) { const id = r.id; persons.push({ x: r.x, y: 1.2, z: r.z, name: r.name, w: 0, find: () => { const q = remotes.get(id); return q ? { x: q.x, y: (q.yy ?? 0) + 1.2, z: q.z, name: q.name } : null } }) }
@@ -2397,6 +2401,14 @@ export default function RaceView({ trackId, custom, laps, me, assistOk = false, 
       }
       const tickExtras = (dt: number, now: number) => {
         houseWorld.tick((foot ?? car).x, (foot ?? car).z, dt)
+        if (isCity && now - dayT > 500) {
+          dayT = now
+          const ib = foot ? buildingAt(foot.x, foot.z) : null
+          houseWorld.setInside(ib ? houseId(ib) : -1)
+          // Tag/Nacht: alle 5 Minuten Wechsel (für alle Spieler gleich, nach Uhrzeit), mit kurzem sanftem Übergang
+          const n = nightness(Date.now() / 1000)
+          if (Math.abs(n - dayN) > 0.004) { dayN = n; rs.setNight(n) }
+        }
         tickKMission(now)
         tickPlaneMesh(dt)
         if (camS && now - camUiT > 300) { camUiT = now; const cs = camS; const who = cs.list[cs.i].find()?.name ?? 'niemand im Bild'; setCamUi((o) => (o && o.i === cs.i && o.who === who && o.n === cs.list.length ? o : { n: cs.list.length, i: cs.i, who })) }
@@ -2405,16 +2417,20 @@ export default function RaceView({ trackId, custom, laps, me, assistOk = false, 
         if (cmd === 'act') {
           const [kind, ids] = String(a).split(':'), id = Number(ids), b = houseById(id)
           if (!b) return
-          if (kind === 'buy') void raceHouseBuy(id).then((r) => { if (dead) return; walletRef.current?.setBalance(r.koins); setHouse({ bld: id, furn: [], garage: [] }); houseWorld.setHouses(houses); say('Das Haus gehört jetzt dir! Du kannst es einrichten und hast eine Garage.') }).catch((e) => say(errorMessage(e)))
-          else if (kind === 'furn') { const h = houseOf(id); if (h) setFurnUi({ b, furn: h.furn }) }
+          if (kind === 'buy') void raceHouseBuy(id).then((r) => { if (dead) return; walletRef.current?.setBalance(r.koins); setHouse({ bld: id, furn: [], garage: [], wall: null }); houseWorld.setHouses(houses); say('Das Haus gehört jetzt dir! Du kannst es einrichten und hast eine Garage.') }).catch((e) => say(errorMessage(e)))
+          else if (kind === 'furn') { const h = houseOf(id); if (h) { furnOpen = { b, furn: h.furn, wall: h.wall }; setFurnUi(furnOpen) } }
           else if (kind === 'gin') enterGarage(id)
         } else if (cmd === 'furnChange') {
-          const fu = furnUi; if (!fu) return
+          const fu = furnOpen; if (!fu) return
           const id = houseId(fu.b), h = houseOf(id); if (!h) return
-          const f = a as Furn[]; setHouse({ ...h, furn: f }); houseWorld.setFurn(id, f); setFurnUi({ b: fu.b, furn: f })
+          const f = a as Furn[]; setHouse({ ...h, furn: f }); houseWorld.setFurn(id, f); furnOpen = { ...fu, furn: f }; setFurnUi(furnOpen)
+        } else if (cmd === 'wallChange') {
+          const fu = furnOpen; if (!fu) return
+          const id = houseId(fu.b), h = houseOf(id); if (!h) return
+          const c = a as string | null; setHouse({ ...h, wall: c }); syncWalls(); houseWorld.setWall(id, c); rs.refreshInterior(); furnOpen = { ...fu, wall: c }; setFurnUi(furnOpen)
         } else if (cmd === 'furnDone') {
-          const fu = furnUi; if (fu) { const h = houseOf(houseId(fu.b)); if (h) saveHouse(h) }
-          setFurnUi(null)
+          const fu = furnOpen; if (fu) { const h = houseOf(houseId(fu.b)); if (h) saveHouse(h) }
+          furnOpen = null; setFurnUi(null)
         } else if (cmd === 'take') leaveGarage(Number(a))
         else if (cmd === 'gfoot') leaveGarage(null)
         else if (cmd === 'mstart') startKMission(a as 'kill' | 'car')
@@ -3577,7 +3593,7 @@ export default function RaceView({ trackId, custom, laps, me, assistOk = false, 
       {bunkerUi === 'drone' && <DronePanel getData={() => droneRef.current()} onClose={() => setBunkerUi(null)} onCams={() => { setBunkerUi(null); xRef.current('cam', 'open') }} />}
       {bunkerUi === 'mission' && <MissionPanel active={missionTxt || null} onStart={(k) => { xRef.current('mstart', k); setBunkerUi(null) }} onCancel={() => xRef.current('mcancel')} onClose={() => setBunkerUi(null)} />}
       {bunkerUi === 'plane' && <PlaneMapPanel onGo={(x, z) => { setBunkerUi(null); xRef.current('plane', { x, z }) }} onClose={() => setBunkerUi(null)} />}
-      {furnUi && <FurnitureEditor b={furnUi.b} furn={furnUi.furn} onChange={(f) => xRef.current('furnChange', f)} onClose={() => xRef.current('furnDone')} />}
+      {furnUi && <FurnitureEditor b={furnUi.b} furn={furnUi.furn} wall={furnUi.wall} onChange={(f) => xRef.current('furnChange', f)} onWall={(c) => xRef.current('wallChange', c)} onClose={() => xRef.current('furnDone')} />}
       {garageUi && <GaragePanel cars={garageUi} onTake={(i) => xRef.current('take', i)} onFoot={() => xRef.current('gfoot')} />}
       {camUi && (
         <div className="absolute left-1/2 top-3 z-30 flex -translate-x-1/2 items-center gap-2 rounded-xl border border-red-400/70 bg-black/75 px-2 py-1 text-white">

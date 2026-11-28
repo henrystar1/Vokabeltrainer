@@ -9,10 +9,13 @@ describe('Häuser', () => {
     expect(houseId(homes[0])).toBeGreaterThanOrEqual(0)
   })
   it('Garagentor liegt auf der Außenwand und bleibt im Haus', () => {
-    for (const b of homes.slice(0, 40)) {
+    for (const b of homes) {
       const g = garageDoor(b)
-      expect(Math.abs(g.x - b.x)).toBeLessThanOrEqual(b.w / 2 + 0.01)
-      expect(Math.abs(g.z - b.z)).toBeLessThanOrEqual(b.d / 2 + 0.01)
+      // Tor (5 m breit) liegt ganz auf einer Außenwand
+      const along = g.tx !== 0 ? [g.x - b.x, b.w] : [g.z - b.z, b.d]
+      expect(Math.abs(along[0]) + 2.5).toBeLessThanOrEqual(along[1] / 2 + 0.01)
+      const across = g.nx !== 0 ? [g.x - b.x, b.w] : [g.z - b.z, b.d]
+      expect(Math.abs(Math.abs(across[0]) - across[1] / 2)).toBeLessThan(0.6)
     }
   })
   it('Möbel werden bereinigt', () => {
@@ -30,5 +33,7 @@ describe('Wandkameras', () => {
     const cams = wallCams()
     expect(cams.length).toBeGreaterThan(50)
     expect(cams.every((c) => Number.isFinite(c.x + c.y + c.z + c.yaw))).toBe(true)
+    // jede Kamera hängt direkt an der Wand ihres Hauses, nicht in der Luft
+    for (const c of cams) { const b = city().buildings[c.id]; const dx = Math.abs(c.x - b.x) - b.w / 2, dz = Math.abs(c.z - b.z) - b.d / 2; expect(Math.max(dx, dz)).toBeLessThan(0.9); expect(Math.max(dx, dz)).toBeGreaterThan(-0.1); expect(Math.min(dx, dz)).toBeLessThan(0) }
   })
 })

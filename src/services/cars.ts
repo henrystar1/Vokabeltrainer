@@ -58,7 +58,7 @@ export const raceKskSet = (color: string, weapon: string) => rpc<unknown>('race_
 export const raceKskBuy = (item: string) => rpc<{ item: string; koins: number }>('race_ksk_buy', { p_item: item })
 export const raceHouseList = () => rpc<unknown>('race_house_list')
 export const raceHouseBuy = (bld: number) => rpc<{ bld: number; koins: number }>('race_house_buy', { p_bld: bld })
-export const raceHouseSave = (bld: number, furniture: unknown, garage: unknown) => rpc<void>('race_house_save', { p_bld: bld, p_furniture: furniture, p_garage: garage })
+export const raceHouseSave = (bld: number, furniture: unknown, garage: unknown, wall: string | null) => rpc<void>('race_house_save', { p_bld: bld, p_furniture: furniture, p_garage: garage, p_wall: wall })
 export const raceKskMissionPay = (kind: 'kill' | 'car') => rpc<{ coins: number; koins: number }>('race_ksk_mission_pay', { p_kind: kind })
 export const raceGearBuy = (item: string) => rpc<{ item: string; koins: number }>('race_gear_buy', { p_item: item })
 export const raceAtmPay = () => rpc<{ coins: number; koins: number | null }>('race_atm_pay')

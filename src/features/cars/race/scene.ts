@@ -1,4 +1,4 @@
-import { garageDoor, houseEligible } from './house'
+import { windowFloors, windowSlots, windowsWanted, winY, WIN } from './windows'
 import { makeArmyModel } from './armyMesh'
 import { makeQuadModel } from './quad'
 import type * as T from 'three'
@@ -106,6 +106,10 @@ export interface RaceScene {
   /** zerschlägt Glasscheiben der Bank im Umkreis r um (x,z); liefert die Anzahl */
   smashGlass: (x: number, z: number, r: number, y?: number) => number
   showInterior: (b: { x: number; z: number; w: number; d: number; h: number; c: number } | null) => void
+  /** Tag/Nacht stufenlos (0 = Tag, 1 = Nacht), nur Stadt */
+  setNight: (n: number) => void
+  /** Innenraum des aktuellen Hauses neu aufbauen (z. B. nach Wandfarbe) */
+  refreshInterior: () => void
   /** Tresortür der Bank öffnen/schließen */
   setVault: (open: boolean) => void
 }
@@ -117,7 +121,8 @@ export function buildScene(THREE: THREE, t: Track): RaceScene {
   scene.fog = new THREE.Fog(th.fog, 200, t.def.mode === 'city' ? 2300 : 1100)
   const follow = new THREE.Group()
   scene.add(follow)
-  scene.add(new THREE.HemisphereLight(th.night ? 0x4a5a9a : 0xdfeeff, th.ground, th.night ? 0.55 : 1.0))
+  const hemi = new THREE.HemisphereLight(th.night ? 0x4a5a9a : 0xdfeeff, th.ground, th.night ? 0.55 : 1.0)
+  scene.add(hemi)
   const sun = new THREE.DirectionalLight(th.night ? 0x8fa6ff : 0xfff2d6, th.sun)
   sun.position.set(120, 220, 80)
   scene.add(sun)
@@ -314,7 +319,9 @@ export function buildScene(THREE: THREE, t: Track): RaceScene {
   let showInterior: RaceScene['showInterior'] = () => {}
   let smashGlass: RaceScene['smashGlass'] = () => 0
   let setVault: RaceScene['setVault'] = () => {}
-  if (mode === 'city') ({ showInterior, setVault, smashGlass } = buildCity(THREE, scene, ground, !!th.night))
+  let cityNight: (n: number) => void = () => undefined
+  let refreshInterior: () => void = () => undefined
+  if (mode === 'city') ({ showInterior, setVault, smashGlass, setNight: cityNight, refreshInterior } = buildCity(THREE, scene, ground, !!th.night))
   if (mode === 'fill') {
     // ausgefüllte Fläche: Asphalt im Vieleck, weiße Randlinie, keine Barriere
     const P = t.def.pts
@@ -325,6 +332,20 @@ export function buildScene(THREE: THREE, t: Track): RaceScene {
     scene.add(ln)
   }
   const makeCar = (kind: string, color: string, name: string, isMe: boolean) => buildCar(THREE, kind, color, name, isMe)
+  // Tag-Nacht-Übergang (nur Stadt): Himmel, Nebel, Licht, Boden, Sonne→Mond, Fenster
+  const NT = THEMES.nacht
+  const cDay = (hex: number) => new THREE.Color(hex), tmpC = new THREE.Color()
+  const setNight = (n: number) => {
+    n = Math.max(0, Math.min(1, n))
+    ;(scene.background as T.Color).copy(cDay(th.sky)).lerp(tmpC.set(NT.sky), n)
+    ;(scene.fog as T.Fog).color.copy(cDay(th.fog)).lerp(tmpC.set(NT.fog), n)
+    hemi.color.set(0xdfeeff).lerp(tmpC.set(0x4a5a9a), n); hemi.groundColor.copy(cDay(th.ground)).lerp(tmpC.set(NT.ground), n); hemi.intensity = 1.0 - 0.45 * n
+    sun.color.set(0xfff2d6).lerp(tmpC.set(0x8fa6ff), n); sun.intensity = th.sun + (NT.sun - th.sun) * n
+    ;(dome.material as T.MeshBasicMaterial).color.setRGB(1 - 0.82 * n, 1 - 0.8 * n, 1 - 0.6 * n)
+    ;(orb.material as T.MeshBasicMaterial).color.set(0xfff3c4).lerp(tmpC.set(0xeaf0ff), n)
+    ;(ground.material as T.MeshStandardMaterial).color.copy(cDay(th.ground)).lerp(tmpC.set(NT.ground), n)
+    cityNight(n)
+  }
   return { scene, sun, theme: th, makeCar, follow, focus, damageCar: (g, dmg, slip, v, time) => damageCar(THREE, g, dmg, slip, v, time), addSiren: (g) => addSiren(THREE, g), tickSiren, makeWalker: (shirt, pants, name, skin) => {
     const g = makeWalkerModel(THREE, shirt, pants)
     if (name) g.add(nameSprite(THREE, name, 2.35))
@@ -342,7 +363,7 @@ export function buildScene(THREE: THREE, t: Track): RaceScene {
       img.src = skin
     }
     return g
-  }, showInterior, setVault, smashGlass }
+  }, showInterior, setVault, smashGlass, setNight, refreshInterior }
 }
 
 interface Body { swat?: boolean; amb?: boolean; fire?: boolean; len: number; wid: number; hgt: number; cabLen: number; cabH: number; cabZ: number; wheelR: number; spoiler?: boolean; bed?: boolean; open?: boolean; tall?: boolean; cage?: boolean; scoop?: boolean; formula?: boolean; track?: number; wheelW?: number; stripe?: boolean }
@@ -1048,7 +1069,7 @@ function buildSupercar(THREE: THREE, color: string, name: string, isMe: boolean)
 
 
 /** Stadt: Straßen (Asphalt mit Mittelstrichen), Häuserblöcke mit Fenstern, Parks mit Bäumen und die Brücke. */
-function buildCity(THREE: THREE, scene: T.Scene, ground: T.Mesh, night: boolean): { smashGlass: RaceScene['smashGlass']; showInterior: RaceScene['showInterior']; setVault: RaceScene['setVault'] } {
+function buildCity(THREE: THREE, scene: T.Scene, ground: T.Mesh, night: boolean): { smashGlass: RaceScene['smashGlass']; showInterior: RaceScene['showInterior']; setVault: RaceScene['setVault']; setNight: (n: number) => void; refreshInterior: () => void } {
   ground.material = new THREE.MeshStandardMaterial({ color: 0x33363e, roughness: 0.95 })
   const P = CITY.pitch
   // Mittelstriche: gestrichelt, ein Instanz-Mesh
@@ -1074,6 +1095,8 @@ function buildCity(THREE: THREE, scene: T.Scene, ground: T.Mesh, night: boolean)
   const wt = new THREE.CanvasTexture(wc); wt.colorSpace = THREE.SRGBColorSpace; wt.wrapS = wt.wrapT = THREE.RepeatWrapping
   const pal = [0xe7e5e4, 0xfca5a5, 0xfde68a, 0xa5b4fc, 0x99f6e4, 0xd6a77a].map((c) => new THREE.Color(c).multiplyScalar(night ? 0.6 : 1))
   const { buildings, parks } = city()
+  const nightHooks: Array<(n: number) => void> = []
+  let hideOuterWindows: (b: Bld | null) => void = () => undefined
   const pos: number[] = [], uv: number[] = [], col: number[] = [], idx: number[] = [], nor: number[] = []
   const face = (p: number[][], nrm: number[], u: number, v: number, c: T.Color) => {
     const b = pos.length / 3
@@ -1131,53 +1154,68 @@ function buildCity(THREE: THREE, scene: T.Scene, ground: T.Mesh, night: boolean)
     scene.add(new THREE.Mesh(geo, new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.85 })))
   }
   const smashGlass = bankDecor(THREE, scene, night)
-  // Echte Fenster (Rahmen, Glas, Fensterbank) und Eckpfeiler als InstancedMeshes – unten zwei Reihen, Tür und Garagentor bleiben frei
+  // Echte Fenster (Rahmen, Glas, Fensterbank) auf allen Etagen und Eckpfeiler als InstancedMeshes; Tür und Garagentor bleiben frei.
+  // Beim Betreten eines Hauses werden dessen Außenfenster ausgeblendet (von innen sieht man durch die Wandöffnungen hinaus).
   {
     type Inst = { x: number; y: number; z: number; rot: number; sx: number; sy: number; sz: number; c: number[] }
-    const frames: Inst[] = [], glass: Inst[] = [], sills: Inst[] = [], pil: Inst[] = []
+    const frames: Inst[] = [], glass: Inst[] = [], sills: Inst[] = [], lit: Inst[] = [], pil: Inst[] = []
+    const rng = { r: [0, 0, 0, 0] as number[] } // Bereich je Haus in frames/glass/sills (gleich lang) und lit
+    const ranges2 = new Map<Bld, { a: number; b: number; la: number; lb: number }>()
     let seed = 7
     const rnd = () => { seed = (seed * 16807) % 2147483647; return seed / 2147483647 }
+    void rng
     for (const b of buildings) {
-      if (b.lo !== undefined || b.hid || (b.col !== undefined && !b.kind) || b.kind === 'army') continue
-      const d = layoutOf(b).door
-      const gd = houseEligible(b) ? garageDoor(b) : null
-      const sides: Array<{ nx: number; nz: number; len: number; cx: number; cz: number }> = [
-        { nx: 0, nz: 1, len: b.w, cx: b.x, cz: b.z + b.d / 2 }, { nx: 0, nz: -1, len: b.w, cx: b.x, cz: b.z - b.d / 2 },
-        { nx: 1, nz: 0, len: b.d, cx: b.x + b.w / 2, cz: b.z }, { nx: -1, nz: 0, len: b.d, cx: b.x - b.w / 2, cz: b.z },
-      ]
-      const rows = [1.9, 5.6].filter((y) => b.h >= y + 2.4)
-      for (const sd of sides) {
-        const n = Math.floor((sd.len - 3) / 5.5)
-        if (n < 1) continue
-        const tx = sd.nz !== 0 ? 1 : 0, tz = sd.nx !== 0 ? 1 : 0, rot = Math.atan2(sd.nx, sd.nz)
-        for (let i = 0; i < n; i++) {
-          const u = -sd.len / 2 + (sd.len * (i + 0.5)) / n
-          const wx = sd.cx + tx * u + sd.nx * 0.1, wz = sd.cz + tz * u + sd.nz * 0.1
-          for (let r = 0; r < rows.length; r++) {
-            const y = rows[r]
-            if (r === 0 && d.nx === sd.nx && d.nz === sd.nz && Math.hypot(wx - d.x, wz - d.z) < 3.8) continue
-            if (r === 0 && gd && gd.nx === sd.nx && gd.nz === sd.nz && Math.hypot(wx - gd.x, wz - gd.z) < 4.6) continue
-            frames.push({ x: wx, y, z: wz, rot, sx: 2.5, sy: 2, sz: 0.3, c: [0.93, 0.93, 0.9] })
-            const lit = night && rnd() < 0.3, v = 0.3 + rnd() * 0.18
-            glass.push({ x: wx + sd.nx * 0.03, y, z: wz + sd.nz * 0.03, rot, sx: 2.0, sy: 1.5, sz: 0.34, c: lit ? [1, 0.84, 0.5] : night ? [0.06, 0.08, 0.15] : [v * 0.8, v * 1.05, v * 1.35] })
-            sills.push({ x: wx + sd.nx * 0.18, y: y - 1.07, z: wz + sd.nz * 0.18, rot, sx: 2.9, sy: 0.14, sz: 0.55, c: [0.78, 0.76, 0.72] })
-          }
+      if (!windowsWanted(b)) continue
+      const g0 = windowSlots(b, true), g1 = windowSlots(b, false), nf = windowFloors(b)
+      const a0 = frames.length, la = lit.length
+      for (let k = 0; k < nf; k++) {
+        const y = winY(b, k)
+        for (const sl of k === 0 ? g0 : g1) {
+          const wx = sl.x + sl.nx * 0.1, wz = sl.z + sl.nz * 0.1
+          frames.push({ x: wx, y, z: wz, rot: sl.rot, sx: WIN.fw, sy: WIN.fh, sz: 0.3, c: [0.93, 0.93, 0.9] })
+          const v = 0.3 + rnd() * 0.18
+          glass.push({ x: wx + sl.nx * 0.03, y, z: wz + sl.nz * 0.03, rot: sl.rot, sx: WIN.gw, sy: WIN.gh, sz: 0.34, c: [v * 0.8, v * 1.05, v * 1.35] })
+          if (rnd() < 0.3) lit.push({ x: wx + sl.nx * 0.05, y, z: wz + sl.nz * 0.05, rot: sl.rot, sx: WIN.gw, sy: WIN.gh, sz: 0.34, c: [1, 0.84, 0.5] })
+          if (k < 2) sills.push({ x: wx + sl.nx * 0.08, y: y - 1.07, z: wz + sl.nz * 0.08, rot: sl.rot, sx: 2.9, sy: 0.14, sz: 0.55, c: [0.78, 0.76, 0.72] })
+          else sills.push({ x: wx, y: -50, z: wz, rot: 0, sx: 0.01, sy: 0.01, sz: 0.01, c: [0, 0, 0] })
         }
       }
+      ranges2.set(b, { a: a0, b: frames.length, la, lb: lit.length })
       for (const sx of [-1, 1]) for (const sz of [-1, 1]) pil.push({ x: b.x + sx * (b.w / 2), y: b.h / 2, z: b.z + sz * (b.d / 2), rot: 0, sx: 0.8, sy: b.h, sz: 0.8, c: [0.8, 0.77, 0.7] })
     }
     const mk = (list: Inst[], mat: T.Material) => {
-      const g = new THREE.BoxGeometry(1, 1, 1), im = new THREE.InstancedMesh(g, mat, list.length)
+      const g = new THREE.BoxGeometry(1, 1, 1), im = new THREE.InstancedMesh(g, mat, Math.max(1, list.length))
+      im.count = list.length
       const o = new THREE.Object3D(), col = new THREE.Color()
       list.forEach((q, i) => { o.position.set(q.x, q.y, q.z); o.rotation.set(0, q.rot, 0); o.scale.set(q.sx, q.sy, q.sz); o.updateMatrix(); im.setMatrixAt(i, o.matrix); col.setRGB(q.c[0], q.c[1], q.c[2]); im.setColorAt(i, col) })
       im.instanceMatrix.needsUpdate = true; if (im.instanceColor) im.instanceColor.needsUpdate = true
       im.frustumCulled = false; scene.add(im)
+      return im
     }
     const dim = night ? 0.6 : 1
-    mk(frames, new THREE.MeshStandardMaterial({ roughness: 0.7, color: new THREE.Color(dim, dim, dim) }))
-    mk(glass, new THREE.MeshBasicMaterial({ color: 0xffffff }))
-    mk(sills, new THREE.MeshStandardMaterial({ roughness: 0.8, color: new THREE.Color(dim, dim, dim) }))
+    const frameM = mk(frames, new THREE.MeshStandardMaterial({ roughness: 0.7, color: new THREE.Color(dim, dim, dim) }))
+    const glassMat = new THREE.MeshBasicMaterial({ color: 0xffffff })
+    const glassM = mk(glass, glassMat)
+    const sillM = mk(sills, new THREE.MeshStandardMaterial({ roughness: 0.8, color: new THREE.Color(dim, dim, dim) }))
+    const litMat = new THREE.MeshBasicMaterial({ color: 0x000000 })
+    const litM = mk(lit, litMat)
     mk(pil, new THREE.MeshStandardMaterial({ roughness: 0.9, color: new THREE.Color(dim, dim, dim) }))
+    // Tag/Nacht: Glas dunkelt ab, ein Teil der Fenster leuchtet warm
+    nightHooks.push((n) => { const v = 1 - 0.78 * n; glassMat.color.setRGB(v, v, v * 1.05); litMat.color.setRGB(n, n * 0.85, n * 0.5); litM.visible = n > 0.03 })
+    nightHooks[nightHooks.length - 1](night ? 1 : 0)
+    // Haus betreten: Außenfenster dieses Hauses ausblenden (Matrizen auf 0 setzen), beim Verlassen wiederherstellen
+    let hidden: { b: Bld; f: Float32Array; g: Float32Array; s: Float32Array; l: Float32Array } | null = null
+    const slice = (im: T.InstancedMesh, a: number, z: number) => (im.instanceMatrix.array as Float32Array).slice(a * 16, z * 16)
+    const put = (im: T.InstancedMesh, a: number, arr: Float32Array) => { (im.instanceMatrix.array as Float32Array).set(arr, a * 16); im.instanceMatrix.needsUpdate = true }
+    const zero = (im: T.InstancedMesh, a: number, z: number) => { (im.instanceMatrix.array as Float32Array).fill(0, a * 16, z * 16); im.instanceMatrix.needsUpdate = true }
+    hideOuterWindows = (b) => {
+      if (hidden && hidden.b === b) return
+      if (hidden) { const r = ranges2.get(hidden.b)!; put(frameM, r.a, hidden.f); put(glassM, r.a, hidden.g); put(sillM, r.a, hidden.s); put(litM, r.la, hidden.l); hidden = null }
+      const r = b ? ranges2.get(b) : undefined
+      if (!b || !r) return
+      hidden = { b, f: slice(frameM, r.a, r.b), g: slice(glassM, r.a, r.b), s: slice(sillM, r.a, r.b), l: slice(litM, r.la, r.lb) }
+      zero(frameM, r.a, r.b); zero(glassM, r.a, r.b); zero(sillM, r.a, r.b); zero(litM, r.la, r.lb)
+    }
   }
   armyDecor(THREE, scene, night, buildings)
   blockDecor(THREE, scene, night, POLICE, false); blockDecor(THREE, scene, night, HOSPITAL, true); blockDecor(THREE, scene, night, FIRE, false, true)
@@ -1186,7 +1224,7 @@ function buildCity(THREE: THREE, scene: T.Scene, ground: T.Mesh, night: boolean)
   const policeWall = new THREE.MeshStandardMaterial({ color: new THREE.Color(0xc7d6f5).multiplyScalar(night ? 0.6 : 1), roughness: 0.85, side: THREE.DoubleSide })
   const hospWall = new THREE.MeshStandardMaterial({ color: new THREE.Color(0xf1f5f9).multiplyScalar(night ? 0.6 : 1), roughness: 0.85, side: THREE.DoubleSide })
   const bankWall = new THREE.MeshStandardMaterial({ color: new THREE.Color(0xdbeafe).multiplyScalar(night ? 0.6 : 1), roughness: 0.2, side: THREE.DoubleSide, transparent: true, opacity: 0.14, depthWrite: false })
-  const showInterior: RaceScene['showInterior'] = (b) => { viewer.show(b as Bld | null, b ? ((b as Bld).kind === 'police' ? policeWall : (b as Bld).kind === 'hospital' || (b as Bld).kind === 'fire' ? hospWall : (b as Bld).kind === 'bank' ? bankWall : wallMats[(b as Bld).c]) : wallMats[0]) }
+  const showInterior: RaceScene['showInterior'] = (b) => { hideOuterWindows(b as Bld | null); viewer.show(b as Bld | null, b ? ((b as Bld).kind === 'police' ? policeWall : (b as Bld).kind === 'hospital' || (b as Bld).kind === 'fire' ? hospWall : (b as Bld).kind === 'bank' ? bankWall : wallMats[(b as Bld).c]) : wallMats[0]) }
 
   // Gehwege unter jedem Block (hellgrau, leicht erhöht) und Parks
   const walk = new THREE.MeshStandardMaterial({ color: night ? 0x5b6270 : 0x9ca3af, roughness: 1 })
@@ -1503,7 +1541,7 @@ function buildCity(THREE: THREE, scene: T.Scene, ground: T.Mesh, night: boolean)
     d.position.set(x, bridgeH(x, zc) + 0.08, zc); scene.add(d)
   }
   }
-  return { showInterior, setVault: viewer.setVault, smashGlass }
+  return { showInterior, setVault: viewer.setVault, smashGlass, setNight: (n) => { for (const h of nightHooks) h(n) }, refreshInterior: viewer.refresh }
 }
 
 
