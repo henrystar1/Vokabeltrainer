@@ -129,6 +129,10 @@ export function layoutOf(b: Bld): Layout {
   return lay
 }
 
+/** Zusätzliche Hindernisse (Möbel der Spielerhäuser), nur gerechnet, nicht gezeichnet */
+const extraSolids = new Map<Bld, Solid[]>()
+export function setExtraSolids(b: Bld, list: Solid[]): void { if (list.length) extraSolids.set(b, list); else extraSolids.delete(b) }
+
 const inRect = (r: Rect, x: number, z: number) => x > r.x0 && x < r.x1 && z > r.z0 && z < r.z1
 
 /** Wand-Kollision im Haus (Punkt gegen Rechtecke): Rückschub oder null, wenn der Punkt frei ist. Die Außenwand hat im Erdgeschoss die Türöffnung. */
@@ -147,6 +151,8 @@ export function interiorPush(b: Bld, x: number, z: number, y: number): { nx: num
   if (!(b.kind === 'bank' && inGlassHole(x, z, y))) for (const r of outer) test(r)
   for (const r of lay.inner) test(r)
   for (const s of lay.solids) if (!s.deco && y < (s.y0 ?? 0) + s.h - 0.25 && y >= (s.y0 ?? 0) - 0.5) test(s)
+  const ex = extraSolids.get(b)
+  if (ex) for (const s of ex) if (y < s.h - 0.25 && y >= -0.5) test(s)
   return best
 }
 

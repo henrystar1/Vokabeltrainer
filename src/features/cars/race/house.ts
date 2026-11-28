@@ -117,3 +117,14 @@ export function wallCams(): WallCam[] {
   })
   return cams
 }
+
+/** Kollisionsquader der Einrichtung (Teppich ausgenommen), in Weltkoordinaten; nur Erdgeschoss. */
+export function furnRects(b: { x: number; z: number }, furn: Furn[]): Array<{ x0: number; x1: number; z0: number; z1: number; h: number; color: number }> {
+  const out: Array<{ x0: number; x1: number; z0: number; z1: number; h: number; color: number }> = []
+  for (const it of furn) {
+    const d = furnDef(it.k); if (!d || d.h < 0.2) continue
+    const w = it.r ? d.d : d.w, dd = it.r ? d.w : d.d, cx = b.x + it.x, cz = b.z + it.z
+    out.push({ x0: cx - w / 2, x1: cx + w / 2, z0: cz - dd / 2, z1: cz + dd / 2, h: d.h, color: d.color })
+  }
+  return out
+}

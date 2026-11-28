@@ -1076,3 +1076,12 @@ Tabelle `book_library_hidden`; `in_library` blendet ein veröffentlichtes Buch d
 - Wandfarbe pro Haus (`WALL_COLORS`, SQL `0121_race_house_wall.sql`, `race_house_save` hat `p_wall`): Hülle `houseMesh` (überdeckt die alte Fenstertextur), Innenwände über `wallColors`; Hülle wird ausgeblendet, wenn man im Haus steht.
 - `windows.ts`: gemeinsame Fensterplätze; außen Instanzen auf allen Etagen (bis 8), innen Wandöffnungen mit Rahmen und getöntem Glas (Durchblick); Außenfenster des betretenen Hauses werden ausgeblendet; `refreshInterior` nach Farbwechsel.
 - `daynight.ts`: 5 Minuten Tag / 5 Minuten Nacht nach UTC-Uhr (für alle gleich), 16 s Übergang; `RaceScene.setNight` (Himmel, Nebel, Licht, Boden, Mond, Fensterglas und leuchtende Fenster).
+
+## Update 157 – Admin-Bots, Minimap-Farben, Möbel-Hitbox
+- `adminBots.ts` (reine Logik, getestet): bis zu 10 Bots, Stufen Okay…Master (`SKILLS`). Der Admin-Client simuliert sie (`botSys` in RaceView, `tickBots`) und sendet sie wie Spieler (`r`-Funk mit Id `bot-N`, 10 Hz; lokal über `onRLocal` eingespeist). Aktivitäten: cruise (Straßenroute, kinematisch), bank (hinfahren, aussteigen, 12–30 s „drin“ = `hd`, flüchten), army (Panzer/Hubschrauber klauen, damit patrouillieren und schießen), fire (zum Brand, nach Zeit `fo`), doctor (`mc`/`mp`/`mh` wie echte Ärzte), fight (schießt per `sd` auf nicht versteckte Spieler), home (Garage, Möbel ergänzen). Ereignisse: `bn` (Meldung), `bh` (Bot-Häuser samt Möbeln für alle Clients). Treffer auf Bots (`sd`/`rk` an `bot-…`) werden vom Admin-Client verarbeitet (`botHitLocal`, auch lokal über Wrapper um `ch.send`); 0 HP = Explosion, Neustart nach 8 s, keine Sterne. Bots laufen nur, solange der Admin im Spiel ist.
+- Bot-Häuser: `botHs`, `refreshHouseWorld()` zeichnet Spieler- und Bot-Häuser; Bot-Häuser sind nicht kaufbar; auf der Minimap in Botfarbe mit „H“.
+- Möbel-Hitbox: `house.furnRects` + `interior.setExtraSolids` (Teppich ohne Kollision), in `interiorPush`.
+- Geparkte Autos (`pk-`) zählen nicht als Spieler (Minimap, Feuer-Host, Listen, Rang); Bots (`bot-`) nicht als Feuer-Host.
+- Minimap: `playerColor.ts` (Admin immer grün, andere Hashfarbe, nie grün); Admin sieht alle mit Namen, auch Versteckte (violett); eigene Häuser gelb.
+- Versteckte Spieler (`hd`, z. B. Garage) werden für Nicht-Admins nicht mehr gezeichnet; Garage macht die eigene Figur unsichtbar (vor `render`).
+- Quad: Auto-Schuss nur nach Umschalten (`qauto`-Knopf, Standard aus).

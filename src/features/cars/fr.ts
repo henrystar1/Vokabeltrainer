@@ -104,6 +104,8 @@ export const FR: Record<string, string> = {
   'Soldat ausgeschaltet!': 'Soldat neutralisé !', 'Panzerfaust! Weich aus!': 'Lance-roquette ! Esquive !', 'Du kletterst aus dem Gelände.': 'Tu sors du terrain en escaladant.', 'Du kletterst über den Zaun!': 'Tu escalades la clôture !', 'Das Fahrzeug ist weg – es kommt bald ein neues.': 'Le véhicule est parti – un nouveau arrive bientôt.',
   'Hubschrauber geklaut! W/S fliegen, A/D drehen, E hoch, R runter, Q/Tippen schießt.': 'Hélicoptère volé ! W/S pour avancer, A/D pour tourner, E monter, R descendre, Q/toucher tire.', 'Panzer geklaut! Pfeile/Wischen drehen, W/S fahren, Q/Tippen schießt.': 'Char volé ! Flèches/glisser pour tourner, W/S pour rouler, Q/toucher tire.',
   'Die KSK rückt an – Elitesoldaten mit Sturmgewehren und Panzerfäusten!': 'Le KSK arrive – des soldats d’élite avec fusils d’assaut et lance-roquettes !', 'KSK-Soldat ausgeschaltet!': 'Soldat du KSK neutralisé !', 'Im Bunker wird nicht geschossen.': 'On ne tire pas dans le bunker.',
+  'Quad: Auto-Schuss an.': 'Quad : tir automatique activé.', 'Quad: Auto-Schuss aus – schieße selbst mit der Schuss-Taste.': 'Quad : tir automatique désactivé – tire toi-même avec la touche de tir.',
+  'Auto-Schuss: AN (tippen = aus)': 'Tir auto : ON (toucher = off)', 'Auto-Schuss: AUS (tippen = an)': 'Tir auto : OFF (toucher = on)',
   'Fäuste.': 'Poings.', 'Schlagstock in der Hand.': 'Matraque en main.', 'Pistole in der Hand.': 'Pistolet en main.', 'Sturmgewehr in der Hand.': 'Fusil d’assaut en main.', 'Scharfschützengewehr in der Hand.': 'Fusil de précision en main.',
   'Das Tor schließt sich – hier findet dich die Polizei nicht.': 'La porte se ferme – ici, la police ne te trouve pas.', 'Du verlässt die Garage.': 'Tu quittes le garage.', 'Dein Auto steht vor der Garage – steig ein.': 'Ta voiture est devant le garage – monte.', 'Die Garage ist voll.': 'Le garage est plein.', 'In der Luft geht das nicht.': 'Impossible en l’air.',
   'Auftrag angenommen – das Ziel ist auf der Karte (blinkender Punkt).': 'Mission acceptée – la cible est sur la carte (point clignotant).', 'Auftrag abgebrochen.': 'Mission annulée.', 'Auftrag erfüllt! Der Auftraggeber überweist …': 'Mission accomplie ! Le commanditaire vire l’argent …', 'Gerade lässt sich keine Zielperson finden – versuch es gleich nochmal.': 'Aucune cible pour l’instant – réessaie bientôt.',
@@ -160,6 +162,16 @@ export const FR: Record<string, string> = {
 
 /** Sätze mit eingebauten Zahlen/Namen. */
 export const PATTERNS: Array<[RegExp, (...m: string[]) => string]> = [
+  [/^(.+) fährt zur Bank …$/, (_, n) => `${n} se rend à la banque …`],
+  [/^(.+) überfällt die Bank!$/, (_, n) => `${n} braque la banque !`],
+  [/^(.+) hat die Bank ausgeraubt und flüchtet!$/, (_, n) => `${n} a braqué la banque et prend la fuite !`],
+  [/^(.+) klaut (einen Panzer|einen Armeehubschrauber)!$/, (_, n, k) => `${n} vole ${k === 'einen Panzer' ? 'un char' : 'un hélicoptère militaire'} !`],
+  [/^(.+) rückt als Feuerwehrmann zum Brand aus!$/, (_, n) => `${n} part au feu en pompier !`],
+  [/^(.+) hat den Brand gelöscht\.$/, (_, n) => `${n} a éteint l’incendie.`],
+  [/^(.+) fährt als Arzt zu einem Verletzten\.$/, (_, n) => `${n} se rend chez un blessé en tant que médecin.`],
+  [/^(.+) hat einen Patienten gerettet\.$/, (_, n) => `${n} a sauvé un patient.`],
+  [/^(.+) greift dich an!$/, (_, n) => `${n} t’attaque !`],
+  [/^(.+) wurde ausgeschaltet\.$/, (_, n) => `${n} a été éliminé.`],
   [/^Fahndungsstufe: (★+)$/, (_, s) => `Niveau de recherche : ${s}`],
   [/^Die Polizei sucht weniger: (★+)$/, (_, s) => `La police te recherche moins : ${s}`],
   [/^Fahndungsstufe (\d+) von (\d+)$/, (_, a, b) => `Niveau de recherche ${a} sur ${b}`],

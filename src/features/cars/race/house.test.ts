@@ -37,3 +37,12 @@ describe('Wandkameras', () => {
     for (const c of cams) { const b = city().buildings[c.id]; const dx = Math.abs(c.x - b.x) - b.w / 2, dz = Math.abs(c.z - b.z) - b.d / 2; expect(Math.max(dx, dz)).toBeLessThan(0.9); expect(Math.max(dx, dz)).toBeGreaterThan(-0.1); expect(Math.min(dx, dz)).toBeLessThan(0) }
   })
 })
+
+import { furnRects as _furnRects } from './house'
+describe('furnRects', () => {
+  it('Teppich ohne Kollision, Rest mit passenden Maßen', () => {
+    const r = _furnRects({ x: 100, z: 50 }, [{ k: 'rug', x: 0, z: 0, r: 0 }, { k: 'bed', x: 2, z: 1, r: 1 }])
+    expect(r).toHaveLength(1)
+    expect(r[0].x1 - r[0].x0).toBeCloseTo(1.5); expect(r[0].z1 - r[0].z0).toBeCloseTo(2)
+  })
+})

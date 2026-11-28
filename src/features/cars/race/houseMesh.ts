@@ -1,5 +1,6 @@
 import type * as T from 'three'
-import { FURNITURE, furnDef, garageDoor, houseById, type Furn, type GarageDoor, type HouseData } from './house'
+import { setExtraSolids } from './interior'
+import { FURNITURE, furnDef, furnRects, garageDoor, houseById, type Furn, type GarageDoor, type HouseData } from './house'
 
 type THREE = typeof T
 
@@ -68,10 +69,10 @@ export function makeHouseWorld(THREE: THREE, scene: T.Scene): HouseWorld {
         const furn = new THREE.Group(); furn.position.set(b.x, 0, b.z); buildFurn(furn, h.furn)
         root.add(frame, furn)
         const en: Entry = { bld: h.bld, door: d, panel, k: 0, want: 0, furn, cx: b.x, cz: b.z, shell: null }
-        entries.set(h.bld, en); paintShell(en, h.wall)
+        entries.set(h.bld, en); paintShell(en, h.wall); setExtraSolids(b, furnRects(b, h.furn))
       }
     },
-    setFurn(bld, f) { const e = entries.get(bld); if (e) buildFurn(e.furn, f) },
+    setFurn(bld, f) { const e = entries.get(bld); if (e) { buildFurn(e.furn, f); const b = houseById(bld); if (b) setExtraSolids(b, furnRects(b, f)) } },
     setWall(bld, color) { const e = entries.get(bld); if (e) paintShell(e, color) },
     setInside(bld) { inside = bld },
     setDoor(bld, open) { const e = entries.get(bld); if (e) e.want = open ? 1 : 0 },
