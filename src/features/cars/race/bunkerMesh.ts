@@ -199,6 +199,12 @@ export function buildBunker(THREE: THREE, scene: T.Scene): BunkerView {
     for (let i = 0; i < 14; i++) B.box(steel, 0.12, 0.9 + (i % 3) * 0.3, 0.1, BUNKER.x0 + 3.4 + i * 0.45, by + 2.2, BK.pad.z - 11.6)
     for (let i = 0; i < 5; i++) B.cyl(black, 0.55, 0.4, BUNKER.x0 + 3.5, by + 0.2 + i * 0.42, BK.pad.z + 13, 'y', 14)
   }
+  {
+    const x = BK.plane.x, z = BK.plane.z
+    B.box(dark, 4, 1.2, 1.2, x, by + 0.6, z + 1.4); B.box(steel, 4.1, 0.1, 1.3, x, by + 1.25, z + 1.4); B.box(black, 3.6, 0.06, 0.9, x, by + 1.3, z + 1.3)
+    place(mkScreen('map', 3.6, 1.7, 91), x, by + 2.3, z + 1.05, Math.PI, 0.1); B.box(black, 3.8, 1.9, 0.15, x, by + 2.3, z + 1.15, 0, 0.1)
+    B.box(yellow, 3.8, 0.12, 0.12, x, by + 3.35, z + 1.15); B.box(cyan, 0.5, 0.04, 0.3, x, by + 1.34, z + 1.7)
+  }
   // ── Iron-Man-Werkstatt: Podest, Anzug im Bau, zwei Greifarme, Regale, Förderband ──
   {
     const f = BK.forge

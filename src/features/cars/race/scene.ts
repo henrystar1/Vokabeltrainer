@@ -1,3 +1,4 @@
+import { garageDoor, houseEligible } from './house'
 import { makeArmyModel } from './armyMesh'
 import { makeQuadModel } from './quad'
 import type * as T from 'three'
@@ -1130,6 +1131,54 @@ function buildCity(THREE: THREE, scene: T.Scene, ground: T.Mesh, night: boolean)
     scene.add(new THREE.Mesh(geo, new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.85 })))
   }
   const smashGlass = bankDecor(THREE, scene, night)
+  // Echte Fenster (Rahmen, Glas, Fensterbank) und Eckpfeiler als InstancedMeshes – unten zwei Reihen, Tür und Garagentor bleiben frei
+  {
+    type Inst = { x: number; y: number; z: number; rot: number; sx: number; sy: number; sz: number; c: number[] }
+    const frames: Inst[] = [], glass: Inst[] = [], sills: Inst[] = [], pil: Inst[] = []
+    let seed = 7
+    const rnd = () => { seed = (seed * 16807) % 2147483647; return seed / 2147483647 }
+    for (const b of buildings) {
+      if (b.lo !== undefined || b.hid || (b.col !== undefined && !b.kind) || b.kind === 'army') continue
+      const d = layoutOf(b).door
+      const gd = houseEligible(b) ? garageDoor(b) : null
+      const sides: Array<{ nx: number; nz: number; len: number; cx: number; cz: number }> = [
+        { nx: 0, nz: 1, len: b.w, cx: b.x, cz: b.z + b.d / 2 }, { nx: 0, nz: -1, len: b.w, cx: b.x, cz: b.z - b.d / 2 },
+        { nx: 1, nz: 0, len: b.d, cx: b.x + b.w / 2, cz: b.z }, { nx: -1, nz: 0, len: b.d, cx: b.x - b.w / 2, cz: b.z },
+      ]
+      const rows = [1.9, 5.6].filter((y) => b.h >= y + 2.4)
+      for (const sd of sides) {
+        const n = Math.floor((sd.len - 3) / 5.5)
+        if (n < 1) continue
+        const tx = sd.nz !== 0 ? 1 : 0, tz = sd.nx !== 0 ? 1 : 0, rot = Math.atan2(sd.nx, sd.nz)
+        for (let i = 0; i < n; i++) {
+          const u = -sd.len / 2 + (sd.len * (i + 0.5)) / n
+          const wx = sd.cx + tx * u + sd.nx * 0.1, wz = sd.cz + tz * u + sd.nz * 0.1
+          for (let r = 0; r < rows.length; r++) {
+            const y = rows[r]
+            if (r === 0 && d.nx === sd.nx && d.nz === sd.nz && Math.hypot(wx - d.x, wz - d.z) < 3.8) continue
+            if (r === 0 && gd && gd.nx === sd.nx && gd.nz === sd.nz && Math.hypot(wx - gd.x, wz - gd.z) < 4.6) continue
+            frames.push({ x: wx, y, z: wz, rot, sx: 2.5, sy: 2, sz: 0.3, c: [0.93, 0.93, 0.9] })
+            const lit = night && rnd() < 0.3, v = 0.3 + rnd() * 0.18
+            glass.push({ x: wx + sd.nx * 0.03, y, z: wz + sd.nz * 0.03, rot, sx: 2.0, sy: 1.5, sz: 0.34, c: lit ? [1, 0.84, 0.5] : night ? [0.06, 0.08, 0.15] : [v * 0.8, v * 1.05, v * 1.35] })
+            sills.push({ x: wx + sd.nx * 0.18, y: y - 1.07, z: wz + sd.nz * 0.18, rot, sx: 2.9, sy: 0.14, sz: 0.55, c: [0.78, 0.76, 0.72] })
+          }
+        }
+      }
+      for (const sx of [-1, 1]) for (const sz of [-1, 1]) pil.push({ x: b.x + sx * (b.w / 2), y: b.h / 2, z: b.z + sz * (b.d / 2), rot: 0, sx: 0.8, sy: b.h, sz: 0.8, c: [0.8, 0.77, 0.7] })
+    }
+    const mk = (list: Inst[], mat: T.Material) => {
+      const g = new THREE.BoxGeometry(1, 1, 1), im = new THREE.InstancedMesh(g, mat, list.length)
+      const o = new THREE.Object3D(), col = new THREE.Color()
+      list.forEach((q, i) => { o.position.set(q.x, q.y, q.z); o.rotation.set(0, q.rot, 0); o.scale.set(q.sx, q.sy, q.sz); o.updateMatrix(); im.setMatrixAt(i, o.matrix); col.setRGB(q.c[0], q.c[1], q.c[2]); im.setColorAt(i, col) })
+      im.instanceMatrix.needsUpdate = true; if (im.instanceColor) im.instanceColor.needsUpdate = true
+      im.frustumCulled = false; scene.add(im)
+    }
+    const dim = night ? 0.6 : 1
+    mk(frames, new THREE.MeshStandardMaterial({ roughness: 0.7, color: new THREE.Color(dim, dim, dim) }))
+    mk(glass, new THREE.MeshBasicMaterial({ color: 0xffffff }))
+    mk(sills, new THREE.MeshStandardMaterial({ roughness: 0.8, color: new THREE.Color(dim, dim, dim) }))
+    mk(pil, new THREE.MeshStandardMaterial({ roughness: 0.9, color: new THREE.Color(dim, dim, dim) }))
+  }
   armyDecor(THREE, scene, night, buildings)
   blockDecor(THREE, scene, night, POLICE, false); blockDecor(THREE, scene, night, HOSPITAL, true); blockDecor(THREE, scene, night, FIRE, false, true)
   const viewer = makeInteriorViewer(THREE, scene, { geo: bg, ranges }, night)

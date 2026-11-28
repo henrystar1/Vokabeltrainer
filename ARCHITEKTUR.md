@@ -1059,3 +1059,14 @@ Tabelle `book_library_hidden`; `in_library` blendet ein veröffentlichtes Buch d
 - Ausstattung wirkt: Turbo (+25 % Tempo), Panzerung (KSK-Schaden 0,28 statt 0,4), Schnellfeuer (46 statt 70 ms), Raketenwerfer (`quadRocket`, Lenkraketen alle 0,6 s; Quad-Heckwaffe per `setQuadWeapon`).
 - SQL **0119** (`race_ksk`, `race_ksk_items`, RPCs `race_ksk_get/set/buy`), `services/cars.ts`: `raceKskGet/Set/Buy`. Hinweis: die KSK-Rolle selbst wird weiter nur per Broadcast vergeben; der Server prüft sie nicht (Käufe sind ohne KSK wirkungslos).
 
+
+## Update 155 – Waffenrad, KSK-Gegner, Bunkerschutz
+- HUD oben links: Kachel-Raster (2 Spalten, Icon + Label) statt Textknopf-Spalte; neuer Waffen-Knopf öffnet das Waffenrad (radial, `wheelUi`, `weaponInfoRef`/`weaponPickRef`).
+- Waffenwahl (`sel0`, `melee()`, `ownLong`): Schlagstock ist nur sichtbar/aktiv, wenn gewählt (`btMeshes` in `swatMan.addBaton`, Sichtbarkeit per `gear.addGear` über Maskenbit 4); Pistole nur mit Bit 8, wenn gewählt. Schlagschaden 22 nur mit Stock.
+- Drohnen-Computer: Erklärtext im Panel, Spotlabel „Spieler live beobachten“.
+- Ab 6 Sternen `kskWave` (feindliche KSK-Fußsoldaten, `kskBots`, 7 Treffer, manche mit Panzerfaust); Iron Mans (`ironWave`) erst ab 8 Sternen; Raketen machen nur 8 (Quad-Rakete 12) von 24 Trefferpunkten an Iron Mans statt Sofort-Abschuss; Quad-Minigun/-Raketen treffen Iron Mans.
+- Bunker: `inBunkerNow()` – in der Halle/im Fahrstuhl kein eigenes Schießen (`fireGun`) und kein Treffer (`hurtByShot`, `rocketHitMe`); KSK-Bots schießen dann nicht.
+- **Nachtrag Update 155 (Häuser etc.)**
+  - `house.ts` (Preis 3000, Hausnummer = Index in `city().buildings`, `houseEligible`, `garageDoor`, Möbelkatalog, `wallCams`), `houseMesh.ts` (Rolltor animiert, Möbel, instanzierte Wandkameras), `HousePanels.tsx` (Möbel-Editor von oben, Garage, KSK-Aufträge, Flugzeug-Karte). SQL `0120_race_houses_missions.sql` (Tabellen `race_houses`, `race_ksk_mission_pay`; RPCs `race_house_list/buy/save`, `race_ksk_mission_pay` mit 60-s-Sperre) – **muss in Supabase ausgeführt werden**.
+  - RaceView: `xRef` (React→Spielschleife), `computeActs` (Kontext-Knöpfe: Haus kaufen/einrichten, Garage), Garage = `safe.garage` (unverwundbar, `hiddenNow`, Sterne sinken alle 3 s), KSK-Aufträge (`kmission`: Zielperson `Ped.keep` / gelber Supercar, Strahl + blinkender Kartenpunkt, Auszahlung per RPC), Flugzeug (`planeS`, Abwurf, Fallschirm `chute`, Sinkrate max. 6 m/s), Wandkamera-Ansicht (`camS`, Kamera-Override vor `updateProjectionMatrix`), Bunker-Spot `plane` (BK.plane) und Drohnen-Panel-Knopf „Wandkameras“.
+  - `scene.ts`: echte Fenster (Rahmen, Glas, Fensterbank, zwei Reihen) und Eckpfeiler als InstancedMeshes; Tür und Garagentor bleiben frei.

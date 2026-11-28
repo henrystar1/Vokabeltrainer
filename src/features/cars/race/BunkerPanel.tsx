@@ -58,7 +58,7 @@ export interface DronePlayer { id: string; name: string; x: number; z: number; k
 export interface DroneData { me: { x: number; z: number; h: number }; players: DronePlayer[] }
 
 /** Drohnen-Computer: Draufsicht auf die Karte mit allen Spielern (live), Zoom und Verfolgen. */
-export function DronePanel({ getData, onClose }: { getData: () => DroneData; onClose: () => void }) {
+export function DronePanel({ getData, onClose, onCams }: { getData: () => DroneData; onClose: () => void; onCams?: () => void }) {
   const ref = useRef<HTMLCanvasElement>(null)
   const [zoom, setZoom] = useState(1)
   const [follow, setFollow] = useState<string | null>(null)
@@ -102,8 +102,10 @@ export function DronePanel({ getData, onClose }: { getData: () => DroneData; onC
         <button type="button" onClick={() => setZoom((z) => Math.min(12, z * 1.6))} className="min-h-[44px] min-w-[44px] rounded-lg bg-white/10 text-lg font-bold" aria-label="Hineinzoomen">＋</button>
         <button type="button" onClick={() => setZoom((z) => Math.max(0.8, z / 1.6))} className="min-h-[44px] min-w-[44px] rounded-lg bg-white/10 text-lg font-bold" aria-label="Herauszoomen">－</button>
         <button type="button" onClick={() => setFollow(follow === 'me' ? null : 'me')} className={`min-h-[44px] rounded-lg px-3 text-sm font-bold ${follow === 'me' ? 'bg-cyan-500/40' : 'bg-white/10'}`}>Mich</button>
+        {onCams && <button type="button" onClick={onCams} className="min-h-[44px] rounded-lg bg-cyan-500/40 px-3 text-sm font-bold">📹 Wandkameras</button>}
         <button type="button" onClick={onClose} className="min-h-[44px] rounded-lg bg-red-500/70 px-4 text-sm font-bold">Schließen</button>
       </div>
+      <p className="mb-2 rounded-lg bg-cyan-500/15 p-2 text-xs text-cyan-100">Das ist die Spionage-Karte von oben: Jeder Punkt ist ein Spieler in der Stadt (<b className="text-green-300">grün</b> = zu Fuß, <b className="text-amber-300">orange</b> = im Fahrzeug, <b className="text-cyan-300">blau</b> = du, gelbes Quadrat = Bunker). Tippe unten auf einen Namen, dann folgt die Drohne ihm live. „Wandkameras“ schaltet auf die Überwachungskameras an den Häusern. ＋ / － zoomt, „Mich“ folgt dir.</p>
       <canvas ref={ref} width={900} height={560} className="min-h-0 w-full flex-1 rounded-xl border border-cyan-500/50 bg-black object-contain" />
       <div className="mt-2 flex max-h-24 flex-wrap gap-2 overflow-auto">
         {list.length === 0 && <span className="text-sm text-slate-300">Gerade sind keine anderen Spieler in der Stadt.</span>}

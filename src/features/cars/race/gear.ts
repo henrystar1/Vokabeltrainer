@@ -85,6 +85,8 @@ export function addGear(THREE: THREE, m: T.Group, mask: number): void {
     inner.userData.ksk = true
   }
   if (mask & 4 && !m.userData.bt) addBaton(THREE, m)
+  // Schlagstock nur sichtbar, solange er gewählt ist (nie zusammen mit einer Schusswaffe in der Hand)
+  for (const o of (m.userData.btMeshes as T.Object3D[] | undefined) ?? []) o.visible = !!(mask & 4)
   const gunBit = mask & 32 ? 32 : mask & 16 ? 16 : mask & 8 ? 8 : 0
   if (gunBit !== ((m.userData.gunBit as number | undefined) ?? 0)) {
     const arm = m.userData.armR as T.Group | undefined

@@ -52,7 +52,7 @@ export function addBaton(THREE: THREE, m: T.Group): void {
   stick.rotation.x = Math.PI / 2; stick.position.set(0, -0.58, 0.28)
   const grip = new THREE.Mesh(new THREE.CylinderGeometry(0.042, 0.042, 0.16, 8), new THREE.MeshStandardMaterial({ color: 0x7c2d12, roughness: 0.8 }))
   grip.rotation.x = Math.PI / 2; grip.position.set(0, -0.58, 0.02)
-  arm.add(stick, grip); m.userData.bt = 1
+  arm.add(stick, grip); m.userData.bt = 1; m.userData.btMeshes = [stick, grip]
 }
 
 let medicCache: HTMLCanvasElement | null = null

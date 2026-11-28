@@ -30,6 +30,8 @@ export const BK = {
   lift: { x: BUNKER.ex, z: BUNKER.z0 + 4.5 },
   /** Strategietisch (Hologramm) in der Mitte */
   table: { x: 90, z: 1432 },
+  /** Flugzeug-Terminal (Fallschirm-Einsatz) an der Nordwand rechts */
+  plane: { x: 114, z: 1457 },
 }
 
 /** Feste Möbel und Geräte (Rechtecke), die man nicht durchläuft */
@@ -39,6 +41,7 @@ export const BUNKER_OBSTACLES: ReadonlyArray<Rect> = [
   rc(BK.forge.x, BK.forge.z, 8, 8),
   rc(BK.table.x, BK.table.z, 9, 5),
   rc(BK.drone.x, BK.drone.z + 1.6, 22, 3.4),
+  rc(BK.plane.x, BK.plane.z + 1.4, 4.4, 1.6),
   // Werkbänke und Regale an den Seitenwänden
   rc(BUNKER.x0 + 2, 1448, 2.4, 14), rc(BUNKER.x1 - 2, 1448, 2.4, 14),
   rc(BUNKER.x0 + 2, 1400, 2.4, 10), rc(BUNKER.x1 - 2, 1400, 2.4, 10),
@@ -68,16 +71,17 @@ export function bunkerClamp(x: number, z: number): { x: number; z: number } {
 export const inBunkerHall = (x: number, z: number): boolean => x >= BUNKER.x0 && x <= BUNKER.x1 && z >= BUNKER.z0 && z <= BUNKER.z1
 const near = (x: number, z: number, p: { x: number; z: number }, r: number): boolean => Math.hypot(x - p.x, z - p.z) < r
 
-export type BunkerSpotKind = 'keypad' | 'lift_down' | 'lift_up' | 'tune' | 'drone' | 'forge' | 'table'
+export type BunkerSpotKind = 'keypad' | 'lift_down' | 'lift_up' | 'tune' | 'drone' | 'forge' | 'table' | 'plane'
 export interface BunkerSpot { kind: BunkerSpotKind; label: string }
 /** Welche Bedienstelle ist in Reichweite? `lvl` = Ebene der Figur (−2 = in der Halle), `open` = Luke offen. */
 export function bunkerSpotNear(x: number, z: number, lvl: number, open: boolean): BunkerSpot | null {
   if (lvl === -2) {
     if (near(x, z, BK.lift, 3.6)) return { kind: 'lift_up', label: 'Fahrstuhl nach oben' }
     if (near(x, z, BK.tune, 3.4)) return { kind: 'tune', label: 'Quad anpassen' }
-    if (near(x, z, BK.drone, 6)) return { kind: 'drone', label: 'Drohnen-Computer' }
+    if (near(x, z, BK.drone, 6)) return { kind: 'drone', label: 'Drohnen-Computer: Spieler live beobachten' }
     if (near(x, z, BK.forge, 7)) return { kind: 'forge', label: 'Iron-Man-Werkstatt' }
-    if (near(x, z, BK.table, 4.5)) return { kind: 'table', label: 'Strategietisch' }
+    if (near(x, z, BK.plane, 3.6)) return { kind: 'plane', label: 'Flugzeug: Fallschirm-Einsatz' }
+    if (near(x, z, BK.table, 4.5)) return { kind: 'table', label: 'Strategietisch: KSK-Aufträge' }
     return null
   }
   if (lvl !== 0) return null
